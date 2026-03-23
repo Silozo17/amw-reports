@@ -96,14 +96,16 @@ Deno.serve(async (req) => {
           }
         );
         const customerData = await customerRes.json();
+        console.log("Google Ads customer discovery response:", JSON.stringify(customerData));
         if (customerData.resourceNames && customerData.resourceNames.length > 0) {
-          // Extract first customer ID (format: customers/1234567890)
           accountId = customerData.resourceNames[0].replace("customers/", "");
           accountName = `Google Ads (${accountId})`;
+        } else {
+          console.warn("No accessible Google Ads customers found:", JSON.stringify(customerData));
         }
       } catch (e) {
-        console.log("Could not fetch customer info:", e);
-        // Non-fatal - we still have the tokens
+        console.error("Could not fetch customer info:", e);
+        // Non-fatal - sync function will auto-discover later
       }
 
       // Update the platform connection with tokens

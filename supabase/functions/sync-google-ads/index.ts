@@ -111,10 +111,34 @@ Deno.serve(async (req) => {
         .eq("id", connectionId);
     }
 
-    // Determine the customer ID to query
-    const customerId = conn.account_id;
+    // Determine the customer ID to query — auto-discover if missing
+    let customerId = conn.account_id;
     if (!customerId) {
-      throw new Error("No Google Ads customer ID found on this connection. Re-connect via OAuth.");
+      const discoverRes = await fetch(
+        "https://googleads.googleapis.com/v17/customers:listAccessibleCustomers",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "developer-token": devToken,
+          },
+        }
+      );
+      const discoverData = await discoverRes.json();
+      if (discoverData.resourceNames && discoverData.resourceNames.length > 0) {
+        customerId = discoverData.resourceNames[0].replace("customers/", "");
+        // Save discovered customer ID back to the connection
+        await supabase
+          .from("platform_connections")
+          .update({
+            account_id: customerId,
+            account_name: `Google Ads (${customerId})`,
+          })
+          .eq("id", connectionId);
+      } else {
+        throw new Error(
+          `Could not discover Google Ads customer ID. API response: ${JSON.stringify(discoverData)}`
+        );
+      }
     }
 
     // Build date range for the requested month
