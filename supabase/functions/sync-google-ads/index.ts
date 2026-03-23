@@ -123,6 +123,12 @@ Deno.serve(async (req) => {
           },
         }
       );
+      if (!discoverRes.ok) {
+        const errText = await discoverRes.text();
+        throw new Error(
+          `Failed to discover Google Ads customers (${discoverRes.status}): ${errText.substring(0, 200)}`
+        );
+      }
       const discoverData = await discoverRes.json();
       if (discoverData.resourceNames && discoverData.resourceNames.length > 0) {
         customerId = discoverData.resourceNames[0].replace("customers/", "");
@@ -136,7 +142,7 @@ Deno.serve(async (req) => {
           .eq("id", connectionId);
       } else {
         throw new Error(
-          `Could not discover Google Ads customer ID. API response: ${JSON.stringify(discoverData)}`
+          `No accessible Google Ads accounts found. Ensure this Google account has access to a Google Ads account.`
         );
       }
     }
@@ -177,12 +183,17 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ query }),
     });
 
-    const adsData = await adsRes.json();
-
-    if (adsRes.status !== 200) {
-      const errMsg = adsData?.error?.message || JSON.stringify(adsData);
+    if (!adsRes.ok) {
+      const errText = await adsRes.text();
+      let errMsg = errText.substring(0, 500);
+      try {
+        const errJson = JSON.parse(errText);
+        errMsg = errJson?.error?.message || errMsg;
+      } catch { /* not JSON */ }
       throw new Error(`Google Ads API error (${adsRes.status}): ${errMsg}`);
     }
+
+    const adsData = await adsRes.json();
 
     // Parse results - searchStream returns array of batches
     const results = adsData.flatMap((batch: any) => batch.results || []);
