@@ -58,8 +58,37 @@ const ClientDetail = () => {
 
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const handleManualSync = async () => {
-    toast.info('Manual sync will be available once API integrations are configured.');
+    const googleConn = connections.find(c => c.platform === 'google_ads' && c.is_connected);
+    if (!googleConn) {
+      toast.info('No connected Google Ads account found. Add and connect one first.');
+      return;
+    }
+
+    setIsSyncing(true);
+    const now = new Date();
+    const month = now.getMonth(); // previous month (0-indexed gives us last month when +1 not added)
+    const year = month === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const syncMonth = month === 0 ? 12 : month;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-google-ads', {
+        body: { connection_id: googleConn.id, month: syncMonth, year },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success(`Synced ${data.campaigns_synced} campaigns for ${syncMonth}/${year}`);
+      fetchData();
+    } catch (e) {
+      console.error('Sync error:', e);
+      toast.error(e instanceof Error ? e.message : 'Sync failed');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleGenerateReport = async () => {
@@ -109,9 +138,9 @@ const ClientDetail = () => {
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
             <ClientEditDialog client={client} onUpdate={fetchData} />
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleManualSync}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              Sync
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleManualSync} disabled={isSyncing}>
+              {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {isSyncing ? 'Syncing...' : 'Sync'}
             </Button>
             <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
