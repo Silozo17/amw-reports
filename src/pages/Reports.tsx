@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, RotateCw, Send, ExternalLink, Loader2 } from 'lucide-react';
-import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod } from '@/lib/reports';
+import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod, sendReportEmail } from '@/lib/reports';
 import { toast } from 'sonner';
 
 interface ReportWithClient {
@@ -40,6 +40,7 @@ const Reports = () => {
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
 
@@ -186,8 +187,22 @@ const Reports = () => {
                       >
                         {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
                       </Button>
-                      <Button size="sm" variant="ghost" title="Send email">
-                        <Send className="h-4 w-4" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!report.pdf_storage_path || sendingIds.has(report.id)}
+                        onClick={async () => {
+                          setSendingIds(prev => new Set(prev).add(report.id));
+                          await sendReportEmail(report.id);
+                          setSendingIds(prev => {
+                            const next = new Set(prev);
+                            next.delete(report.id);
+                            return next;
+                          });
+                        }}
+                        title="Send email"
+                      >
+                        {sendingIds.has(report.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       </Button>
                     </div>
                   </CardContent>
