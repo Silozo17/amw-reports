@@ -40,6 +40,7 @@ const Reports = () => {
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
 
