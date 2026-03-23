@@ -10,20 +10,33 @@ import { toast } from 'sonner';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signIn(email, password);
-
-    if (error) {
-      toast.error(error.message);
+    if (isSignUp) {
+      const { error } = await signUp(email, password, fullName);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Account created! Signing you in...');
+        // Auto-confirmed, so sign in immediately
+        const { error: signInError } = await signIn(email, password);
+        if (!signInError) navigate('/');
+      }
     } else {
-      navigate('/');
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        navigate('/');
+      }
     }
 
     setIsLoading(false);
