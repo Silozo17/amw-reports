@@ -14,16 +14,563 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      client_platform_config: {
+        Row: {
+          client_id: string
+          created_at: string
+          enabled_metrics: string[] | null
+          id: string
+          is_enabled: boolean
+          platform: Database["public"]["Enums"]["platform_type"]
+          section_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enabled_metrics?: string[] | null
+          id?: string
+          is_enabled?: boolean
+          platform: Database["public"]["Enums"]["platform_type"]
+          section_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enabled_metrics?: string[] | null
+          id?: string
+          is_enabled?: boolean
+          platform?: Database["public"]["Enums"]["platform_type"]
+          section_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_platform_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_recipients: {
+        Row: {
+          client_id: string
+          created_at: string
+          email: string
+          id: string
+          is_primary: boolean | null
+          name: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          email: string
+          id?: string
+          is_primary?: boolean | null
+          name: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          is_primary?: boolean | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_recipients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          account_manager: string | null
+          business_address: string | null
+          company_name: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          enable_explanations: boolean | null
+          enable_mom_comparison: boolean | null
+          enable_upsell: boolean | null
+          enable_yoy_comparison: boolean | null
+          full_name: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          phone: string | null
+          position: string | null
+          preferred_currency: string | null
+          preferred_timezone: string | null
+          report_detail_level: string | null
+          reporting_start_date: string | null
+          services_subscribed: string[] | null
+          social_handles: Json | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          account_manager?: string | null
+          business_address?: string | null
+          company_name: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          enable_explanations?: boolean | null
+          enable_mom_comparison?: boolean | null
+          enable_upsell?: boolean | null
+          enable_yoy_comparison?: boolean | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          preferred_currency?: string | null
+          preferred_timezone?: string | null
+          report_detail_level?: string | null
+          reporting_start_date?: string | null
+          services_subscribed?: string[] | null
+          social_handles?: Json | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          account_manager?: string | null
+          business_address?: string | null
+          company_name?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          enable_explanations?: boolean | null
+          enable_mom_comparison?: boolean | null
+          enable_upsell?: boolean | null
+          enable_yoy_comparison?: boolean | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          preferred_currency?: string | null
+          preferred_timezone?: string | null
+          report_detail_level?: string | null
+          reporting_start_date?: string | null
+          services_subscribed?: string[] | null
+          social_handles?: Json | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      email_logs: {
+        Row: {
+          client_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          recipient_email: string
+          report_id: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          recipient_email: string
+          report_id?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          recipient_email?: string
+          report_id?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_logs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      metric_defaults: {
+        Row: {
+          available_metrics: string[]
+          created_at: string
+          default_metrics: string[]
+          id: string
+          platform: Database["public"]["Enums"]["platform_type"]
+        }
+        Insert: {
+          available_metrics?: string[]
+          created_at?: string
+          default_metrics?: string[]
+          id?: string
+          platform: Database["public"]["Enums"]["platform_type"]
+        }
+        Update: {
+          available_metrics?: string[]
+          created_at?: string
+          default_metrics?: string[]
+          id?: string
+          platform?: Database["public"]["Enums"]["platform_type"]
+        }
+        Relationships: []
+      }
+      monthly_snapshots: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          metrics_data: Json
+          platform: Database["public"]["Enums"]["platform_type"]
+          raw_data: Json | null
+          report_month: number
+          report_year: number
+          snapshot_locked: boolean
+          top_content: Json | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          metrics_data?: Json
+          platform: Database["public"]["Enums"]["platform_type"]
+          raw_data?: Json | null
+          report_month: number
+          report_year: number
+          snapshot_locked?: boolean
+          top_content?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          metrics_data?: Json
+          platform?: Database["public"]["Enums"]["platform_type"]
+          raw_data?: Json | null
+          report_month?: number
+          report_year?: number
+          snapshot_locked?: boolean
+          top_content?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_connections: {
+        Row: {
+          access_token: string | null
+          account_id: string | null
+          account_name: string | null
+          client_id: string
+          created_at: string
+          id: string
+          is_connected: boolean
+          last_error: string | null
+          last_sync_at: string | null
+          last_sync_status: Database["public"]["Enums"]["job_status"] | null
+          metadata: Json | null
+          platform: Database["public"]["Enums"]["platform_type"]
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          account_id?: string | null
+          account_name?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_error?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: Database["public"]["Enums"]["job_status"] | null
+          metadata?: Json | null
+          platform: Database["public"]["Enums"]["platform_type"]
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          account_id?: string | null
+          account_name?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_error?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: Database["public"]["Enums"]["job_status"] | null
+          metadata?: Json | null
+          platform?: Database["public"]["Enums"]["platform_type"]
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_connections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      report_logs: {
+        Row: {
+          client_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          report_id: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          triggered_by: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          report_id?: string | null
+          status: Database["public"]["Enums"]["job_status"]
+          triggered_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          report_id?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_logs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          ai_executive_summary: string | null
+          ai_insights: string | null
+          ai_upsell_recommendations: string | null
+          client_id: string
+          created_at: string
+          generated_at: string | null
+          id: string
+          pdf_storage_path: string | null
+          report_month: number
+          report_year: number
+          status: Database["public"]["Enums"]["job_status"]
+          updated_at: string
+        }
+        Insert: {
+          ai_executive_summary?: string | null
+          ai_insights?: string | null
+          ai_upsell_recommendations?: string | null
+          client_id: string
+          created_at?: string
+          generated_at?: string | null
+          id?: string
+          pdf_storage_path?: string | null
+          report_month: number
+          report_year: number
+          status?: Database["public"]["Enums"]["job_status"]
+          updated_at?: string
+        }
+        Update: {
+          ai_executive_summary?: string | null
+          ai_insights?: string | null
+          ai_upsell_recommendations?: string | null
+          client_id?: string
+          created_at?: string
+          generated_at?: string | null
+          id?: string
+          pdf_storage_path?: string | null
+          report_month?: number
+          report_year?: number
+          status?: Database["public"]["Enums"]["job_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_logs: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          report_month: number
+          report_year: number
+          started_at: string
+          status: Database["public"]["Enums"]["job_status"]
+          triggered_by: string | null
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          report_month: number
+          report_year: number
+          started_at?: string
+          status: Database["public"]["Enums"]["job_status"]
+          triggered_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          platform?: Database["public"]["Enums"]["platform_type"]
+          report_month?: number
+          report_year?: number
+          started_at?: string
+          status?: Database["public"]["Enums"]["job_status"]
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "owner" | "manager"
+      job_status: "pending" | "running" | "success" | "failed" | "partial"
+      platform_type:
+        | "google_ads"
+        | "meta_ads"
+        | "facebook"
+        | "instagram"
+        | "tiktok"
+        | "linkedin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +697,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["owner", "manager"],
+      job_status: ["pending", "running", "success", "failed", "partial"],
+      platform_type: [
+        "google_ads",
+        "meta_ads",
+        "facebook",
+        "instagram",
+        "tiktok",
+        "linkedin",
+      ],
+    },
   },
 } as const
