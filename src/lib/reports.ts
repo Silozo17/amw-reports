@@ -40,7 +40,36 @@ export const getReportPreviewUrl = async (pdfPath: string): Promise<string | nul
   return data?.signedUrl ?? null;
 };
 
+export const sendReportEmail = async (reportId: string) => {
+  const { data, error } = await supabase.functions.invoke('send-report-email', {
+    body: { report_id: reportId },
+  });
+
+  if (error) {
+    toast.error(`Failed to send email: ${error.message}`);
+    return null;
+  }
+
+  if (data?.error) {
+    toast.error(`Email error: ${data.error}`);
+    return null;
+  }
+
+  toast.success(data.message ?? 'Report emailed successfully');
+  return data;
+};
+
 export const getCurrentReportPeriod = () => {
+  const now = new Date();
+  // If before the 5th, report for previous month
+  const month = now.getDate() < 5
+    ? (now.getMonth() === 0 ? 12 : now.getMonth())
+    : now.getMonth() + 1;
+  const year = now.getDate() < 5 && now.getMonth() === 0
+    ? now.getFullYear() - 1
+    : now.getFullYear();
+  return { month, year };
+};
   const now = new Date();
   // If before the 5th, report for previous month
   const month = now.getDate() < 5

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, RotateCw, Send, ExternalLink, Loader2 } from 'lucide-react';
-import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod } from '@/lib/reports';
+import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod, sendReportEmail } from '@/lib/reports';
 import { toast } from 'sonner';
 
 interface ReportWithClient {
