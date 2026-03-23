@@ -138,9 +138,9 @@ const ClientDetail = () => {
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
             <ClientEditDialog client={client} onUpdate={fetchData} />
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleManualSync}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              Sync
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleManualSync} disabled={isSyncing}>
+              {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {isSyncing ? 'Syncing...' : 'Sync'}
             </Button>
             <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
