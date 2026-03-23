@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
@@ -6,9 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin } from 'lucide-react';
-import type { Client, ClientRecipient, PlatformConnection } from '@/types/database';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText } from 'lucide-react';
+import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
+import RecipientDialog from '@/components/clients/RecipientDialog';
+import ConnectionDialog from '@/components/clients/ConnectionDialog';
+import ClientEditDialog from '@/components/clients/ClientEditDialog';
+import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
+import { toast } from 'sonner';
 
 const ClientDetail = () => {
   const { id } = useParams();
@@ -18,24 +23,30 @@ const ClientDetail = () => {
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!id) return;
-
-    const fetchData = async () => {
-      const [clientRes, recipientsRes, connectionsRes] = await Promise.all([
-        supabase.from('clients').select('*').eq('id', id).single(),
-        supabase.from('client_recipients').select('*').eq('client_id', id),
-        supabase.from('platform_connections').select('*').eq('client_id', id),
-      ]);
-
-      setClient(clientRes.data as Client | null);
-      setRecipients((recipientsRes.data as ClientRecipient[]) ?? []);
-      setConnections((connectionsRes.data as PlatformConnection[]) ?? []);
-      setIsLoading(false);
-    };
-
-    fetchData();
+    const [clientRes, recipientsRes, connectionsRes] = await Promise.all([
+      supabase.from('clients').select('*').eq('id', id).single(),
+      supabase.from('client_recipients').select('*').eq('client_id', id),
+      supabase.from('platform_connections').select('*').eq('client_id', id),
+    ]);
+    setClient(clientRes.data as Client | null);
+    setRecipients((recipientsRes.data as ClientRecipient[]) ?? []);
+    setConnections((connectionsRes.data as PlatformConnection[]) ?? []);
+    setIsLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleManualSync = async () => {
+    toast.info('Manual sync will be available once API integrations are configured.');
+  };
+
+  const handleGenerateReport = async () => {
+    toast.info('Report generation will be available once the PDF engine is built.');
+  };
 
   if (isLoading) {
     return (
@@ -56,6 +67,8 @@ const ClientDetail = () => {
     );
   }
 
+  const connectedPlatforms: PlatformType[] = connections.map(c => c.platform);
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -69,16 +82,28 @@ const ClientDetail = () => {
               <p className="text-muted-foreground font-body mt-1">{client.full_name}{client.position && ` · ${client.position}`}</p>
             </div>
           </div>
-          <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">
-            {client.is_active ? 'Active' : 'Inactive'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">
+              {client.is_active ? 'Active' : 'Inactive'}
+            </Badge>
+            <ClientEditDialog client={client} onUpdate={fetchData} />
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleManualSync}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Sync
+            </Button>
+            <Button size="sm" className="gap-2" onClick={handleGenerateReport}>
+              <FileText className="h-3.5 w-3.5" />
+              Generate Report
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="overview">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="connections">Connections</TabsTrigger>
-            <TabsTrigger value="recipients">Recipients</TabsTrigger>
+            <TabsTrigger value="connections">Connections ({connections.length})</TabsTrigger>
+            <TabsTrigger value="recipients">Recipients ({recipients.length})</TabsTrigger>
+            <TabsTrigger value="metrics">Metrics</TabsTrigger>
             <TabsTrigger value="settings">Report Settings</TabsTrigger>
           </TabsList>
 
@@ -92,11 +117,14 @@ const ClientDetail = () => {
                   {client.website && <div className="flex items-center gap-2"><Globe className="h-4 w-4 text-muted-foreground" />{client.website}</div>}
                   {client.business_address && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />{client.business_address}</div>}
                   {client.account_manager && <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" />Manager: {client.account_manager}</div>}
+                  {!client.email && !client.phone && !client.website && (
+                    <p className="text-muted-foreground">No contact details added yet</p>
+                  )}
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader><CardTitle className="font-display text-lg">Services</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="font-display text-lg">Services & Notes</CardTitle></CardHeader>
                 <CardContent>
                   {client.services_subscribed.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
@@ -114,13 +142,35 @@ const ClientDetail = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Quick summary cards */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-display text-primary">{connections.filter(c => c.is_connected).length}</p>
+                  <p className="text-xs text-muted-foreground">Connected Platforms</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-display text-primary">{recipients.length}</p>
+                  <p className="text-xs text-muted-foreground">Report Recipients</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-display text-primary">{client.report_detail_level}</p>
+                  <p className="text-xs text-muted-foreground capitalize">Report Detail</p>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="connections" className="mt-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="font-display text-lg">Platform Connections</CardTitle>
-                <Button size="sm" variant="outline">Add Connection</Button>
+                <ConnectionDialog clientId={client.id} connections={connections} onUpdate={fetchData} />
               </CardHeader>
               <CardContent>
                 {connections.length === 0 ? (
@@ -131,7 +181,11 @@ const ClientDetail = () => {
                       <div key={conn.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
                         <div>
                           <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
-                          <p className="text-xs text-muted-foreground">{conn.account_name ?? conn.account_id ?? 'No account info'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {conn.account_name ?? conn.account_id ?? 'No account info'}
+                            {conn.last_sync_at && ` · Last sync: ${new Date(conn.last_sync_at).toLocaleDateString()}`}
+                          </p>
+                          {conn.last_error && <p className="text-xs text-destructive mt-1">{conn.last_error}</p>}
                         </div>
                         <Badge variant={conn.is_connected ? 'default' : 'destructive'}>
                           {conn.is_connected ? 'Connected' : 'Disconnected'}
@@ -148,11 +202,11 @@ const ClientDetail = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="font-display text-lg">Report Recipients</CardTitle>
-                <Button size="sm" variant="outline">Add Recipient</Button>
+                <RecipientDialog clientId={client.id} recipients={recipients} onUpdate={fetchData} />
               </CardHeader>
               <CardContent>
                 {recipients.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No recipients configured</p>
+                  <p className="text-sm text-muted-foreground py-4 text-center">No recipients configured — add at least one to receive reports</p>
                 ) : (
                   <div className="space-y-2">
                     {recipients.map(r => (
@@ -168,6 +222,10 @@ const ClientDetail = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="metrics" className="mt-4">
+            <MetricConfigPanel clientId={client.id} connectedPlatforms={connectedPlatforms} />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-4">
