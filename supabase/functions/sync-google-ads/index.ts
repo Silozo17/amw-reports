@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       ORDER BY metrics.cost_micros DESC
     `;
 
-    const searchUrl = `https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:searchStream`;
+    const searchUrl = `https://googleads.googleapis.com/v20/customers/${customerId}/googleAds:searchStream`;
     const adsRes = await fetch(searchUrl, {
       method: "POST",
       headers: {
