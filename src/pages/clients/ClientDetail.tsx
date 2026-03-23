@@ -98,9 +98,9 @@ const ClientDetail = () => {
               <RefreshCw className="h-3.5 w-3.5" />
               Sync
             </Button>
-            <Button size="sm" className="gap-2" onClick={handleGenerateReport}>
-              <FileText className="h-3.5 w-3.5" />
-              Generate Report
+            <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              {isGenerating ? 'Generating...' : 'Generate Report'}
             </Button>
           </div>
         </div>
