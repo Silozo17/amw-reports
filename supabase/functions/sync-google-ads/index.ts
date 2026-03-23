@@ -183,12 +183,17 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ query }),
     });
 
-    const adsData = await adsRes.json();
-
-    if (adsRes.status !== 200) {
-      const errMsg = adsData?.error?.message || JSON.stringify(adsData);
+    if (!adsRes.ok) {
+      const errText = await adsRes.text();
+      let errMsg = errText.substring(0, 500);
+      try {
+        const errJson = JSON.parse(errText);
+        errMsg = errJson?.error?.message || errMsg;
+      } catch { /* not JSON */ }
       throw new Error(`Google Ads API error (${adsRes.status}): ${errMsg}`);
     }
+
+    const adsData = await adsRes.json();
 
     // Parse results - searchStream returns array of batches
     const results = adsData.flatMap((batch: any) => batch.results || []);
