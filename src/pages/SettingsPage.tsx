@@ -40,17 +40,19 @@ const SettingsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
-    const [membersRes, defaultsRes] = await Promise.all([
-      supabase.from('user_roles').select('*, profiles!user_roles_user_id_fkey(full_name, email)'),
+    const [rolesRes, defaultsRes, profilesRes] = await Promise.all([
+      supabase.from('user_roles').select('*'),
       supabase.from('metric_defaults').select('*'),
+      supabase.from('profiles').select('user_id, full_name, email'),
     ]);
 
-    // The join may fail due to missing FK — fallback to separate query
-    let members = (membersRes.data as TeamMember[]) ?? [];
-    if (membersRes.error) {
-      const { data: roles } = await supabase.from('user_roles').select('*');
-      members = (roles as TeamMember[]) ?? [];
-    }
+    const roles = (rolesRes.data ?? []) as Array<{ id: string; user_id: string; role: 'owner' | 'manager' }>;
+    const profiles = (profilesRes.data ?? []) as Array<{ user_id: string; full_name: string | null; email: string | null }>;
+
+    const members: TeamMember[] = roles.map(r => ({
+      ...r,
+      profiles: profiles.find(p => p.user_id === r.user_id) ?? null,
+    }));
     setTeamMembers(members);
     setMetricDefaults((defaultsRes.data as MetricDefault[]) ?? []);
     setIsLoading(false);
