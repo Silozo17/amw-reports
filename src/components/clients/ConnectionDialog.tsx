@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Plug } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
@@ -19,12 +19,15 @@ interface ConnectionDialogProps {
 
 const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin'];
 
+const OAUTH_SUPPORTED: PlatformType[] = ['google_ads'];
+
 const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogProps) => {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<PlatformType | ''>('');
   const [accountName, setAccountName] = useState('');
   const [accountId, setAccountId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
 
   const handleAdd = async () => {
     if (!platform) {
@@ -44,7 +47,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
     if (error) {
       toast.error('Failed to add connection');
     } else {
-      toast.success('Connection added — ready for OAuth setup');
+      toast.success('Connection added');
       setPlatform('');
       setAccountName('');
       setAccountId('');
@@ -60,6 +63,36 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
     } else {
       toast.success('Connection removed');
       onUpdate();
+    }
+  };
+
+  const handleOAuthConnect = async (conn: PlatformConnection) => {
+    if (!OAUTH_SUPPORTED.includes(conn.platform)) {
+      toast.info(`OAuth for ${PLATFORM_LABELS[conn.platform]} is not yet available.`);
+      return;
+    }
+
+    setConnectingId(conn.id);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('google-ads-connect', {
+        body: {
+          connection_id: conn.id,
+          redirect_url: window.location.origin,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.auth_url) {
+        window.location.href = data.auth_url;
+      } else {
+        throw new Error('No auth URL returned');
+      }
+    } catch (e) {
+      console.error('OAuth error:', e);
+      toast.error('Failed to start OAuth flow');
+      setConnectingId(null);
     }
   };
 
@@ -85,6 +118,22 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
                   <Badge variant={conn.is_connected ? 'default' : 'destructive'} className="text-xs">
                     {conn.is_connected ? 'Connected' : 'Pending'}
                   </Badge>
+                  {!conn.is_connected && OAUTH_SUPPORTED.includes(conn.platform) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1"
+                      disabled={connectingId === conn.id}
+                      onClick={() => handleOAuthConnect(conn)}
+                    >
+                      {connectingId === conn.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <ExternalLink className="h-3 w-3" />
+                      )}
+                      Connect
+                    </Button>
+                  )}
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemove(conn.id)}>
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
@@ -103,7 +152,10 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
               </SelectTrigger>
               <SelectContent>
                 {PLATFORMS.map(p => (
-                  <SelectItem key={p} value={p}>{PLATFORM_LABELS[p]}</SelectItem>
+                  <SelectItem key={p} value={p}>
+                    {PLATFORM_LABELS[p]}
+                    {OAUTH_SUPPORTED.includes(p) ? ' ✓' : ''}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -121,7 +173,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
             {isSubmitting ? 'Adding...' : 'Add Connection'}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            OAuth authentication will be configured when API credentials are set up.
+            ✓ = OAuth supported. Add a connection, then click "Connect" to authenticate.
           </p>
         </div>
       </DialogContent>

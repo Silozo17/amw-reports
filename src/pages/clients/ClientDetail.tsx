@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,25 @@ import { toast } from 'sonner';
 const ClientDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [client, setClient] = useState<Client | null>(null);
   const [recipients, setRecipients] = useState<ClientRecipient[]>([]);
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Handle OAuth callback query params
+  useEffect(() => {
+    const oauthSuccess = searchParams.get('oauth_success');
+    const oauthError = searchParams.get('oauth_error');
+    if (oauthSuccess) {
+      toast.success(`Successfully connected ${oauthSuccess.replace('_', ' ')}!`);
+      setSearchParams({}, { replace: true });
+    }
+    if (oauthError) {
+      toast.error(`OAuth error: ${oauthError}`);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
