@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2 } from 'lucide-react';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
 import RecipientDialog from '@/components/clients/RecipientDialog';
 import ConnectionDialog from '@/components/clients/ConnectionDialog';
 import ClientEditDialog from '@/components/clients/ClientEditDialog';
 import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
+import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
@@ -40,12 +41,18 @@ const ClientDetail = () => {
     fetchData();
   }, [fetchData]);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const handleManualSync = async () => {
     toast.info('Manual sync will be available once API integrations are configured.');
   };
 
   const handleGenerateReport = async () => {
-    toast.info('Report generation will be available once the PDF engine is built.');
+    if (!client) return;
+    setIsGenerating(true);
+    const { month, year } = getCurrentReportPeriod();
+    await generateReport(client.id, month, year);
+    setIsGenerating(false);
   };
 
   if (isLoading) {
@@ -91,9 +98,9 @@ const ClientDetail = () => {
               <RefreshCw className="h-3.5 w-3.5" />
               Sync
             </Button>
-            <Button size="sm" className="gap-2" onClick={handleGenerateReport}>
-              <FileText className="h-3.5 w-3.5" />
-              Generate Report
+            <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              {isGenerating ? 'Generating...' : 'Generate Report'}
             </Button>
           </div>
         </div>

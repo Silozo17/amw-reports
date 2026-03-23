@@ -4,7 +4,10 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Download, RotateCw, Send } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FileText, Download, RotateCw, Send, ExternalLink, Loader2 } from 'lucide-react';
+import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod } from '@/lib/reports';
+import { toast } from 'sonner';
 
 interface ReportWithClient {
   id: string;
@@ -27,29 +30,102 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   partial: 'outline',
 };
 
+interface ClientOption {
+  id: string;
+  company_name: string;
+}
+
 const Reports = () => {
   const [reports, setReports] = useState<ReportWithClient[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [selectedClient, setSelectedClient] = useState<string>('');
+  const [isGeneratingNew, setIsGeneratingNew] = useState(false);
 
-  useEffect(() => {
-    const fetchReports = async () => {
-      const { data } = await supabase
+  const fetchReports = async () => {
+    const [reportsRes, clientsRes] = await Promise.all([
+      supabase
         .from('reports')
         .select('*, clients(company_name, full_name)')
         .order('report_year', { ascending: false })
-        .order('report_month', { ascending: false });
-      setReports((data as ReportWithClient[]) ?? []);
-      setIsLoading(false);
-    };
+        .order('report_month', { ascending: false }),
+      supabase.from('clients').select('id, company_name').eq('is_active', true).order('company_name'),
+    ]);
+    setReports((reportsRes.data as ReportWithClient[]) ?? []);
+    setClients((clientsRes.data as ClientOption[]) ?? []);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
     fetchReports();
   }, []);
+
+  const handleRegenerate = async (report: ReportWithClient) => {
+    setGeneratingIds(prev => new Set(prev).add(report.id));
+    await generateReport(report.client_id, report.report_month, report.report_year);
+    await fetchReports();
+    setGeneratingIds(prev => {
+      const next = new Set(prev);
+      next.delete(report.id);
+      return next;
+    });
+  };
+
+  const handleDownload = async (report: ReportWithClient) => {
+    if (!report.pdf_storage_path) {
+      toast.error('No PDF available');
+      return;
+    }
+    const filename = `${report.clients?.company_name ?? 'report'}_${MONTH_NAMES[report.report_month]}_${report.report_year}.pdf`;
+    await downloadReport(report.pdf_storage_path, filename);
+  };
+
+  const handlePreview = async (report: ReportWithClient) => {
+    if (!report.pdf_storage_path) {
+      toast.error('No PDF available');
+      return;
+    }
+    const url = await getReportPreviewUrl(report.pdf_storage_path);
+    if (url) window.open(url, '_blank');
+  };
+
+  const handleGenerateNew = async () => {
+    if (!selectedClient) {
+      toast.error('Select a client first');
+      return;
+    }
+    setIsGeneratingNew(true);
+    const { month, year } = getCurrentReportPeriod();
+    await generateReport(selectedClient, month, year);
+    await fetchReports();
+    setIsGeneratingNew(false);
+  };
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-display">Reports</h1>
-          <p className="text-muted-foreground font-body mt-1">Monthly client reports</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display">Reports</h1>
+            <p className="text-muted-foreground font-body mt-1">Monthly client reports</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Select client" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleGenerateNew} disabled={isGeneratingNew || !selectedClient} className="gap-2">
+              {isGeneratingNew ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              {isGeneratingNew ? 'Generating...' : 'Generate Report'}
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -59,40 +135,65 @@ const Reports = () => {
             <CardContent className="py-12 text-center">
               <FileText className="mx-auto h-12 w-12 text-muted-foreground/40 mb-4" />
               <p className="text-muted-foreground">No reports generated yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Reports are auto-generated on the 6th of each month</p>
+              <p className="text-xs text-muted-foreground mt-1">Select a client above to generate your first report</p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
-            {reports.map(report => (
-              <Card key={report.id}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-primary" />
+            {reports.map(report => {
+              const isRegenerating = generatingIds.has(report.id);
+              return (
+                <Card key={report.id}>
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-body font-semibold">{report.clients?.company_name ?? 'Unknown'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {MONTH_NAMES[report.report_month]} {report.report_year}
+                          {report.generated_at && ` · Generated ${new Date(report.generated_at).toLocaleDateString()}`}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-body font-semibold">{report.clients?.company_name ?? 'Unknown'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {MONTH_NAMES[report.report_month]} {report.report_year}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'}>{report.status}</Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!report.pdf_storage_path}
+                        onClick={() => handlePreview(report)}
+                        title="Preview"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!report.pdf_storage_path}
+                        onClick={() => handleDownload(report)}
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={isRegenerating}
+                        onClick={() => handleRegenerate(report)}
+                        title="Regenerate"
+                      >
+                        {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" title="Send email">
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'}>{report.status}</Badge>
-                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path}>
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost">
-                      <RotateCw className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost">
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
