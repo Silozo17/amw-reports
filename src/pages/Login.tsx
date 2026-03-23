@@ -50,11 +50,24 @@ const Login = () => {
             <h1 className="text-4xl font-display tracking-wide text-primary">AMW</h1>
             <p className="text-xs font-body tracking-widest text-muted-foreground uppercase">Media</p>
           </div>
-          <CardTitle className="text-2xl font-display">Sign In</CardTitle>
+          <CardTitle className="text-2xl font-display">{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
           <CardDescription>Internal reporting platform</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your full name"
+                  required
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -62,7 +75,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@amwmedia.com"
+                placeholder="you@amwmedia.co.uk"
                 required
               />
             </div>
@@ -75,11 +88,19 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                minLength={6}
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? (isSignUp ? 'Creating account...' : 'Signing in...') : (isSignUp ? 'Create Account' : 'Sign In')}
             </Button>
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
+            </button>
           </form>
         </CardContent>
       </Card>
