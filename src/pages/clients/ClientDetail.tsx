@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2 } from 'lucide-react';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
 import RecipientDialog from '@/components/clients/RecipientDialog';
 import ConnectionDialog from '@/components/clients/ConnectionDialog';
 import ClientEditDialog from '@/components/clients/ClientEditDialog';
 import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
+import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
