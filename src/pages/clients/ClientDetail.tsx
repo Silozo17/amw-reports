@@ -41,12 +41,18 @@ const ClientDetail = () => {
     fetchData();
   }, [fetchData]);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const handleManualSync = async () => {
     toast.info('Manual sync will be available once API integrations are configured.');
   };
 
   const handleGenerateReport = async () => {
-    toast.info('Report generation will be available once the PDF engine is built.');
+    if (!client) return;
+    setIsGenerating(true);
+    const { month, year } = getCurrentReportPeriod();
+    await generateReport(client.id, month, year);
+    setIsGenerating(false);
   };
 
   if (isLoading) {
