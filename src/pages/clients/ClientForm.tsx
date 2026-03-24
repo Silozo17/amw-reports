@@ -51,6 +51,41 @@ const ClientForm = () => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleGoogleSearch = async () => {
+    if (!form.company_name.trim()) {
+      toast.error('Enter a company name first');
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-places-lookup', {
+        body: { query: form.company_name },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); return; }
+      setSearchResults(data.results || []);
+      setSearchOpen(true);
+      if ((data.results || []).length === 0) toast.info('No results found');
+    } catch (e) {
+      console.error('Google search error:', e);
+      toast.error('Failed to search Google');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const applySearchResult = (result: { name: string; address: string; phone: string; website: string }) => {
+    setForm(prev => ({
+      ...prev,
+      company_name: result.name || prev.company_name,
+      business_address: result.address || prev.business_address,
+      phone: formatPhone(result.phone) || prev.phone,
+      website: result.website || prev.website,
+    }));
+    setSearchOpen(false);
+    toast.success('Details filled from Google');
+  };
+
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
