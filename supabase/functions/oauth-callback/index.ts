@@ -173,12 +173,16 @@ Deno.serve(async (req) => {
       // Discover ad accounts
       let accountName = null;
       let accountId = null;
+      const adAccounts: Array<{ id: string; name: string }> = [];
       try {
         const acctRes = await fetch(
           `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,name,account_status&access_token=${accessToken}`
         );
         const acctData = await acctRes.json();
         if (acctData.data && acctData.data.length > 0) {
+          for (const a of acctData.data) {
+            adAccounts.push({ id: a.id, name: a.name || a.id });
+          }
           const active = acctData.data.find((a: any) => a.account_status === 1) || acctData.data[0];
           accountId = active.id;
           accountName = active.name || `Meta Ads (${accountId})`;
@@ -187,11 +191,38 @@ Deno.serve(async (req) => {
         console.warn("Could not discover ad accounts:", e);
       }
 
+      // Discover Facebook Pages and linked Instagram accounts
+      const pages: Array<{ id: string; name: string; instagram?: { id: string; username: string } }> = [];
+      try {
+        const pagesRes = await fetch(
+          `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,instagram_business_account{id,username}&access_token=${accessToken}`
+        );
+        const pagesData = await pagesRes.json();
+        console.log("Meta pages discovery:", JSON.stringify(pagesData));
+        if (pagesData.data && pagesData.data.length > 0) {
+          for (const page of pagesData.data) {
+            const entry: { id: string; name: string; instagram?: { id: string; username: string } } = {
+              id: page.id,
+              name: page.name || page.id,
+            };
+            if (page.instagram_business_account) {
+              entry.instagram = {
+                id: page.instagram_business_account.id,
+                username: page.instagram_business_account.username || "",
+              };
+            }
+            pages.push(entry);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not discover pages:", e);
+      }
+
       const { error: updateError } = await supabase
         .from("platform_connections")
         .update({
           access_token: accessToken,
-          refresh_token: null, // Meta uses long-lived tokens, no refresh token
+          refresh_token: null,
           token_expires_at: expiresAt,
           is_connected: true,
           last_error: null,
@@ -200,6 +231,8 @@ Deno.serve(async (req) => {
           metadata: {
             token_type: "bearer",
             long_lived: true,
+            ad_accounts: adAccounts,
+            pages,
           },
         })
         .eq("id", connectionId);

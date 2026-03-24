@@ -110,11 +110,8 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
         {connections.length > 0 && (
           <div className="space-y-2 mb-4">
             {connections.map(conn => (
-              <div key={conn.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                <div>
-                  <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
-                  <p className="text-xs text-muted-foreground">{conn.account_name || conn.account_id || 'No account info'}</p>
-                </div>
+              <div key={conn.id} className="flex flex-col p-2 rounded-md bg-muted/50 gap-1.5">
+                <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge variant={conn.is_connected ? 'default' : 'destructive'} className="text-xs">
                     {conn.is_connected ? 'Connected' : 'Pending'}
