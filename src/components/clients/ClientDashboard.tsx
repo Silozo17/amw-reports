@@ -577,7 +577,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             {spendByPlatform.length > 0 ? (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-display">💰 Spend Distribution</CardTitle>
+                   <CardTitle className="text-sm font-display flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Spend Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={260}>
@@ -614,7 +614,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               </Card>
             ) : (
               <Card className="border-dashed">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-display">💰 Spend Distribution</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm font-display flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Spend Distribution</CardTitle></CardHeader>
                 <CardContent className="flex items-center justify-center h-[260px]">
                   <p className="text-sm text-muted-foreground italic">No spend data available for this period</p>
                 </CardContent>
@@ -625,7 +625,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             {engagementStackedData.length > 0 ? (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-display">💬 Engagement Breakdown</CardTitle>
+                   <CardTitle className="text-sm font-display flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> Engagement Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={260}>
@@ -645,7 +645,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               </Card>
             ) : (
               <Card className="border-dashed">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-display">💬 Engagement Breakdown</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm font-display flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> Engagement Breakdown</CardTitle></CardHeader>
                 <CardContent className="flex items-center justify-center h-[260px]">
                   <p className="text-sm text-muted-foreground italic">No engagement data available for this period</p>
                 </CardContent>
@@ -657,7 +657,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           {impressionsByPlatform.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-display">📊 Impressions & Clicks by Platform</CardTitle>
+                <CardTitle className="text-sm font-display flex items-center gap-1.5"><BarChart3 className="h-4 w-4" /> Impressions & Clicks by Platform</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -679,7 +679,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           {trendChartData.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-display">📈 Performance Trend</CardTitle>
+                <CardTitle className="text-sm font-display flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /> Performance Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
