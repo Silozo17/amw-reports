@@ -392,7 +392,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground font-medium">No performance data available</p>
             <p className="text-sm text-muted-foreground/70">
-              Sync platform data for {FULL_MONTH_NAMES[selectedPeriod.month]} {selectedPeriod.year} to see your dashboard.
+              Sync platform data for this period to see your dashboard.
             </p>
           </CardContent>
         </Card>
@@ -410,9 +410,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         <Card className="border-dashed border-amber-500/30 bg-amber-500/5">
           <CardContent className="py-12 text-center space-y-3">
             <AlertCircle className="h-10 w-10 mx-auto text-amber-500" />
-            <p className="text-muted-foreground font-medium">No activity recorded for {FULL_MONTH_NAMES[selectedPeriod.month]} {selectedPeriod.year}</p>
+            <p className="text-muted-foreground font-medium">No activity recorded for this period</p>
             <p className="text-sm text-muted-foreground/70">
-              Try selecting a different month or sync historical data to find periods with activity.
+              Try selecting a different period or sync historical data to find periods with activity.
             </p>
           </CardContent>
         </Card>
