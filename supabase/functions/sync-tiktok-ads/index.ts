@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
           report_type: "BASIC",
           dimensions: ["campaign_id"],
           data_level: "AUCTION_CAMPAIGN",
-          metrics: ["spend", "impressions", "clicks", "conversion", "ctr", "cpc", "cpm", "reach"],
+          metrics: ["spend", "impressions", "clicks", "conversion", "ctr", "cpc", "cpm", "reach", "video_play_actions", "average_video_play", "video_watched_2s", "video_watched_6s", "profile_visits_rate"],
           start_date: startDate,
           end_date: endDate,
           page_size: 500,
@@ -101,6 +101,8 @@ Deno.serve(async (req) => {
     let totalClicks = 0;
     let totalConversions = 0;
     let totalReach = 0;
+    let totalVideoPlays = 0;
+    let totalAvgWatchTime = 0;
 
     const campaigns: any[] = [];
 
@@ -117,6 +119,8 @@ Deno.serve(async (req) => {
       totalClicks += clicks;
       totalConversions += conversions;
       totalReach += reach;
+      totalVideoPlays += Number(m.video_play_actions || 0);
+      totalAvgWatchTime += Number(m.average_video_play || 0);
 
       campaigns.push({
         id: row.dimensions?.campaign_id,
@@ -137,6 +141,8 @@ Deno.serve(async (req) => {
       cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
       cpm: totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0,
       cost_per_conversion: totalConversions > 0 ? totalSpend / totalConversions : 0,
+      video_views: totalVideoPlays,
+      average_watch_time: campaigns.length > 0 ? totalAvgWatchTime / campaigns.length : 0,
       campaign_count: campaigns.length,
     };
 

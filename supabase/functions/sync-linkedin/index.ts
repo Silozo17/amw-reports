@@ -120,6 +120,40 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch organic post engagement for each organization
+    let totalLikes = 0;
+    let totalComments = 0;
+    let totalShares = 0;
+    let totalOrgImpressions = 0;
+    let totalOrgClicks = 0;
+
+    for (const org of organizations) {
+      try {
+        const postsUrl = `https://api.linkedin.com/rest/ugcPosts?q=authors&authors=List(urn:li:organization:${org.id})&count=50`;
+        const postsRes = await fetch(postsUrl, { headers: LI_HEADERS(accessToken) });
+        const postsData = await postsRes.json();
+
+        for (const post of postsData.elements || []) {
+          try {
+            const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${org.id}&ugcPosts=List(${post.id})`;
+            const statsRes = await fetch(statsUrl, { headers: LI_HEADERS(accessToken) });
+            const statsData = await statsRes.json();
+
+            for (const stat of statsData.elements || []) {
+              const s = stat.totalShareStatistics || {};
+              totalLikes += Number(s.likeCount || 0);
+              totalComments += Number(s.commentCount || 0);
+              totalShares += Number(s.shareCount || 0);
+              totalOrgImpressions += Number(s.impressionCount || 0);
+              totalOrgClicks += Number(s.clickCount || 0);
+            }
+          } catch {} // non-blocking per post
+        }
+      } catch (e) {
+        console.warn(`LinkedIn org posts error for ${org.id}:`, e);
+      }
+    }
+
     const metricsData = {
       spend: totalSpend,
       impressions: totalImpressions,
@@ -132,6 +166,13 @@ Deno.serve(async (req) => {
       total_followers: totalFollowers,
       campaign_count: campaigns.length,
       organizations_count: organizations.length,
+      likes: totalLikes,
+      comments: totalComments,
+      shares: totalShares,
+      organic_impressions: totalOrgImpressions,
+      organic_clicks: totalOrgClicks,
+      engagement: totalLikes + totalComments + totalShares,
+      engagement_rate: totalOrgImpressions > 0 ? ((totalLikes + totalComments + totalShares) / totalOrgImpressions) * 100 : 0,
     };
 
     const topContent = campaigns

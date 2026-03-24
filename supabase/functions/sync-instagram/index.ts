@@ -111,16 +111,17 @@ Deno.serve(async (req) => {
     let totalReach = 0;
     let totalProfileViews = 0;
     let totalFollowerCount = 0;
+    let totalMediaCount = 0;
     const allTopMedia: any[] = [];
     const globalMetricsMap: Record<string, number> = {};
 
     for (const ig of igAccounts) {
       const { ig_id, page_token } = ig;
 
-      // Fetch IG User Insights (comprehensive metrics)
+      // Fetch IG User Insights (only non-deprecated metrics)
       const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views,follower_count&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
@@ -149,9 +150,9 @@ Deno.serve(async (req) => {
           .eq("id", connectionId);
       }
 
-      // Fetch follower count (current snapshot)
+      // Fetch follower count and media count from user profile
       try {
-        const userRes = await fetch(`${GRAPH_BASE}/${ig_id}?fields=followers_count&access_token=${page_token}`);
+        const userRes = await fetch(`${GRAPH_BASE}/${ig_id}?fields=followers_count,media_count,website&access_token=${page_token}`);
         if (!userRes.ok) {
           const errorBody = await userRes.text();
           throw new Error(`API error (${userRes.status}): ${errorBody}`);
@@ -159,6 +160,9 @@ Deno.serve(async (req) => {
         const userData = await userRes.json();
         if (userData.followers_count) {
           totalFollowerCount += userData.followers_count;
+        }
+        if (userData.media_count) {
+          totalMediaCount += userData.media_count;
         }
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
@@ -179,16 +183,17 @@ Deno.serve(async (req) => {
         const mediaData = await mediaRes.json();
 
         if (mediaData.data) {
-          // Batch fetch saves and video_views for top 20 posts
+          // Batch fetch saves, video_views, and profile_activity for top 20 posts
           for (const mediaItem of mediaData.data.slice(0, 20)) {
             try {
-              const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=saved,video_views,reach&access_token=${page_token}`;
+              const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=saved,video_views,reach,profile_activity&access_token=${page_token}`;
               const mediaInsightsRes = await fetch(mediaInsightsUrl);
               if (mediaInsightsRes.ok) {
                 const mediaInsightsData = await mediaInsightsRes.json();
                 for (const insight of mediaInsightsData.data || []) {
                   if (insight.name === 'saved') mediaItem.saves = insight.values?.[0]?.value || 0;
                   if (insight.name === 'video_views') mediaItem.video_views_insight = insight.values?.[0]?.value || 0;
+                  if (insight.name === 'profile_activity') mediaItem.profile_activity = insight.values?.[0]?.value || 0;
                 }
               }
             } catch {} // non-blocking
@@ -202,6 +207,7 @@ Deno.serve(async (req) => {
               comments: m.comments_count || 0,
               saves: m.saves || 0,
               video_views: m.video_views || m.video_views_insight || 0,
+              profile_activity: m.profile_activity || 0,
               media_type: m.media_type,
               total_engagement: (m.like_count || 0) + (m.comments_count || 0) + (m.saves || 0),
             });
@@ -229,17 +235,11 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.total_engagement - a.total_engagement)
       .slice(0, 10);
 
-    const now = new Date();
-    const isRecentMonth =
-      (year === now.getFullYear() && month <= now.getMonth() + 1) ||
-      (year === now.getFullYear() - 1 && month === 12 && now.getMonth() === 0);
-
     const metricsData: Record<string, number> = {
       impressions: totalImpressions,
       reach: totalReach,
       profile_visits: totalProfileViews,
-      website_clicks: globalMetricsMap.website_clicks || 0,
-      email_contacts: globalMetricsMap.email_contacts || 0,
+      website_clicks: allTopMedia.reduce((sum, m) => sum + (m.profile_activity || 0), 0),
       engagement: totalLikes + totalComments + totalSaves,
       likes: totalLikes,
       comments: totalComments,
@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
       carousel_count: carouselCount,
       engagement_rate: totalReach > 0 ? ((totalLikes + totalComments + totalSaves) / totalReach) * 100 : 0,
     };
-    if (isRecentMonth && totalFollowerCount > 0) {
+    if (totalFollowerCount > 0) {
       metricsData.total_followers = totalFollowerCount;
     }
 
