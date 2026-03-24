@@ -218,7 +218,6 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
                       {OAUTH_SUPPORTED.includes(p) ? ' (OAuth)' : META_DEPENDENT.includes(p) ? ' (via Meta)' : ''}
                     </span>
                   </SelectItem>
-                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
