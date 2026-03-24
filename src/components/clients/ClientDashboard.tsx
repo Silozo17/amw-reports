@@ -168,9 +168,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     }
     setPlatformConfigs(configMap);
 
-    // Aggregate quarterly data if needed
+    // Aggregate multi-month data if needed
     let currentSnapshots = (currentRes.data ?? []) as SnapshotData[];
-    if (type === 'quarterly' && currentSnapshots.length > 0) {
+    if (isMultiMonth && currentSnapshots.length > 0) {
       const grouped = new Map<PlatformType, Record<string, number>>();
       for (const s of currentSnapshots) {
         const existing = grouped.get(s.platform) || {};
