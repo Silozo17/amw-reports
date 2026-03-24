@@ -77,30 +77,63 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
 
   const fetchSnapshots = useCallback(async () => {
     setIsLoading(true);
-    const { month, year, type } = selectedPeriod;
+    const { month, year, type, startDate, endDate } = selectedPeriod;
 
-    let months: Array<{ m: number; y: number }> = [];
-    if (type === 'quarterly') {
-      const qStart = Math.floor((month - 1) / 3) * 3 + 1;
-      months = [{ m: qStart, y: year }, { m: qStart + 1, y: year }, { m: qStart + 2, y: year }];
-    } else {
-      months = [{ m: month, y: year }];
-    }
-
-    // Fetch current period
+    // Build current-period query
     let query = supabase.from('monthly_snapshots')
       .select('platform, metrics_data, report_month, report_year')
       .eq('client_id', clientId);
 
-    if (months.length === 1) {
-      query = query.eq('report_month', months[0].m).eq('report_year', months[0].y);
+    // Whether we need multi-month aggregation
+    let isMultiMonth = false;
+
+    if (type === 'quarterly') {
+      const qStart = Math.floor((month - 1) / 3) * 3 + 1;
+      query = query.in('report_month', [qStart, qStart + 1, qStart + 2]).eq('report_year', year);
+      isMultiMonth = true;
+    } else if (type === 'ytd') {
+      const currentMonth = new Date().getMonth() + 1;
+      const ytdMonths = Array.from({ length: currentMonth }, (_, i) => i + 1);
+      query = query.in('report_month', ytdMonths).eq('report_year', year);
+      isMultiMonth = true;
+    } else if (type === 'last_year') {
+      query = query.eq('report_year', year);
+      isMultiMonth = true;
+    } else if (type === 'maximum') {
+      // No month/year filter — fetch all
+      isMultiMonth = true;
+    } else if (type === 'custom' && startDate && endDate) {
+      const sMonth = startDate.getMonth() + 1;
+      const sYear = startDate.getFullYear();
+      const eMonth = endDate.getMonth() + 1;
+      const eYear = endDate.getFullYear();
+      if (sYear === eYear) {
+        const customMonths = Array.from({ length: eMonth - sMonth + 1 }, (_, i) => sMonth + i);
+        query = query.in('report_month', customMonths).eq('report_year', sYear);
+      } else {
+        query = query.or(
+          `and(report_year.eq.${sYear},report_month.gte.${sMonth}),and(report_year.gt.${sYear},report_year.lt.${eYear}),and(report_year.eq.${eYear},report_month.lte.${eMonth})`
+        );
+      }
+      isMultiMonth = true;
     } else {
-      query = query.in('report_month', months.map(m => m.m)).eq('report_year', year);
+      // weekly / monthly — single month
+      query = query.eq('report_month', month).eq('report_year', year);
     }
 
-    // Fetch previous period for comparison
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear = month === 1 ? year - 1 : year;
+    // Previous period for comparison
+    let prevMonth = month;
+    let prevYear = year;
+    const showComparison = type === 'weekly' || type === 'monthly' || type === 'quarterly';
+    if (type === 'quarterly') {
+      // Previous quarter
+      const d = subMonths(new Date(year, month - 1), 3);
+      prevMonth = d.getMonth() + 1;
+      prevYear = d.getFullYear();
+    } else {
+      prevMonth = month === 1 ? 12 : month - 1;
+      prevYear = month === 1 ? year - 1 : year;
+    }
 
     // Trend: server-side filter to last 6 months
     const sixMonthsAgo = new Date(year, month - 1);
