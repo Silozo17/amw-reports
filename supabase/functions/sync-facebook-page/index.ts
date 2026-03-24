@@ -190,6 +190,7 @@ Deno.serve(async (req) => {
             const likes = post.likes?.summary?.total_count || 0;
             const comments = post.comments?.summary?.total_count || 0;
             const shares = post.shares?.count || 0;
+            const reactions = post.reactions?.summary?.total_count || 0;
             allTopPosts.push({
               page_name: page.name,
               message: (post.message || "").substring(0, 100),
@@ -197,6 +198,7 @@ Deno.serve(async (req) => {
               likes,
               comments,
               shares,
+              reactions,
               total_engagement: likes + comments + shares,
             });
           }
@@ -229,6 +231,8 @@ Deno.serve(async (req) => {
       likes: allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
       comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
+      reactions: allTopPosts.reduce((s, p) => s + (p.reactions || 0), 0),
+      saves: 0, // not available via Pages API
       posts_published: allTopPosts.length,
       engagement_rate: totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0,
       pages_count: pages.length,
