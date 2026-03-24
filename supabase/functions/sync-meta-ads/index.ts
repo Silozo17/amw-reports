@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     const insightsParams = new URLSearchParams({
       access_token: accessToken,
       level: "campaign",
-      fields: "campaign_name,campaign_id,impressions,clicks,spend,actions,action_values,ctr,cpc,cpm,reach,frequency,link_clicks,video_play_actions",
+      fields: "campaign_name,campaign_id,impressions,clicks,spend,actions,action_values,ctr,cpc,cpm,reach,frequency,video_play_actions",
       time_range: JSON.stringify({ since: startDate, until: endDate }),
       limit: "500",
     });
@@ -169,7 +169,12 @@ Deno.serve(async (req) => {
       totalConversions += conversions;
       totalConversionsValue += conversionsValue;
       totalReach += reach;
-      totalLinkClicks += Number(row.link_clicks || 0);
+      // Extract link_clicks from actions array
+      const linkClickAction = row.actions?.find((a: any) => a.action_type === 'link_click');
+      const outboundClickAction = row.actions?.find((a: any) => a.action_type === 'outbound_click');
+      totalLinkClicks += linkClickAction ? Number(linkClickAction.value || 0)
+        : outboundClickAction ? Number(outboundClickAction.value || 0)
+        : 0;
       if (row.video_play_actions) {
         for (const action of row.video_play_actions) {
           totalVideoPlays += Number(action.value || 0);
