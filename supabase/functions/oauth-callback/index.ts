@@ -57,7 +57,6 @@ Deno.serve(async (req) => {
       const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
       const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
-      // Exchange code for tokens
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -71,7 +70,6 @@ Deno.serve(async (req) => {
       });
 
       const tokenData = await tokenRes.json();
-
       if (tokenData.error) {
         throw new Error(tokenData.error_description || tokenData.error);
       }
@@ -80,7 +78,6 @@ Deno.serve(async (req) => {
         Date.now() + (tokenData.expires_in || 3600) * 1000
       ).toISOString();
 
-      // Try to get the Google Ads customer info using the access token
       let accountName = null;
       let accountId = null;
       const devToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
@@ -105,10 +102,8 @@ Deno.serve(async (req) => {
         }
       } catch (e) {
         console.error("Could not fetch customer info:", e);
-        // Non-fatal - sync function will auto-discover later
       }
 
-      // Update the platform connection with tokens
       const { error: updateError } = await supabase
         .from("platform_connections")
         .update({
@@ -122,6 +117,89 @@ Deno.serve(async (req) => {
           metadata: {
             scope: tokenData.scope,
             token_type: tokenData.token_type,
+          },
+        })
+        .eq("id", connectionId);
+
+      if (updateError) {
+        throw new Error(`DB update failed: ${updateError.message}`);
+      }
+    } else if (platform === "meta_ads") {
+      const appId = "1473709394207184";
+      const appSecret = Deno.env.get("META_APP_SECRET")!;
+      const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+      // Exchange code for short-lived token
+      const tokenRes = await fetch(
+        `https://graph.facebook.com/v21.0/oauth/access_token?` +
+          new URLSearchParams({
+            client_id: appId,
+            client_secret: appSecret,
+            redirect_uri: redirectUri,
+            code,
+          })
+      );
+
+      const tokenData = await tokenRes.json();
+      if (tokenData.error) {
+        throw new Error(tokenData.error.message || tokenData.error);
+      }
+
+      // Exchange for long-lived token
+      let accessToken = tokenData.access_token;
+      let expiresIn = tokenData.expires_in || 3600;
+
+      try {
+        const longRes = await fetch(
+          `https://graph.facebook.com/v21.0/oauth/access_token?` +
+            new URLSearchParams({
+              grant_type: "fb_exchange_token",
+              client_id: appId,
+              client_secret: appSecret,
+              fb_exchange_token: accessToken,
+            })
+        );
+        const longData = await longRes.json();
+        if (longData.access_token) {
+          accessToken = longData.access_token;
+          expiresIn = longData.expires_in || 5184000; // ~60 days
+        }
+      } catch (e) {
+        console.warn("Could not exchange for long-lived token:", e);
+      }
+
+      const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+      // Discover ad accounts
+      let accountName = null;
+      let accountId = null;
+      try {
+        const acctRes = await fetch(
+          `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,name,account_status&access_token=${accessToken}`
+        );
+        const acctData = await acctRes.json();
+        if (acctData.data && acctData.data.length > 0) {
+          const active = acctData.data.find((a: any) => a.account_status === 1) || acctData.data[0];
+          accountId = active.id;
+          accountName = active.name || `Meta Ads (${accountId})`;
+        }
+      } catch (e) {
+        console.warn("Could not discover ad accounts:", e);
+      }
+
+      const { error: updateError } = await supabase
+        .from("platform_connections")
+        .update({
+          access_token: accessToken,
+          refresh_token: null, // Meta uses long-lived tokens, no refresh token
+          token_expires_at: expiresAt,
+          is_connected: true,
+          last_error: null,
+          account_name: accountName,
+          account_id: accountId,
+          metadata: {
+            token_type: "bearer",
+            long_lived: true,
           },
         })
         .eq("id", connectionId);

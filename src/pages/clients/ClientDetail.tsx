@@ -61,34 +61,57 @@ const ClientDetail = () => {
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleManualSync = async () => {
-    const googleConn = connections.find(c => c.platform === 'google_ads' && c.is_connected);
-    if (!googleConn) {
-      toast.info('No connected Google Ads account found. Add and connect one first.');
-      return;
-    }
-
     setIsSyncing(true);
     const now = new Date();
-    const month = now.getMonth(); // previous month (0-indexed gives us last month when +1 not added)
+    const month = now.getMonth(); // previous month
     const year = month === 0 ? now.getFullYear() - 1 : now.getFullYear();
     const syncMonth = month === 0 ? 12 : month;
 
-    try {
-      const { data, error } = await supabase.functions.invoke('sync-google-ads', {
-        body: { connection_id: googleConn.id, month: syncMonth, year },
-      });
+    let syncCount = 0;
+    let errors: string[] = [];
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast.success(`Synced ${data.campaigns_synced} campaigns for ${syncMonth}/${year}`);
-      fetchData();
-    } catch (e) {
-      console.error('Sync error:', e);
-      toast.error(e instanceof Error ? e.message : 'Sync failed');
-    } finally {
-      setIsSyncing(false);
+    // Sync Google Ads
+    const googleConn = connections.find(c => c.platform === 'google_ads' && c.is_connected);
+    if (googleConn) {
+      try {
+        const { data, error } = await supabase.functions.invoke('sync-google-ads', {
+          body: { connection_id: googleConn.id, month: syncMonth, year },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        syncCount += data.campaigns_synced || 0;
+      } catch (e) {
+        console.error('Google Ads sync error:', e);
+        errors.push(`Google Ads: ${e instanceof Error ? e.message : 'failed'}`);
+      }
     }
+
+    // Sync Meta Ads
+    const metaConn = connections.find(c => c.platform === 'meta_ads' && c.is_connected);
+    if (metaConn) {
+      try {
+        const { data, error } = await supabase.functions.invoke('sync-meta-ads', {
+          body: { connection_id: metaConn.id, month: syncMonth, year },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        syncCount += data.campaigns_synced || 0;
+      } catch (e) {
+        console.error('Meta Ads sync error:', e);
+        errors.push(`Meta Ads: ${e instanceof Error ? e.message : 'failed'}`);
+      }
+    }
+
+    if (!googleConn && !metaConn) {
+      toast.info('No connected platforms found. Add and connect one first.');
+    } else if (errors.length > 0) {
+      toast.error(`Sync errors: ${errors.join('; ')}`);
+    } else {
+      toast.success(`Synced ${syncCount} campaigns for ${syncMonth}/${year}`);
+    }
+
+    fetchData();
+    setIsSyncing(false);
   };
 
   const handleGenerateReport = async () => {
