@@ -109,35 +109,61 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
 
         {connections.length > 0 && (
           <div className="space-y-2 mb-4">
-            {connections.map(conn => (
-              <div key={conn.id} className="flex flex-col p-2 rounded-md bg-muted/50 gap-1.5">
-                <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant={conn.is_connected ? 'default' : 'destructive'} className="text-xs">
-                    {conn.is_connected ? 'Connected' : 'Pending'}
-                  </Badge>
-                  {!conn.is_connected && OAUTH_SUPPORTED.includes(conn.platform) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs gap-1"
-                      disabled={connectingId === conn.id}
-                      onClick={() => handleOAuthConnect(conn)}
-                    >
-                      {connectingId === conn.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <ExternalLink className="h-3 w-3" />
+            {connections.map(conn => {
+              const meta = conn.metadata as { pages?: Array<{ id: string; name: string; instagram?: { id: string; username: string } }>; ad_accounts?: Array<{ id: string; name: string }> } | null;
+              return (
+                <div key={conn.id} className="flex flex-col p-2 rounded-md bg-muted/50 gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
+                      <p className="text-xs text-muted-foreground">{conn.account_name || conn.account_id || 'No account info'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={conn.is_connected ? 'default' : 'destructive'} className="text-xs">
+                        {conn.is_connected ? 'Connected' : 'Pending'}
+                      </Badge>
+                      {!conn.is_connected && OAUTH_SUPPORTED.includes(conn.platform) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1"
+                          disabled={connectingId === conn.id}
+                          onClick={() => handleOAuthConnect(conn)}
+                        >
+                          {connectingId === conn.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <ExternalLink className="h-3 w-3" />
+                          )}
+                          Connect
+                        </Button>
                       )}
-                      Connect
-                    </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemove(conn.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                  {conn.is_connected && meta?.pages && meta.pages.length > 0 && (
+                    <div className="pl-2 border-l-2 border-primary/20 space-y-0.5">
+                      <p className="text-xs font-medium text-muted-foreground">Pages & Instagram:</p>
+                      {meta.pages.map(page => (
+                        <p key={page.id} className="text-xs text-muted-foreground">
+                          📄 {page.name}{page.instagram ? ` · 📸 @${page.instagram.username}` : ''}
+                        </p>
+                      ))}
+                    </div>
                   )}
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemove(conn.id)}>
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
+                  {conn.is_connected && meta?.ad_accounts && meta.ad_accounts.length > 0 && (
+                    <div className="pl-2 border-l-2 border-primary/20 space-y-0.5">
+                      <p className="text-xs font-medium text-muted-foreground">Ad Accounts:</p>
+                      {meta.ad_accounts.map(acct => (
+                        <p key={acct.id} className="text-xs text-muted-foreground">📊 {acct.name}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
