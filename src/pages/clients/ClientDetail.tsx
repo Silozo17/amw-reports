@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3, CalendarIcon, History } from 'lucide-react';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
 import RecipientDialog from '@/components/clients/RecipientDialog';
@@ -78,27 +80,32 @@ const ClientDetail = () => {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMenuOpen, setSyncMenuOpen] = useState(false);
+  const [syncMonth, setSyncMonth] = useState(() => {
+    const n = new Date();
+    return n.getMonth() === 0 ? 12 : n.getMonth();
+  });
+  const [syncYear, setSyncYear] = useState(() => {
+    const n = new Date();
+    return n.getMonth() === 0 ? n.getFullYear() - 1 : n.getFullYear();
+  });
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState('');
 
-  const handleManualSync = async () => {
-    setIsSyncing(true);
-    const now = new Date();
-    const month = now.getMonth();
-    const year = month === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    const syncMonth = month === 0 ? 12 : month;
-
+  const runSyncForMonth = async (m: number, y: number) => {
     let syncCount = 0;
     const errors: string[] = [];
 
     const syncPlatform = async (conn: PlatformConnection, functionName: string, label: string) => {
       try {
         const { data, error } = await supabase.functions.invoke(functionName, {
-          body: { connection_id: conn.id, month: syncMonth, year },
+          body: { connection_id: conn.id, month: m, year: y },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         syncCount += data.campaigns_synced || data.pages_synced || data.accounts_synced || 1;
       } catch (e) {
-        console.error(`${label} sync error:`, e);
+        console.error(`Sync error:`, e);
         errors.push(`${label}: ${e instanceof Error ? e.message : 'failed'}`);
       }
     };
@@ -113,12 +120,7 @@ const ClientDetail = () => {
     };
 
     const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
-
-    if (connectedPlatformConns.length === 0) {
-      toast.info('No fully configured platforms found. Connect and select accounts first.');
-      setIsSyncing(false);
-      return;
-    }
+    if (connectedPlatformConns.length === 0) return { syncCount: 0, errors: ['No connected platforms'] };
 
     await Promise.all(
       connectedPlatformConns.map(conn => {
@@ -128,14 +130,69 @@ const ClientDetail = () => {
       })
     );
 
+    return { syncCount, errors };
+  };
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    setSyncMenuOpen(false);
+
+    const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
+    if (connectedPlatformConns.length === 0) {
+      toast.info('No fully configured platforms found. Connect and select accounts first.');
+      setIsSyncing(false);
+      return;
+    }
+
+    const { syncCount, errors } = await runSyncForMonth(syncMonth, syncYear);
+
     if (errors.length > 0) {
       toast.error(`Sync errors: ${errors.join('; ')}`);
     } else {
-      toast.success(`Synced ${syncCount} items for ${syncMonth}/${year}`);
+      toast.success(`Synced ${syncCount} items for ${syncMonth}/${syncYear}`);
     }
 
     fetchData();
     setIsSyncing(false);
+  };
+
+  const handleBulkSync = async () => {
+    setIsBulkSyncing(true);
+    setSyncMenuOpen(false);
+
+    const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
+    if (connectedPlatformConns.length === 0) {
+      toast.info('No fully configured platforms found.');
+      setIsBulkSyncing(false);
+      return;
+    }
+
+    // Sync last 12 months
+    const now = new Date();
+    let m = now.getMonth() === 0 ? 12 : now.getMonth();
+    let y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    let totalSynced = 0;
+    const allErrors: string[] = [];
+    const MONTH_NAMES_SHORT = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    for (let i = 0; i < 12; i++) {
+      setBulkProgress(`Syncing ${MONTH_NAMES_SHORT[m]} ${y}... (${i + 1}/12)`);
+      const { syncCount, errors } = await runSyncForMonth(m, y);
+      totalSynced += syncCount;
+      allErrors.push(...errors);
+      m--;
+      if (m === 0) { m = 12; y--; }
+    }
+
+    if (allErrors.length > 0) {
+      toast.error(`Bulk sync completed with ${allErrors.length} errors`);
+    } else {
+      toast.success(`Bulk sync complete — synced ${totalSynced} items across 12 months`);
+    }
+
+    setBulkProgress('');
+    setIsBulkSyncing(false);
+    fetchData();
   };
 
   const handleGenerateReport = async () => {
@@ -190,10 +247,48 @@ const ClientDetail = () => {
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
             <ClientEditDialog client={client} onUpdate={fetchData} />
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleManualSync} disabled={isSyncing}>
-              {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-            </Button>
+            <Popover open={syncMenuOpen} onOpenChange={setSyncMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2" disabled={isSyncing || isBulkSyncing}>
+                  {isSyncing || isBulkSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">{isBulkSyncing ? bulkProgress : isSyncing ? 'Syncing...' : 'Sync'}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-4 space-y-3" align="end">
+                <p className="text-sm font-medium">Sync Data</p>
+                <div className="flex gap-2">
+                  <Select value={String(syncMonth)} onValueChange={v => setSyncMonth(Number(v))}>
+                    <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>
+                          {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][i]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(syncYear)} onValueChange={v => setSyncYear(Number(v))}>
+                    <SelectTrigger className="w-20 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 5 }, (_, i) => {
+                        const yr = new Date().getFullYear() - i;
+                        return <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button size="sm" className="w-full gap-2" onClick={handleManualSync} disabled={isSyncing}>
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Sync Selected Month
+                </Button>
+                <div className="border-t pt-2">
+                  <Button size="sm" variant="outline" className="w-full gap-2" onClick={handleBulkSync} disabled={isBulkSyncing}>
+                    <History className="h-3.5 w-3.5" />
+                    Sync Last 12 Months
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{isGenerating ? 'Generating...' : 'Report'}</span>
