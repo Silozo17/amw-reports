@@ -137,6 +137,10 @@ Deno.serve(async (req) => {
         totalImpressions += metricsMap.impressions || 0;
         totalReach += metricsMap.reach || 0;
         totalProfileViews += metricsMap.profile_views || 0;
+        // Accumulate per-account metrics into global map
+        for (const [k, v] of Object.entries(metricsMap)) {
+          globalMetricsMap[k] = (globalMetricsMap[k] || 0) + v;
+        }
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
         console.error(`Sync error:`, errorMsg);
