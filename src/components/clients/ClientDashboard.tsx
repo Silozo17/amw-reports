@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import PlatformMetricsCard from './PlatformMetricsCard';
 import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from './DashboardHeader';
-import { PLATFORM_LABELS, getCurrencySymbol } from '@/types/database';
+import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -204,7 +204,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
     const totalClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
     const totalEngagement = filtered.reduce((sum, s) => sum + (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0), 0);
-    const totalFollowers = filtered.reduce((sum, s) => sum + (s.metrics_data.total_followers || 0), 0);
+    // For followers, take the max from the selected period (not sum — it's a snapshot, not cumulative)
+    const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
     const totalConversions = filtered.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);

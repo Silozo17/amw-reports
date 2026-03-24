@@ -144,6 +144,18 @@ export const getCurrencySymbol = (code: string): string => {
   return CURRENCY_OPTIONS.find(c => c.value === code)?.symbol ?? code;
 };
 
+/** Metrics that are internal/derived and should never show as individual cards */
+export const HIDDEN_METRICS = new Set(['campaign_count', 'pages_count', 'roas']);
+
+/** Ad-specific metrics that should NOT appear on organic-only platforms */
+export const AD_METRICS = new Set([
+  'spend', 'cpc', 'cpm', 'cost_per_conversion', 'conversions',
+  'conversions_value', 'roas', 'campaign_count', 'conversion_rate', 'leads',
+]);
+
+/** Platforms that are organic-only (no ad spend metrics) */
+export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'linkedin']);
+
 export const METRIC_LABELS: Record<string, string> = {
   spend: 'Spend',
   impressions: 'Impressions',
