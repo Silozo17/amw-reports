@@ -13,6 +13,7 @@ import RecipientDialog from '@/components/clients/RecipientDialog';
 import ConnectionDialog from '@/components/clients/ConnectionDialog';
 import ClientEditDialog from '@/components/clients/ClientEditDialog';
 import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
+import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { toast } from 'sonner';
 
@@ -25,17 +26,35 @@ const ClientDetail = () => {
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Account picker state
+  const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   // Handle OAuth callback query params
   useEffect(() => {
-    const oauthSuccess = searchParams.get('oauth_success');
     const oauthError = searchParams.get('oauth_error');
-    if (oauthSuccess) {
-      toast.success(`Successfully connected ${oauthSuccess.replace('_', ' ')}!`);
-      setSearchParams({}, { replace: true });
-    }
+    const pendingConnectionId = searchParams.get('oauth_pending_selection');
+
     if (oauthError) {
       toast.error(`OAuth error: ${oauthError}`);
       setSearchParams({}, { replace: true });
+    }
+
+    if (pendingConnectionId) {
+      // Clear the param immediately
+      setSearchParams({}, { replace: true });
+      // Fetch the connection and open the picker
+      supabase
+        .from('platform_connections')
+        .select('*')
+        .eq('id', pendingConnectionId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setPickerConnection(data as PlatformConnection);
+            setPickerOpen(true);
+          }
+        });
     }
   }, [searchParams, setSearchParams]);
 
@@ -57,18 +76,17 @@ const ClientDetail = () => {
   }, [fetchData]);
 
   const [isGenerating, setIsGenerating] = useState(false);
-
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleManualSync = async () => {
     setIsSyncing(true);
     const now = new Date();
-    const month = now.getMonth(); // previous month
+    const month = now.getMonth();
     const year = month === 0 ? now.getFullYear() - 1 : now.getFullYear();
     const syncMonth = month === 0 ? 12 : month;
 
     let syncCount = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
 
     const syncPlatform = async (conn: PlatformConnection, functionName: string, label: string) => {
       try {
@@ -93,10 +111,10 @@ const ClientDetail = () => {
       linkedin: 'sync-linkedin',
     };
 
-    const connectedPlatformConns = connections.filter(c => c.is_connected);
+    const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
 
     if (connectedPlatformConns.length === 0) {
-      toast.info('No connected platforms found. Add and connect one first.');
+      toast.info('No fully configured platforms found. Connect and select accounts first.');
       setIsSyncing(false);
       return;
     }
@@ -125,6 +143,11 @@ const ClientDetail = () => {
     const { month, year } = getCurrentReportPeriod();
     await generateReport(client.id, month, year);
     setIsGenerating(false);
+  };
+
+  const handleOpenPicker = (conn: PlatformConnection) => {
+    setPickerConnection(conn);
+    setPickerOpen(true);
   };
 
   if (isLoading) {
@@ -222,11 +245,10 @@ const ClientDetail = () => {
               </Card>
             </div>
 
-            {/* Quick summary cards */}
             <div className="grid gap-4 md:grid-cols-3">
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-display text-primary">{connections.filter(c => c.is_connected).length}</p>
+                  <p className="text-2xl font-display text-primary">{connections.filter(c => c.is_connected && c.account_id).length}</p>
                   <p className="text-xs text-muted-foreground">Connected Platforms</p>
                 </CardContent>
               </Card>
@@ -249,28 +271,43 @@ const ClientDetail = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="font-display text-lg">Platform Connections</CardTitle>
-                <ConnectionDialog clientId={client.id} connections={connections} onUpdate={fetchData} />
+                <ConnectionDialog clientId={client.id} connections={connections} onUpdate={fetchData} onOpenPicker={handleOpenPicker} />
               </CardHeader>
               <CardContent>
                 {connections.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4 text-center">No platforms connected yet</p>
                 ) : (
                   <div className="space-y-3">
-                    {connections.map(conn => (
-                      <div key={conn.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
-                        <div>
-                          <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {conn.account_name ?? conn.account_id ?? 'No account info'}
-                            {conn.last_sync_at && ` · Last sync: ${new Date(conn.last_sync_at).toLocaleDateString()}`}
-                          </p>
-                          {conn.last_error && <p className="text-xs text-destructive mt-1">{conn.last_error}</p>}
+                    {connections.map(conn => {
+                      const needsSelection = conn.is_connected && !conn.account_id;
+                      return (
+                        <div key={conn.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                          <div>
+                            <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {conn.account_name ?? conn.account_id ?? 'No account selected'}
+                              {conn.last_sync_at && ` · Last sync: ${new Date(conn.last_sync_at).toLocaleDateString()}`}
+                            </p>
+                            {conn.last_error && <p className="text-xs text-destructive mt-1">{conn.last_error}</p>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {needsSelection && (
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleOpenPicker(conn)}>
+                                Select Account
+                              </Button>
+                            )}
+                            {conn.is_connected && conn.account_id && (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleOpenPicker(conn)}>
+                                Change
+                              </Button>
+                            )}
+                            <Badge variant={conn.is_connected && conn.account_id ? 'default' : needsSelection ? 'secondary' : 'destructive'}>
+                              {conn.is_connected && conn.account_id ? 'Connected' : needsSelection ? 'Select Account' : 'Disconnected'}
+                            </Badge>
+                          </div>
                         </div>
-                        <Badge variant={conn.is_connected ? 'default' : 'destructive'}>
-                          {conn.is_connected ? 'Connected' : 'Disconnected'}
-                        </Badge>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -323,6 +360,15 @@ const ClientDetail = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Account Picker Dialog */}
+      <AccountPickerDialog
+        connection={pickerConnection}
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onComplete={fetchData}
+        clientId={client.id}
+      />
     </AppLayout>
   );
 };

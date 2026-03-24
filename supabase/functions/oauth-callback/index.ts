@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       throw new Error(`Unsupported platform: ${platform}`);
     }
 
-    // Redirect to client page
+    // Redirect to client page with pending selection flag
     const { data: connData } = await supabase
       .from("platform_connections")
       .select("client_id")
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       : "/clients";
 
     return Response.redirect(
-      `${frontendUrl}${clientPath}?oauth_success=${platform}`,
+      `${frontendUrl}${clientPath}?oauth_pending_selection=${connectionId}`,
       302
     );
   } catch (e) {
@@ -126,8 +126,8 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
 
   const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
-  let accountName = null;
-  let accountId = null;
+  // Discover ALL accessible customer accounts
+  const customers: Array<{ id: string; name: string }> = [];
   const devToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
 
   try {
@@ -143,13 +143,16 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
     const customerData = await customerRes.json();
     console.log("Google Ads customer discovery:", JSON.stringify(customerData));
     if (customerData.resourceNames?.length > 0) {
-      accountId = customerData.resourceNames[0].replace("customers/", "");
-      accountName = `Google Ads (${accountId})`;
+      for (const rn of customerData.resourceNames) {
+        const custId = rn.replace("customers/", "");
+        customers.push({ id: custId, name: `Google Ads (${custId})` });
+      }
     }
   } catch (e) {
     console.error("Could not fetch customer info:", e);
   }
 
+  // Store all accounts but do NOT auto-select
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -158,9 +161,9 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
-      account_name: accountName,
-      account_id: accountId,
-      metadata: { scope: tokenData.scope, token_type: tokenData.token_type },
+      account_name: null,
+      account_id: null,
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, customers },
     })
     .eq("id", connectionId);
 
@@ -201,9 +204,7 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
 
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Discover ad accounts
-  let accountName = null;
-  let accountId = null;
+  // Discover ALL ad accounts
   const adAccounts: Array<{ id: string; name: string }> = [];
   try {
     const acctRes = await fetch(
@@ -214,15 +215,12 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
       for (const a of acctData.data) {
         adAccounts.push({ id: a.id, name: a.name || a.id });
       }
-      const active = acctData.data.find((a: any) => a.account_status === 1) || acctData.data[0];
-      accountId = active.id;
-      accountName = active.name || `Meta Ads (${accountId})`;
     }
   } catch (e) {
     console.warn("Could not discover ad accounts:", e);
   }
 
-  // Discover Facebook Pages and linked Instagram accounts
+  // Discover ALL Facebook Pages and linked Instagram accounts
   const pages: Array<{ id: string; name: string; access_token?: string; instagram?: { id: string; username: string } }> = [];
   try {
     const pagesRes = await fetch(
@@ -247,6 +245,7 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
     console.warn("Could not discover pages:", e);
   }
 
+  // Store all discovered assets but do NOT auto-select
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -255,8 +254,8 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
-      account_name: accountName,
-      account_id: accountId,
+      account_name: null,
+      account_id: null,
       metadata: { token_type: "bearer", long_lived: true, ad_accounts: adAccounts, pages },
     })
     .eq("id", connectionId);
@@ -287,13 +286,10 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
   const accessToken = tokenData.data.access_token;
   const advertiserIds = tokenData.data.advertiser_ids || [];
 
-  // Pick first advertiser
-  let accountName = null;
-  let accountId = null;
+  // Discover ALL advertiser accounts
   const advertisers: Array<{ id: string; name: string }> = [];
 
   if (advertiserIds.length > 0) {
-    accountId = String(advertiserIds[0]);
     try {
       const infoRes = await fetch(
         `https://business-api.tiktok.com/open_api/v1.3/advertiser/info/?advertiser_ids=["${advertiserIds.join('","')}"]`,
@@ -304,24 +300,26 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
         for (const adv of infoData.data.list) {
           advertisers.push({ id: String(adv.advertiser_id), name: adv.advertiser_name || String(adv.advertiser_id) });
         }
-        accountName = advertisers[0]?.name || `TikTok Ads (${accountId})`;
       }
     } catch (e) {
       console.warn("Could not fetch TikTok advertiser info:", e);
-      accountName = `TikTok Ads (${accountId})`;
+      for (const id of advertiserIds) {
+        advertisers.push({ id: String(id), name: `TikTok Ads (${id})` });
+      }
     }
   }
 
+  // Store all but do NOT auto-select
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
       access_token: accessToken,
       refresh_token: null,
-      token_expires_at: new Date(Date.now() + 86400 * 1000).toISOString(), // TikTok tokens are long-lived
+      token_expires_at: new Date(Date.now() + 86400 * 1000).toISOString(),
       is_connected: true,
       last_error: null,
-      account_name: accountName,
-      account_id: accountId,
+      account_name: null,
+      account_id: null,
       metadata: { advertisers, token_type: "bearer" },
     })
     .eq("id", connectionId);
@@ -355,9 +353,7 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   const accessToken = tokenData.access_token;
   const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
-  // Discover ad accounts
-  let accountName = null;
-  let accountId = null;
+  // Discover ALL ad accounts
   const adAccounts: Array<{ id: string; name: string }> = [];
 
   try {
@@ -378,14 +374,12 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
         const adId = String(el.id);
         adAccounts.push({ id: adId, name: el.name || adId });
       }
-      accountId = adAccounts[0].id;
-      accountName = adAccounts[0].name;
     }
   } catch (e) {
     console.warn("Could not discover LinkedIn ad accounts:", e);
   }
 
-  // Discover organization pages
+  // Discover ALL organization pages
   const organizations: Array<{ id: string; name: string }> = [];
   try {
     const orgRes = await fetch(
@@ -407,15 +401,12 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
           organizations.push({ id: String(org.id), name: org.localizedName || String(org.id) });
         }
       }
-      if (!accountName && organizations.length > 0) {
-        accountName = organizations[0].name;
-        accountId = organizations[0].id;
-      }
     }
   } catch (e) {
     console.warn("Could not discover LinkedIn organizations:", e);
   }
 
+  // Store all but do NOT auto-select
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -424,8 +415,8 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
-      account_name: accountName,
-      account_id: accountId,
+      account_name: null,
+      account_id: null,
       metadata: { ad_accounts: adAccounts, organizations, token_type: "bearer" },
     })
     .eq("id", connectionId);
