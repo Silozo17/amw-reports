@@ -25,7 +25,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify connection exists
     const { data: conn, error: connError } = await supabase
       .from("platform_connections")
       .select("id, platform, client_id")
@@ -39,22 +38,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    const appId = "1473709394207184";
+    const clientId = Deno.env.get("LINKEDIN_CLIENT_ID")!;
     const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
     const state = btoa(
       JSON.stringify({
         connection_id,
-        platform: conn.platform,
+        platform: "linkedin",
         redirect_url: redirect_url || "https://amw-reports.lovable.app",
       })
     );
 
-    const authUrl = new URL("https://www.facebook.com/v25.0/dialog/oauth");
-    authUrl.searchParams.set("client_id", appId);
-    authUrl.searchParams.set("redirect_uri", redirectUri);
+    const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization");
     authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("scope", "ads_read,pages_show_list,pages_read_engagement,business_management");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("scope", "r_ads r_ads_reporting r_organization_social r_organization_admin");
     authUrl.searchParams.set("state", state);
 
     return new Response(
