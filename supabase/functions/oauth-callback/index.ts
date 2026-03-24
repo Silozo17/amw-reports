@@ -143,9 +143,31 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
     const customerData = await customerRes.json();
     console.log("Google Ads customer discovery:", JSON.stringify(customerData));
     if (customerData.resourceNames?.length > 0) {
+      // Fetch descriptive names for each customer
       for (const rn of customerData.resourceNames) {
         const custId = rn.replace("customers/", "");
-        customers.push({ id: custId, name: `Google Ads (${custId})` });
+        let descriptiveName = `Google Ads (${custId})`;
+        try {
+          const nameRes = await fetch(
+            `https://googleads.googleapis.com/v20/customers/${custId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${tokenData.access_token}`,
+                "developer-token": devToken || "",
+                "login-customer-id": custId,
+              },
+            }
+          );
+          if (nameRes.ok) {
+            const nameData = await nameRes.json();
+            if (nameData.descriptiveName) {
+              descriptiveName = nameData.descriptiveName;
+            }
+          }
+        } catch (e) {
+          console.warn(`Could not fetch name for customer ${custId}:`, e);
+        }
+        customers.push({ id: custId, name: descriptiveName });
       }
     }
   } catch (e) {
