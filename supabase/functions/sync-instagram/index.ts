@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
-    // FIX 7: Token expiry check
+    // Token expiry check
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
       await supabaseClient.from("platform_connections")
         .update({ last_error: "Token expired. Please reconnect.", last_sync_status: "failed" })
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       throw new Error("No connected Meta Ads account found. Connect Meta Ads first to enable Instagram sync.");
     }
 
-    // FIX 7: Meta token expiry check
+    // Meta token expiry check
     if (metaConn.token_expires_at && new Date(metaConn.token_expires_at) < new Date()) {
       await supabaseClient.from("platform_connections")
         .update({ last_error: "Meta Ads token expired. Please reconnect Meta Ads.", last_sync_status: "failed" })
@@ -77,7 +77,6 @@ Deno.serve(async (req) => {
 
     const metadata = metaConn.metadata as any;
     const pages = metadata?.pages || [];
-    // FIX 3: Require page-level access token, skip pages without one
     const igAccounts = pages
       .filter((p: any) => p.instagram?.id)
       .map((p: any) => {
@@ -113,15 +112,16 @@ Deno.serve(async (req) => {
     let totalProfileViews = 0;
     let totalFollowerCount = 0;
     const allTopMedia: any[] = [];
+    const globalMetricsMap: Record<string, number> = {};
 
     for (const ig of igAccounts) {
       const { ig_id, page_token } = ig;
 
-      // Fetch IG User Insights (impressions, reach, profile_views)
+      // Fetch IG User Insights (comprehensive metrics)
+      const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views,website_clicks,email_contacts,get_directions_clicks,phone_call_clicks,text_message_clicks,accounts_engaged&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
         const insightsRes = await fetch(insightsUrl);
-        // FIX 5: Check response status before parsing
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
           throw new Error(`API error (${insightsRes.status}): ${errorBody}`);
@@ -131,15 +131,17 @@ Deno.serve(async (req) => {
         if (insightsData.data) {
           for (const metric of insightsData.data) {
             const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-            switch (metric.name) {
-              case "impressions": totalImpressions += total; break;
-              case "reach": totalReach += total; break;
-              case "profile_views": totalProfileViews += total; break;
-            }
+            metricsMap[metric.name] = (metricsMap[metric.name] || 0) + total;
           }
         }
+        totalImpressions += metricsMap.impressions || 0;
+        totalReach += metricsMap.reach || 0;
+        totalProfileViews += metricsMap.profile_views || 0;
+        // Accumulate per-account metrics into global map
+        for (const [k, v] of Object.entries(metricsMap)) {
+          globalMetricsMap[k] = (globalMetricsMap[k] || 0) + v;
+        }
       } catch (pageError) {
-        // FIX 6: Surface errors instead of swallowing
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
         console.error(`Sync error:`, errorMsg);
         await supabaseClient.from("platform_connections")
@@ -150,7 +152,6 @@ Deno.serve(async (req) => {
       // Fetch follower count (current snapshot)
       try {
         const userRes = await fetch(`${GRAPH_BASE}/${ig_id}?fields=followers_count&access_token=${page_token}`);
-        // FIX 5: Check response status before parsing
         if (!userRes.ok) {
           const errorBody = await userRes.text();
           throw new Error(`API error (${userRes.status}): ${errorBody}`);
@@ -167,11 +168,10 @@ Deno.serve(async (req) => {
           .eq("id", connectionId);
       }
 
-      // Fetch top media
+      // Fetch top media with expanded fields
       try {
-        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type&since=${sinceTs}&until=${untilTs}&limit=25&access_token=${page_token}`;
+        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,video_views,thumbnail_url&since=${sinceTs}&until=${untilTs}&limit=50&access_token=${page_token}`;
         const mediaRes = await fetch(mediaUrl);
-        // FIX 5: Check response status before parsing
         if (!mediaRes.ok) {
           const errorBody = await mediaRes.text();
           throw new Error(`API error (${mediaRes.status}): ${errorBody}`);
@@ -179,14 +179,31 @@ Deno.serve(async (req) => {
         const mediaData = await mediaRes.json();
 
         if (mediaData.data) {
+          // Batch fetch saves and video_views for top 20 posts
+          for (const mediaItem of mediaData.data.slice(0, 20)) {
+            try {
+              const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=saved,video_views,reach&access_token=${page_token}`;
+              const mediaInsightsRes = await fetch(mediaInsightsUrl);
+              if (mediaInsightsRes.ok) {
+                const mediaInsightsData = await mediaInsightsRes.json();
+                for (const insight of mediaInsightsData.data || []) {
+                  if (insight.name === 'saved') mediaItem.saves = insight.values?.[0]?.value || 0;
+                  if (insight.name === 'video_views') mediaItem.video_views_insight = insight.values?.[0]?.value || 0;
+                }
+              }
+            } catch {} // non-blocking
+          }
+
           for (const m of mediaData.data) {
             allTopMedia.push({
               caption: (m.caption || "").substring(0, 100),
               timestamp: m.timestamp,
               likes: m.like_count || 0,
               comments: m.comments_count || 0,
+              saves: m.saves || 0,
+              video_views: m.video_views || m.video_views_insight || 0,
               media_type: m.media_type,
-              total_engagement: (m.like_count || 0) + (m.comments_count || 0),
+              total_engagement: (m.like_count || 0) + (m.comments_count || 0) + (m.saves || 0),
             });
           }
         }
@@ -199,11 +216,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Aggregate media metrics
+    const totalLikes = allTopMedia.reduce((sum, m) => sum + (m.likes || 0), 0);
+    const totalComments = allTopMedia.reduce((sum, m) => sum + (m.comments || 0), 0);
+    const totalSaves = allTopMedia.reduce((sum, m) => sum + (m.saves || 0), 0);
+    const totalVideoViews = allTopMedia.reduce((sum, m) => sum + (m.video_views || 0), 0);
+    const reelCount = allTopMedia.filter(m => m.media_type === 'VIDEO' || m.media_type === 'REELS').length;
+    const imageCount = allTopMedia.filter(m => m.media_type === 'IMAGE').length;
+    const carouselCount = allTopMedia.filter(m => m.media_type === 'CAROUSEL_ALBUM').length;
+
     const topContent = allTopMedia
       .sort((a, b) => b.total_engagement - a.total_engagement)
       .slice(0, 10);
 
-    // FIX 4: Correct isRecentMonth condition
     const now = new Date();
     const isRecentMonth =
       (year === now.getFullYear() && month <= now.getMonth() + 1) ||
@@ -213,11 +238,19 @@ Deno.serve(async (req) => {
       impressions: totalImpressions,
       reach: totalReach,
       profile_visits: totalProfileViews,
-      engagement: allTopMedia.reduce((sum, m) => sum + m.total_engagement, 0),
-      engagement_rate: totalImpressions > 0 ? allTopMedia.reduce((sum, m) => sum + m.total_engagement, 0) / totalImpressions : 0,
+      website_clicks: globalMetricsMap.website_clicks || 0,
+      email_contacts: globalMetricsMap.email_contacts || 0,
+      engagement: totalLikes + totalComments + totalSaves,
+      likes: totalLikes,
+      comments: totalComments,
+      saves: totalSaves,
+      video_views: totalVideoViews,
       posts_published: allTopMedia.length,
+      reel_count: reelCount,
+      image_count: imageCount,
+      carousel_count: carouselCount,
+      engagement_rate: totalReach > 0 ? ((totalLikes + totalComments + totalSaves) / totalReach) * 100 : 0,
     };
-
     if (isRecentMonth && totalFollowerCount > 0) {
       metricsData.total_followers = totalFollowerCount;
     }
