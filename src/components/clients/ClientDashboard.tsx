@@ -144,8 +144,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
 
     const [currentRes, prevRes, trendRes, connectionsRes, configRes] = await Promise.all([
       query,
-      supabase.from('monthly_snapshots').select('platform, metrics_data, report_month, report_year')
-        .eq('client_id', clientId).eq('report_month', prevMonth).eq('report_year', prevYear),
+      showComparison
+        ? supabase.from('monthly_snapshots').select('platform, metrics_data, report_month, report_year')
+            .eq('client_id', clientId).eq('report_month', prevMonth).eq('report_year', prevYear)
+        : Promise.resolve({ data: [], error: null }),
       supabase.from('monthly_snapshots').select('platform, metrics_data, report_month, report_year')
         .eq('client_id', clientId)
         .or(`report_year.gt.${startYear},and(report_year.eq.${startYear},report_month.gte.${startMonth})`)
