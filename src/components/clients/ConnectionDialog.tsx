@@ -75,7 +75,8 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
     setConnectingId(conn.id);
 
     try {
-      const { data, error } = await supabase.functions.invoke('google-ads-connect', {
+      const functionName = conn.platform === 'meta_ads' ? 'meta-ads-connect' : 'google-ads-connect';
+      const { data, error } = await supabase.functions.invoke(functionName, {
         body: {
           connection_id: conn.id,
           redirect_url: window.location.origin,
