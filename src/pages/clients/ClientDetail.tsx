@@ -10,7 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3, CalendarIcon, History } from 'lucide-react';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
-import { PLATFORM_LABELS } from '@/types/database';
+import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
+import { formatPhone } from '@/lib/utils';
 import RecipientDialog from '@/components/clients/RecipientDialog';
 import ConnectionDialog from '@/components/clients/ConnectionDialog';
 import ClientEditDialog from '@/components/clients/ClientEditDialog';
@@ -237,6 +238,9 @@ const ClientDetail = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
+            {client.logo_url && (
+              <img src={client.logo_url} alt={`${client.company_name} logo`} className="h-10 w-10 rounded-lg object-contain border bg-muted" />
+            )}
             <div>
               <h1 className="text-2xl sm:text-3xl font-display">{client.company_name}</h1>
               <p className="text-muted-foreground font-body mt-1 text-sm">{client.full_name}{client.position && ` · ${client.position}`}</p>
@@ -307,7 +311,7 @@ const ClientDetail = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-4">
-            <ClientDashboard clientId={client.id} clientName={client.company_name} />
+            <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} />
           </TabsContent>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
@@ -316,7 +320,7 @@ const ClientDetail = () => {
                 <CardHeader><CardTitle className="font-display text-lg">Contact Info</CardTitle></CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   {client.email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" />{client.email}</div>}
-                  {client.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" />{client.phone}</div>}
+                  {client.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" />{formatPhone(client.phone)}</div>}
                   {client.website && <div className="flex items-center gap-2"><Globe className="h-4 w-4 text-muted-foreground" />{client.website}</div>}
                   {client.business_address && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />{client.business_address}</div>}
                   {client.account_manager && <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" />Manager: {client.account_manager}</div>}
@@ -384,8 +388,11 @@ const ClientDetail = () => {
                       return (
                         <div key={conn.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
                           <div>
-                            <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              {PLATFORM_LOGOS[conn.platform] && <img src={PLATFORM_LOGOS[conn.platform]} alt="" className="h-5 w-5 object-contain" />}
+                              <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground ml-7">
                               {conn.account_name ?? conn.account_id ?? 'No account selected'}
                               {conn.last_sync_at && ` · Last sync: ${new Date(conn.last_sync_at).toLocaleDateString()}`}
                             </p>

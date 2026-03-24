@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
-import { PLATFORM_LABELS } from '@/types/database';
+import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 
 interface ConnectionDialogProps {
   clientId: string;
@@ -141,8 +141,11 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
               const needsSelection = conn.is_connected && !conn.account_id;
               return (
                 <div key={conn.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {PLATFORM_LOGOS[conn.platform] && <img src={PLATFORM_LOGOS[conn.platform]} alt="" className="h-4 w-4 object-contain" />}
+                        <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
+                      </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {conn.account_name || conn.account_id || (needsSelection ? 'Account not selected' : 'Not connected')}
                     </p>
@@ -209,8 +212,11 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
               <SelectContent>
                 {PLATFORMS.map(p => (
                   <SelectItem key={p} value={p}>
-                    {PLATFORM_LABELS[p]}
-                    {OAUTH_SUPPORTED.includes(p) ? ' (OAuth)' : META_DEPENDENT.includes(p) ? ' (via Meta)' : ''}
+                    <span className="flex items-center gap-2">
+                      {PLATFORM_LOGOS[p] && <img src={PLATFORM_LOGOS[p]} alt="" className="h-4 w-4 object-contain" />}
+                      {PLATFORM_LABELS[p]}
+                      {OAUTH_SUPPORTED.includes(p) ? ' (OAuth)' : META_DEPENDENT.includes(p) ? ' (via Meta)' : ''}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

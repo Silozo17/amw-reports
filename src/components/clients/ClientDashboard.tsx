@@ -2,14 +2,14 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, TrendingUp, TrendingDown, Minus, DollarSign, Eye, MousePointerClick, Users, BarChart3, PieChartIcon } from 'lucide-react';
+import { Loader2, Sparkles, TrendingUp, TrendingDown, Minus, DollarSign, Eye, MousePointerClick, Users, BarChart3, PieChartIcon, AlertCircle } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line,
 } from 'recharts';
 import PlatformMetricsCard from './PlatformMetricsCard';
 import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from './DashboardHeader';
-import { PLATFORM_LABELS } from '@/types/database';
+import { PLATFORM_LABELS, getCurrencySymbol } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,7 @@ const PIE_COLORS = [
 interface ClientDashboardProps {
   clientId: string;
   clientName: string;
+  currencyCode?: string;
 }
 
 interface SnapshotData {
@@ -38,7 +39,8 @@ interface SnapshotData {
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const FULL_MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientDashboardProps) => {
+  const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
   const defaultMonth = now.getMonth() === 0 ? 12 : now.getMonth();
   const defaultYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
@@ -49,6 +51,7 @@ const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
     month: defaultMonth,
     year: defaultYear,
   });
+  const [hasAutoDetected, setHasAutoDetected] = useState(false);
 
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
@@ -137,8 +140,33 @@ const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
 
     const platforms = [...new Set((allSnapshotsRes.data ?? []).map((c: any) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
+
+    // Smart default: if current period has all zeros and we haven't auto-detected yet,
+    // find the most recent month with non-zero data
+    if (!hasAutoDetected && currentSnapshots.length === 0 && (trendRes.data ?? []).length > 0) {
+      const allSnaps = (trendRes.data ?? []) as SnapshotData[];
+      const monthsWithData = new Map<string, { m: number; y: number; total: number }>();
+      for (const s of allSnaps) {
+        const key = `${s.report_year}-${s.report_month}`;
+        const existing = monthsWithData.get(key) || { m: s.report_month, y: s.report_year, total: 0 };
+        const total = Object.values(s.metrics_data).reduce((sum, v) => sum + (typeof v === 'number' ? Math.abs(v) : 0), 0);
+        existing.total += total;
+        monthsWithData.set(key, existing);
+      }
+      const sorted = Array.from(monthsWithData.values()).filter(d => d.total > 0).sort((a, b) => {
+        if (a.y !== b.y) return b.y - a.y;
+        return b.m - a.m;
+      });
+      if (sorted.length > 0) {
+        setSelectedPeriod(prev => ({ ...prev, month: sorted[0].m, year: sorted[0].y }));
+      }
+      setHasAutoDetected(true);
+    } else if (!hasAutoDetected) {
+      setHasAutoDetected(true);
+    }
+
     setIsLoading(false);
-  }, [clientId, selectedPeriod]);
+  }, [clientId, selectedPeriod, hasAutoDetected]);
 
   useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
 
@@ -187,14 +215,14 @@ const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
     const calcChange = (curr: number, prev: number) => prev !== 0 ? ((curr - prev) / prev) * 100 : undefined;
 
     return [
-      { label: 'Total Spend', value: totalSpend, formatted: `$${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: calcChange(totalSpend, prevSpend), icon: DollarSign, isCost: true },
+      { label: 'Total Spend', value: totalSpend, formatted: `${currSymbol}${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: calcChange(totalSpend, prevSpend), icon: DollarSign, isCost: true },
       { label: 'Reach / Impressions', value: totalReach, formatted: totalReach >= 1000000 ? `${(totalReach / 1000000).toFixed(1)}M` : totalReach >= 1000 ? `${(totalReach / 1000).toFixed(1)}K` : totalReach.toLocaleString(), change: calcChange(totalReach, prevReach), icon: Eye },
       { label: 'Clicks', value: totalClicks, formatted: totalClicks >= 1000 ? `${(totalClicks / 1000).toFixed(1)}K` : totalClicks.toLocaleString(), change: calcChange(totalClicks, prevClicks), icon: MousePointerClick },
       { label: 'Engagement', value: totalEngagement, formatted: totalEngagement >= 1000 ? `${(totalEngagement / 1000).toFixed(1)}K` : totalEngagement.toLocaleString(), change: calcChange(totalEngagement, prevEngagement), icon: BarChart3 },
       ...(totalFollowers > 0 ? [{ label: 'Followers', value: totalFollowers, formatted: totalFollowers >= 1000 ? `${(totalFollowers / 1000).toFixed(1)}K` : totalFollowers.toLocaleString(), change: undefined as number | undefined, icon: Users }] : []),
       ...(totalConversions > 0 ? [{ label: 'Conversions', value: totalConversions, formatted: totalConversions.toLocaleString(), change: undefined as number | undefined, icon: TrendingUp }] : []),
     ];
-  }, [filtered, filteredPrev]);
+  }, [filtered, filteredPrev, currSymbol]);
 
   // Chart data
   const spendByPlatform = useMemo(() =>
@@ -253,6 +281,7 @@ const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
 
   const hasData = snapshots.length > 0;
   const hasFilteredData = filtered.length > 0;
+  const allZeros = hasFilteredData && kpis.every(k => k.value === 0);
 
   return (
     <div className="space-y-8">
@@ -282,6 +311,16 @@ const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
             <p className="text-muted-foreground font-medium">No data for this platform</p>
             <p className="text-sm text-muted-foreground/70">
               Try selecting "All Platforms" or sync data for this platform.
+            </p>
+          </CardContent>
+        </Card>
+      ) : allZeros ? (
+        <Card className="border-dashed border-warning/30 bg-warning/5">
+          <CardContent className="py-12 text-center space-y-3">
+            <AlertCircle className="h-10 w-10 mx-auto text-warning" />
+            <p className="text-muted-foreground font-medium">No activity recorded for {FULL_MONTH_NAMES[selectedPeriod.month]} {selectedPeriod.year}</p>
+            <p className="text-sm text-muted-foreground/70">
+              Try selecting a different month or sync historical data to find periods with activity.
             </p>
           </CardContent>
         </Card>
@@ -351,7 +390,7 @@ const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
                       >
                         {spendByPlatform.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                       </Pie>
-                      <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+                      <RechartsTooltip formatter={(value: number) => `${currSymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -462,6 +501,7 @@ const ClientDashboard = ({ clientId, clientName }: ClientDashboardProps) => {
                     platform={snapshot.platform}
                     metrics={snapshot.metrics_data}
                     prevMetrics={prevSnapshot?.metrics_data}
+                    currencyCode={currencyCode}
                   />
                 );
               })

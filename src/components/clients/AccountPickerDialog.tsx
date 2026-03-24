@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Check, ChevronRight, ChevronLeft, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
-import { PLATFORM_LABELS } from '@/types/database';
+import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import { cn } from '@/lib/utils';
 
 interface MetaPage {
@@ -184,7 +184,8 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-xl sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl">
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              {PLATFORM_LOGOS.meta_ads && <img src={PLATFORM_LOGOS.meta_ads} alt="" className="h-6 w-6 object-contain" />}
               Connect Meta Ads
             </DialogTitle>
             {/* Step indicator */}
@@ -358,7 +359,8 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">
+          <DialogTitle className="font-display text-xl flex items-center gap-2">
+            {platform && PLATFORM_LOGOS[platform] && <img src={PLATFORM_LOGOS[platform]} alt="" className="h-6 w-6 object-contain" />}
             Select {PLATFORM_LABELS[platform!]} Account
           </DialogTitle>
         </DialogHeader>

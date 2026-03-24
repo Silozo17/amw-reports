@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -6,9 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Pencil } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pencil, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatPhone } from '@/lib/utils';
 import type { Client } from '@/types/database';
+import { CURRENCY_OPTIONS } from '@/types/database';
 
 interface ClientEditDialogProps {
   client: Client;
@@ -18,6 +21,10 @@ interface ClientEditDialogProps {
 const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [form, setForm] = useState({
     full_name: client.full_name,
     company_name: client.company_name,
@@ -59,11 +66,24 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
         enable_explanations: client.enable_explanations,
         report_detail_level: client.report_detail_level,
       });
+      setLogoFile(null);
+      setLogoPreview(client.logo_url ?? null);
     }
   }, [open, client]);
 
   const handleChange = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo must be under 5MB');
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
   };
 
   const handleSave = async () => {
@@ -73,7 +93,29 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
     }
 
     setIsSubmitting(true);
-    const { error } = await supabase.from('clients').update(form).eq('id', client.id);
+
+    let logoUrl = client.logo_url;
+
+    if (logoFile) {
+      const ext = logoFile.name.split('.').pop();
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('client-logos').upload(path, logoFile);
+      if (uploadErr) {
+        toast.error('Failed to upload logo');
+        setIsSubmitting(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('client-logos').getPublicUrl(path);
+      logoUrl = urlData.publicUrl;
+    } else if (!logoPreview) {
+      logoUrl = null;
+    }
+
+    const { error } = await supabase.from('clients').update({
+      ...form,
+      phone: formatPhone(form.phone),
+      logo_url: logoUrl,
+    }).eq('id', client.id);
 
     if (error) {
       toast.error('Failed to update client');
@@ -99,6 +141,37 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            {logoPreview ? (
+              <div className="relative h-14 w-14 rounded-lg border overflow-hidden bg-muted shrink-0">
+                <img src={logoPreview} alt="Logo" className="h-full w-full object-contain" />
+                <button
+                  type="button"
+                  onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                  className="absolute top-0 right-0 rounded-full bg-destructive p-0.5"
+                >
+                  <X className="h-2.5 w-2.5 text-destructive-foreground" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors"
+              >
+                <Upload className="h-5 w-5 text-muted-foreground" />
+              </button>
+            )}
+            <div>
+              <p className="text-xs font-medium">Client Logo</p>
+              <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => fileInputRef.current?.click()}>
+                {logoPreview ? 'Change' : 'Upload'}
+              </Button>
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
+          </div>
+
           <div className="grid gap-3 grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-sm">Full Name *</Label>
@@ -117,8 +190,8 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
               <Input type="email" value={form.email} onChange={e => handleChange('email', e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Phone</Label>
-              <Input value={form.phone} onChange={e => handleChange('phone', e.target.value)} />
+              <Label className="text-sm">Phone (no country code)</Label>
+              <Input value={form.phone} onChange={e => handleChange('phone', e.target.value)} placeholder="e.g. 7911 123456" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">Website</Label>
@@ -134,7 +207,14 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">Currency</Label>
-              <Input value={form.preferred_currency} onChange={e => handleChange('preferred_currency', e.target.value)} />
+              <Select value={form.preferred_currency} onValueChange={v => handleChange('preferred_currency', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CURRENCY_OPTIONS.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
