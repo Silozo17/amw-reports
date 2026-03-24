@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users, BarChart3, PieChartIcon, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users, BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,

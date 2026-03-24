@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, ChevronRight, ChevronLeft, Info } from 'lucide-react';
+import { Loader2, Check, ChevronRight, ChevronLeft, Info, BarChart3, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
