@@ -35,14 +35,14 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 const METRIC_LABELS: Record<string, string> = {
   spend: "Spend", impressions: "Impressions", clicks: "Clicks",
-  ctr: "CTR", conversions: "Conversions", cpc: "CPC",
+  ctr: "CTR", conversions: "Conversions", cpc: "CPC", cpm: "CPM",
   reach: "Reach", total_followers: "Followers", follower_growth: "Growth",
   engagement: "Engagement", engagement_rate: "Eng. Rate",
   likes: "Likes", comments: "Comments", shares: "Shares",
   video_views: "Video Views", posts_published: "Posts",
   cost_per_conversion: "Cost/Conv", conversion_rate: "Conv. Rate",
   leads: "Leads", saves: "Saves", profile_visits: "Profile Visits",
-  page_likes: "Page Likes", link_clicks: "Link Clicks",
+  page_likes: "Page Likes", page_views: "Page Views", link_clicks: "Link Clicks",
   audience_growth_rate: "Audience Growth",
 };
 

@@ -97,6 +97,16 @@ Deno.serve(async (req) => {
         const insightsRes = await fetch(insightsUrl);
         const insightsData = await insightsRes.json();
 
+        if (insightsData.error) {
+          const errMsg = insightsData.error.message || "Unknown Graph API error";
+          console.error(`Facebook Insights API error for page ${pageId}:`, errMsg);
+          // Surface the error on the connection
+          await supabase.from("platform_connections").update({
+            last_error: `Page ${page.name || pageId}: ${errMsg}`,
+            last_sync_status: "partial",
+          }).eq("id", connectionId);
+        }
+
         if (insightsData.data) {
           for (const metric of insightsData.data) {
             const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
@@ -109,7 +119,13 @@ Deno.serve(async (req) => {
           }
         }
       } catch (e) {
-        console.warn(`Could not fetch insights for page ${pageId}:`, e);
+        const errMsg = e instanceof Error ? e.message : "Unknown error";
+        console.error(`Could not fetch insights for page ${pageId}:`, errMsg);
+        // Surface the error instead of silently swallowing it
+        await supabase.from("platform_connections").update({
+          last_error: `Failed to fetch insights for page ${page.name || pageId}: ${errMsg}`,
+          last_sync_status: "partial",
+        }).eq("id", connectionId);
       }
 
       // Fetch top posts
