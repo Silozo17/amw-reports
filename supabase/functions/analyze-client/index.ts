@@ -139,6 +139,9 @@ Data: ${dataContext}`
     const aiResult = await response.json();
     const analysis = aiResult.choices?.[0]?.message?.content ?? "Unable to generate analysis.";
 
+    // Record successful call for rate limiting
+    rateLimitMap.set(client_id, Date.now());
+
     return new Response(JSON.stringify({ analysis }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
