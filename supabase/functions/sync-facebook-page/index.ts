@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
-    // FIX 7: Token expiry check
+    // Token expiry check
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
       await supabaseClient.from("platform_connections")
         .update({ last_error: "Token expired. Please reconnect.", last_sync_status: "failed" })
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       throw new Error("No connected Meta Ads account found. Connect Meta Ads first to enable Facebook Page sync.");
     }
 
-    // FIX 7: Meta token expiry check
+    // Meta token expiry check
     if (metaConn.token_expires_at && new Date(metaConn.token_expires_at) < new Date()) {
       await supabaseClient.from("platform_connections")
         .update({ last_error: "Meta Ads token expired. Please reconnect Meta Ads.", last_sync_status: "failed" })
@@ -100,10 +100,10 @@ Deno.serve(async (req) => {
     let totalEngagement = 0;
     let totalPageViews = 0;
     let totalFollowerAdds = 0;
+    const metricsAccum: Record<string, number> = {};
     const allTopPosts: any[] = [];
 
     for (const page of pages) {
-      // FIX 2: Require page-level access token
       const pageToken = page.access_token;
       if (!pageToken) {
         const errorMsg = `No Page Access Token for page ${page.id}. Reconnect Meta Ads.`;
@@ -115,11 +115,10 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // Fetch Page Insights
+      // Fetch Page Insights (comprehensive metrics)
       try {
-        const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_impressions,page_post_engagements,page_views_total,page_fan_adds&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_impressions,page_impressions_organic,page_impressions_paid,page_post_engagements,page_views_total,page_fan_adds,page_fan_removes,page_fans,page_reach,page_video_views,page_actions_post_reactions_total&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const insightsRes = await fetch(insightsUrl);
-        // FIX 5: Check response status before parsing
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
           throw new Error(`API error (${insightsRes.status}): ${errorBody}`);
@@ -140,14 +139,19 @@ Deno.serve(async (req) => {
             const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
             switch (metric.name) {
               case "page_impressions": totalImpressions += total; break;
+              case "page_impressions_organic": metricsAccum.organic_impressions = (metricsAccum.organic_impressions || 0) + total; break;
+              case "page_impressions_paid": metricsAccum.paid_impressions = (metricsAccum.paid_impressions || 0) + total; break;
               case "page_post_engagements": totalEngagement += total; break;
               case "page_views_total": totalPageViews += total; break;
               case "page_fan_adds": totalFollowerAdds += total; break;
+              case "page_fan_removes": metricsAccum.follower_removes = (metricsAccum.follower_removes || 0) + total; break;
+              case "page_fans": metricsAccum.total_fans = Math.max(metricsAccum.total_fans || 0, total); break;
+              case "page_reach": metricsAccum.reach = (metricsAccum.reach || 0) + total; break;
+              case "page_video_views": metricsAccum.video_views = (metricsAccum.video_views || 0) + total; break;
             }
           }
         }
       } catch (pageError) {
-        // FIX 6: Surface errors instead of swallowing
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
         console.error(`Sync error:`, errorMsg);
         await supabaseClient.from("platform_connections")
@@ -155,11 +159,26 @@ Deno.serve(async (req) => {
           .eq("id", connectionId);
       }
 
-      // Fetch top posts
+      // Fetch video stats separately
       try {
-        const postsUrl = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,likes.summary(true),comments.summary(true),shares&since=${startDate}&until=${endDate}&limit=10&access_token=${pageToken}`;
+        const videoUrl = `${GRAPH_BASE}/${pageId}/video_posts?fields=length,description,created_time,video_insights{name,values}&since=${startDate}&until=${endDate}&limit=25&access_token=${pageToken}`;
+        const videoRes = await fetch(videoUrl);
+        if (videoRes.ok) {
+          const videoData = await videoRes.json();
+          for (const video of videoData.data || []) {
+            for (const insight of video.video_insights?.data || []) {
+              if (insight.name === 'total_video_views') {
+                metricsAccum.video_views = (metricsAccum.video_views || 0) + (insight.values?.[0]?.value || 0);
+              }
+            }
+          }
+        }
+      } catch {} // non-blocking
+
+      // Fetch top posts with reactions and shares
+      try {
+        const postsUrl = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,likes.summary(true),comments.summary(true),shares,reactions.summary(true),full_picture&since=${startDate}&until=${endDate}&limit=25&access_token=${pageToken}`;
         const postsRes = await fetch(postsUrl);
-        // FIX 5: Check response status before parsing
         if (!postsRes.ok) {
           const errorBody = await postsRes.text();
           throw new Error(`API error (${postsRes.status}): ${errorBody}`);
@@ -183,7 +202,6 @@ Deno.serve(async (req) => {
           }
         }
       } catch (pageError) {
-        // FIX 6: Surface errors instead of swallowing
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
         console.error(`Sync error:`, errorMsg);
         await supabaseClient.from("platform_connections")
@@ -199,10 +217,20 @@ Deno.serve(async (req) => {
 
     const metricsData = {
       impressions: totalImpressions,
+      organic_impressions: metricsAccum.organic_impressions || 0,
+      paid_impressions: metricsAccum.paid_impressions || 0,
+      reach: metricsAccum.reach || 0,
       engagement: totalEngagement,
       page_views: totalPageViews,
       follower_growth: totalFollowerAdds,
-      engagement_rate: totalImpressions > 0 ? totalEngagement / totalImpressions : 0,
+      follower_removes: metricsAccum.follower_removes || 0,
+      total_followers: metricsAccum.total_fans || 0,
+      video_views: metricsAccum.video_views || 0,
+      likes: allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
+      comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
+      shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
+      posts_published: allTopPosts.length,
+      engagement_rate: totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0,
       pages_count: pages.length,
     };
 
