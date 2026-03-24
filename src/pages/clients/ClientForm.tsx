@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Upload, X } from 'lucide-react';
+import { ArrowLeft, Upload, X, Search, Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { formatPhone } from '@/lib/utils';
 import { CURRENCY_OPTIONS } from '@/types/database';
@@ -22,6 +23,9 @@ const ClientForm = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ name: string; address: string; phone: string; website: string }>>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [form, setForm] = useState({
     full_name: '',
@@ -45,6 +49,41 @@ const ClientForm = () => {
 
   const handleChange = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleGoogleSearch = async () => {
+    if (!form.company_name.trim()) {
+      toast.error('Enter a company name first');
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-places-lookup', {
+        body: { query: form.company_name },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); return; }
+      setSearchResults(data.results || []);
+      setSearchOpen(true);
+      if ((data.results || []).length === 0) toast.info('No results found');
+    } catch (e) {
+      console.error('Google search error:', e);
+      toast.error('Failed to search Google');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const applySearchResult = (result: { name: string; address: string; phone: string; website: string }) => {
+    setForm(prev => ({
+      ...prev,
+      company_name: result.name || prev.company_name,
+      business_address: result.address || prev.business_address,
+      phone: formatPhone(result.phone) || prev.phone,
+      website: result.website || prev.website,
+    }));
+    setSearchOpen(false);
+    toast.success('Details filled from Google');
   };
 
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,7 +199,35 @@ const ClientForm = () => {
               </div>
               <div className="space-y-2">
                 <Label>Company Name *</Label>
-                <Input value={form.company_name} onChange={e => handleChange('company_name', e.target.value)} required />
+                <div className="flex gap-2">
+                  <Input value={form.company_name} onChange={e => handleChange('company_name', e.target.value)} required className="flex-1" />
+                  <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" size="icon" onClick={handleGoogleSearch} disabled={isSearching} title="Search Google for business details">
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0" align="start">
+                      {searchResults.length > 0 ? (
+                        <div className="max-h-64 overflow-y-auto">
+                          {searchResults.map((r, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className="w-full text-left p-3 hover:bg-muted/50 border-b last:border-b-0 transition-colors"
+                              onClick={() => applySearchResult(r)}
+                            >
+                              <p className="text-sm font-medium">{r.name}</p>
+                              {r.address && <p className="text-xs text-muted-foreground mt-0.5">{r.address}</p>}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="p-3 text-sm text-muted-foreground">No results</p>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Position</Label>
