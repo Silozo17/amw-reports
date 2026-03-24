@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabaseClient = createClient(supabaseUrl, serviceRoleKey);
 
   let connectionId = "";
   let clientId = "";
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: conn, error: connError } = await supabase
+    const { data: conn, error: connError } = await supabaseClient
       .from("platform_connections")
       .select("*")
       .eq("id", connectionId)
@@ -46,8 +46,16 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
+    // FIX 7: Token expiry check
+    if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
+      await supabaseClient.from("platform_connections")
+        .update({ last_error: "Token expired. Please reconnect.", last_sync_status: "failed" })
+        .eq("id", connectionId);
+      return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Find meta_ads connection to get Instagram business account IDs
-    const { data: metaConn } = await supabase
+    const { data: metaConn } = await supabaseClient
       .from("platform_connections")
       .select("*")
       .eq("client_id", clientId)
@@ -59,18 +67,34 @@ Deno.serve(async (req) => {
       throw new Error("No connected Meta Ads account found. Connect Meta Ads first to enable Instagram sync.");
     }
 
+    // FIX 7: Meta token expiry check
+    if (metaConn.token_expires_at && new Date(metaConn.token_expires_at) < new Date()) {
+      await supabaseClient.from("platform_connections")
+        .update({ last_error: "Meta Ads token expired. Please reconnect Meta Ads.", last_sync_status: "failed" })
+        .eq("id", connectionId);
+      return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const metadata = metaConn.metadata as any;
     const pages = metadata?.pages || [];
+    // FIX 3: Require page-level access token, skip pages without one
     const igAccounts = pages
       .filter((p: any) => p.instagram?.id)
-      .map((p: any) => ({ ig_id: p.instagram.id, ig_username: p.instagram.username, page_token: p.access_token || metaConn.access_token }));
+      .map((p: any) => {
+        if (!p.access_token) {
+          console.error(`No Page token for IG account ${p.instagram?.id}. Reconnect Meta.`);
+          return null;
+        }
+        return { ig_id: p.instagram.id, ig_username: p.instagram.username, page_token: p.access_token };
+      })
+      .filter(Boolean);
 
     if (igAccounts.length === 0) {
       throw new Error("No Instagram Business accounts found. Make sure your Facebook Pages have linked Instagram accounts.");
     }
 
     // Create sync log
-    const { data: syncLog } = await supabase
+    const { data: syncLog } = await supabaseClient
       .from("sync_logs")
       .insert({ client_id: clientId, platform: "instagram", status: "running", report_month: month, report_year: year })
       .select("id")
@@ -97,6 +121,11 @@ Deno.serve(async (req) => {
       try {
         const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
         const insightsRes = await fetch(insightsUrl);
+        // FIX 5: Check response status before parsing
+        if (!insightsRes.ok) {
+          const errorBody = await insightsRes.text();
+          throw new Error(`API error (${insightsRes.status}): ${errorBody}`);
+        }
         const insightsData = await insightsRes.json();
 
         if (insightsData.data) {
@@ -109,25 +138,44 @@ Deno.serve(async (req) => {
             }
           }
         }
-      } catch (e) {
-        console.warn(`Could not fetch IG insights for ${ig_id}:`, e);
+      } catch (pageError) {
+        // FIX 6: Surface errors instead of swallowing
+        const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
+        console.error(`Sync error:`, errorMsg);
+        await supabaseClient.from("platform_connections")
+          .update({ last_error: errorMsg, last_sync_status: "partial" })
+          .eq("id", connectionId);
       }
 
       // Fetch follower count (current snapshot)
       try {
         const userRes = await fetch(`${GRAPH_BASE}/${ig_id}?fields=followers_count&access_token=${page_token}`);
+        // FIX 5: Check response status before parsing
+        if (!userRes.ok) {
+          const errorBody = await userRes.text();
+          throw new Error(`API error (${userRes.status}): ${errorBody}`);
+        }
         const userData = await userRes.json();
         if (userData.followers_count) {
           totalFollowerCount += userData.followers_count;
         }
-      } catch (e) {
-        console.warn(`Could not fetch follower count for ${ig_id}:`, e);
+      } catch (pageError) {
+        const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
+        console.error(`Sync error:`, errorMsg);
+        await supabaseClient.from("platform_connections")
+          .update({ last_error: errorMsg, last_sync_status: "partial" })
+          .eq("id", connectionId);
       }
 
       // Fetch top media
       try {
         const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type&since=${sinceTs}&until=${untilTs}&limit=25&access_token=${page_token}`;
         const mediaRes = await fetch(mediaUrl);
+        // FIX 5: Check response status before parsing
+        if (!mediaRes.ok) {
+          const errorBody = await mediaRes.text();
+          throw new Error(`API error (${mediaRes.status}): ${errorBody}`);
+        }
         const mediaData = await mediaRes.json();
 
         if (mediaData.data) {
@@ -142,8 +190,12 @@ Deno.serve(async (req) => {
             });
           }
         }
-      } catch (e) {
-        console.warn(`Could not fetch media for ${ig_id}:`, e);
+      } catch (pageError) {
+        const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
+        console.error(`Sync error:`, errorMsg);
+        await supabaseClient.from("platform_connections")
+          .update({ last_error: errorMsg, last_sync_status: "partial" })
+          .eq("id", connectionId);
       }
     }
 
@@ -151,11 +203,11 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.total_engagement - a.total_engagement)
       .slice(0, 10);
 
-    // Only include total_followers for current or previous month (we can't know historical counts)
+    // FIX 4: Correct isRecentMonth condition
     const now = new Date();
     const isRecentMonth =
-      (year === now.getFullYear() && month >= now.getMonth()) || // current or prev month this year
-      (year === now.getFullYear() - 1 && month === 12 && now.getMonth() === 0); // Dec when it's Jan
+      (year === now.getFullYear() && month <= now.getMonth() + 1) ||
+      (year === now.getFullYear() - 1 && month === 12 && now.getMonth() === 0);
 
     const metricsData: Record<string, number> = {
       impressions: totalImpressions,
@@ -171,7 +223,7 @@ Deno.serve(async (req) => {
     }
 
     // Upsert monthly snapshot
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseClient
       .from("monthly_snapshots")
       .select("id, snapshot_locked")
       .eq("client_id", clientId)
@@ -183,15 +235,15 @@ Deno.serve(async (req) => {
     if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
 
     if (existing) {
-      await supabase.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: topContent }).eq("id", existing.id);
+      await supabaseClient.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: topContent }).eq("id", existing.id);
     } else {
-      await supabase.from("monthly_snapshots").insert({ client_id: clientId, platform: "instagram", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent });
+      await supabaseClient.from("monthly_snapshots").insert({ client_id: clientId, platform: "instagram", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent });
     }
 
-    await supabase.from("platform_connections").update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null }).eq("id", connectionId);
+    await supabaseClient.from("platform_connections").update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null }).eq("id", connectionId);
 
     if (syncLog?.id) {
-      await supabase.from("sync_logs").update({ status: "success", completed_at: new Date().toISOString() }).eq("id", syncLog.id);
+      await supabaseClient.from("sync_logs").update({ status: "success", completed_at: new Date().toISOString() }).eq("id", syncLog.id);
     }
 
     return new Response(
@@ -201,7 +253,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error("Instagram sync error:", e);
     if (connectionId) {
-      await supabase.from("platform_connections").update({ last_sync_status: "failed", last_error: e instanceof Error ? e.message : "Unknown error" }).eq("id", connectionId);
+      await supabaseClient.from("platform_connections").update({ last_sync_status: "failed", last_error: e instanceof Error ? e.message : "Unknown error" }).eq("id", connectionId);
     }
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),

@@ -4,13 +4,18 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plug, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plug, RefreshCw, AlertCircle, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformConnection } from '@/types/database';
+
+const META_PERMISSIONS_UPDATE_DATE = '2026-03-24';
 
 const Connections = () => {
   const [connections, setConnections] = useState<(PlatformConnection & { clients?: { company_name: string } | null })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    return localStorage.getItem('meta-reconnect-banner-dismissed') === 'true';
+  });
 
   useEffect(() => {
     const fetchConnections = async () => {
@@ -24,6 +29,16 @@ const Connections = () => {
     fetchConnections();
   }, []);
 
+  const handleDismissBanner = () => {
+    setBannerDismissed(true);
+    localStorage.setItem('meta-reconnect-banner-dismissed', 'true');
+  };
+
+  // Show banner if any meta_ads connection was created before the permissions update date
+  const showMetaBanner = !bannerDismissed && connections.some(
+    c => c.platform === 'meta_ads' && c.is_connected && new Date(c.created_at) < new Date(META_PERMISSIONS_UPDATE_DATE)
+  );
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -31,6 +46,21 @@ const Connections = () => {
           <h1 className="text-3xl font-display">Connections</h1>
           <p className="text-muted-foreground font-body mt-1">Platform integrations across all clients</p>
         </div>
+
+        {/* FIX 8: Meta reconnect banner */}
+        {showMetaBanner && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-600 dark:text-yellow-400" />
+              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                ⚠️ Meta permissions have been updated. Please reconnect your Meta Ads account to enable full data access.
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={handleDismissBanner}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading connections...</div>
