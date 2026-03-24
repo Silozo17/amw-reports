@@ -74,6 +74,15 @@ Deno.serve(async (req) => {
     const yoySnapshots = yoySnapshotsRes.data ?? [];
     const configs = configRes.data ?? [];
 
+    if (snapshots.length === 0) {
+      return new Response(JSON.stringify({ 
+        error: "No data snapshots found for this period. Please sync platform data before generating a report." 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Generate AI insights
     let aiSummary = "";
     let aiInsights = "";
