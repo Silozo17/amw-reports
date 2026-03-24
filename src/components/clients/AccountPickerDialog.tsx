@@ -373,35 +373,43 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
             {accounts.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  {platform === 'google_ads' ? 'Select a Customer Account:' :
+                  {platform === 'google_ads' ? 'Select a Google Ads Account:' :
                    platform === 'tiktok' ? 'Select an Advertiser Account:' : 'Select an Ad Account:'}
                 </p>
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {accounts.map(acct => (
-                    <button
-                      key={acct.id}
-                      onClick={() => setSelectedAccountId(acct.id)}
-                      className={cn(
-                        'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
-                        selectedAccountId === acct.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-card'
-                      )}
-                    >
-                      <div className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-                        selectedAccountId === acct.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground'
-                      )}>
-                        {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : acct.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{acct.name}</p>
-                        <p className="text-xs text-muted-foreground">ID: {acct.id}</p>
-                      </div>
-                    </button>
-                  ))}
+                  {accounts.map(acct => {
+                    const isGenericName = acct.name.startsWith('Google Ads (');
+                    return (
+                      <button
+                        key={acct.id}
+                        onClick={() => setSelectedAccountId(acct.id)}
+                        className={cn(
+                          'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                          selectedAccountId === acct.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card'
+                        )}
+                      >
+                        <div className={cn(
+                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                          selectedAccountId === acct.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
+                        )}>
+                          {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : platform === 'google_ads' ? '📊' : acct.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{acct.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {platform === 'google_ads' ? `Account ID: ${acct.id.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3')}` : `ID: ${acct.id}`}
+                          </p>
+                          {platform === 'google_ads' && isGenericName && (
+                            <p className="text-[10px] text-warning mt-0.5">Name will update after reconnecting</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
