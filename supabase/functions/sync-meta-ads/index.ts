@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     const insightsParams = new URLSearchParams({
       access_token: accessToken,
       level: "campaign",
-      fields: "campaign_name,campaign_id,impressions,clicks,spend,actions,action_values,ctr,cpc,cpm,reach,frequency",
+      fields: "campaign_name,campaign_id,impressions,clicks,spend,actions,action_values,ctr,cpc,cpm,reach,frequency,link_clicks,video_play_actions",
       time_range: JSON.stringify({ since: startDate, until: endDate }),
       limit: "500",
     });
@@ -130,6 +130,8 @@ Deno.serve(async (req) => {
     let totalConversions = 0;
     let totalConversionsValue = 0;
     let totalReach = 0;
+    let totalLinkClicks = 0;
+    let totalVideoPlays = 0;
 
     const campaigns: any[] = [];
 
@@ -167,7 +169,12 @@ Deno.serve(async (req) => {
       totalConversions += conversions;
       totalConversionsValue += conversionsValue;
       totalReach += reach;
-
+      totalLinkClicks += Number(row.link_clicks || 0);
+      if (row.video_play_actions) {
+        for (const action of row.video_play_actions) {
+          totalVideoPlays += Number(action.value || 0);
+        }
+      }
       campaigns.push({
         name: row.campaign_name || "Unknown",
         id: row.campaign_id,
@@ -188,6 +195,7 @@ Deno.serve(async (req) => {
     const overallCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
     const overallCpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
     const costPerConversion = totalConversions > 0 ? totalSpend / totalConversions : 0;
+    const totalFrequency = totalImpressions > 0 && totalReach > 0 ? totalImpressions / totalReach : 0;
 
     const metricsData = {
       impressions: totalImpressions,
@@ -201,6 +209,9 @@ Deno.serve(async (req) => {
       cost_per_conversion: costPerConversion,
       roas: totalSpend > 0 ? totalConversionsValue / totalSpend : 0,
       reach: totalReach,
+      link_clicks: totalLinkClicks,
+      frequency: totalFrequency,
+      video_views: totalVideoPlays,
       campaign_count: campaigns.length,
     };
 

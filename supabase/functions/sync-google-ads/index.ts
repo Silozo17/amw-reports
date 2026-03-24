@@ -165,7 +165,9 @@ Deno.serve(async (req) => {
         metrics.conversions_value,
         metrics.ctr,
         metrics.average_cpc,
-        metrics.average_cpm
+        metrics.average_cpm,
+        metrics.search_impression_share,
+        metrics.search_rank_lost_impression_share
       FROM campaign
       WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
         AND campaign.status != 'REMOVED'
@@ -204,6 +206,7 @@ Deno.serve(async (req) => {
     let totalCostMicros = 0;
     let totalConversions = 0;
     let totalConversionsValue = 0;
+    let totalSearchImpressionShare = 0;
 
     const campaigns: any[] = [];
 
@@ -220,7 +223,7 @@ Deno.serve(async (req) => {
       totalCostMicros += costMicros;
       totalConversions += conversions;
       totalConversionsValue += conversionsValue;
-
+      totalSearchImpressionShare += Number(m.searchImpressionShare || 0);
       campaigns.push({
         name: row.campaign?.name || "Unknown",
         id: row.campaign?.id,
@@ -253,6 +256,9 @@ Deno.serve(async (req) => {
       cpm: overallCpm,
       cost_per_conversion: costPerConversion,
       roas: totalCost > 0 ? totalConversionsValue / totalCost : 0,
+      reach: 0,
+      conversion_rate: totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0,
+      search_impression_share: totalSearchImpressionShare,
       campaign_count: campaigns.length,
     };
 
