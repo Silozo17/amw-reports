@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PLATFORM_LABELS, METRIC_LABELS } from '@/types/database';
+import { PLATFORM_LABELS, METRIC_LABELS, PLATFORM_LOGOS, getCurrencySymbol } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 import MetricTooltip from './MetricTooltip';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -9,11 +9,12 @@ interface PlatformMetricsCardProps {
   platform: PlatformType;
   metrics: Record<string, number>;
   prevMetrics?: Record<string, number>;
+  currencyCode?: string;
 }
 
-const formatValue = (key: string, value: number): string => {
+const formatValue = (key: string, value: number, currencySymbol: string): string => {
   if (key === 'spend' || key === 'cpc' || key === 'cost_per_conversion') {
-    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (key === 'ctr' || key === 'engagement_rate' || key === 'conversion_rate' || key === 'audience_growth_rate') {
     return `${value.toFixed(2)}%`;
@@ -23,19 +24,12 @@ const formatValue = (key: string, value: number): string => {
   return value % 1 !== 0 ? value.toFixed(2) : value.toLocaleString();
 };
 
-const PLATFORM_ICONS: Record<string, string> = {
-  google_ads: '📊',
-  meta_ads: '📱',
-  facebook: '📘',
-  instagram: '📸',
-  tiktok: '🎵',
-  linkedin: '💼',
-};
-
-const PlatformMetricsCard = ({ platform, metrics, prevMetrics }: PlatformMetricsCardProps) => {
+const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'GBP' }: PlatformMetricsCardProps) => {
   const metricEntries = Object.entries(metrics).filter(
     ([_, val]) => typeof val === 'number'
   );
+  const currencySymbol = getCurrencySymbol(currencyCode);
+  const logo = PLATFORM_LOGOS[platform];
 
   if (metricEntries.length === 0) return null;
 
@@ -43,7 +37,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics }: PlatformMetrics
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="font-display text-base flex items-center gap-2">
-          <span className="text-xl">{PLATFORM_ICONS[platform] || '📈'}</span>
+          {logo && <img src={logo} alt="" className="h-6 w-6 object-contain" />}
           {PLATFORM_LABELS[platform] || platform}
         </CardTitle>
       </CardHeader>
@@ -68,7 +62,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics }: PlatformMetrics
                   </p>
                   <MetricTooltip metricKey={key} />
                 </div>
-                <p className="text-xl font-bold font-display">{formatValue(key, value)}</p>
+                <p className="text-xl font-bold font-display">{formatValue(key, value, currencySymbol)}</p>
                 {change !== undefined ? (
                   <div className={cn(
                     'flex items-center gap-1 text-xs font-medium',

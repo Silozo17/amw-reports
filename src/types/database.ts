@@ -1,3 +1,11 @@
+import allSocialsLogo from '@/assets/logos/all-socials.webp';
+import facebookLogo from '@/assets/logos/facebook.webp';
+import googleLogo from '@/assets/logos/google.webp';
+import instagramLogo from '@/assets/logos/instagram.webp';
+import linkedinLogo from '@/assets/logos/linkedin.webp';
+import metaLogo from '@/assets/logos/meta.webp';
+import tiktokLogo from '@/assets/logos/tiktok.webp';
+
 export type AppRole = 'owner' | 'manager';
 export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
@@ -37,6 +45,7 @@ export interface Client {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  logo_url: string | null;
 }
 
 export interface ClientRecipient {
@@ -109,6 +118,30 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   instagram: 'Instagram',
   tiktok: 'TikTok',
   linkedin: 'LinkedIn',
+};
+
+export const PLATFORM_LOGOS: Record<string, string> = {
+  all: allSocialsLogo,
+  google_ads: googleLogo,
+  meta_ads: metaLogo,
+  facebook: facebookLogo,
+  instagram: instagramLogo,
+  tiktok: tiktokLogo,
+  linkedin: linkedinLogo,
+};
+
+export const CURRENCY_OPTIONS = [
+  { value: 'GBP', label: 'GBP (£)', symbol: '£' },
+  { value: 'EUR', label: 'EUR (€)', symbol: '€' },
+  { value: 'USD', label: 'USD ($)', symbol: '$' },
+  { value: 'PLN', label: 'PLN (zł)', symbol: 'zł' },
+  { value: 'CAD', label: 'CAD (C$)', symbol: 'C$' },
+  { value: 'AUD', label: 'AUD (A$)', symbol: 'A$' },
+  { value: 'NZD', label: 'NZD (NZ$)', symbol: 'NZ$' },
+];
+
+export const getCurrencySymbol = (code: string): string => {
+  return CURRENCY_OPTIONS.find(c => c.value === code)?.symbol ?? code;
 };
 
 export const METRIC_LABELS: Record<string, string> = {

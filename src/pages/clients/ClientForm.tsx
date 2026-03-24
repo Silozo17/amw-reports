@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,14 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatPhone } from '@/lib/utils';
+import { CURRENCY_OPTIONS } from '@/types/database';
 
 const ClientForm = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     full_name: '',
@@ -27,8 +33,8 @@ const ClientForm = () => {
     website: '',
     notes: '',
     is_active: true,
-    preferred_currency: 'AUD',
-    preferred_timezone: 'Australia/Sydney',
+    preferred_currency: 'GBP',
+    preferred_timezone: 'Europe/London',
     account_manager: '',
     enable_upsell: false,
     enable_mom_comparison: true,
@@ -41,6 +47,17 @@ const ClientForm = () => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo must be under 5MB');
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.full_name || !form.company_name) {
@@ -49,8 +66,26 @@ const ClientForm = () => {
     }
 
     setIsSubmitting(true);
+
+    let logoUrl: string | null = null;
+
+    if (logoFile) {
+      const ext = logoFile.name.split('.').pop();
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('client-logos').upload(path, logoFile);
+      if (uploadErr) {
+        toast.error('Failed to upload logo');
+        setIsSubmitting(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('client-logos').getPublicUrl(path);
+      logoUrl = urlData.publicUrl;
+    }
+
     const { error } = await supabase.from('clients').insert({
       ...form,
+      phone: formatPhone(form.phone),
+      logo_url: logoUrl,
       created_by: user?.id,
     });
 
@@ -77,6 +112,45 @@ const ClientForm = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Logo Upload */}
+          <Card>
+            <CardHeader><CardTitle className="font-display text-lg">Client Logo</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                {logoPreview ? (
+                  <div className="relative h-20 w-20 rounded-lg border overflow-hidden bg-muted">
+                    <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                      className="absolute top-0.5 right-0.5 rounded-full bg-destructive p-0.5"
+                    >
+                      <X className="h-3 w-3 text-destructive-foreground" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-20 w-20 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors"
+                  >
+                    <Upload className="h-6 w-6 text-muted-foreground" />
+                  </button>
+                )}
+                <div>
+                  <p className="text-sm font-medium">Upload a logo</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG or WEBP, max 5MB. Displayed on reports.</p>
+                  {!logoPreview && (
+                    <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => fileInputRef.current?.click()}>
+                      Choose File
+                    </Button>
+                  )}
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle className="font-display text-lg">Contact Details</CardTitle></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
@@ -97,8 +171,8 @@ const ClientForm = () => {
                 <Input type="email" value={form.email} onChange={e => handleChange('email', e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input value={form.phone} onChange={e => handleChange('phone', e.target.value)} />
+                <Label>Phone (local format, no country code)</Label>
+                <Input value={form.phone} onChange={e => handleChange('phone', e.target.value)} placeholder="e.g. 7911 123456" />
               </div>
               <div className="space-y-2">
                 <Label>Website</Label>
@@ -114,7 +188,14 @@ const ClientForm = () => {
               </div>
               <div className="space-y-2">
                 <Label>Currency</Label>
-                <Input value={form.preferred_currency} onChange={e => handleChange('preferred_currency', e.target.value)} />
+                <Select value={form.preferred_currency} onValueChange={v => handleChange('preferred_currency', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCY_OPTIONS.map(c => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

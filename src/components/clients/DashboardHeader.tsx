@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, subMonths, addMonths } from 'date-fns';
 import type { PlatformType } from '@/types/database';
-import { PLATFORM_LABELS } from '@/types/database';
+import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 
 export type PeriodType = 'weekly' | 'monthly' | 'quarterly' | 'custom';
 
@@ -19,16 +19,6 @@ export interface SelectedPeriod {
 }
 
 export type PlatformFilter = 'all' | PlatformType;
-
-const PLATFORM_ICONS: Record<string, string> = {
-  all: '🌐',
-  google_ads: '📊',
-  meta_ads: '📱',
-  facebook: '📘',
-  instagram: '📸',
-  tiktok: '🎵',
-  linkedin: '💼',
-};
 
 interface DashboardHeaderProps {
   selectedPlatform: PlatformFilter;
@@ -83,18 +73,21 @@ const DashboardHeader = ({
     <div className="space-y-4">
       {/* Platform Tabs */}
       <div className="flex flex-wrap gap-2">
-        {platformOptions.map(opt => (
-          <Button
-            key={opt.value}
-            variant={selectedPlatform === opt.value ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onPlatformChange(opt.value)}
-            className="gap-1.5"
-          >
-            <span className="text-sm">{PLATFORM_ICONS[opt.value] || '📈'}</span>
-            {opt.label}
-          </Button>
-        ))}
+        {platformOptions.map(opt => {
+          const logo = PLATFORM_LOGOS[opt.value];
+          return (
+            <Button
+              key={opt.value}
+              variant={selectedPlatform === opt.value ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onPlatformChange(opt.value)}
+              className="gap-1.5"
+            >
+              {logo && <img src={logo} alt="" className="h-4 w-4 object-contain" />}
+              {opt.label}
+            </Button>
+          );
+        })}
       </div>
 
       {/* Time Range + Navigation */}
