@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3 } from 'lucide-react';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
 import RecipientDialog from '@/components/clients/RecipientDialog';
@@ -14,6 +14,7 @@ import ConnectionDialog from '@/components/clients/ConnectionDialog';
 import ClientEditDialog from '@/components/clients/ClientEditDialog';
 import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
 import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
+import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { toast } from 'sonner';
 
@@ -174,40 +175,45 @@ const ClientDetail = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-display">{client.company_name}</h1>
-              <p className="text-muted-foreground font-body mt-1">{client.full_name}{client.position && ` · ${client.position}`}</p>
+              <h1 className="text-2xl sm:text-3xl font-display">{client.company_name}</h1>
+              <p className="text-muted-foreground font-body mt-1 text-sm">{client.full_name}{client.position && ` · ${client.position}`}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 ml-12 sm:ml-0">
             <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
             <ClientEditDialog client={client} onUpdate={fetchData} />
             <Button variant="outline" size="sm" className="gap-2" onClick={handleManualSync} disabled={isSyncing}>
               {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              {isSyncing ? 'Syncing...' : 'Sync'}
+              <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
             </Button>
             <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              {isGenerating ? 'Generating...' : 'Generate Report'}
+              <span className="hidden sm:inline">{isGenerating ? 'Generating...' : 'Report'}</span>
             </Button>
           </div>
         </div>
 
-        <Tabs defaultValue="overview">
-          <TabsList>
+        <Tabs defaultValue="dashboard">
+          <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
+            <TabsTrigger value="dashboard" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5 hidden sm:inline" />Dashboard</TabsTrigger>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="connections">Connections ({connections.length})</TabsTrigger>
-            <TabsTrigger value="recipients">Recipients ({recipients.length})</TabsTrigger>
+            <TabsTrigger value="connections">Connections</TabsTrigger>
+            <TabsTrigger value="recipients">Recipients</TabsTrigger>
             <TabsTrigger value="metrics">Metrics</TabsTrigger>
-            <TabsTrigger value="settings">Report Settings</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="dashboard" className="mt-4">
+            <ClientDashboard clientId={client.id} clientName={client.company_name} />
+          </TabsContent>
 
           <TabsContent value="overview" className="space-y-4 mt-4">
             <div className="grid gap-4 md:grid-cols-2">
