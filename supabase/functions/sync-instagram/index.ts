@@ -154,6 +154,17 @@ Deno.serve(async (req) => {
           .eq("id", connectionId);
       }
 
+      // Fetch website_clicks separately (different metric_type)
+      try {
+        const websiteClicksUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=website_clicks&period=day&metric_type=total_value&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const wcRes = await fetch(websiteClicksUrl);
+        if (wcRes.ok) {
+          const wcData = await wcRes.json();
+          const wcValue = wcData?.data?.[0]?.total_value?.value || 0;
+          globalMetricsMap['website_clicks'] = (globalMetricsMap['website_clicks'] || 0) + wcValue;
+        }
+      } catch {} // non-blocking
+
       // Fetch follower count and media count from user profile
       try {
         const userRes = await fetch(`${GRAPH_BASE}/${ig_id}?fields=followers_count,media_count,website&access_token=${page_token}`);
@@ -243,7 +254,7 @@ Deno.serve(async (req) => {
       impressions: totalImpressions,
       reach: totalReach,
       profile_visits: totalProfileViews,
-      website_clicks: allTopMedia.reduce((sum, m) => sum + (m.profile_activity || 0), 0),
+      website_clicks: globalMetricsMap['website_clicks'] || 0,
       engagement: totalLikes + totalComments + totalSaves,
       likes: totalLikes,
       comments: totalComments,
