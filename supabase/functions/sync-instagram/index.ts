@@ -88,7 +88,11 @@ Deno.serve(async (req) => {
       })
       .filter(Boolean);
 
-    if (igAccounts.length === 0) {
+    const connMetadata = conn.metadata as any;
+    const targetIgId = conn.account_id || connMetadata?.ig_user_id;
+    const filteredAccounts = targetIgId ? igAccounts.filter((ig: any) => ig.ig_id === targetIgId) : igAccounts;
+
+    if (filteredAccounts.length === 0) {
       throw new Error("No Instagram Business accounts found. Make sure your Facebook Pages have linked Instagram accounts.");
     }
 
@@ -115,13 +119,13 @@ Deno.serve(async (req) => {
     const allTopMedia: any[] = [];
     const globalMetricsMap: Record<string, number> = {};
 
-    for (const ig of igAccounts) {
+    for (const ig of filteredAccounts) {
       const { ig_id, page_token } = ig;
 
       // Fetch IG User Insights (only non-deprecated metrics)
       const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach,profile_views,follower_count&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach,profile_views&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
