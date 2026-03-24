@@ -19,7 +19,7 @@ interface ConnectionDialogProps {
 
 const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin'];
 
-const OAUTH_SUPPORTED: PlatformType[] = ['google_ads'];
+const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads'];
 
 const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogProps) => {
   const [open, setOpen] = useState(false);
