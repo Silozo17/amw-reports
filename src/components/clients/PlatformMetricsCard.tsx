@@ -41,36 +41,35 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics }: PlatformMetrics
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-4">
         <CardTitle className="font-display text-base flex items-center gap-2">
-          <span className="text-lg">{PLATFORM_ICONS[platform] || '📈'}</span>
+          <span className="text-xl">{PLATFORM_ICONS[platform] || '📈'}</span>
           {PLATFORM_LABELS[platform] || platform}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {metricEntries.map(([key, value]) => {
             const prevValue = prevMetrics?.[key];
             const change = prevValue && prevValue !== 0
               ? ((value - prevValue) / prevValue) * 100
               : undefined;
 
-            // For cost metrics, down is good
             const isCostMetric = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion';
             const isPositive = change !== undefined
               ? isCostMetric ? change < 0 : change > 0
               : undefined;
 
             return (
-              <div key={key} className="rounded-lg border bg-card p-3 space-y-1">
-                <div className="flex items-center gap-1">
-                  <p className="text-[11px] text-muted-foreground truncate uppercase tracking-wider">
+              <div key={key} className="rounded-xl border bg-card p-4 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[11px] text-muted-foreground truncate uppercase tracking-wider font-medium">
                     {METRIC_LABELS[key] || key}
                   </p>
                   <MetricTooltip metricKey={key} />
                 </div>
-                <p className="text-lg font-semibold font-display">{formatValue(key, value)}</p>
-                {change !== undefined && (
+                <p className="text-xl font-bold font-display">{formatValue(key, value)}</p>
+                {change !== undefined ? (
                   <div className={cn(
                     'flex items-center gap-1 text-xs font-medium',
                     isPositive === true ? 'text-accent' :
@@ -81,7 +80,9 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics }: PlatformMetrics
                      <Minus className="h-3 w-3" />}
                     <span>{change > 0 ? '+' : ''}{change.toFixed(1)}% MoM</span>
                   </div>
-                )}
+                ) : value === 0 ? (
+                  <p className="text-[10px] text-muted-foreground/50 italic">No data</p>
+                ) : null}
               </div>
             );
           })}
