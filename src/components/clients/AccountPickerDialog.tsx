@@ -111,77 +111,51 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
 
       // For Meta: create facebook/instagram connections for selected pages
       if (platform === 'meta_ads' && selectedPages.length > 0) {
+        // Fetch the full connection row (with access_token, token_expires_at) from DB
+        const { data: fullConn } = await supabase
+          .from('platform_connections')
+          .select('access_token, token_expires_at')
+          .eq('id', connection.id)
+          .single();
+
+        const connAccessToken = fullConn?.access_token;
+        const connTokenExpires = fullConn?.token_expires_at;
+
         for (const pageId of selectedPages) {
           const page = pages.find(p => p.id === pageId);
           if (!page) continue;
 
           // Create Facebook Page connection
-          const { error: fbError } = await supabase
-            .from('platform_connections')
-            .upsert({
-              client_id: clientId,
-              platform: 'facebook' as PlatformType,
-              is_connected: true,
-              account_id: page.id,
-              account_name: page.name,
-              access_token: page.access_token || connection.access_token,
-              token_expires_at: connection.token_expires_at,
-              metadata: { page_id: page.id, page_name: page.name, source_connection_id: connection.id },
-            }, { onConflict: 'client_id,platform' });
-
-          if (fbError) {
-            // If upsert fails due to no unique constraint, try insert
-            await supabase.from('platform_connections').insert({
-              client_id: clientId,
-              platform: 'facebook' as PlatformType,
-              is_connected: true,
-              account_id: page.id,
-              account_name: page.name,
-              access_token: page.access_token || connection.access_token,
-              token_expires_at: connection.token_expires_at,
-              metadata: { page_id: page.id, page_name: page.name, source_connection_id: connection.id },
-            });
-          }
+          await supabase.from('platform_connections').insert({
+            client_id: clientId,
+            platform: 'facebook' as PlatformType,
+            is_connected: true,
+            account_id: page.id,
+            account_name: page.name,
+            access_token: page.access_token || connAccessToken,
+            token_expires_at: connTokenExpires,
+            metadata: { page_id: page.id, page_name: page.name, source_connection_id: connection.id },
+          });
 
           // Create Instagram connection if page has linked IG
           if (page.instagram) {
             const igName = page.instagram.username ? `@${page.instagram.username}` : `IG (${page.instagram.id})`;
 
-            const { error: igError } = await supabase
-              .from('platform_connections')
-              .upsert({
-                client_id: clientId,
-                platform: 'instagram' as PlatformType,
-                is_connected: true,
-                account_id: page.instagram.id,
-                account_name: igName,
-                access_token: page.access_token || connection.access_token,
-                token_expires_at: connection.token_expires_at,
-                metadata: {
-                  ig_user_id: page.instagram.id,
-                  ig_username: page.instagram.username,
-                  page_id: page.id,
-                  source_connection_id: connection.id,
-                },
-              }, { onConflict: 'client_id,platform' });
-
-            if (igError) {
-              await supabase.from('platform_connections').insert({
-                client_id: clientId,
-                platform: 'instagram' as PlatformType,
-                is_connected: true,
-                account_id: page.instagram.id,
-                account_name: igName,
-                access_token: page.access_token || connection.access_token,
-                token_expires_at: connection.token_expires_at,
-                metadata: {
-                  ig_user_id: page.instagram.id,
-                  ig_username: page.instagram.username,
-                  page_id: page.id,
-                  source_connection_id: connection.id,
-                },
-              });
-            }
+            await supabase.from('platform_connections').insert({
+              client_id: clientId,
+              platform: 'instagram' as PlatformType,
+              is_connected: true,
+              account_id: page.instagram.id,
+              account_name: igName,
+              access_token: page.access_token || connAccessToken,
+              token_expires_at: connTokenExpires,
+              metadata: {
+                ig_user_id: page.instagram.id,
+                ig_username: page.instagram.username,
+                page_id: page.id,
+                source_connection_id: connection.id,
+              },
+            });
           }
         }
       }
@@ -190,20 +164,19 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
       if (platform === 'linkedin' && selectedPages.length > 0) {
         const selectedOrg = organizations.find(o => selectedPages.includes(o.id));
         if (selectedOrg && !selectedAccountId) {
-          // If no ad account but org selected, use org as the account
           await supabase
             .from('platform_connections')
             .update({
               account_id: selectedOrg.id,
               account_name: selectedOrg.name,
-              metadata: { ...metadata, selected_organization: selectedOrg },
+              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as Record<string, unknown>,
             })
             .eq('id', connection.id);
         } else if (selectedOrg) {
           await supabase
             .from('platform_connections')
             .update({
-              metadata: { ...metadata, selected_organization: selectedOrg },
+              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as Record<string, unknown>,
             })
             .eq('id', connection.id);
         }
