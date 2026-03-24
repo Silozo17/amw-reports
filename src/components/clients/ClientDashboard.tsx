@@ -494,7 +494,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           <div className="space-y-5">
             <h3 className="text-lg font-display">Platform Details</h3>
             {filtered.length > 0 ? (
-              filtered.map(snapshot => {
+              filtered.filter(snapshot => {
+                // Skip platforms where all displayable metrics are zero
+                const isOrganic = ORGANIC_PLATFORMS.has(snapshot.platform);
+                const hasVisibleNonZero = Object.entries(snapshot.metrics_data).some(
+                  ([key, val]) =>
+                    typeof val === 'number' && val > 0 &&
+                    !HIDDEN_METRICS.has(key) &&
+                    !(isOrganic && AD_METRICS.has(key))
+                );
+                return hasVisibleNonZero;
+              }).map(snapshot => {
                 const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
                 return (
                   <PlatformMetricsCard
