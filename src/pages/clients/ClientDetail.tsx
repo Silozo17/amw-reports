@@ -70,44 +70,49 @@ const ClientDetail = () => {
     let syncCount = 0;
     let errors: string[] = [];
 
-    // Sync Google Ads
-    const googleConn = connections.find(c => c.platform === 'google_ads' && c.is_connected);
-    if (googleConn) {
+    const syncPlatform = async (conn: PlatformConnection, functionName: string, label: string) => {
       try {
-        const { data, error } = await supabase.functions.invoke('sync-google-ads', {
-          body: { connection_id: googleConn.id, month: syncMonth, year },
+        const { data, error } = await supabase.functions.invoke(functionName, {
+          body: { connection_id: conn.id, month: syncMonth, year },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        syncCount += data.campaigns_synced || 0;
+        syncCount += data.campaigns_synced || data.pages_synced || data.accounts_synced || 1;
       } catch (e) {
-        console.error('Google Ads sync error:', e);
-        errors.push(`Google Ads: ${e instanceof Error ? e.message : 'failed'}`);
+        console.error(`${label} sync error:`, e);
+        errors.push(`${label}: ${e instanceof Error ? e.message : 'failed'}`);
       }
-    }
+    };
 
-    // Sync Meta Ads
-    const metaConn = connections.find(c => c.platform === 'meta_ads' && c.is_connected);
-    if (metaConn) {
-      try {
-        const { data, error } = await supabase.functions.invoke('sync-meta-ads', {
-          body: { connection_id: metaConn.id, month: syncMonth, year },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        syncCount += data.campaigns_synced || 0;
-      } catch (e) {
-        console.error('Meta Ads sync error:', e);
-        errors.push(`Meta Ads: ${e instanceof Error ? e.message : 'failed'}`);
-      }
-    }
+    const syncMap: Record<string, string> = {
+      google_ads: 'sync-google-ads',
+      meta_ads: 'sync-meta-ads',
+      facebook: 'sync-facebook-page',
+      instagram: 'sync-instagram',
+      tiktok: 'sync-tiktok-ads',
+      linkedin: 'sync-linkedin',
+    };
 
-    if (!googleConn && !metaConn) {
+    const connectedPlatformConns = connections.filter(c => c.is_connected);
+
+    if (connectedPlatformConns.length === 0) {
       toast.info('No connected platforms found. Add and connect one first.');
-    } else if (errors.length > 0) {
+      setIsSyncing(false);
+      return;
+    }
+
+    await Promise.all(
+      connectedPlatformConns.map(conn => {
+        const fn = syncMap[conn.platform];
+        if (fn) return syncPlatform(conn, fn, PLATFORM_LABELS[conn.platform]);
+        return Promise.resolve();
+      })
+    );
+
+    if (errors.length > 0) {
       toast.error(`Sync errors: ${errors.join('; ')}`);
     } else {
-      toast.success(`Synced ${syncCount} campaigns for ${syncMonth}/${year}`);
+      toast.success(`Synced ${syncCount} items for ${syncMonth}/${year}`);
     }
 
     fetchData();
