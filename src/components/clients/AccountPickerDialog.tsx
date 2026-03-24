@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, ChevronRight, ChevronLeft, Info } from 'lucide-react';
+import { Loader2, Check, ChevronRight, ChevronLeft, Info, BarChart3, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
@@ -398,7 +398,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                             ? 'bg-primary text-primary-foreground'
                             : 'bg-muted text-muted-foreground'
                         )}>
-                          {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : platform === 'google_ads' ? '📊' : acct.name.charAt(0)}
+                          {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : platform === 'google_ads' ? <BarChart3 className="h-5 w-5" /> : acct.name.charAt(0)}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm truncate">{acct.name}</p>
@@ -438,7 +438,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-muted-foreground'
                       )}>
-                        {selectedPages.includes(org.id) ? <Check className="h-5 w-5" /> : '🏢'}
+                        {selectedPages.includes(org.id) ? <Check className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-sm">{org.name}</p>

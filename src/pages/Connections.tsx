@@ -53,7 +53,7 @@ const Connections = () => {
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-600 dark:text-yellow-400" />
               <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                ⚠️ Meta permissions have been updated. Please reconnect your Meta Ads account to enable full data access.
+                Meta permissions have been updated. Please reconnect your Meta Ads account to enable full data access.
               </p>
             </div>
             <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={handleDismissBanner}>
