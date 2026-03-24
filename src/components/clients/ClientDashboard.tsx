@@ -1,21 +1,25 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { subMonths, formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, TrendingUp, TrendingDown, Minus, DollarSign, Eye, MousePointerClick, Users, BarChart3, PieChartIcon, AlertCircle, Clock } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users, BarChart3, PieChartIcon, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, Line,
+  ReferenceLine,
 } from 'recharts';
 import PlatformMetricsCard from './PlatformMetricsCard';
 import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from './DashboardHeader';
+import AudienceMap from './AudienceMap';
 import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from '@/types/database';
 import type { PlatformType, JobStatus } from '@/types/database';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const PIE_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
+const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
 
 interface ClientDashboardProps {
   clientId: string;
@@ -44,8 +48,166 @@ interface PlatformConfigData {
 }
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const FULL_MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+// ─── Animated Counter Component ────────────────────────────────
+function useAnimatedCounter(target: number, duration = 800): number {
+  const [current, setCurrent] = useState(0);
+  const prevTarget = useRef(0);
+  const rafId = useRef<number>();
+
+  useEffect(() => {
+    const start = prevTarget.current;
+    const diff = target - start;
+    if (diff === 0) { setCurrent(target); return; }
+    const startTime = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCurrent(start + diff * eased);
+      if (progress < 1) {
+        rafId.current = requestAnimationFrame(tick);
+      } else {
+        prevTarget.current = target;
+      }
+    };
+    rafId.current = requestAnimationFrame(tick);
+    return () => { if (rafId.current) cancelAnimationFrame(rafId.current); };
+  }, [target, duration]);
+
+  return current;
+}
+
+const formatKpiValue = (val: number, isCurrency: boolean, currSymbol: string): string => {
+  if (isCurrency) return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+  if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
+  return Math.round(val).toLocaleString();
+};
+
+// ─── KPI Sparkline Card ────────────────────────────────────────
+interface KpiCardProps {
+  label: string;
+  value: number;
+  change?: number;
+  icon: React.ElementType;
+  isCost?: boolean;
+  sparklineData: Array<{ v: number }>;
+  currSymbol: string;
+}
+
+const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, currSymbol }: KpiCardProps) => {
+  const animatedValue = useAnimatedCounter(value);
+  const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
+  const bgTint = change !== undefined
+    ? isPositive ? 'rgba(78, 214, 142, 0.05)' : 'rgba(239, 68, 68, 0.05)'
+    : undefined;
+
+  return (
+    <Card className="relative overflow-hidden" style={bgTint ? { backgroundColor: bgTint } : undefined}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+            <Icon className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-tight">{label}</p>
+        </div>
+        <p className="text-xl font-display font-bold leading-none mb-1">
+          {formatKpiValue(animatedValue, !!isCost, currSymbol)}
+        </p>
+        {change !== undefined && (
+          <div className={cn(
+            'flex items-center gap-1 text-[11px] font-medium',
+            isPositive === true ? 'text-accent' :
+            isPositive === false ? 'text-destructive' : 'text-muted-foreground'
+          )}>
+            <span>{isPositive ? '▲' : '▼'} {Math.abs(change).toFixed(1)}%</span>
+          </div>
+        )}
+        {/* Sparkline */}
+        {sparklineData.length > 1 && (
+          <div className="mt-2 -mx-1">
+            <ResponsiveContainer width="100%" height={50}>
+              <AreaChart data={sparklineData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id={`spark-${label.replace(/\s/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#b32fbf" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#b32fbf" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey="v"
+                  stroke="#b32fbf"
+                  strokeWidth={1.5}
+                  fill={`url(#spark-${label.replace(/\s/g, '')})`}
+                  dot={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {value === 0 && (
+          <p className="text-[10px] text-muted-foreground/50 mt-1 italic">Data unavailable</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ─── Dashboard Skeleton ────────────────────────────────────────
+const DashboardSkeleton = () => (
+  <div className="space-y-8">
+    {/* KPI skeletons */}
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-7 w-7 rounded-lg" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-3 w-14" />
+            <Skeleton className="h-[50px] w-full rounded" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    {/* Chart skeletons */}
+    <div className="grid gap-6 md:grid-cols-2">
+      {Array.from({ length: 2 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-2"><Skeleton className="h-4 w-32" /></CardHeader>
+          <CardContent><Skeleton className="h-[260px] w-full rounded" /></CardContent>
+        </Card>
+      ))}
+    </div>
+    {/* Platform card skeletons */}
+    <div className="space-y-4">
+      <Skeleton className="h-5 w-32" />
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-4"><Skeleton className="h-5 w-40" /></CardHeader>
+          <CardContent><Skeleton className="h-24 w-full rounded" /></CardContent>
+        </Card>
+      ))}
+    </div>
+  </div>
+);
+
+// ─── Custom Centre Label for Donut ─────────────────────────────
+const DonutCentreLabel = ({ viewBox, value }: any) => {
+  const { cx, cy } = viewBox;
+  return (
+    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central">
+      <tspan x={cx} dy="-0.3em" className="fill-foreground text-lg font-bold">{value}</tspan>
+      <tspan x={cx} dy="1.4em" className="fill-muted-foreground text-[10px]">Total</tspan>
+    </text>
+  );
+};
+
+// ─── Main Dashboard ────────────────────────────────────────────
 const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientDashboardProps) => {
   const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
@@ -70,21 +232,16 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalysing, setIsAnalysing] = useState(false);
 
-  // Reset auto-detection when client changes
-  useEffect(() => {
-    setHasAutoDetected(false);
-  }, [clientId]);
+  useEffect(() => { setHasAutoDetected(false); }, [clientId]);
 
   const fetchSnapshots = useCallback(async () => {
     setIsLoading(true);
     const { month, year, type, startDate, endDate } = selectedPeriod;
 
-    // Build current-period query
     let query = supabase.from('monthly_snapshots')
       .select('platform, metrics_data, report_month, report_year')
       .eq('client_id', clientId);
 
-    // Whether we need multi-month aggregation
     let isMultiMonth = false;
 
     if (type === 'quarterly') {
@@ -100,7 +257,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       query = query.eq('report_year', year);
       isMultiMonth = true;
     } else if (type === 'maximum') {
-      // No month/year filter — fetch all
       isMultiMonth = true;
     } else if (type === 'custom' && startDate && endDate) {
       const sMonth = startDate.getMonth() + 1;
@@ -117,16 +273,13 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       }
       isMultiMonth = true;
     } else {
-      // weekly / monthly — single month
       query = query.eq('report_month', month).eq('report_year', year);
     }
 
-    // Previous period for comparison
     let prevMonth = month;
     let prevYear = year;
     const showComparison = type === 'weekly' || type === 'monthly' || type === 'quarterly';
     if (type === 'quarterly') {
-      // Previous quarter
       const d = subMonths(new Date(year, month - 1), 3);
       prevMonth = d.getMonth() + 1;
       prevYear = d.getFullYear();
@@ -135,7 +288,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       prevYear = month === 1 ? year - 1 : year;
     }
 
-    // Trend: server-side filter to last 6 months
     const sixMonthsAgo = new Date(year, month - 1);
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const startMonth = sixMonthsAgo.getMonth() + 1;
@@ -157,45 +309,31 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         .eq('client_id', clientId),
     ]);
 
-    // Store connections
     setConnections((connectionsRes.data ?? []) as ConnectionData[]);
 
-    // Store platform configs as a Map
     const configMap = new Map<string, PlatformConfigData>();
     for (const c of (configRes.data ?? []) as PlatformConfigData[]) {
       configMap.set(c.platform, c);
     }
     setPlatformConfigs(configMap);
 
-    // Aggregate multi-month data if needed
     let currentSnapshots = (currentRes.data ?? []) as SnapshotData[];
     if (isMultiMonth && currentSnapshots.length > 0) {
       const grouped = new Map<PlatformType, Record<string, number>>();
       for (const s of currentSnapshots) {
         const existing = grouped.get(s.platform) || {};
         for (const [k, v] of Object.entries(s.metrics_data)) {
-          if (typeof v === 'number') {
-            existing[k] = (existing[k] || 0) + v;
-          }
+          if (typeof v === 'number') existing[k] = (existing[k] || 0) + v;
         }
         grouped.set(s.platform, existing);
       }
-      // Recalculate derived rate metrics from totals
       currentSnapshots = Array.from(grouped.entries()).map(([platform, metrics]) => {
-        const adjusted = { ...metrics };
-        if (adjusted.spend && adjusted.clicks) {
-          adjusted.cpc = adjusted.spend / adjusted.clicks;
-        }
-        if (adjusted.spend && adjusted.conversions) {
-          adjusted.cost_per_conversion = adjusted.spend / adjusted.conversions;
-        }
-        if (adjusted.clicks && adjusted.impressions) {
-          adjusted.ctr = (adjusted.clicks / adjusted.impressions) * 100;
-        }
-        if (adjusted.engagement && adjusted.impressions) {
-          adjusted.engagement_rate = (adjusted.engagement / adjusted.impressions) * 100;
-        }
-        return { platform, metrics_data: adjusted, report_month: month, report_year: year };
+        const a = { ...metrics };
+        if (a.spend && a.clicks) a.cpc = a.spend / a.clicks;
+        if (a.spend && a.conversions) a.cost_per_conversion = a.spend / a.conversions;
+        if (a.clicks && a.impressions) a.ctr = (a.clicks / a.impressions) * 100;
+        if (a.engagement && a.impressions) a.engagement_rate = (a.engagement / a.impressions) * 100;
+        return { platform, metrics_data: a, report_month: month, report_year: year };
       });
     }
 
@@ -206,14 +344,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     const platforms = [...new Set((connectionsRes.data ?? []).map((c: any) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
 
-    // Smart default: if current period has no real data (all zeros or no snapshots),
-    // find the most recent month with non-zero data
-    const hasRealData = currentSnapshots.some(snapshot => {
-      const metrics = snapshot.metrics_data;
-      return Object.entries(metrics).some(([key, v]) =>
-        typeof v === 'number' && v > 0 && !HIDDEN_METRICS.has(key)
-      );
-    });
+    const hasRealData = currentSnapshots.some(snapshot =>
+      Object.entries(snapshot.metrics_data).some(([key, v]) => typeof v === 'number' && v > 0 && !HIDDEN_METRICS.has(key))
+    );
 
     if (!hasAutoDetected && !hasRealData && (trendRes.data ?? []).length > 0) {
       const allSnaps = (trendRes.data ?? []) as SnapshotData[];
@@ -221,19 +354,12 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       for (const s of allSnaps) {
         const key = `${s.report_year}-${s.report_month}`;
         const existing = monthsWithData.get(key) || { m: s.report_month, y: s.report_year, total: 0 };
-        const total = Object.entries(s.metrics_data)
-          .filter(([k]) => !HIDDEN_METRICS.has(k))
-          .reduce((sum, [, v]) => sum + (typeof v === 'number' ? Math.abs(v) : 0), 0);
+        const total = Object.entries(s.metrics_data).filter(([k]) => !HIDDEN_METRICS.has(k)).reduce((sum, [, v]) => sum + (typeof v === 'number' ? Math.abs(v) : 0), 0);
         existing.total += total;
         monthsWithData.set(key, existing);
       }
-      const sorted = Array.from(monthsWithData.values()).filter(d => d.total > 0).sort((a, b) => {
-        if (a.y !== b.y) return b.y - a.y;
-        return b.m - a.m;
-      });
-      if (sorted.length > 0) {
-        setSelectedPeriod(prev => ({ ...prev, month: sorted[0].m, year: sorted[0].y }));
-      }
+      const sorted = Array.from(monthsWithData.values()).filter(d => d.total > 0).sort((a, b) => a.y !== b.y ? b.y - a.y : b.m - a.m);
+      if (sorted.length > 0) setSelectedPeriod(prev => ({ ...prev, month: sorted[0].m, year: sorted[0].y }));
       setHasAutoDetected(true);
     } else if (!hasAutoDetected) {
       setHasAutoDetected(true);
@@ -261,25 +387,16 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     }
   };
 
-  // Filter snapshots by selected platform
-  const filtered = useMemo(() => {
-    if (selectedPlatform === 'all') return snapshots;
-    return snapshots.filter(s => s.platform === selectedPlatform);
-  }, [snapshots, selectedPlatform]);
+  const filtered = useMemo(() => selectedPlatform === 'all' ? snapshots : snapshots.filter(s => s.platform === selectedPlatform), [snapshots, selectedPlatform]);
+  const filteredPrev = useMemo(() => selectedPlatform === 'all' ? prevSnapshots : prevSnapshots.filter(s => s.platform === selectedPlatform), [prevSnapshots, selectedPlatform]);
 
-  const filteredPrev = useMemo(() => {
-    if (selectedPlatform === 'all') return prevSnapshots;
-    return prevSnapshots.filter(s => s.platform === selectedPlatform);
-  }, [prevSnapshots, selectedPlatform]);
-
-  // KPI Aggregates
+  // ─── KPI Aggregates ──────────────────────────────────────────
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
     const totalClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
     const totalEngagement = filtered.reduce((sum, s) => sum + (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0), 0);
     const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
-    const totalConversions = filtered.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const prevReach = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
@@ -289,29 +406,58 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     const calcChange = (curr: number, prev: number) => prev !== 0 ? ((curr - prev) / prev) * 100 : undefined;
 
     return [
-      { label: 'Total Spend', value: totalSpend, formatted: `${currSymbol}${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: calcChange(totalSpend, prevSpend), icon: DollarSign, isCost: true },
-      { label: 'Reach / Impressions', value: totalReach, formatted: totalReach >= 1000000 ? `${(totalReach / 1000000).toFixed(1)}M` : totalReach >= 1000 ? `${(totalReach / 1000).toFixed(1)}K` : totalReach.toLocaleString(), change: calcChange(totalReach, prevReach), icon: Eye },
-      { label: 'Clicks', value: totalClicks, formatted: totalClicks >= 1000 ? `${(totalClicks / 1000).toFixed(1)}K` : totalClicks.toLocaleString(), change: calcChange(totalClicks, prevClicks), icon: MousePointerClick },
-      { label: 'Engagement', value: totalEngagement, formatted: totalEngagement >= 1000 ? `${(totalEngagement / 1000).toFixed(1)}K` : totalEngagement.toLocaleString(), change: calcChange(totalEngagement, prevEngagement), icon: BarChart3 },
-      ...(totalFollowers > 0 ? [{ label: 'Followers', value: totalFollowers, formatted: totalFollowers >= 1000 ? `${(totalFollowers / 1000).toFixed(1)}K` : totalFollowers.toLocaleString(), change: undefined as number | undefined, icon: Users }] : []),
-      ...(totalConversions > 0 ? [{ label: 'Conversions', value: totalConversions, formatted: totalConversions.toLocaleString(), change: undefined as number | undefined, icon: TrendingUp }] : []),
+      { label: 'Total Spend', value: totalSpend, change: calcChange(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: 'spend' },
+      { label: 'Reach', value: totalReach, change: calcChange(totalReach, prevReach), icon: Eye, metricKey: 'reach' },
+      { label: 'Clicks', value: totalClicks, change: calcChange(totalClicks, prevClicks), icon: MousePointerClick, metricKey: 'clicks' },
+      { label: 'Engagement', value: totalEngagement, change: calcChange(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: 'engagement' },
+      ...(totalFollowers > 0 ? [{ label: 'Followers', value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: 'total_followers' }] : []),
     ];
-  }, [filtered, filteredPrev, currSymbol]);
+  }, [filtered, filteredPrev]);
 
-  // Chart data
+  // ─── Sparkline data per KPI from trend ───────────────────────
+  const sparklineMap = useMemo(() => {
+    const map: Record<string, Array<{ v: number }>> = {};
+    const relevantTrend = selectedPlatform === 'all' ? trendData : trendData.filter(s => s.platform === selectedPlatform);
+    const monthMap = new Map<string, Record<string, number>>();
+
+    for (const s of relevantTrend) {
+      const key = `${s.report_year}-${String(s.report_month).padStart(2, '0')}`;
+      const existing = monthMap.get(key) || {};
+      existing.spend = (existing.spend || 0) + (s.metrics_data.spend || 0);
+      existing.reach = (existing.reach || 0) + (s.metrics_data.reach || s.metrics_data.impressions || 0);
+      existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0);
+      existing.engagement = (existing.engagement || 0) + (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0);
+      existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
+      monthMap.set(key, existing);
+    }
+
+    const sorted = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+    for (const metricKey of ['spend', 'reach', 'clicks', 'engagement', 'total_followers']) {
+      map[metricKey] = sorted.map(([, data]) => ({ v: data[metricKey] || 0 }));
+    }
+    return map;
+  }, [trendData, selectedPlatform]);
+
+  // ─── Chart Data ──────────────────────────────────────────────
   const spendByPlatform = useMemo(() =>
     filtered.filter(s => s.metrics_data.spend > 0).map(s => ({
       name: PLATFORM_LABELS[s.platform] || s.platform,
       value: Math.round(s.metrics_data.spend * 100) / 100,
     })), [filtered]);
 
-  const engagementByPlatform = useMemo(() =>
+  const totalSpend = useMemo(() => spendByPlatform.reduce((s, d) => s + d.value, 0), [spendByPlatform]);
+
+  // Engagement breakdown as stacked bar (likes, comments, shares per platform)
+  const engagementStackedData = useMemo(() =>
     filtered.filter(s => {
-      const eng = (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0);
+      const eng = (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0) + (s.metrics_data.engagement || 0);
       return eng > 0;
     }).map(s => ({
       name: PLATFORM_LABELS[s.platform] || s.platform,
-      value: (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0),
+      likes: s.metrics_data.likes || 0,
+      comments: s.metrics_data.comments || 0,
+      shares: s.metrics_data.shares || 0,
+      saves: s.metrics_data.saves || 0,
     })), [filtered]);
 
   const impressionsByPlatform = useMemo(() =>
@@ -321,11 +467,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       clicks: s.metrics_data.clicks || 0,
     })), [filtered]);
 
-  // Trend data for line chart
+  // Trend data for area chart
   const trendChartData = useMemo(() => {
     const monthMap = new Map<string, { spend: number; impressions: number; clicks: number; engagement: number }>();
     const relevantTrend = selectedPlatform === 'all' ? trendData : trendData.filter(s => s.platform === selectedPlatform);
-
     for (const s of relevantTrend) {
       const key = `${s.report_year}-${String(s.report_month).padStart(2, '0')}`;
       const existing = monthMap.get(key) || { spend: 0, impressions: 0, clicks: 0, engagement: 0 };
@@ -335,32 +480,28 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       existing.engagement += (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0);
       monthMap.set(key, existing);
     }
-
-    return Array.from(monthMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6)
-      .map(([key, data]) => {
-        const [y, m] = key.split('-');
-        return { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, ...data };
-      });
+    return Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, data]) => {
+      const [y, m] = key.split('-');
+      return { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, ...data };
+    });
   }, [trendData, selectedPlatform]);
+
+  // Geo data extracted from snapshots
+  const geoData = useMemo(() => {
+    const all: Array<{ lat: number; lng: number; value: number; label: string }> = [];
+    for (const s of filtered) {
+      const geo = (s.metrics_data as any)?.geo_data;
+      if (Array.isArray(geo)) all.push(...geo);
+    }
+    return all;
+  }, [filtered]);
 
   // Last synced timestamp
   const lastSyncedAt = useMemo(() => {
-    const syncDates = connections
-      .filter(c => c.last_sync_at)
-      .map(c => new Date(c.last_sync_at!).getTime());
+    const syncDates = connections.filter(c => c.last_sync_at).map(c => new Date(c.last_sync_at!).getTime());
     if (syncDates.length === 0) return null;
     return new Date(Math.max(...syncDates));
   }, [connections]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   const hasData = snapshots.length > 0;
   const hasFilteredData = filtered.length > 0;
@@ -368,7 +509,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
 
   return (
     <div className="space-y-8">
-      {/* Header with Platform & Time controls */}
+      {/* Header */}
       <DashboardHeader
         selectedPlatform={selectedPlatform}
         onPlatformChange={setSelectedPlatform}
@@ -377,7 +518,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         availablePlatforms={availablePlatforms}
       />
 
-      {/* Last synced indicator */}
+      {/* Last synced */}
       {lastSyncedAt && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
@@ -385,14 +526,15 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         </div>
       )}
 
-      {!hasData ? (
+      {/* PART 4: Skeleton loading */}
+      {isLoading ? (
+        <DashboardSkeleton />
+      ) : !hasData ? (
         <Card className="border-dashed">
           <CardContent className="py-16 text-center space-y-3">
             <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground font-medium">No performance data available</p>
-            <p className="text-sm text-muted-foreground/70">
-              Sync platform data for this period to see your dashboard.
-            </p>
+            <p className="text-sm text-muted-foreground/70">Sync platform data for this period to see your dashboard.</p>
           </CardContent>
         </Card>
       ) : !hasFilteredData ? (
@@ -400,9 +542,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           <CardContent className="py-16 text-center space-y-3">
             <PieChartIcon className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground font-medium">No data for this platform</p>
-            <p className="text-sm text-muted-foreground/70">
-              Try selecting "All Platforms" or sync data for this platform.
-            </p>
+            <p className="text-sm text-muted-foreground/70">Try selecting "All Platforms" or sync data for this platform.</p>
           </CardContent>
         </Card>
       ) : allZeros ? (
@@ -410,55 +550,30 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           <CardContent className="py-12 text-center space-y-3">
             <AlertCircle className="h-10 w-10 mx-auto text-amber-500" />
             <p className="text-muted-foreground font-medium">No activity recorded for this period</p>
-            <p className="text-sm text-muted-foreground/70">
-              Try selecting a different period or sync historical data to find periods with activity.
-            </p>
+            <p className="text-sm text-muted-foreground/70">Try selecting a different period or sync historical data to find periods with activity.</p>
           </CardContent>
         </Card>
       ) : (
         <>
-          {/* KPI Summary Cards */}
+          {/* PART 1: KPI Cards with Sparklines */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {kpis.map(kpi => {
-              const Icon = kpi.icon;
-              const isPositive = kpi.change !== undefined
-                ? kpi.isCost ? kpi.change < 0 : kpi.change > 0
-                : undefined;
-
-              return (
-                <Card key={kpi.label} className="relative overflow-hidden">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                        <Icon className="h-4 w-4 text-primary" />
-                      </div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{kpi.label}</p>
-                    </div>
-                    <p className="text-2xl font-display font-bold">{kpi.formatted}</p>
-                    {kpi.change !== undefined && (
-                      <div className={cn(
-                        'flex items-center gap-1 mt-2 text-xs font-medium',
-                        isPositive === true ? 'text-accent' :
-                        isPositive === false ? 'text-destructive' : 'text-muted-foreground'
-                      )}>
-                        {kpi.change > 0 ? <TrendingUp className="h-3 w-3" /> :
-                         kpi.change < 0 ? <TrendingDown className="h-3 w-3" /> :
-                         <Minus className="h-3 w-3" />}
-                        <span>{kpi.change > 0 ? '+' : ''}{kpi.change.toFixed(1)}% vs prev</span>
-                      </div>
-                    )}
-                    {kpi.value === 0 && (
-                      <p className="text-xs text-muted-foreground/60 mt-1 italic">Data unavailable</p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {kpis.map(kpi => (
+              <KpiCard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                change={kpi.change}
+                icon={kpi.icon}
+                isCost={kpi.isCost}
+                sparklineData={sparklineMap[kpi.metricKey] || []}
+                currSymbol={currSymbol}
+              />
+            ))}
           </div>
 
-          {/* Charts Grid */}
+          {/* PART 2: Charts */}
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Spend Distribution */}
+            {/* Spend Distribution — Donut */}
             {spendByPlatform.length > 0 ? (
               <Card>
                 <CardHeader className="pb-2">
@@ -473,16 +588,26 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={90}
-                        innerRadius={50}
+                        outerRadius={100}
+                        innerRadius={60}
                         paddingAngle={3}
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
-                        {spendByPlatform.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                        {spendByPlatform.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                       </Pie>
                       <RechartsTooltip formatter={(value: number) => `${currSymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
                       <Legend />
+                      {/* Centre total */}
+                      <Pie data={[{ value: 1 }]} dataKey="value" cx="50%" cy="50%" outerRadius={0} innerRadius={0} fill="none">
+                        <ReferenceLine />
+                      </Pie>
+                      <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central" className="fill-foreground text-base font-bold font-display">
+                        {currSymbol}{totalSpend >= 1000 ? `${(totalSpend / 1000).toFixed(1)}K` : totalSpend.toFixed(0)}
+                      </text>
+                      <text x="50%" y="56%" textAnchor="middle" dominantBaseline="central" className="fill-muted-foreground text-[10px]">
+                        Total
+                      </text>
                     </PieChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -496,32 +621,25 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               </Card>
             )}
 
-            {/* Engagement Breakdown */}
-            {engagementByPlatform.length > 0 ? (
+            {/* Engagement Breakdown — Stacked Bar */}
+            {engagementStackedData.length > 0 ? (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-display">💬 Engagement Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie
-                        data={engagementByPlatform}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={90}
-                        innerRadius={50}
-                        paddingAngle={3}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {engagementByPlatform.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                      </Pie>
-                      <RechartsTooltip formatter={(value: number) => value.toLocaleString()} />
+                    <BarChart data={engagementStackedData} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <RechartsTooltip />
+                      <Bar dataKey="likes" name="Likes" stackId="eng" fill={CHART_COLORS[0]} radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="comments" name="Comments" stackId="eng" fill={CHART_COLORS[1]} />
+                      <Bar dataKey="shares" name="Shares" stackId="eng" fill={CHART_COLORS[2]} />
+                      <Bar dataKey="saves" name="Saves" stackId="eng" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
                       <Legend />
-                    </PieChart>
+                    </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
@@ -535,7 +653,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             )}
           </div>
 
-          {/* Impressions & Clicks Bar Chart */}
+          {/* Impressions & Clicks — Grouped Bar */}
           {impressionsByPlatform.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
@@ -548,8 +666,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <RechartsTooltip />
-                    <Bar dataKey="impressions" name="Impressions" fill={PIE_COLORS[0]} radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="clicks" name="Clicks" fill={PIE_COLORS[1]} radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="impressions" name="Impressions" fill="#539BDB" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="clicks" name="Clicks" fill="#4ED68E" radius={[4, 4, 0, 0]} />
                     <Legend />
                   </BarChart>
                 </ResponsiveContainer>
@@ -557,7 +675,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             </Card>
           )}
 
-          {/* Trend Line Chart */}
+          {/* Performance Trend — Area Chart */}
           {trendChartData.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
@@ -565,20 +683,37 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={trendChartData}>
+                  <AreaChart data={trendChartData}>
+                    <defs>
+                      <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#b32fbf" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#b32fbf" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="trendGradientBlue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#539BDB" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#539BDB" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="trendGradientGreen" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#4ED68E" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#4ED68E" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <RechartsTooltip />
-                    <Line type="monotone" dataKey="impressions" name="Impressions" stroke={PIE_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="clicks" name="Clicks" stroke={PIE_COLORS[1]} strokeWidth={2} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="engagement" name="Engagement" stroke={PIE_COLORS[2]} strokeWidth={2} dot={{ r: 4 }} />
+                    <Area type="monotone" dataKey="impressions" name="Impressions" stroke="#b32fbf" strokeWidth={2} fill="url(#trendGradient)" dot={{ r: 4, fill: '#b32fbf' }} />
+                    <Area type="monotone" dataKey="clicks" name="Clicks" stroke="#539BDB" strokeWidth={2} fill="url(#trendGradientBlue)" dot={{ r: 4, fill: '#539BDB' }} />
+                    <Area type="monotone" dataKey="engagement" name="Engagement" stroke="#4ED68E" strokeWidth={2} fill="url(#trendGradientGreen)" dot={{ r: 4, fill: '#4ED68E' }} />
                     <Legend />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           )}
+
+          {/* PART 5: Audience Map */}
+          <AudienceMap geoData={geoData} />
 
           {/* Per-Platform Metrics */}
           <div className="space-y-5">
@@ -586,10 +721,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             {filtered.length > 0 ? (
               filtered
                 .filter(snapshot => {
-                  // Hide platforms disabled in config
                   const config = platformConfigs.get(snapshot.platform);
                   if (config && !config.is_enabled) return false;
-                  // Skip platforms where all displayable metrics are zero
                   const isOrganic = ORGANIC_PLATFORMS.has(snapshot.platform);
                   const enabledMetrics = config?.enabled_metrics;
                   const hasVisibleNonZero = Object.entries(snapshot.metrics_data).some(
@@ -636,13 +769,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             <Sparkles className="h-4 w-4 text-primary" />
             AI Performance Analysis
           </CardTitle>
-          <Button
-            size="sm"
-            variant={aiAnalysis ? 'outline' : 'default'}
-            onClick={handleAnalyse}
-            disabled={isAnalysing}
-            className="gap-2"
-          >
+          <Button size="sm" variant={aiAnalysis ? 'outline' : 'default'} onClick={handleAnalyse} disabled={isAnalysing} className="gap-2">
             {isAnalysing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {aiAnalysis ? 'Refresh Analysis' : 'Generate Analysis'}
           </Button>
@@ -655,9 +782,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              Click "Generate Analysis" to get an AI-powered summary of this client's performance.
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-6">Click "Generate Analysis" to get an AI-powered summary of this client's performance.</p>
           )}
         </CardContent>
       </Card>

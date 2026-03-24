@@ -25,6 +25,15 @@ const STATUS_COLORS: Record<string, string> = {
   partial: 'bg-amber-500',
 };
 
+const PLATFORM_ACCENT_COLORS: Record<string, string> = {
+  google_ads: '#4285f4',
+  meta_ads: '#0668E1',
+  facebook: '#1877F2',
+  instagram: '#E4405F',
+  tiktok: '#FE2C55',
+  linkedin: '#0A66C2',
+};
+
 const formatValue = (key: string, value: number, currencySymbol: string): string => {
   if (key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm') {
     return `${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -51,10 +60,11 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
   const currencySymbol = getCurrencySymbol(currencyCode);
   const logo = PLATFORM_LOGOS[platform];
   const statusColor = syncStatus ? STATUS_COLORS[syncStatus] ?? '' : '';
+  const accentColor = PLATFORM_ACCENT_COLORS[platform];
 
   if (metricEntries.length === 0) {
     return (
-      <Card className="border-dashed">
+      <Card className="border-dashed" style={accentColor ? { borderLeft: `3px solid ${accentColor}` } : undefined}>
         <CardHeader className="pb-4">
           <CardTitle className="font-display text-base flex items-center gap-2">
             {logo && <img src={logo} alt="" className="h-6 w-6 object-contain" />}
@@ -72,7 +82,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card>
+      <Card style={accentColor ? { borderLeft: `3px solid ${accentColor}` } : undefined}>
         <CollapsibleTrigger asChild>
           <CardHeader className="pb-4 cursor-pointer select-none hover:bg-muted/30 transition-colors">
             <CardTitle className="font-display text-base flex items-center gap-2">
