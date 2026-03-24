@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
         });
 
         // Executive summary
-        const summaryRes = await fetch("https://ai.lovable.dev/api/v1/chat/completions", {
+        const summaryRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -116,10 +116,12 @@ If data is empty or unavailable, write a brief note that data collection is in p
         if (summaryRes.ok) {
           const summaryJson = await summaryRes.json();
           aiSummary = summaryJson.choices?.[0]?.message?.content ?? "";
+        } else {
+          console.error("AI summary failed:", summaryRes.status, await summaryRes.text());
         }
 
         // Platform insights
-        const insightsRes = await fetch("https://ai.lovable.dev/api/v1/chat/completions", {
+        const insightsRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -143,11 +145,13 @@ If no data is available, write a brief note that data will be included once plat
         if (insightsRes.ok) {
           const insightsJson = await insightsRes.json();
           aiInsights = insightsJson.choices?.[0]?.message?.content ?? "";
+        } else {
+          console.error("AI insights failed:", insightsRes.status, await insightsRes.text());
         }
 
         // Upsell recommendations (if enabled)
         if (client.enable_upsell) {
-          const upsellRes = await fetch("https://ai.lovable.dev/api/v1/chat/completions", {
+          const upsellRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -173,6 +177,8 @@ Data: ${dataContext}`
           if (upsellRes.ok) {
             const upsellJson = await upsellRes.json();
             aiUpsell = upsellJson.choices?.[0]?.message?.content ?? "";
+          } else {
+            console.error("AI upsell failed:", upsellRes.status, await upsellRes.text());
           }
         }
       } catch (aiError) {
