@@ -20,12 +20,20 @@ const NAV_ITEMS = [
   { to: '/settings', label: 'Settings', icon: Settings, ownerOnly: true },
 ];
 
-const AppSidebar = () => {
+interface AppSidebarProps {
+  onNavigate?: () => void;
+}
+
+const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const { signOut, profile, role, isOwner } = useAuth();
   const location = useLocation();
 
+  const handleNavClick = () => {
+    onNavigate?.();
+  };
+
   return (
-    <aside className="flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+    <aside className="flex h-full w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       <div className="flex items-center gap-2 px-6 py-5 border-b border-sidebar-border">
         <div>
           <h1 className="text-2xl font-display tracking-wide text-primary">AMW</h1>
@@ -43,6 +51,7 @@ const AppSidebar = () => {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={handleNavClick}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-body font-medium transition-colors',
                 isActive
@@ -68,7 +77,7 @@ const AppSidebar = () => {
           </div>
         </div>
         <button
-          onClick={signOut}
+          onClick={() => { signOut(); onNavigate?.(); }}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-body text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
         >
           <LogOut className="h-4 w-4" />

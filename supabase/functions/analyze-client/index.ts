@@ -1,0 +1,137 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const { client_id, month, year } = await req.json();
+
+    if (!client_id || !month || !year) {
+      return new Response(JSON.stringify({ error: "Missing client_id, month, or year" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: "AI not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Fetch client + snapshots
+    const [clientRes, snapshotsRes, prevSnapshotsRes, connectionsRes] = await Promise.all([
+      supabase.from("clients").select("company_name, services_subscribed").eq("id", client_id).single(),
+      supabase.from("monthly_snapshots").select("platform, metrics_data, top_content").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
+      supabase.from("monthly_snapshots").select("platform, metrics_data")
+        .eq("client_id", client_id)
+        .eq("report_month", month === 1 ? 12 : month - 1)
+        .eq("report_year", month === 1 ? year - 1 : year),
+      supabase.from("platform_connections").select("platform, account_name, is_connected, account_id").eq("client_id", client_id),
+    ]);
+
+    const client = clientRes.data;
+    const snapshots = snapshotsRes.data ?? [];
+    const prevSnapshots = prevSnapshotsRes.data ?? [];
+    const connections = connectionsRes.data ?? [];
+
+    if (!client) {
+      return new Response(JSON.stringify({ error: "Client not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (snapshots.length === 0) {
+      return new Response(JSON.stringify({ 
+        analysis: "No performance data available yet for this period. Sync platform data to generate an AI analysis." 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    const dataContext = JSON.stringify({
+      client_name: client.company_name,
+      month: MONTH_NAMES[month],
+      year,
+      platforms_connected: connections.filter((c: any) => c.is_connected && c.account_id).map((c: any) => c.platform),
+      current: snapshots.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
+      previous: prevSnapshots.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
+    });
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{
+          role: "user",
+          content: `You are an expert digital marketing analyst. Analyse the following marketing performance data for ${client.company_name} for ${MONTH_NAMES[month]} ${year}.
+
+Write a comprehensive but easy-to-understand analysis (4-6 paragraphs) covering:
+1. Overall performance summary — what's going well and what needs attention
+2. Platform-by-platform breakdown of key trends
+3. Month-over-month changes and what they mean
+4. Actionable recommendations for improvement
+
+Use plain English that a non-technical business owner would understand. Avoid jargon — explain any marketing terms. Be specific with numbers and percentages where available.
+
+Data: ${dataContext}`
+        }],
+        max_tokens: 1000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("AI error:", response.status, errText);
+
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ error: "AI analysis failed" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const aiResult = await response.json();
+    const analysis = aiResult.choices?.[0]?.message?.content ?? "Unable to generate analysis.";
+
+    return new Response(JSON.stringify({ analysis }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("analyze-client error:", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

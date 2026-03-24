@@ -2,13 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Check, ChevronRight, ChevronLeft, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
+import { cn } from '@/lib/utils';
 
 interface MetaPage {
   id: string;
@@ -30,34 +28,33 @@ interface AccountPickerDialogProps {
   clientId: string;
 }
 
+type MetaStep = 'ad_account' | 'pages' | 'confirm';
+
 const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clientId }: AccountPickerDialogProps) => {
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [metaStep, setMetaStep] = useState<MetaStep>('ad_account');
 
   const metadata = connection?.metadata as Record<string, unknown> | null;
   const platform = connection?.platform;
+  const isMeta = platform === 'meta_ads';
 
-  // Reset selections when connection changes
   useEffect(() => {
     setSelectedAccountId('');
     setSelectedPages([]);
+    setMetaStep('ad_account');
   }, [connection?.id]);
 
   if (!connection || !metadata) return null;
 
   const getAccountOptions = (): DiscoveredAccount[] => {
     switch (platform) {
-      case 'google_ads':
-        return (metadata.customers as DiscoveredAccount[]) || [];
-      case 'meta_ads':
-        return (metadata.ad_accounts as DiscoveredAccount[]) || [];
-      case 'tiktok':
-        return (metadata.advertisers as DiscoveredAccount[]) || [];
-      case 'linkedin':
-        return (metadata.ad_accounts as DiscoveredAccount[]) || [];
-      default:
-        return [];
+      case 'google_ads': return (metadata.customers as DiscoveredAccount[]) || [];
+      case 'meta_ads': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
+      case 'tiktok': return (metadata.advertisers as DiscoveredAccount[]) || [];
+      case 'linkedin': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
+      default: return [];
     }
   };
 
@@ -75,6 +72,8 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
   const pages = getPages();
   const organizations = getOrganizations();
 
+  const hasNoAssets = accounts.length === 0 && pages.length === 0 && organizations.length === 0;
+
   const togglePage = (pageId: string) => {
     setSelectedPages(prev =>
       prev.includes(pageId) ? prev.filter(id => id !== pageId) : [...prev, pageId]
@@ -86,32 +85,23 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
       toast.error('Please select an account');
       return;
     }
-
-    // For linkedin, either ad account or org is fine
     if (platform === 'linkedin' && !selectedAccountId && organizations.length === 0) {
       toast.error('Please select an account');
       return;
     }
 
     setIsSaving(true);
-
     try {
       const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
-      // Update the main connection with the selected account
       const { error } = await supabase
         .from('platform_connections')
-        .update({
-          account_id: selectedAccountId || null,
-          account_name: selectedAccount?.name || null,
-        })
+        .update({ account_id: selectedAccountId || null, account_name: selectedAccount?.name || null })
         .eq('id', connection.id);
-
       if (error) throw error;
 
-      // For Meta: create facebook/instagram connections for selected pages
-      if (platform === 'meta_ads' && selectedPages.length > 0) {
-        // Fetch the full connection row (with access_token, token_expires_at) from DB
+      // Meta: create facebook/instagram connections for selected pages
+      if (isMeta && selectedPages.length > 0) {
         const { data: fullConn } = await supabase
           .from('platform_connections')
           .select('access_token, token_expires_at')
@@ -125,7 +115,6 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
           const page = pages.find(p => p.id === pageId);
           if (!page) continue;
 
-          // Create Facebook Page connection
           await supabase.from('platform_connections').insert({
             client_id: clientId,
             platform: 'facebook' as PlatformType,
@@ -137,10 +126,8 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
             metadata: { page_id: page.id, page_name: page.name, source_connection_id: connection.id },
           });
 
-          // Create Instagram connection if page has linked IG
           if (page.instagram) {
             const igName = page.instagram.username ? `@${page.instagram.username}` : `IG (${page.instagram.id})`;
-
             await supabase.from('platform_connections').insert({
               client_id: clientId,
               platform: 'instagram' as PlatformType,
@@ -160,22 +147,15 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
         }
       }
 
-      // For LinkedIn: save selected organization if any
+      // LinkedIn: save selected organization
       if (platform === 'linkedin' && selectedPages.length > 0) {
         const selectedOrg = organizations.find(o => selectedPages.includes(o.id));
-        if (selectedOrg && !selectedAccountId) {
+        if (selectedOrg) {
           await supabase
             .from('platform_connections')
             .update({
-              account_id: selectedOrg.id,
-              account_name: selectedOrg.name,
-              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as unknown as Record<string, never>,
-            })
-            .eq('id', connection.id);
-        } else if (selectedOrg) {
-          await supabase
-            .from('platform_connections')
-            .update({
+              account_id: selectedAccountId || selectedOrg.id,
+              account_name: selectedAccountId ? selectedAccount?.name : selectedOrg.name,
               metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as unknown as Record<string, never>,
             })
             .eq('id', connection.id);
@@ -193,72 +173,234 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
     }
   };
 
-  const hasNoAssets = accounts.length === 0 && pages.length === 0 && organizations.length === 0;
+  // ─── META MULTI-STEP ───
+  if (isMeta && !hasNoAssets) {
+    const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+    const selectedPageObjects = pages.filter(p => selectedPages.includes(p.id));
 
+    const stepNumber = metaStep === 'ad_account' ? 1 : metaStep === 'pages' ? 2 : 3;
+
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">
+              Connect Meta Ads
+            </DialogTitle>
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 pt-3">
+              {[1, 2, 3].map(s => (
+                <div key={s} className="flex items-center gap-2">
+                  <div className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
+                    s < stepNumber ? 'bg-primary text-primary-foreground' :
+                    s === stepNumber ? 'bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2' :
+                    'bg-muted text-muted-foreground'
+                  )}>
+                    {s < stepNumber ? <Check className="h-4 w-4" /> : s}
+                  </div>
+                  <span className={cn(
+                    'text-xs font-medium hidden sm:inline',
+                    s === stepNumber ? 'text-foreground' : 'text-muted-foreground'
+                  )}>
+                    {s === 1 ? 'Ad Account' : s === 2 ? 'Facebook Page' : 'Confirm'}
+                  </span>
+                  {s < 3 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              ))}
+            </div>
+          </DialogHeader>
+
+          {/* Step 1: Ad Account */}
+          {metaStep === 'ad_account' && (
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-muted-foreground">Select the Meta Ads account for this client:</p>
+              {accounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No ad accounts discovered. You can skip this step.</p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {accounts.map(acct => (
+                    <button
+                      key={acct.id}
+                      onClick={() => setSelectedAccountId(acct.id)}
+                      className={cn(
+                        'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                        selectedAccountId === acct.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card'
+                      )}
+                    >
+                      <div className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                        selectedAccountId === acct.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      )}>
+                        {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : acct.name.charAt(0)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{acct.name}</p>
+                        <p className="text-xs text-muted-foreground">ID: {acct.id}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Facebook Pages */}
+          {metaStep === 'pages' && (
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-muted-foreground">Select the Facebook Page(s) for this client:</p>
+              <div className="flex items-start gap-2 rounded-md bg-secondary/10 border border-secondary/20 p-3">
+                <Info className="h-4 w-4 text-secondary shrink-0 mt-0.5" />
+                <p className="text-xs text-secondary">
+                  If an Instagram Business account is linked to this page, it will be connected automatically.
+                </p>
+              </div>
+              {pages.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No Facebook Pages discovered.</p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {pages.map(page => (
+                    <button
+                      key={page.id}
+                      onClick={() => togglePage(page.id)}
+                      className={cn(
+                        'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                        selectedPages.includes(page.id)
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card'
+                      )}
+                    >
+                      <div className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                        selectedPages.includes(page.id)
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      )}>
+                        {selectedPages.includes(page.id) ? <Check className="h-5 w-5" /> : '📄'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{page.name}</p>
+                        {page.instagram && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            📸 Instagram: @{page.instagram.username || page.instagram.id}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Confirmation */}
+          {metaStep === 'confirm' && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">Review your selections before saving:</p>
+              <div className="space-y-3">
+                <div className="rounded-lg border bg-card p-4">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ad Account</p>
+                  <p className="font-medium text-sm">{selectedAccount?.name || 'None selected'}</p>
+                </div>
+
+                {selectedPageObjects.length > 0 && (
+                  <div className="rounded-lg border bg-card p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Facebook Pages & Instagram</p>
+                    <div className="space-y-2">
+                      {selectedPageObjects.map(page => (
+                        <div key={page.id} className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 text-primary shrink-0" />
+                          <span>{page.name}</span>
+                          {page.instagram && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              + @{page.instagram.username || page.instagram.id}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex-row gap-2">
+            {metaStep !== 'ad_account' && (
+              <Button variant="outline" onClick={() => setMetaStep(metaStep === 'confirm' ? 'pages' : 'ad_account')}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
+              </Button>
+            )}
+            <div className="flex-1" />
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            {metaStep !== 'confirm' ? (
+              <Button onClick={() => setMetaStep(metaStep === 'ad_account' ? 'pages' : 'confirm')}>
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+                {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save Selection
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // ─── NON-META / SINGLE STEP ───
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="font-display">
+          <DialogTitle className="font-display text-xl">
             Select {PLATFORM_LABELS[platform!]} Account
           </DialogTitle>
         </DialogHeader>
 
         {hasNoAssets ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
+          <p className="text-sm text-muted-foreground py-6 text-center">
             No accounts were discovered. Make sure you granted the correct permissions during authorization.
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 py-2">
             {/* Ad Account / Customer selector */}
             {accounts.length > 0 && (
-              <div className="space-y-1.5">
-                <Label className="text-sm">
-                  {platform === 'google_ads' ? 'Customer Account' : 
-                   platform === 'tiktok' ? 'Advertiser Account' : 'Ad Account'}
-                </Label>
-                <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map(acct => (
-                      <SelectItem key={acct.id} value={acct.id}>
-                        {acct.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Meta: Facebook Pages + Instagram */}
-            {pages.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-sm">Facebook Pages & Instagram</Label>
-                <p className="text-xs text-muted-foreground">
-                  Select the page(s) for this client. Linked Instagram accounts will be added automatically.
+                <p className="text-sm text-muted-foreground">
+                  {platform === 'google_ads' ? 'Select a Customer Account:' :
+                   platform === 'tiktok' ? 'Select an Advertiser Account:' : 'Select an Ad Account:'}
                 </p>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {pages.map(page => (
-                    <label
-                      key={page.id}
-                      className="flex items-start gap-3 p-2 rounded-md bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {accounts.map(acct => (
+                    <button
+                      key={acct.id}
+                      onClick={() => setSelectedAccountId(acct.id)}
+                      className={cn(
+                        'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                        selectedAccountId === acct.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card'
+                      )}
                     >
-                      <Checkbox
-                        checked={selectedPages.includes(page.id)}
-                        onCheckedChange={() => togglePage(page.id)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">📄 {page.name}</p>
-                        {page.instagram && (
-                          <p className="text-xs text-muted-foreground">
-                            📸 @{page.instagram.username || page.instagram.id}
-                          </p>
-                        )}
+                      <div className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                        selectedAccountId === acct.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      )}>
+                        {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : acct.name.charAt(0)}
                       </div>
-                    </label>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{acct.name}</p>
+                        <p className="text-xs text-muted-foreground">ID: {acct.id}</p>
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -267,19 +409,31 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
             {/* LinkedIn: Organizations */}
             {organizations.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-sm">Company Pages</Label>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-sm text-muted-foreground">Select a Company Page:</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {organizations.map(org => (
-                    <label
+                    <button
                       key={org.id}
-                      className="flex items-center gap-3 p-2 rounded-md bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                      onClick={() => togglePage(org.id)}
+                      className={cn(
+                        'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                        selectedPages.includes(org.id)
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card'
+                      )}
                     >
-                      <Checkbox
-                        checked={selectedPages.includes(org.id)}
-                        onCheckedChange={() => togglePage(org.id)}
-                      />
-                      <p className="text-sm font-medium">🏢 {org.name}</p>
-                    </label>
+                      <div className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                        selectedPages.includes(org.id)
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      )}>
+                        {selectedPages.includes(org.id) ? <Check className="h-5 w-5" /> : '🏢'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm">{org.name}</p>
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>
