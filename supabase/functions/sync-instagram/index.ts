@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
       // Fetch IG User Insights (only non-deprecated metrics)
       const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach,profile_views,follower_count&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
@@ -135,8 +135,8 @@ Deno.serve(async (req) => {
             metricsMap[metric.name] = (metricsMap[metric.name] || 0) + total;
           }
         }
-        totalImpressions += metricsMap.impressions || 0;
         totalReach += metricsMap.reach || 0;
+        totalImpressions = totalReach; // impressions deprecated at account level; use reach
         totalProfileViews += metricsMap.profile_views || 0;
         // Accumulate per-account metrics into global map
         for (const [k, v] of Object.entries(metricsMap)) {
@@ -245,7 +245,10 @@ Deno.serve(async (req) => {
       comments: totalComments,
       saves: totalSaves,
       video_views: totalVideoViews,
-      posts_published: allTopMedia.length,
+      posts_published: allTopMedia.filter(m => {
+        const d = new Date(m.timestamp);
+        return d.getFullYear() === year && d.getMonth() + 1 === month;
+      }).length,
       reel_count: reelCount,
       image_count: imageCount,
       carousel_count: carouselCount,

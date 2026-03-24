@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
 
       // Fetch Page Insights (comprehensive metrics)
       try {
-        const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_impressions,page_impressions_organic,page_impressions_paid,page_post_engagements,page_views_total,page_fan_adds,page_fan_removes,page_fans,page_reach,page_video_views,page_actions_post_reactions_total&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_impressions,page_impressions_organic,page_impressions_paid,page_post_engagements,page_views_total,page_fans,page_reach,page_video_views&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
@@ -143,8 +143,7 @@ Deno.serve(async (req) => {
               case "page_impressions_paid": metricsAccum.paid_impressions = (metricsAccum.paid_impressions || 0) + total; break;
               case "page_post_engagements": totalEngagement += total; break;
               case "page_views_total": totalPageViews += total; break;
-              case "page_fan_adds": totalFollowerAdds += total; break;
-              case "page_fan_removes": metricsAccum.follower_removes = (metricsAccum.follower_removes || 0) + total; break;
+              // page_fan_adds and page_fan_removes removed — deprecated in Graph API v21+
               case "page_fans": metricsAccum.total_fans = Math.max(metricsAccum.total_fans || 0, total); break;
               case "page_reach": metricsAccum.reach = (metricsAccum.reach || 0) + total; break;
               case "page_video_views": metricsAccum.video_views = (metricsAccum.video_views || 0) + total; break;
@@ -224,8 +223,8 @@ Deno.serve(async (req) => {
       reach: metricsAccum.reach || 0,
       engagement: totalEngagement,
       page_views: totalPageViews,
-      follower_growth: totalFollowerAdds,
-      follower_removes: metricsAccum.follower_removes || 0,
+      follower_growth: 0,
+      follower_removes: 0,
       total_followers: metricsAccum.total_fans || 0,
       video_views: metricsAccum.video_views || 0,
       likes: allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
