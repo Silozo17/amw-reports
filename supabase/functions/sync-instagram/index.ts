@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
           // Batch fetch saves, video_views, and profile_activity for top 20 posts
           for (const mediaItem of mediaData.data.slice(0, 20)) {
             try {
-              const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=saved,video_views,reach,profile_activity&access_token=${page_token}`;
+              const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=saved,video_views,reach,impressions&access_token=${page_token}`;
               const mediaInsightsRes = await fetch(mediaInsightsUrl);
               if (mediaInsightsRes.ok) {
                 const mediaInsightsData = await mediaInsightsRes.json();
