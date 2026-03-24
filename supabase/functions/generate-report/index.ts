@@ -88,6 +88,12 @@ Deno.serve(async (req) => {
     const yoySnapshots = yoySnapshotsRes.data ?? [];
     const configs = configRes.data ?? [];
 
+    // Currency symbol from client preference
+    const CURRENCY_SYMBOLS: Record<string, string> = {
+      GBP: "£", EUR: "€", USD: "$", PLN: "zł", CAD: "C$", AUD: "A$", NZD: "NZ$",
+    };
+    const currSymbol = CURRENCY_SYMBOLS[client.preferred_currency ?? "GBP"] ?? "£";
+
     if (snapshots.length === 0) {
       return new Response(JSON.stringify({ 
         error: "No data snapshots found for this period. Please sync platform data before generating a report." 
@@ -183,7 +189,7 @@ Deno.serve(async (req) => {
     };
 
     const formatMetricValue = (key: string, val: number): string => {
-      if (key === "spend" || key === "cpc" || key === "cost_per_conversion") return `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (key === "spend" || key === "cpc" || key === "cost_per_conversion") return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       if (key === "ctr" || key === "engagement_rate" || key === "conversion_rate" || key === "audience_growth_rate") return `${val.toFixed(2)}%`;
       if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
       if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
@@ -238,7 +244,7 @@ Deno.serve(async (req) => {
     const prevTotalEngagement = prevSnapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.engagement || 0) + (sn.metrics_data?.likes || 0) + (sn.metrics_data?.comments || 0) + (sn.metrics_data?.shares || 0), 0);
 
     const kpiCards = [
-      { label: "TOTAL SPEND", value: `$${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, prev: prevTotalSpend, curr: totalSpend, isCost: true },
+      { label: "TOTAL SPEND", value: `${currSymbol}${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, prev: prevTotalSpend, curr: totalSpend, isCost: true },
       { label: "IMPRESSIONS", value: totalImpressions >= 1000 ? `${(totalImpressions / 1000).toFixed(1)}K` : String(totalImpressions), prev: prevTotalImpressions, curr: totalImpressions },
       { label: "CLICKS", value: totalClicks >= 1000 ? `${(totalClicks / 1000).toFixed(1)}K` : String(totalClicks), prev: prevTotalClicks, curr: totalClicks },
       { label: "ENGAGEMENT", value: totalEngagement >= 1000 ? `${(totalEngagement / 1000).toFixed(1)}K` : String(totalEngagement), prev: prevTotalEngagement, curr: totalEngagement },

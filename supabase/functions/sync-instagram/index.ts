@@ -151,15 +151,24 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.total_engagement - a.total_engagement)
       .slice(0, 10);
 
-    const metricsData = {
+    // Only include total_followers for current or previous month (we can't know historical counts)
+    const now = new Date();
+    const isRecentMonth =
+      (year === now.getFullYear() && month >= now.getMonth()) || // current or prev month this year
+      (year === now.getFullYear() - 1 && month === 12 && now.getMonth() === 0); // Dec when it's Jan
+
+    const metricsData: Record<string, number> = {
       impressions: totalImpressions,
       reach: totalReach,
       profile_visits: totalProfileViews,
-      total_followers: totalFollowerCount,
       engagement: allTopMedia.reduce((sum, m) => sum + m.total_engagement, 0),
       engagement_rate: totalImpressions > 0 ? allTopMedia.reduce((sum, m) => sum + m.total_engagement, 0) / totalImpressions : 0,
       posts_published: allTopMedia.length,
     };
+
+    if (isRecentMonth && totalFollowerCount > 0) {
+      metricsData.total_followers = totalFollowerCount;
+    }
 
     // Upsert monthly snapshot
     const { data: existing } = await supabase

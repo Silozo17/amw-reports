@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PLATFORM_LABELS, METRIC_LABELS, PLATFORM_LOGOS, getCurrencySymbol } from '@/types/database';
+import { PLATFORM_LABELS, METRIC_LABELS, PLATFORM_LOGOS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 import MetricTooltip from './MetricTooltip';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -25,8 +25,13 @@ const formatValue = (key: string, value: number, currencySymbol: string): string
 };
 
 const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'GBP' }: PlatformMetricsCardProps) => {
+  const isOrganic = ORGANIC_PLATFORMS.has(platform);
+
   const metricEntries = Object.entries(metrics).filter(
-    ([_, val]) => typeof val === 'number'
+    ([key, val]) =>
+      typeof val === 'number' &&
+      !HIDDEN_METRICS.has(key) &&
+      !(isOrganic && AD_METRICS.has(key))
   );
   const currencySymbol = getCurrencySymbol(currencyCode);
   const logo = PLATFORM_LOGOS[platform];
