@@ -169,14 +169,14 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
             .update({
               account_id: selectedOrg.id,
               account_name: selectedOrg.name,
-              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as Record<string, unknown>,
+              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as unknown as Record<string, never>,
             })
             .eq('id', connection.id);
         } else if (selectedOrg) {
           await supabase
             .from('platform_connections')
             .update({
-              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as Record<string, unknown>,
+              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as unknown as Record<string, never>,
             })
             .eq('id', connection.id);
         }
