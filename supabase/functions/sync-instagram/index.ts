@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
       // Fetch IG User Insights (comprehensive metrics)
       const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views,website_clicks,email_contacts,get_directions_clicks,phone_call_clicks,text_message_clicks,accounts_engaged&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=impressions,reach,profile_views,follower_count&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
