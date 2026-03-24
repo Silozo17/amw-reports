@@ -1,26 +1,50 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { subMonths, formatDistanceToNow, format } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users, BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, TrendingUp } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { subMonths, formatDistanceToNow, format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  AreaChart, Area, Line,
+  Sparkles,
+  Banknote,
+  Eye,
+  MousePointerClick,
+  MessageCircle,
+  Users,
+  BarChart3,
+  PieChartIcon,
+  AlertCircle,
+  Clock,
+  Loader2,
+  TrendingUp,
+} from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  AreaChart,
+  Area,
+  Line,
   ReferenceLine,
-} from 'recharts';
-import PlatformMetricsCard from './PlatformMetricsCard';
-import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from './DashboardHeader';
-import AudienceMap from './AudienceMap';
-import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from '@/types/database';
-import type { PlatformType, JobStatus } from '@/types/database';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+} from "recharts";
+import PlatformMetricsCard from "./PlatformMetricsCard";
+import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from "./DashboardHeader";
+import AudienceMap from "./AudienceMap";
+import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
+import type { PlatformType, JobStatus } from "@/types/database";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
+const CHART_COLORS = ["#b32fbf", "#539BDB", "#4ED68E", "#EE8733", "#241f21", "#8b5cf6"];
 
 interface ClientDashboardProps {
   clientId: string;
@@ -59,7 +83,10 @@ function useAnimatedCounter(target: number, duration = 800): number {
   useEffect(() => {
     const start = prevTarget.current;
     const diff = target - start;
-    if (diff === 0) { setCurrent(target); return; }
+    if (diff === 0) {
+      setCurrent(target);
+      return;
+    }
     const startTime = performance.now();
     const tick = (now: number) => {
       const elapsed = now - startTime;
@@ -73,14 +100,17 @@ function useAnimatedCounter(target: number, duration = 800): number {
       }
     };
     rafId.current = requestAnimationFrame(tick);
-    return () => { if (rafId.current) cancelAnimationFrame(rafId.current); };
+    return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+    };
   }, [target, duration]);
 
   return current;
 }
 
 const formatKpiValue = (val: number, isCurrency: boolean, currSymbol: string): string => {
-  if (isCurrency) return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (isCurrency)
+    return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
   if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
   return Math.round(val).toLocaleString();
@@ -100,9 +130,8 @@ interface KpiCardProps {
 const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, currSymbol }: KpiCardProps) => {
   const animatedValue = useAnimatedCounter(value);
   const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
-  const bgTint = change !== undefined
-    ? isPositive ? 'rgba(78, 214, 142, 0.05)' : 'rgba(239, 68, 68, 0.05)'
-    : undefined;
+  const bgTint =
+    change !== undefined ? (isPositive ? "rgba(78, 214, 142, 0.05)" : "rgba(239, 68, 68, 0.05)") : undefined;
 
   return (
     <Card className="relative overflow-hidden" style={bgTint ? { backgroundColor: bgTint } : undefined}>
@@ -111,18 +140,23 @@ const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, curr
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
             <Icon className="h-3.5 w-3.5 text-primary" />
           </div>
-          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-tight">{label}</p>
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-tight">
+            {label}
+          </p>
         </div>
         <p className="text-xl font-display font-bold leading-none mb-1">
           {formatKpiValue(animatedValue, !!isCost, currSymbol)}
         </p>
         {change !== undefined && (
-          <div className={cn(
-            'flex items-center gap-1 text-[11px] font-medium',
-            isPositive === true ? 'text-accent' :
-            isPositive === false ? 'text-destructive' : 'text-muted-foreground'
-          )}>
-            <span>{isPositive ? '▲' : '▼'} {Math.abs(change).toFixed(1)}%</span>
+          <div
+            className={cn(
+              "flex items-center gap-1 text-[11px] font-medium",
+              isPositive === true ? "text-accent" : isPositive === false ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            <span>
+              {isPositive ? "▲" : "▼"} {Math.abs(change).toFixed(1)}%
+            </span>
           </div>
         )}
         {/* Sparkline */}
@@ -131,7 +165,7 @@ const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, curr
             <ResponsiveContainer width="100%" height={50}>
               <AreaChart data={sparklineData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id={`spark-${label.replace(/\s/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id={`spark-${label.replace(/\s/g, "")}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#b32fbf" stopOpacity={0.3} />
                     <stop offset="100%" stopColor="#b32fbf" stopOpacity={0} />
                   </linearGradient>
@@ -141,16 +175,14 @@ const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, curr
                   dataKey="v"
                   stroke="#b32fbf"
                   strokeWidth={1.5}
-                  fill={`url(#spark-${label.replace(/\s/g, '')})`}
+                  fill={`url(#spark-${label.replace(/\s/g, "")})`}
                   dot={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         )}
-        {value === 0 && (
-          <p className="text-[10px] text-muted-foreground/50 mt-1 italic">Data unavailable</p>
-        )}
+        {value === 0 && <p className="text-[10px] text-muted-foreground/50 mt-1 italic">Data unavailable</p>}
       </CardContent>
     </Card>
   );
@@ -179,8 +211,12 @@ const DashboardSkeleton = () => (
     <div className="grid gap-6 md:grid-cols-2">
       {Array.from({ length: 2 }).map((_, i) => (
         <Card key={i}>
-          <CardHeader className="pb-2"><Skeleton className="h-4 w-32" /></CardHeader>
-          <CardContent><Skeleton className="h-[260px] w-full rounded" /></CardContent>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[260px] w-full rounded" />
+          </CardContent>
         </Card>
       ))}
     </div>
@@ -189,8 +225,12 @@ const DashboardSkeleton = () => (
       <Skeleton className="h-5 w-32" />
       {Array.from({ length: 3 }).map((_, i) => (
         <Card key={i}>
-          <CardHeader className="pb-4"><Skeleton className="h-5 w-40" /></CardHeader>
-          <CardContent><Skeleton className="h-24 w-full rounded" /></CardContent>
+          <CardHeader className="pb-4">
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-24 w-full rounded" />
+          </CardContent>
         </Card>
       ))}
     </div>
@@ -202,22 +242,26 @@ const DonutCentreLabel = ({ viewBox, value }: any) => {
   const { cx, cy } = viewBox;
   return (
     <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central">
-      <tspan x={cx} dy="-0.3em" className="fill-foreground text-lg font-bold">{value}</tspan>
-      <tspan x={cx} dy="1.4em" className="fill-muted-foreground text-[10px]">Total</tspan>
+      <tspan x={cx} dy="-0.3em" className="fill-foreground text-lg font-bold">
+        {value}
+      </tspan>
+      <tspan x={cx} dy="1.4em" className="fill-muted-foreground text-[10px]">
+        Total
+      </tspan>
     </text>
   );
 };
 
 // ─── Main Dashboard ────────────────────────────────────────────
-const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientDashboardProps) => {
   const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
   const defaultMonth = now.getMonth() === 0 ? 12 : now.getMonth();
   const defaultYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
 
-  const [selectedPlatform, setSelectedPlatform] = useState<PlatformFilter>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformFilter>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod>({
-    type: 'monthly',
+    type: "monthly",
     month: defaultMonth,
     year: defaultYear,
   });
@@ -230,61 +274,64 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
   const [connections, setConnections] = useState<ConnectionData[]>([]);
   const [platformConfigs, setPlatformConfigs] = useState<Map<string, PlatformConfigData>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
-  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [aiAnalysis, setAiAnalysis] = useState("");
   const [aiAnalysisDate, setAiAnalysisDate] = useState<Date | null>(null);
   const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
-  useEffect(() => { setHasAutoDetected(false); }, [clientId]);
+  useEffect(() => {
+    setHasAutoDetected(false);
+  }, [clientId]);
 
   const fetchSnapshots = useCallback(async () => {
     setIsLoading(true);
     const { month, year, type, startDate, endDate } = selectedPeriod;
 
-    let query = supabase.from('monthly_snapshots')
-      .select('platform, metrics_data, report_month, report_year')
-      .eq('client_id', clientId);
+    let query = supabase
+      .from("monthly_snapshots")
+      .select("platform, metrics_data, report_month, report_year")
+      .eq("client_id", clientId);
 
     let isMultiMonth = false;
 
-    if (type === 'quarterly') {
+    if (type === "quarterly") {
       const qStart = Math.floor((month - 1) / 3) * 3 + 1;
-      query = query.in('report_month', [qStart, qStart + 1, qStart + 2]).eq('report_year', year);
+      query = query.in("report_month", [qStart, qStart + 1, qStart + 2]).eq("report_year", year);
       isMultiMonth = true;
-    } else if (type === 'ytd') {
+    } else if (type === "ytd") {
       const currentMonth = new Date().getMonth() + 1;
       const ytdMonths = Array.from({ length: currentMonth }, (_, i) => i + 1);
-      query = query.in('report_month', ytdMonths).eq('report_year', year);
+      query = query.in("report_month", ytdMonths).eq("report_year", year);
       isMultiMonth = true;
-    } else if (type === 'last_year') {
-      query = query.eq('report_year', year);
+    } else if (type === "last_year") {
+      query = query.eq("report_year", year);
       isMultiMonth = true;
-    } else if (type === 'maximum') {
+    } else if (type === "maximum") {
       isMultiMonth = true;
-    } else if (type === 'custom' && startDate && endDate) {
+    } else if (type === "custom" && startDate && endDate) {
       const sMonth = startDate.getMonth() + 1;
       const sYear = startDate.getFullYear();
       const eMonth = endDate.getMonth() + 1;
       const eYear = endDate.getFullYear();
       if (sYear === eYear) {
         const customMonths = Array.from({ length: eMonth - sMonth + 1 }, (_, i) => sMonth + i);
-        query = query.in('report_month', customMonths).eq('report_year', sYear);
+        query = query.in("report_month", customMonths).eq("report_year", sYear);
       } else {
         query = query.or(
-          `and(report_year.eq.${sYear},report_month.gte.${sMonth}),and(report_year.gt.${sYear},report_year.lt.${eYear}),and(report_year.eq.${eYear},report_month.lte.${eMonth})`
+          `and(report_year.eq.${sYear},report_month.gte.${sMonth}),and(report_year.gt.${sYear},report_year.lt.${eYear}),and(report_year.eq.${eYear},report_month.lte.${eMonth})`,
         );
       }
       isMultiMonth = true;
     } else {
-      query = query.eq('report_month', month).eq('report_year', year);
+      query = query.eq("report_month", month).eq("report_year", year);
     }
 
     let prevMonth = month;
     let prevYear = year;
-    const showComparison = type === 'weekly' || type === 'monthly' || type === 'quarterly';
-    if (type === 'quarterly') {
+    const showComparison = type === "weekly" || type === "monthly" || type === "quarterly";
+    if (type === "quarterly") {
       const d = subMonths(new Date(year, month - 1), 3);
       prevMonth = d.getMonth() + 1;
       prevYear = d.getFullYear();
@@ -301,17 +348,26 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     const [currentRes, prevRes, trendRes, connectionsRes, configRes] = await Promise.all([
       query,
       showComparison
-        ? supabase.from('monthly_snapshots').select('platform, metrics_data, report_month, report_year')
-            .eq('client_id', clientId).eq('report_month', prevMonth).eq('report_year', prevYear)
+        ? supabase
+            .from("monthly_snapshots")
+            .select("platform, metrics_data, report_month, report_year")
+            .eq("client_id", clientId)
+            .eq("report_month", prevMonth)
+            .eq("report_year", prevYear)
         : Promise.resolve({ data: [], error: null }),
-      supabase.from('monthly_snapshots').select('platform, metrics_data, report_month, report_year')
-        .eq('client_id', clientId)
+      supabase
+        .from("monthly_snapshots")
+        .select("platform, metrics_data, report_month, report_year")
+        .eq("client_id", clientId)
         .or(`report_year.gt.${startYear},and(report_year.eq.${startYear},report_month.gte.${startMonth})`)
-        .order('report_year', { ascending: true }).order('report_month', { ascending: true }),
-      supabase.from('platform_connections').select('platform, last_sync_at, last_sync_status, last_error')
-        .eq('client_id', clientId).eq('is_connected', true),
-      supabase.from('client_platform_config').select('platform, is_enabled, enabled_metrics')
-        .eq('client_id', clientId),
+        .order("report_year", { ascending: true })
+        .order("report_month", { ascending: true }),
+      supabase
+        .from("platform_connections")
+        .select("platform, last_sync_at, last_sync_status, last_error")
+        .eq("client_id", clientId)
+        .eq("is_connected", true),
+      supabase.from("client_platform_config").select("platform, is_enabled, enabled_metrics").eq("client_id", clientId),
     ]);
 
     setConnections((connectionsRes.data ?? []) as ConnectionData[]);
@@ -328,7 +384,13 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       for (const s of currentSnapshots) {
         const existing = grouped.get(s.platform) || {};
         for (const [k, v] of Object.entries(s.metrics_data)) {
-          if (typeof v === 'number') existing[k] = (existing[k] || 0) + v;
+          if (typeof v === "number") {
+            if (k === "total_followers") {
+              existing[k] = Math.max(existing[k] || 0, v);
+            } else {
+              existing[k] = (existing[k] || 0) + v;
+            }
+          }
         }
         grouped.set(s.platform, existing);
       }
@@ -349,8 +411,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     const platforms = [...new Set((connectionsRes.data ?? []).map((c: any) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
 
-    const hasRealData = currentSnapshots.some(snapshot =>
-      Object.entries(snapshot.metrics_data).some(([key, v]) => typeof v === 'number' && v > 0 && !HIDDEN_METRICS.has(key))
+    const hasRealData = currentSnapshots.some((snapshot) =>
+      Object.entries(snapshot.metrics_data).some(
+        ([key, v]) => typeof v === "number" && v > 0 && !HIDDEN_METRICS.has(key),
+      ),
     );
 
     if (!hasAutoDetected && !hasRealData && (trendRes.data ?? []).length > 0) {
@@ -359,12 +423,16 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       for (const s of allSnaps) {
         const key = `${s.report_year}-${s.report_month}`;
         const existing = monthsWithData.get(key) || { m: s.report_month, y: s.report_year, total: 0 };
-        const total = Object.entries(s.metrics_data).filter(([k]) => !HIDDEN_METRICS.has(k)).reduce((sum, [, v]) => sum + (typeof v === 'number' ? Math.abs(v) : 0), 0);
+        const total = Object.entries(s.metrics_data)
+          .filter(([k]) => !HIDDEN_METRICS.has(k))
+          .reduce((sum, [, v]) => sum + (typeof v === "number" ? Math.abs(v) : 0), 0);
         existing.total += total;
         monthsWithData.set(key, existing);
       }
-      const sorted = Array.from(monthsWithData.values()).filter(d => d.total > 0).sort((a, b) => a.y !== b.y ? b.y - a.y : b.m - a.m);
-      if (sorted.length > 0) setSelectedPeriod(prev => ({ ...prev, month: sorted[0].m, year: sorted[0].y }));
+      const sorted = Array.from(monthsWithData.values())
+        .filter((d) => d.total > 0)
+        .sort((a, b) => (a.y !== b.y ? b.y - a.y : b.m - a.m));
+      if (sorted.length > 0) setSelectedPeriod((prev) => ({ ...prev, month: sorted[0].m, year: sorted[0].y }));
       setHasAutoDetected(true);
     } else if (!hasAutoDetected) {
       setHasAutoDetected(true);
@@ -373,7 +441,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     setIsLoading(false);
   }, [clientId, selectedPeriod, hasAutoDetected]);
 
-  useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
+  useEffect(() => {
+    fetchSnapshots();
+  }, [fetchSnapshots]);
 
   // Rate limit cooldown timer
   useEffect(() => {
@@ -388,126 +458,224 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
   const handleAnalyse = async () => {
     const now = Date.now();
     if (now - lastAnalysisTime < 60000) {
-      toast.error(`Please wait ${Math.ceil((lastAnalysisTime + 60000 - now) / 1000)}s before generating another analysis`);
+      toast.error(
+        `Please wait ${Math.ceil((lastAnalysisTime + 60000 - now) / 1000)}s before generating another analysis`,
+      );
       return;
     }
     setIsAnalysing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('analyze-client', {
+      const { data, error } = await supabase.functions.invoke("analyze-client", {
         body: { client_id: clientId, month: selectedPeriod.month, year: selectedPeriod.year },
       });
       if (error) throw error;
-      if (data?.error) { toast.error(data.error); return; }
-      setAiAnalysis(data.analysis || 'No analysis available.');
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+      setAiAnalysis(data.analysis || "No analysis available.");
       setAiAnalysisDate(new Date());
       setLastAnalysisTime(Date.now());
       setCooldownRemaining(60);
       setAnalysisDialogOpen(true);
     } catch (e) {
-      console.error('Analysis error:', e);
-      toast.error('Failed to generate AI analysis');
+      console.error("Analysis error:", e);
+      toast.error("Failed to generate AI analysis");
     } finally {
       setIsAnalysing(false);
     }
   };
 
-  const filtered = useMemo(() => selectedPlatform === 'all' ? snapshots : snapshots.filter(s => s.platform === selectedPlatform), [snapshots, selectedPlatform]);
-  const filteredPrev = useMemo(() => selectedPlatform === 'all' ? prevSnapshots : prevSnapshots.filter(s => s.platform === selectedPlatform), [prevSnapshots, selectedPlatform]);
+  const filtered = useMemo(
+    () => (selectedPlatform === "all" ? snapshots : snapshots.filter((s) => s.platform === selectedPlatform)),
+    [snapshots, selectedPlatform],
+  );
+  const filteredPrev = useMemo(
+    () => (selectedPlatform === "all" ? prevSnapshots : prevSnapshots.filter((s) => s.platform === selectedPlatform)),
+    [prevSnapshots, selectedPlatform],
+  );
 
   // ─── KPI Aggregates ──────────────────────────────────────────
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
     const totalClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
-    const totalEngagement = filtered.reduce((sum, s) => sum + (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0), 0);
-    const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
+    const totalEngagement = filtered.reduce(
+      (sum, s) =>
+        sum +
+        (s.metrics_data.engagement || 0) +
+        (s.metrics_data.likes || 0) +
+        (s.metrics_data.comments || 0) +
+        (s.metrics_data.shares || 0),
+      0,
+    );
+    const totalFollowers = Math.max(...filtered.map((s) => s.metrics_data.total_followers || 0), 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
-    const prevReach = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
+    const prevReach = filteredPrev.reduce(
+      (sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0),
+      0,
+    );
     const prevClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
-    const prevEngagement = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0), 0);
+    const prevEngagement = filteredPrev.reduce(
+      (sum, s) =>
+        sum +
+        (s.metrics_data.engagement || 0) +
+        (s.metrics_data.likes || 0) +
+        (s.metrics_data.comments || 0) +
+        (s.metrics_data.shares || 0),
+      0,
+    );
 
-    const calcChange = (curr: number, prev: number) => prev !== 0 ? ((curr - prev) / prev) * 100 : undefined;
+    const calcChange = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
     return [
-      { label: 'Total Spend', value: totalSpend, change: calcChange(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: 'spend' },
-      { label: 'Reach', value: totalReach, change: calcChange(totalReach, prevReach), icon: Eye, metricKey: 'reach' },
-      { label: 'Clicks', value: totalClicks, change: calcChange(totalClicks, prevClicks), icon: MousePointerClick, metricKey: 'clicks' },
-      { label: 'Engagement', value: totalEngagement, change: calcChange(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: 'engagement' },
-      ...(totalFollowers > 0 ? [{ label: 'Followers', value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: 'total_followers' }] : []),
+      ...(["all", "meta_ads", "google_ads"].includes(selectedPlatform)
+        ? [
+            {
+              label: "Total Spend",
+              value: totalSpend,
+              change: calcChange(totalSpend, prevSpend),
+              icon: Banknote,
+              isCost: true,
+              metricKey: "spend",
+            },
+          ]
+        : []),
+      { label: "Reach", value: totalReach, change: calcChange(totalReach, prevReach), icon: Eye, metricKey: "reach" },
+      {
+        label: "Clicks",
+        value: totalClicks,
+        change: calcChange(totalClicks, prevClicks),
+        icon: MousePointerClick,
+        metricKey: "clicks",
+      },
+      {
+        label: "Engagement",
+        value: totalEngagement,
+        change: calcChange(totalEngagement, prevEngagement),
+        icon: MessageCircle,
+        metricKey: "engagement",
+      },
+      ...(totalFollowers > 0
+        ? [
+            {
+              label: "Followers",
+              value: totalFollowers,
+              change: undefined as number | undefined,
+              icon: Users,
+              metricKey: "total_followers",
+            },
+          ]
+        : []),
     ];
   }, [filtered, filteredPrev]);
 
   // ─── Sparkline data per KPI from trend ───────────────────────
   const sparklineMap = useMemo(() => {
     const map: Record<string, Array<{ v: number }>> = {};
-    const relevantTrend = selectedPlatform === 'all' ? trendData : trendData.filter(s => s.platform === selectedPlatform);
+    const relevantTrend =
+      selectedPlatform === "all" ? trendData : trendData.filter((s) => s.platform === selectedPlatform);
     const monthMap = new Map<string, Record<string, number>>();
 
     for (const s of relevantTrend) {
-      const key = `${s.report_year}-${String(s.report_month).padStart(2, '0')}`;
+      const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
       const existing = monthMap.get(key) || {};
       existing.spend = (existing.spend || 0) + (s.metrics_data.spend || 0);
       existing.reach = (existing.reach || 0) + (s.metrics_data.reach || s.metrics_data.impressions || 0);
       existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0);
-      existing.engagement = (existing.engagement || 0) + (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0);
+      existing.engagement =
+        (existing.engagement || 0) +
+        (s.metrics_data.engagement || 0) +
+        (s.metrics_data.likes || 0) +
+        (s.metrics_data.comments || 0) +
+        (s.metrics_data.shares || 0);
       existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
       monthMap.set(key, existing);
     }
 
-    const sorted = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
-    for (const metricKey of ['spend', 'reach', 'clicks', 'engagement', 'total_followers']) {
+    const sorted = Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6);
+    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers"]) {
       map[metricKey] = sorted.map(([, data]) => ({ v: data[metricKey] || 0 }));
     }
     return map;
   }, [trendData, selectedPlatform]);
 
   // ─── Chart Data ──────────────────────────────────────────────
-  const spendByPlatform = useMemo(() =>
-    filtered.filter(s => s.metrics_data.spend > 0).map(s => ({
-      name: PLATFORM_LABELS[s.platform] || s.platform,
-      value: Math.round(s.metrics_data.spend * 100) / 100,
-    })), [filtered]);
+  const spendByPlatform = useMemo(
+    () =>
+      filtered
+        .filter((s) => s.metrics_data.spend > 0)
+        .map((s) => ({
+          name: PLATFORM_LABELS[s.platform] || s.platform,
+          value: Math.round(s.metrics_data.spend * 100) / 100,
+        })),
+    [filtered],
+  );
 
   const totalSpend = useMemo(() => spendByPlatform.reduce((s, d) => s + d.value, 0), [spendByPlatform]);
 
   // Engagement breakdown as stacked bar (likes, comments, shares per platform)
-  const engagementStackedData = useMemo(() =>
-    filtered.filter(s => {
-      const eng = (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0) + (s.metrics_data.engagement || 0);
-      return eng > 0;
-    }).map(s => ({
-      name: PLATFORM_LABELS[s.platform] || s.platform,
-      likes: s.metrics_data.likes || 0,
-      comments: s.metrics_data.comments || 0,
-      shares: s.metrics_data.shares || 0,
-      saves: s.metrics_data.saves || 0,
-    })), [filtered]);
+  const engagementStackedData = useMemo(
+    () =>
+      filtered
+        .filter((s) => {
+          const eng =
+            (s.metrics_data.likes || 0) +
+            (s.metrics_data.comments || 0) +
+            (s.metrics_data.shares || 0) +
+            (s.metrics_data.engagement || 0);
+          return eng > 0;
+        })
+        .map((s) => ({
+          name: PLATFORM_LABELS[s.platform] || s.platform,
+          likes: s.metrics_data.likes || 0,
+          comments: s.metrics_data.comments || 0,
+          shares: s.metrics_data.shares || 0,
+          saves: s.metrics_data.saves || 0,
+        })),
+    [filtered],
+  );
 
-  const impressionsByPlatform = useMemo(() =>
-    filtered.filter(s => s.metrics_data.impressions > 0).map(s => ({
-      name: PLATFORM_LABELS[s.platform] || s.platform,
-      impressions: s.metrics_data.impressions,
-      clicks: s.metrics_data.clicks || 0,
-    })), [filtered]);
+  const impressionsByPlatform = useMemo(
+    () =>
+      filtered
+        .filter((s) => s.metrics_data.impressions > 0)
+        .map((s) => ({
+          name: PLATFORM_LABELS[s.platform] || s.platform,
+          impressions: s.metrics_data.impressions,
+          clicks: s.metrics_data.clicks || 0,
+        })),
+    [filtered],
+  );
 
   // Trend data for area chart
   const trendChartData = useMemo(() => {
     const monthMap = new Map<string, { spend: number; impressions: number; clicks: number; engagement: number }>();
-    const relevantTrend = selectedPlatform === 'all' ? trendData : trendData.filter(s => s.platform === selectedPlatform);
+    const relevantTrend =
+      selectedPlatform === "all" ? trendData : trendData.filter((s) => s.platform === selectedPlatform);
     for (const s of relevantTrend) {
-      const key = `${s.report_year}-${String(s.report_month).padStart(2, '0')}`;
+      const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
       const existing = monthMap.get(key) || { spend: 0, impressions: 0, clicks: 0, engagement: 0 };
       existing.spend += s.metrics_data.spend || 0;
       existing.impressions += s.metrics_data.impressions || 0;
       existing.clicks += s.metrics_data.clicks || 0;
-      existing.engagement += (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0);
+      existing.engagement +=
+        (s.metrics_data.engagement || 0) +
+        (s.metrics_data.likes || 0) +
+        (s.metrics_data.comments || 0) +
+        (s.metrics_data.shares || 0);
       monthMap.set(key, existing);
     }
-    return Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, data]) => {
-      const [y, m] = key.split('-');
-      return { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, ...data };
-    });
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([key, data]) => {
+        const [y, m] = key.split("-");
+        return { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, ...data };
+      });
   }, [trendData, selectedPlatform]);
 
   // Geo data extracted from snapshots
@@ -522,14 +690,14 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
 
   // Last synced timestamp
   const lastSyncedAt = useMemo(() => {
-    const syncDates = connections.filter(c => c.last_sync_at).map(c => new Date(c.last_sync_at!).getTime());
+    const syncDates = connections.filter((c) => c.last_sync_at).map((c) => new Date(c.last_sync_at!).getTime());
     if (syncDates.length === 0) return null;
     return new Date(Math.max(...syncDates));
   }, [connections]);
 
   const hasData = snapshots.length > 0;
   const hasFilteredData = filtered.length > 0;
-  const allZeros = hasFilteredData && kpis.every(k => k.value === 0);
+  const allZeros = hasFilteredData && kpis.every((k) => k.value === 0);
 
   return (
     <div className="space-y-8">
@@ -552,13 +720,19 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         )}
         <Button
           size="sm"
-          variant={aiAnalysis ? 'outline' : 'default'}
+          variant={aiAnalysis ? "outline" : "default"}
           onClick={handleAnalyse}
           disabled={isAnalysing || cooldownRemaining > 0}
           className="gap-2"
         >
           {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {isAnalysing ? 'Analysing...' : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? 'Refresh Analysis' : 'Generate AI Analysis'}
+          {isAnalysing
+            ? "Analysing..."
+            : cooldownRemaining > 0
+              ? `Wait ${cooldownRemaining}s`
+              : aiAnalysis
+                ? "Refresh Analysis"
+                : "Generate AI Analysis"}
         </Button>
       </div>
 
@@ -569,9 +743,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
               <CardTitle className="text-sm font-display">AI Analysis</CardTitle>
-              <span className="text-[10px] text-muted-foreground">{format(aiAnalysisDate, 'dd MMM yyyy, HH:mm')}</span>
+              <span className="text-[10px] text-muted-foreground">{format(aiAnalysisDate, "dd MMM yyyy, HH:mm")}</span>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => setAnalysisDialogOpen(true)}>View Full Analysis</Button>
+            <Button size="sm" variant="ghost" onClick={() => setAnalysisDialogOpen(true)}>
+              View Full Analysis
+            </Button>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground line-clamp-3">{aiAnalysis}</p>
@@ -589,9 +765,14 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             </DialogTitle>
           </DialogHeader>
           <div className="prose prose-sm max-w-none text-foreground">
-            {aiAnalysis.split('\n').filter(Boolean).map((para, i) => (
-              <p key={i} className="text-sm leading-relaxed mb-3">{para}</p>
-            ))}
+            {aiAnalysis
+              .split("\n")
+              .filter(Boolean)
+              .map((para, i) => (
+                <p key={i} className="text-sm leading-relaxed mb-3">
+                  {para}
+                </p>
+              ))}
           </div>
         </DialogContent>
       </Dialog>
@@ -604,7 +785,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           <CardContent className="py-16 text-center space-y-3">
             <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground font-medium">No performance data available</p>
-            <p className="text-sm text-muted-foreground/70">Sync platform data for this period to see your dashboard.</p>
+            <p className="text-sm text-muted-foreground/70">
+              Sync platform data for this period to see your dashboard.
+            </p>
           </CardContent>
         </Card>
       ) : !hasFilteredData ? (
@@ -612,7 +795,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           <CardContent className="py-16 text-center space-y-3">
             <PieChartIcon className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground font-medium">No data for this platform</p>
-            <p className="text-sm text-muted-foreground/70">Try selecting "All Platforms" or sync data for this platform.</p>
+            <p className="text-sm text-muted-foreground/70">
+              Try selecting "All Platforms" or sync data for this platform.
+            </p>
           </CardContent>
         </Card>
       ) : allZeros ? (
@@ -620,14 +805,16 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           <CardContent className="py-12 text-center space-y-3">
             <AlertCircle className="h-10 w-10 mx-auto text-amber-500" />
             <p className="text-muted-foreground font-medium">No activity recorded for this period</p>
-            <p className="text-sm text-muted-foreground/70">Try selecting a different period or sync historical data to find periods with activity.</p>
+            <p className="text-sm text-muted-foreground/70">
+              Try selecting a different period or sync historical data to find periods with activity.
+            </p>
           </CardContent>
         </Card>
       ) : (
         <>
           {/* PART 1: KPI Cards with Sparklines */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {kpis.map(kpi => (
+            {kpis.map((kpi) => (
               <KpiCard
                 key={kpi.label}
                 label={kpi.label}
@@ -644,10 +831,12 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           {/* PART 2: Charts */}
           <div className="grid gap-6 md:grid-cols-2">
             {/* Spend Distribution — Donut */}
-            {spendByPlatform.length > 0 ? (
+            {spendByPlatform.length > 1 ? (
               <Card>
                 <CardHeader className="pb-2">
-                   <CardTitle className="text-sm font-display flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Spend Distribution</CardTitle>
+                  <CardTitle className="text-sm font-display flex items-center gap-1.5">
+                    <Banknote className="h-4 w-4" /> Spend Distribution
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={260}>
@@ -664,18 +853,45 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
-                        {spendByPlatform.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                        {spendByPlatform.map((_, i) => (
+                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                        ))}
                       </Pie>
-                      <RechartsTooltip formatter={(value: number) => `${currSymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+                      <RechartsTooltip
+                        formatter={(value: number) =>
+                          `${currSymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                        }
+                      />
                       <Legend />
                       {/* Centre total */}
-                      <Pie data={[{ value: 1 }]} dataKey="value" cx="50%" cy="50%" outerRadius={0} innerRadius={0} fill="none">
+                      <Pie
+                        data={[{ value: 1 }]}
+                        dataKey="value"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={0}
+                        innerRadius={0}
+                        fill="none"
+                      >
                         <ReferenceLine />
                       </Pie>
-                      <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central" className="fill-foreground text-base font-bold font-display">
-                        {currSymbol}{totalSpend >= 1000 ? `${(totalSpend / 1000).toFixed(1)}K` : totalSpend.toFixed(0)}
+                      <text
+                        x="50%"
+                        y="46%"
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        className="fill-foreground text-base font-bold font-display"
+                      >
+                        {currSymbol}
+                        {totalSpend >= 1000 ? `${(totalSpend / 1000).toFixed(1)}K` : totalSpend.toFixed(0)}
                       </text>
-                      <text x="50%" y="56%" textAnchor="middle" dominantBaseline="central" className="fill-muted-foreground text-[10px]">
+                      <text
+                        x="50%"
+                        y="56%"
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        className="fill-muted-foreground text-[10px]"
+                      >
                         Total
                       </text>
                     </PieChart>
@@ -684,7 +900,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               </Card>
             ) : (
               <Card className="border-dashed">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-display flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Spend Distribution</CardTitle></CardHeader>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-display flex items-center gap-1.5">
+                    <Banknote className="h-4 w-4" /> Spend Distribution
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="flex items-center justify-center h-[260px]">
                   <p className="text-sm text-muted-foreground italic">No spend data available for this period</p>
                 </CardContent>
@@ -695,7 +915,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             {engagementStackedData.length > 0 ? (
               <Card>
                 <CardHeader className="pb-2">
-                   <CardTitle className="text-sm font-display flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> Engagement Breakdown</CardTitle>
+                  <CardTitle className="text-sm font-display flex items-center gap-1.5">
+                    <MessageCircle className="h-4 w-4" /> Engagement Breakdown
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={260}>
@@ -715,7 +937,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               </Card>
             ) : (
               <Card className="border-dashed">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-display flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> Engagement Breakdown</CardTitle></CardHeader>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-display flex items-center gap-1.5">
+                    <MessageCircle className="h-4 w-4" /> Engagement Breakdown
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="flex items-center justify-center h-[260px]">
                   <p className="text-sm text-muted-foreground italic">No engagement data available for this period</p>
                 </CardContent>
@@ -727,7 +953,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           {impressionsByPlatform.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-display flex items-center gap-1.5"><BarChart3 className="h-4 w-4" /> Impressions & Clicks by Platform</CardTitle>
+                <CardTitle className="text-sm font-display flex items-center gap-1.5">
+                  <BarChart3 className="h-4 w-4" /> Impressions & Clicks by Platform
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -749,7 +977,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           {trendChartData.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-display flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /> Performance Trend</CardTitle>
+                <CardTitle className="text-sm font-display flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4" /> Performance Trend
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -772,9 +1002,33 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <RechartsTooltip />
-                    <Area type="monotone" dataKey="impressions" name="Impressions" stroke="#b32fbf" strokeWidth={2} fill="url(#trendGradient)" dot={{ r: 4, fill: '#b32fbf' }} />
-                    <Area type="monotone" dataKey="clicks" name="Clicks" stroke="#539BDB" strokeWidth={2} fill="url(#trendGradientBlue)" dot={{ r: 4, fill: '#539BDB' }} />
-                    <Area type="monotone" dataKey="engagement" name="Engagement" stroke="#4ED68E" strokeWidth={2} fill="url(#trendGradientGreen)" dot={{ r: 4, fill: '#4ED68E' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="impressions"
+                      name="Impressions"
+                      stroke="#b32fbf"
+                      strokeWidth={2}
+                      fill="url(#trendGradient)"
+                      dot={{ r: 4, fill: "#b32fbf" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="clicks"
+                      name="Clicks"
+                      stroke="#539BDB"
+                      strokeWidth={2}
+                      fill="url(#trendGradientBlue)"
+                      dot={{ r: 4, fill: "#539BDB" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="engagement"
+                      name="Engagement"
+                      stroke="#4ED68E"
+                      strokeWidth={2}
+                      fill="url(#trendGradientGreen)"
+                      dot={{ r: 4, fill: "#4ED68E" }}
+                    />
                     <Legend />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -790,24 +1044,25 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
             <h3 className="text-lg font-display">Platform Details</h3>
             {filtered.length > 0 ? (
               filtered
-                .filter(snapshot => {
+                .filter((snapshot) => {
                   const config = platformConfigs.get(snapshot.platform);
                   if (config && !config.is_enabled) return false;
                   const isOrganic = ORGANIC_PLATFORMS.has(snapshot.platform);
                   const enabledMetrics = config?.enabled_metrics;
                   const hasVisibleNonZero = Object.entries(snapshot.metrics_data).some(
                     ([key, val]) =>
-                      typeof val === 'number' && val > 0 &&
+                      typeof val === "number" &&
+                      val > 0 &&
                       !HIDDEN_METRICS.has(key) &&
                       !(isOrganic && AD_METRICS.has(key)) &&
-                      (enabledMetrics && enabledMetrics.length > 0 ? enabledMetrics.includes(key) : true)
+                      (enabledMetrics && enabledMetrics.length > 0 ? enabledMetrics.includes(key) : true),
                   );
                   return hasVisibleNonZero;
                 })
-                .map(snapshot => {
-                  const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
+                .map((snapshot) => {
+                  const prevSnapshot = filteredPrev.find((s) => s.platform === snapshot.platform);
                   const config = platformConfigs.get(snapshot.platform);
-                  const conn = connections.find(c => c.platform === snapshot.platform);
+                  const conn = connections.find((c) => c.platform === snapshot.platform);
                   return (
                     <PlatformMetricsCard
                       key={snapshot.platform}
@@ -815,7 +1070,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
                       metrics={snapshot.metrics_data}
                       prevMetrics={prevSnapshot?.metrics_data}
                       currencyCode={currencyCode}
-                      enabledMetrics={config?.enabled_metrics && config.enabled_metrics.length > 0 ? config.enabled_metrics : undefined}
+                      enabledMetrics={
+                        config?.enabled_metrics && config.enabled_metrics.length > 0
+                          ? config.enabled_metrics
+                          : undefined
+                      }
                       syncStatus={conn?.last_sync_status}
                       lastError={conn?.last_error}
                     />
@@ -843,7 +1102,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         <CardContent className="py-8 text-center space-y-2">
           <Users className="h-10 w-10 mx-auto text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">Audience insights coming soon</p>
-          <p className="text-xs text-muted-foreground/60">Demographics, age groups, and geographic data will appear here once available.</p>
+          <p className="text-xs text-muted-foreground/60">
+            Demographics, age groups, and geographic data will appear here once available.
+          </p>
         </CardContent>
       </Card>
     </div>
