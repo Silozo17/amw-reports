@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, subMonths, addMonths } from 'date-fns';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { subMonths, addMonths } from 'date-fns';
 import type { PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 
-export type PeriodType = 'weekly' | 'monthly' | 'quarterly' | 'custom';
+// TODO: Implement weekly view when daily snapshots are available
+// TODO: Implement custom date range when snapshot filtering supports date ranges
+export type PeriodType = 'monthly' | 'quarterly';
 
 export interface SelectedPeriod {
   type: PeriodType;
@@ -37,8 +37,6 @@ const DashboardHeader = ({
   onPeriodChange,
   availablePlatforms,
 }: DashboardHeaderProps) => {
-  const [customOpen, setCustomOpen] = useState(false);
-
   const platformOptions: Array<{ value: PlatformFilter; label: string }> = [
     { value: 'all', label: 'All Platforms' },
     ...availablePlatforms.map(p => ({ value: p as PlatformFilter, label: PLATFORM_LABELS[p] })),
@@ -46,9 +44,7 @@ const DashboardHeader = ({
 
   const periodTypes: Array<{ value: PeriodType; label: string }> = [
     { value: 'monthly', label: 'Monthly' },
-    { value: 'weekly', label: 'Weekly' },
     { value: 'quarterly', label: 'Quarterly' },
-    { value: 'custom', label: 'Custom' },
   ];
 
   const handlePrevMonth = () => {
@@ -63,11 +59,9 @@ const DashboardHeader = ({
     onPeriodChange({ ...selectedPeriod, month: d.getMonth() + 1, year: d.getFullYear() });
   };
 
-  const periodLabel = selectedPeriod.type === 'custom' && selectedPeriod.startDate && selectedPeriod.endDate
-    ? `${format(selectedPeriod.startDate, 'MMM d')} – ${format(selectedPeriod.endDate, 'MMM d, yyyy')}`
-    : selectedPeriod.type === 'quarterly'
-      ? `Q${Math.ceil(selectedPeriod.month / 3)} ${selectedPeriod.year}`
-      : `${MONTH_NAMES[selectedPeriod.month]} ${selectedPeriod.year}`;
+  const periodLabel = selectedPeriod.type === 'quarterly'
+    ? `Q${Math.ceil(selectedPeriod.month / 3)} ${selectedPeriod.year}`
+    : `${MONTH_NAMES[selectedPeriod.month]} ${selectedPeriod.year}`;
 
   return (
     <div className="space-y-4">
@@ -103,12 +97,7 @@ const DashboardHeader = ({
                 selectedPeriod.type === pt.value && 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
               )}
               onClick={() => {
-                if (pt.value === 'custom') {
-                  setCustomOpen(true);
-                  onPeriodChange({ ...selectedPeriod, type: 'custom' });
-                } else {
-                  onPeriodChange({ ...selectedPeriod, type: pt.value, startDate: undefined, endDate: undefined });
-                }
+                onPeriodChange({ ...selectedPeriod, type: pt.value, startDate: undefined, endDate: undefined });
               }}
             >
               {pt.label}
@@ -116,47 +105,15 @@ const DashboardHeader = ({
           ))}
         </div>
 
-        {selectedPeriod.type !== 'custom' && (
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrevMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium min-w-[140px] text-center">{periodLabel}</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {selectedPeriod.type === 'custom' && (
-          <Popover open={customOpen} onOpenChange={setCustomOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 text-xs">
-                <CalendarIcon className="h-3.5 w-3.5" />
-                {periodLabel}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="range"
-                selected={selectedPeriod.startDate && selectedPeriod.endDate ? { from: selectedPeriod.startDate, to: selectedPeriod.endDate } : undefined}
-                onSelect={(range) => {
-                  if (range?.from) {
-                    onPeriodChange({
-                      ...selectedPeriod,
-                      startDate: range.from,
-                      endDate: range.to || range.from,
-                      month: (range.from.getMonth() + 1),
-                      year: range.from.getFullYear(),
-                    });
-                  }
-                }}
-                disabled={(date) => date > new Date()}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-        )}
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrevMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium min-w-[140px] text-center">{periodLabel}</span>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Save, Undo2 } from 'lucide-react';
 import { PLATFORM_LABELS, METRIC_LABELS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 
@@ -27,79 +29,134 @@ interface MetricConfigPanelProps {
   connectedPlatforms: PlatformType[];
 }
 
+interface LocalPlatformState {
+  isEnabled: boolean;
+  enabledMetrics: string[];
+}
+
 const MetricConfigPanel = ({ clientId, connectedPlatforms }: MetricConfigPanelProps) => {
   const [configs, setConfigs] = useState<PlatformConfig[]>([]);
   const [defaults, setDefaults] = useState<MetricDefault[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const fetchData = async () => {
+  // Local draft state for batch editing
+  const [localState, setLocalState] = useState<Map<PlatformType, LocalPlatformState>>(new Map());
+
+  const fetchData = useCallback(async () => {
     const [configRes, defaultsRes] = await Promise.all([
       supabase.from('client_platform_config').select('*').eq('client_id', clientId),
       supabase.from('metric_defaults').select('*'),
     ]);
-    setConfigs((configRes.data as PlatformConfig[]) ?? []);
-    setDefaults((defaultsRes.data as MetricDefault[]) ?? []);
+    const fetchedConfigs = (configRes.data as PlatformConfig[]) ?? [];
+    const fetchedDefaults = (defaultsRes.data as MetricDefault[]) ?? [];
+    setConfigs(fetchedConfigs);
+    setDefaults(fetchedDefaults);
+    // Initialise local state from saved configs
+    initLocalState(fetchedConfigs, fetchedDefaults);
     setIsLoading(false);
+  }, [clientId]);
+
+  const initLocalState = (savedConfigs: PlatformConfig[], savedDefaults: MetricDefault[]) => {
+    const map = new Map<PlatformType, LocalPlatformState>();
+    for (const platform of connectedPlatforms) {
+      const config = savedConfigs.find(c => c.platform === platform);
+      const def = savedDefaults.find(d => d.platform === platform);
+      map.set(platform, {
+        isEnabled: config?.is_enabled ?? true,
+        enabledMetrics: config?.enabled_metrics ?? def?.default_metrics ?? [],
+      });
+    }
+    setLocalState(map);
   };
 
   useEffect(() => {
     fetchData();
-  }, [clientId]);
+  }, [fetchData]);
 
-  const getConfig = (platform: PlatformType): PlatformConfig | undefined =>
-    configs.find(c => c.platform === platform);
+  // Detect unsaved changes
+  const hasChanges = useMemo(() => {
+    for (const platform of connectedPlatforms) {
+      const local = localState.get(platform);
+      if (!local) continue;
+      const config = configs.find(c => c.platform === platform);
+      const def = defaults.find(d => d.platform === platform);
 
-  const getDefault = (platform: PlatformType): MetricDefault | undefined =>
-    defaults.find(d => d.platform === platform);
+      const savedEnabled = config?.is_enabled ?? true;
+      const savedMetrics = config?.enabled_metrics ?? def?.default_metrics ?? [];
 
-  const ensureConfig = async (platform: PlatformType): Promise<string | null> => {
-    const existing = getConfig(platform);
-    if (existing) return existing.id;
-
-    const def = getDefault(platform);
-    const { data, error } = await supabase.from('client_platform_config').insert({
-      client_id: clientId,
-      platform,
-      is_enabled: true,
-      enabled_metrics: def?.default_metrics ?? [],
-    }).select('id').single();
-
-    if (error) {
-      toast.error('Failed to create config');
-      return null;
+      if (local.isEnabled !== savedEnabled) return true;
+      if (local.enabledMetrics.length !== savedMetrics.length) return true;
+      const sortedLocal = [...local.enabledMetrics].sort();
+      const sortedSaved = [...savedMetrics].sort();
+      if (sortedLocal.some((m, i) => m !== sortedSaved[i])) return true;
     }
-    await fetchData();
-    return data.id;
+    return false;
+  }, [localState, configs, defaults, connectedPlatforms]);
+
+  const togglePlatform = (platform: PlatformType, enabled: boolean) => {
+    setLocalState(prev => {
+      const next = new Map(prev);
+      const current = next.get(platform);
+      if (current) {
+        next.set(platform, { ...current, isEnabled: enabled });
+      }
+      return next;
+    });
   };
 
-  const togglePlatform = async (platform: PlatformType, enabled: boolean) => {
-    const configId = await ensureConfig(platform);
-    if (!configId) return;
-
-    const { error } = await supabase.from('client_platform_config')
-      .update({ is_enabled: enabled })
-      .eq('id', configId);
-
-    if (error) toast.error('Failed to update');
-    else await fetchData();
+  const toggleMetric = (platform: PlatformType, metric: string, enabled: boolean) => {
+    setLocalState(prev => {
+      const next = new Map(prev);
+      const current = next.get(platform);
+      if (current) {
+        const newMetrics = enabled
+          ? [...new Set([...current.enabledMetrics, metric])]
+          : current.enabledMetrics.filter(m => m !== metric);
+        next.set(platform, { ...current, enabledMetrics: newMetrics });
+      }
+      return next;
+    });
   };
 
-  const toggleMetric = async (platform: PlatformType, metric: string, enabled: boolean) => {
-    const configId = await ensureConfig(platform);
-    if (!configId) return;
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      for (const platform of connectedPlatforms) {
+        const local = localState.get(platform);
+        if (!local) continue;
 
-    const config = configs.find(c => c.id === configId);
-    const currentMetrics = config?.enabled_metrics ?? [];
-    const newMetrics = enabled
-      ? [...currentMetrics, metric]
-      : currentMetrics.filter(m => m !== metric);
+        const existingConfig = configs.find(c => c.platform === platform);
 
-    const { error } = await supabase.from('client_platform_config')
-      .update({ enabled_metrics: newMetrics })
-      .eq('id', configId);
+        if (existingConfig) {
+          const { error } = await supabase.from('client_platform_config')
+            .update({ is_enabled: local.isEnabled, enabled_metrics: local.enabledMetrics })
+            .eq('id', existingConfig.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('client_platform_config')
+            .insert({
+              client_id: clientId,
+              platform,
+              is_enabled: local.isEnabled,
+              enabled_metrics: local.enabledMetrics,
+            });
+          if (error) throw error;
+        }
+      }
 
-    if (error) toast.error('Failed to update metric');
-    else await fetchData();
+      toast.success('Metric configuration saved');
+      await fetchData();
+    } catch (e) {
+      toast.error(`Failed to save: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    initLocalState(configs, defaults);
+    toast.info('Changes discarded');
   };
 
   if (isLoading) {
@@ -118,12 +175,32 @@ const MetricConfigPanel = ({ clientId, connectedPlatforms }: MetricConfigPanelPr
 
   return (
     <div className="space-y-4">
+      {/* Save/Discard bar */}
+      {hasChanges && (
+        <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Unsaved changes</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleDiscard} className="gap-1.5">
+              <Undo2 className="h-3.5 w-3.5" />
+              Discard
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={isSaving} className="gap-1.5">
+              <Save className="h-3.5 w-3.5" />
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {connectedPlatforms.map(platform => {
-        const config = getConfig(platform);
-        const def = getDefault(platform);
+        const local = localState.get(platform);
+        const def = defaults.find(d => d.platform === platform);
         const availableMetrics = def?.available_metrics ?? Object.keys(METRIC_LABELS);
-        const enabledMetrics = config?.enabled_metrics ?? def?.default_metrics ?? [];
-        const isEnabled = config?.is_enabled ?? true;
+        const enabledMetrics = local?.enabledMetrics ?? [];
+        const isEnabled = local?.isEnabled ?? true;
 
         return (
           <Card key={platform}>
