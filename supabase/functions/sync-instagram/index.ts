@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
     let totalProfileViews = 0;
     let totalFollowerCount = 0;
     const allTopMedia: any[] = [];
+    const globalMetricsMap: Record<string, number> = {};
 
     for (const ig of igAccounts) {
       const { ig_id, page_token } = ig;
