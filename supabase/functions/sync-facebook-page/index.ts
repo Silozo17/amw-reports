@@ -25,10 +25,10 @@ Deno.serve(async (req) => {
     connectionId = connection_id;
 
     if (!connectionId || !month || !year) {
-      return new Response(
-        JSON.stringify({ error: "connection_id, month, and year are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "connection_id, month, and year are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get the meta_ads connection for this client (pages are stored in meta_ads metadata)
@@ -39,20 +39,24 @@ Deno.serve(async (req) => {
       .single();
 
     if (connError || !conn) {
-      return new Response(
-        JSON.stringify({ error: "Connection not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Connection not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     clientId = conn.client_id;
 
     // Token expiry check
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
-      await supabaseClient.from("platform_connections")
+      await supabaseClient
+        .from("platform_connections")
         .update({ last_error: "Token expired. Please reconnect.", last_sync_status: "failed" })
         .eq("id", connectionId);
-      return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Token expired" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // For facebook platform connections, we need the meta_ads connection's page tokens
@@ -70,10 +74,14 @@ Deno.serve(async (req) => {
 
     // Meta token expiry check
     if (metaConn.token_expires_at && new Date(metaConn.token_expires_at) < new Date()) {
-      await supabaseClient.from("platform_connections")
+      await supabaseClient
+        .from("platform_connections")
         .update({ last_error: "Meta Ads token expired. Please reconnect Meta Ads.", last_sync_status: "failed" })
         .eq("id", connectionId);
-      return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Token expired" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const metadata = metaConn.metadata as any;
@@ -108,7 +116,8 @@ Deno.serve(async (req) => {
       if (!pageToken) {
         const errorMsg = `No Page Access Token for page ${page.id}. Reconnect Meta Ads.`;
         console.error(errorMsg);
-        await supabaseClient.from("platform_connections")
+        await supabaseClient
+          .from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "failed" })
           .eq("id", connectionId);
         continue;
@@ -128,32 +137,57 @@ Deno.serve(async (req) => {
         if (insightsData.error) {
           const errMsg = insightsData.error.message || "Unknown Graph API error";
           console.error(`Facebook Insights API error for page ${pageId}:`, errMsg);
-          await supabaseClient.from("platform_connections").update({
-            last_error: `Page ${page.name || pageId}: ${errMsg}`,
-            last_sync_status: "partial",
-          }).eq("id", connectionId);
+          await supabaseClient
+            .from("platform_connections")
+            .update({
+              last_error: `Page ${page.name || pageId}: ${errMsg}`,
+              last_sync_status: "partial",
+            })
+            .eq("id", connectionId);
         }
 
         if (insightsData.data) {
           for (const metric of insightsData.data) {
             const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
             switch (metric.name) {
-              case "page_impressions": totalImpressions += total; break;
-              case "page_impressions_organic": metricsAccum.organic_impressions = (metricsAccum.organic_impressions || 0) + total; break;
-              case "page_impressions_paid": metricsAccum.paid_impressions = (metricsAccum.paid_impressions || 0) + total; break;
-              case "page_post_engagements": totalEngagement += total; break;
-              case "page_views_total": totalPageViews += total; break;
-              // page_fan_adds and page_fan_removes removed — deprecated in Graph API v21+
-              case "page_fans": metricsAccum.total_fans = Math.max(metricsAccum.total_fans || 0, total); break;
-              case "page_reach": metricsAccum.reach = (metricsAccum.reach || 0) + total; break;
-              case "page_video_views": metricsAccum.video_views = (metricsAccum.video_views || 0) + total; break;
+              case "page_impressions":
+                totalImpressions += total;
+                break;
+              case "page_impressions_organic":
+                metricsAccum.organic_impressions = (metricsAccum.organic_impressions || 0) + total;
+                break;
+              case "page_impressions_paid":
+                metricsAccum.paid_impressions = (metricsAccum.paid_impressions || 0) + total;
+                break;
+              case "page_post_engagements":
+                totalEngagement += total;
+                break;
+              case "page_views_total":
+                totalPageViews += total;
+                break;
+              case "page_fan_adds":
+                totalFollowerAdds += total;
+                break;
+              case "page_fan_removes":
+                metricsAccum.follower_removes = (metricsAccum.follower_removes || 0) + total;
+                break;
+              case "page_fans":
+                metricsAccum.total_fans = Math.max(metricsAccum.total_fans || 0, total);
+                break;
+              case "page_reach":
+                metricsAccum.reach = (metricsAccum.reach || 0) + total;
+                break;
+              case "page_video_views":
+                metricsAccum.video_views = (metricsAccum.video_views || 0) + total;
+                break;
             }
           }
         }
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
         console.error(`Sync error:`, errorMsg);
-        await supabaseClient.from("platform_connections")
+        await supabaseClient
+          .from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
@@ -166,7 +200,7 @@ Deno.serve(async (req) => {
           const videoData = await videoRes.json();
           for (const video of videoData.data || []) {
             for (const insight of video.video_insights?.data || []) {
-              if (insight.name === 'total_video_views') {
+              if (insight.name === "total_video_views") {
                 metricsAccum.video_views = (metricsAccum.video_views || 0) + (insight.values?.[0]?.value || 0);
               }
             }
@@ -189,7 +223,6 @@ Deno.serve(async (req) => {
             const likes = post.likes?.summary?.total_count || 0;
             const comments = post.comments?.summary?.total_count || 0;
             const shares = post.shares?.count || 0;
-            const reactions = post.reactions?.summary?.total_count || 0;
             allTopPosts.push({
               page_name: page.name,
               message: (post.message || "").substring(0, 100),
@@ -197,7 +230,6 @@ Deno.serve(async (req) => {
               likes,
               comments,
               shares,
-              reactions,
               total_engagement: likes + comments + shares,
             });
           }
@@ -205,16 +237,15 @@ Deno.serve(async (req) => {
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
         console.error(`Sync error:`, errorMsg);
-        await supabaseClient.from("platform_connections")
+        await supabaseClient
+          .from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
     }
 
     // Sort top posts by engagement
-    const topContent = allTopPosts
-      .sort((a, b) => b.total_engagement - a.total_engagement)
-      .slice(0, 10);
+    const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement).slice(0, 10);
 
     const metricsData = {
       impressions: totalImpressions,
@@ -223,15 +254,13 @@ Deno.serve(async (req) => {
       reach: metricsAccum.reach || 0,
       engagement: totalEngagement,
       page_views: totalPageViews,
-      follower_growth: 0,
-      follower_removes: 0,
+      follower_growth: totalFollowerAdds,
+      follower_removes: metricsAccum.follower_removes || 0,
       total_followers: metricsAccum.total_fans || 0,
       video_views: metricsAccum.video_views || 0,
       likes: allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
       comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
-      reactions: allTopPosts.reduce((s, p) => s + (p.reactions || 0), 0),
-      saves: 0, // not available via Pages API
       posts_published: allTopPosts.length,
       engagement_rate: totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0,
       pages_count: pages.length,
@@ -252,30 +281,50 @@ Deno.serve(async (req) => {
     }
 
     if (existing) {
-      await supabaseClient.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: topContent }).eq("id", existing.id);
+      await supabaseClient
+        .from("monthly_snapshots")
+        .update({ metrics_data: metricsData, top_content: topContent })
+        .eq("id", existing.id);
     } else {
-      await supabaseClient.from("monthly_snapshots").insert({ client_id: clientId, platform: "facebook", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent });
+      await supabaseClient
+        .from("monthly_snapshots")
+        .insert({
+          client_id: clientId,
+          platform: "facebook",
+          report_month: month,
+          report_year: year,
+          metrics_data: metricsData,
+          top_content: topContent,
+        });
     }
 
     // Update connection sync status
-    await supabaseClient.from("platform_connections").update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null }).eq("id", connectionId);
+    await supabaseClient
+      .from("platform_connections")
+      .update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null })
+      .eq("id", connectionId);
 
     if (syncLog?.id) {
-      await supabaseClient.from("sync_logs").update({ status: "success", completed_at: new Date().toISOString() }).eq("id", syncLog.id);
+      await supabaseClient
+        .from("sync_logs")
+        .update({ status: "success", completed_at: new Date().toISOString() })
+        .eq("id", syncLog.id);
     }
 
-    return new Response(
-      JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     console.error("Facebook Page sync error:", e);
     if (connectionId) {
-      await supabaseClient.from("platform_connections").update({ last_sync_status: "failed", last_error: e instanceof Error ? e.message : "Unknown error" }).eq("id", connectionId);
+      await supabaseClient
+        .from("platform_connections")
+        .update({ last_sync_status: "failed", last_error: e instanceof Error ? e.message : "Unknown error" })
+        .eq("id", connectionId);
     }
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
