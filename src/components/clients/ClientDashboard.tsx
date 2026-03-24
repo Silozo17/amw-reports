@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, TrendingUp, TrendingDown, Minus, DollarSign, Eye, MousePointerClick, Users, BarChart3, PieChartIcon, AlertCircle } from 'lucide-react';
+import { Loader2, Sparkles, TrendingUp, TrendingDown, Minus, DollarSign, Eye, MousePointerClick, Users, BarChart3, PieChartIcon, AlertCircle, Clock } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line,
@@ -10,18 +10,12 @@ import {
 import PlatformMetricsCard from './PlatformMetricsCard';
 import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from './DashboardHeader';
 import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from '@/types/database';
-import type { PlatformType } from '@/types/database';
+import type { PlatformType, JobStatus } from '@/types/database';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
 
-const PIE_COLORS = [
-  'hsl(295, 61%, 47%)',
-  'hsl(210, 53%, 59%)',
-  'hsl(148, 58%, 57%)',
-  'hsl(27, 83%, 57%)',
-  'hsl(348, 8%, 40%)',
-  'hsl(0, 84%, 60%)',
-];
+const PIE_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
 
 interface ClientDashboardProps {
   clientId: string;
@@ -34,6 +28,19 @@ interface SnapshotData {
   metrics_data: Record<string, number>;
   report_month: number;
   report_year: number;
+}
+
+interface ConnectionData {
+  platform: PlatformType;
+  last_sync_at: string | null;
+  last_sync_status: JobStatus | null;
+  last_error: string | null;
+}
+
+interface PlatformConfigData {
+  platform: PlatformType;
+  is_enabled: boolean;
+  enabled_metrics: string[];
 }
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -57,9 +64,16 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
   const [trendData, setTrendData] = useState<SnapshotData[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<PlatformType[]>([]);
+  const [connections, setConnections] = useState<ConnectionData[]>([]);
+  const [platformConfigs, setPlatformConfigs] = useState<Map<string, PlatformConfigData>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalysing, setIsAnalysing] = useState(false);
+
+  // Reset auto-detection when client changes
+  useEffect(() => {
+    setHasAutoDetected(false);
+  }, [clientId]);
 
   const fetchSnapshots = useCallback(async () => {
     setIsLoading(true);
@@ -88,24 +102,35 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear = month === 1 ? year - 1 : year;
 
-    // Fetch last 6 months for trend
-    const trendMonths: Array<{ m: number; y: number }> = [];
-    let tm = month, ty = year;
-    for (let i = 0; i < 6; i++) {
-      trendMonths.push({ m: tm, y: ty });
-      tm--;
-      if (tm === 0) { tm = 12; ty--; }
-    }
+    // Trend: server-side filter to last 6 months
+    const sixMonthsAgo = new Date(year, month - 1);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const startMonth = sixMonthsAgo.getMonth() + 1;
+    const startYear = sixMonthsAgo.getFullYear();
 
-    const [currentRes, prevRes, trendRes, allSnapshotsRes] = await Promise.all([
+    const [currentRes, prevRes, trendRes, connectionsRes, configRes] = await Promise.all([
       query,
       supabase.from('monthly_snapshots').select('platform, metrics_data, report_month, report_year')
         .eq('client_id', clientId).eq('report_month', prevMonth).eq('report_year', prevYear),
       supabase.from('monthly_snapshots').select('platform, metrics_data, report_month, report_year')
-        .eq('client_id', clientId).order('report_year', { ascending: true }).order('report_month', { ascending: true }),
-      // Get all unique platforms
-      supabase.from('platform_connections').select('platform').eq('client_id', clientId).eq('is_connected', true),
+        .eq('client_id', clientId)
+        .or(`report_year.gt.${startYear},and(report_year.eq.${startYear},report_month.gte.${startMonth})`)
+        .order('report_year', { ascending: true }).order('report_month', { ascending: true }),
+      supabase.from('platform_connections').select('platform, last_sync_at, last_sync_status, last_error')
+        .eq('client_id', clientId).eq('is_connected', true),
+      supabase.from('client_platform_config').select('platform, is_enabled, enabled_metrics')
+        .eq('client_id', clientId),
     ]);
+
+    // Store connections
+    setConnections((connectionsRes.data ?? []) as ConnectionData[]);
+
+    // Store platform configs as a Map
+    const configMap = new Map<string, PlatformConfigData>();
+    for (const c of (configRes.data ?? []) as PlatformConfigData[]) {
+      configMap.set(c.platform, c);
+    }
+    setPlatformConfigs(configMap);
 
     // Aggregate quarterly data if needed
     let currentSnapshots = (currentRes.data ?? []) as SnapshotData[];
@@ -115,20 +140,25 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         const existing = grouped.get(s.platform) || {};
         for (const [k, v] of Object.entries(s.metrics_data)) {
           if (typeof v === 'number') {
-            // Average rate metrics, sum count metrics
-            const isRate = k.includes('rate') || k === 'ctr' || k === 'cpc' || k === 'cost_per_conversion';
-            existing[k] = isRate ? ((existing[k] || 0) + v) : ((existing[k] || 0) + v);
+            existing[k] = (existing[k] || 0) + v;
           }
         }
         grouped.set(s.platform, existing);
       }
-      // For rate metrics, divide by number of months
-      const monthCount = months.length;
+      // Recalculate derived rate metrics from totals
       currentSnapshots = Array.from(grouped.entries()).map(([platform, metrics]) => {
         const adjusted = { ...metrics };
-        for (const k of Object.keys(adjusted)) {
-          const isRate = k.includes('rate') || k === 'ctr' || k === 'cpc' || k === 'cost_per_conversion';
-          if (isRate) adjusted[k] = adjusted[k] / monthCount;
+        if (adjusted.spend && adjusted.clicks) {
+          adjusted.cpc = adjusted.spend / adjusted.clicks;
+        }
+        if (adjusted.spend && adjusted.conversions) {
+          adjusted.cost_per_conversion = adjusted.spend / adjusted.conversions;
+        }
+        if (adjusted.clicks && adjusted.impressions) {
+          adjusted.ctr = (adjusted.clicks / adjusted.impressions) * 100;
+        }
+        if (adjusted.engagement && adjusted.impressions) {
+          adjusted.engagement_rate = (adjusted.engagement / adjusted.impressions) * 100;
         }
         return { platform, metrics_data: adjusted, report_month: month, report_year: year };
       });
@@ -138,18 +168,27 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     setPrevSnapshots((prevRes.data ?? []) as SnapshotData[]);
     setTrendData((trendRes.data ?? []) as SnapshotData[]);
 
-    const platforms = [...new Set((allSnapshotsRes.data ?? []).map((c: any) => c.platform as PlatformType))];
+    const platforms = [...new Set((connectionsRes.data ?? []).map((c: any) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
 
-    // Smart default: if current period has all zeros and we haven't auto-detected yet,
+    // Smart default: if current period has no real data (all zeros or no snapshots),
     // find the most recent month with non-zero data
-    if (!hasAutoDetected && currentSnapshots.length === 0 && (trendRes.data ?? []).length > 0) {
+    const hasRealData = currentSnapshots.some(snapshot => {
+      const metrics = snapshot.metrics_data;
+      return Object.entries(metrics).some(([key, v]) =>
+        typeof v === 'number' && v > 0 && !HIDDEN_METRICS.has(key)
+      );
+    });
+
+    if (!hasAutoDetected && !hasRealData && (trendRes.data ?? []).length > 0) {
       const allSnaps = (trendRes.data ?? []) as SnapshotData[];
       const monthsWithData = new Map<string, { m: number; y: number; total: number }>();
       for (const s of allSnaps) {
         const key = `${s.report_year}-${s.report_month}`;
         const existing = monthsWithData.get(key) || { m: s.report_month, y: s.report_year, total: 0 };
-        const total = Object.values(s.metrics_data).reduce((sum, v) => sum + (typeof v === 'number' ? Math.abs(v) : 0), 0);
+        const total = Object.entries(s.metrics_data)
+          .filter(([k]) => !HIDDEN_METRICS.has(k))
+          .reduce((sum, [, v]) => sum + (typeof v === 'number' ? Math.abs(v) : 0), 0);
         existing.total += total;
         monthsWithData.set(key, existing);
       }
@@ -204,7 +243,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
     const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
     const totalClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
     const totalEngagement = filtered.reduce((sum, s) => sum + (s.metrics_data.engagement || 0) + (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0), 0);
-    // For followers, take the max from the selected period (not sum — it's a snapshot, not cumulative)
     const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
     const totalConversions = filtered.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
 
@@ -248,7 +286,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       clicks: s.metrics_data.clicks || 0,
     })), [filtered]);
 
-  // Trend data for line chart (last 6 months)
+  // Trend data for line chart
   const trendChartData = useMemo(() => {
     const monthMap = new Map<string, { spend: number; impressions: number; clicks: number; engagement: number }>();
     const relevantTrend = selectedPlatform === 'all' ? trendData : trendData.filter(s => s.platform === selectedPlatform);
@@ -271,6 +309,15 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         return { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, ...data };
       });
   }, [trendData, selectedPlatform]);
+
+  // Last synced timestamp
+  const lastSyncedAt = useMemo(() => {
+    const syncDates = connections
+      .filter(c => c.last_sync_at)
+      .map(c => new Date(c.last_sync_at!).getTime());
+    if (syncDates.length === 0) return null;
+    return new Date(Math.max(...syncDates));
+  }, [connections]);
 
   if (isLoading) {
     return (
@@ -295,6 +342,14 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         availablePlatforms={availablePlatforms}
       />
 
+      {/* Last synced indicator */}
+      {lastSyncedAt && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5" />
+          <span>Last synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
+        </div>
+      )}
+
       {!hasData ? (
         <Card className="border-dashed">
           <CardContent className="py-16 text-center space-y-3">
@@ -316,9 +371,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           </CardContent>
         </Card>
       ) : allZeros ? (
-        <Card className="border-dashed border-warning/30 bg-warning/5">
+        <Card className="border-dashed border-amber-500/30 bg-amber-500/5">
           <CardContent className="py-12 text-center space-y-3">
-            <AlertCircle className="h-10 w-10 mx-auto text-warning" />
+            <AlertCircle className="h-10 w-10 mx-auto text-amber-500" />
             <p className="text-muted-foreground font-medium">No activity recorded for {FULL_MONTH_NAMES[selectedPeriod.month]} {selectedPeriod.year}</p>
             <p className="text-sm text-muted-foreground/70">
               Try selecting a different month or sync historical data to find periods with activity.
@@ -328,7 +383,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       ) : (
         <>
           {/* KPI Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {kpis.map(kpi => {
               const Icon = kpi.icon;
               const isPositive = kpi.change !== undefined
@@ -468,7 +523,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           )}
 
           {/* Trend Line Chart */}
-          {trendChartData.length > 1 && (
+          {trendChartData.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-display">📈 Performance Trend</CardTitle>
@@ -494,28 +549,40 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
           <div className="space-y-5">
             <h3 className="text-lg font-display">Platform Details</h3>
             {filtered.length > 0 ? (
-              filtered.filter(snapshot => {
-                // Skip platforms where all displayable metrics are zero
-                const isOrganic = ORGANIC_PLATFORMS.has(snapshot.platform);
-                const hasVisibleNonZero = Object.entries(snapshot.metrics_data).some(
-                  ([key, val]) =>
-                    typeof val === 'number' && val > 0 &&
-                    !HIDDEN_METRICS.has(key) &&
-                    !(isOrganic && AD_METRICS.has(key))
-                );
-                return hasVisibleNonZero;
-              }).map(snapshot => {
-                const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
-                return (
-                  <PlatformMetricsCard
-                    key={snapshot.platform}
-                    platform={snapshot.platform}
-                    metrics={snapshot.metrics_data}
-                    prevMetrics={prevSnapshot?.metrics_data}
-                    currencyCode={currencyCode}
-                  />
-                );
-              })
+              filtered
+                .filter(snapshot => {
+                  // Hide platforms disabled in config
+                  const config = platformConfigs.get(snapshot.platform);
+                  if (config && !config.is_enabled) return false;
+                  // Skip platforms where all displayable metrics are zero
+                  const isOrganic = ORGANIC_PLATFORMS.has(snapshot.platform);
+                  const enabledMetrics = config?.enabled_metrics;
+                  const hasVisibleNonZero = Object.entries(snapshot.metrics_data).some(
+                    ([key, val]) =>
+                      typeof val === 'number' && val > 0 &&
+                      !HIDDEN_METRICS.has(key) &&
+                      !(isOrganic && AD_METRICS.has(key)) &&
+                      (enabledMetrics && enabledMetrics.length > 0 ? enabledMetrics.includes(key) : true)
+                  );
+                  return hasVisibleNonZero;
+                })
+                .map(snapshot => {
+                  const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
+                  const config = platformConfigs.get(snapshot.platform);
+                  const conn = connections.find(c => c.platform === snapshot.platform);
+                  return (
+                    <PlatformMetricsCard
+                      key={snapshot.platform}
+                      platform={snapshot.platform}
+                      metrics={snapshot.metrics_data}
+                      prevMetrics={prevSnapshot?.metrics_data}
+                      currencyCode={currencyCode}
+                      enabledMetrics={config?.enabled_metrics && config.enabled_metrics.length > 0 ? config.enabled_metrics : undefined}
+                      syncStatus={conn?.last_sync_status}
+                      lastError={conn?.last_error}
+                    />
+                  );
+                })
             ) : (
               <Card className="border-dashed">
                 <CardContent className="py-8 text-center">
@@ -524,18 +591,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               </Card>
             )}
           </div>
-
-          {/* Demographics Placeholder */}
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-display">👥 Audience & Demographics</CardTitle>
-            </CardHeader>
-            <CardContent className="py-8 text-center space-y-2">
-              <Users className="h-10 w-10 mx-auto text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">Audience insights coming soon</p>
-              <p className="text-xs text-muted-foreground/60">Demographics, age groups, and geographic data will appear here once available.</p>
-            </CardContent>
-          </Card>
         </>
       )}
 
@@ -569,6 +624,18 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
               Click "Generate Analysis" to get an AI-powered summary of this client's performance.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Demographics Placeholder */}
+      <Card className="border-dashed">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-display">👥 Audience & Demographics</CardTitle>
+        </CardHeader>
+        <CardContent className="py-8 text-center space-y-2">
+          <Users className="h-10 w-10 mx-auto text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground">Audience insights coming soon</p>
+          <p className="text-xs text-muted-foreground/60">Demographics, age groups, and geographic data will appear here once available.</p>
         </CardContent>
       </Card>
     </div>
