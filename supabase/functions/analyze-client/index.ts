@@ -5,6 +5,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// In-memory rate limit: 60s cooldown per client_id
+const rateLimitMap = new Map<string, number>();
+const RATE_LIMIT_MS = 60_000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -14,6 +18,17 @@ Deno.serve(async (req) => {
     if (!client_id || !month || !year) {
       return new Response(JSON.stringify({ error: "Missing client_id, month, or year" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Server-side rate limit check
+    const lastCall = rateLimitMap.get(client_id);
+    const now = Date.now();
+    if (lastCall && now - lastCall < RATE_LIMIT_MS) {
+      const waitSec = Math.ceil((RATE_LIMIT_MS - (now - lastCall)) / 1000);
+      return new Response(JSON.stringify({ error: `Rate limited. Please wait ${waitSec}s.` }), {
+        status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { subMonths, formatDistanceToNow } from 'date-fns';
+import { subMonths, formatDistanceToNow, format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -230,7 +231,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
   const [platformConfigs, setPlatformConfigs] = useState<Map<string, PlatformConfigData>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState('');
+  const [aiAnalysisDate, setAiAnalysisDate] = useState<Date | null>(null);
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
   const [isAnalysing, setIsAnalysing] = useState(false);
+  const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   useEffect(() => { setHasAutoDetected(false); }, [clientId]);
 
@@ -370,7 +375,22 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
 
   useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
 
+  // Rate limit cooldown timer
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return;
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((lastAnalysisTime + 60000 - Date.now()) / 1000));
+      setCooldownRemaining(remaining);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownRemaining, lastAnalysisTime]);
+
   const handleAnalyse = async () => {
+    const now = Date.now();
+    if (now - lastAnalysisTime < 60000) {
+      toast.error(`Please wait ${Math.ceil((lastAnalysisTime + 60000 - now) / 1000)}s before generating another analysis`);
+      return;
+    }
     setIsAnalysing(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-client', {
@@ -379,6 +399,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
       setAiAnalysis(data.analysis || 'No analysis available.');
+      setAiAnalysisDate(new Date());
+      setLastAnalysisTime(Date.now());
+      setCooldownRemaining(60);
+      setAnalysisDialogOpen(true);
     } catch (e) {
       console.error('Analysis error:', e);
       toast.error('Failed to generate AI analysis');
@@ -518,13 +542,59 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         availablePlatforms={availablePlatforms}
       />
 
-      {/* Last synced */}
-      {lastSyncedAt && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock className="h-3.5 w-3.5" />
-          <span>Last synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
-        </div>
+      {/* Last synced + AI Analysis button */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        {lastSyncedAt && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span>Last synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
+          </div>
+        )}
+        <Button
+          size="sm"
+          variant={aiAnalysis ? 'outline' : 'default'}
+          onClick={handleAnalyse}
+          disabled={isAnalysing || cooldownRemaining > 0}
+          className="gap-2"
+        >
+          {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {isAnalysing ? 'Analysing...' : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? 'Refresh Analysis' : 'Generate AI Analysis'}
+        </Button>
+      </div>
+
+      {/* Saved AI Analysis Card */}
+      {aiAnalysis && aiAnalysisDate && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-display">AI Analysis</CardTitle>
+              <span className="text-[10px] text-muted-foreground">{format(aiAnalysisDate, 'dd MMM yyyy, HH:mm')}</span>
+            </div>
+            <Button size="sm" variant="ghost" onClick={() => setAnalysisDialogOpen(true)}>View Full Analysis</Button>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground line-clamp-3">{aiAnalysis}</p>
+          </CardContent>
+        </Card>
       )}
+
+      {/* AI Analysis Dialog */}
+      <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              AI Performance Analysis
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm max-w-none text-foreground">
+            {aiAnalysis.split('\n').filter(Boolean).map((para, i) => (
+              <p key={i} className="text-sm leading-relaxed mb-3">{para}</p>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* PART 4: Skeleton loading */}
       {isLoading ? (
@@ -762,35 +832,13 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = 'GBP' }: ClientD
         </>
       )}
 
-      {/* AI Analysis */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base font-display flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            AI Performance Analysis
-          </CardTitle>
-          <Button size="sm" variant={aiAnalysis ? 'outline' : 'default'} onClick={handleAnalyse} disabled={isAnalysing} className="gap-2">
-            {isAnalysing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {aiAnalysis ? 'Refresh Analysis' : 'Generate Analysis'}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {aiAnalysis ? (
-            <div className="prose prose-sm max-w-none text-foreground">
-              {aiAnalysis.split('\n').filter(Boolean).map((para, i) => (
-                <p key={i} className="text-sm leading-relaxed mb-3">{para}</p>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">Click "Generate Analysis" to get an AI-powered summary of this client's performance.</p>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Demographics Placeholder */}
       <Card className="border-dashed">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-display">👥 Audience & Demographics</CardTitle>
+          <CardTitle className="text-sm font-display flex items-center gap-1.5">
+            <Users className="h-4 w-4" />
+            Audience & Demographics
+          </CardTitle>
         </CardHeader>
         <CardContent className="py-8 text-center space-y-2">
           <Users className="h-10 w-10 mx-auto text-muted-foreground/30" />
