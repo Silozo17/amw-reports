@@ -1,93 +1,70 @@
 
 
-# Fix Plan: 10 Sections — Metric Toggles, Dashboard Data, Layout & More
+# Plan: Fix Quarterly Navigation + Full Period Selector Dropdown
 
-## Section 1: Fix Metric Toggle Race Condition
-**File:** `src/components/clients/MetricConfigPanel.tsx`
-- Replace `toggleMetric` (lines 87-103): Instead of reading from stale React `configs` state, fetch the latest `enabled_metrics` directly from Supabase via a fresh `.select()` query before updating
-- Add try-catch wrapping and success toast
-- Apply same try-catch + success toast pattern to `togglePlatform` (lines 75-85)
+## Problem
+1. **Quarterly arrows step by 1 month** — `handlePrevMonth`/`handleNextMonth` always call `subMonths`/`addMonths` by 1, so it takes 3 clicks to move one quarter.
+2. **No period type selector beyond Monthly/Quarterly** — user wants Weekly, Monthly, Quarterly, Year to Date, Last Year, Maximum, and Custom with date pickers.
 
-## Section 2: Add Save/Discard Batch Editing to MetricConfigPanel
-**File:** `src/components/clients/MetricConfigPanel.tsx`
-- Add `localConfigs` state (draft copy of `configs`) and `localPlatformEnabled` map
-- Toggle clicks update local state only — no DB writes on click
-- Add `hasChanges` computed boolean comparing local vs saved
-- Render "Save Changes" (primary) + "Discard" (outline) buttons when `hasChanges` is true
-- Show amber "Unsaved changes" badge in header
-- On Save: batch-update all changed configs to Supabase, toast success, `fetchData()`
-- On Discard: reset local state to match `configs`
-- This replaces per-click DB writes entirely (Section 1 fix becomes the Save handler pattern)
+## Changes
 
-## Section 3: Connect Metric Config to Dashboard
-**File:** `src/components/clients/ClientDashboard.tsx`
-- Add `client_platform_config` query to `fetchSnapshots` Promise.all
-- Store as `platformConfigs` Map: `platform → { isEnabled, enabledMetrics }`
-- Filter out platforms where `is_enabled === false` from rendering
-- Pass `enabledMetrics` array to each `PlatformMetricsCard`
+### File: `src/components/clients/DashboardHeader.tsx`
 
-**File:** `src/components/clients/PlatformMetricsCard.tsx`
-- Add `enabledMetrics?: string[]` to props
-- Add filter: `(enabledMetrics ? enabledMetrics.includes(key) : true)`
-- When `metricEntries.length === 0`, show dashed-border card with message instead of returning null
+**1. Expand `PeriodType` and `SelectedPeriod`:**
+```typescript
+export type PeriodType = 'weekly' | 'monthly' | 'quarterly' | 'ytd' | 'last_year' | 'maximum' | 'custom';
+```
+- `startDate` and `endDate` are used for `custom` type
+- `ytd`, `last_year`, `maximum` are computed ranges (no arrows needed)
 
-## Section 4: Fix Smart-Default / "No Activity" Bug
-**File:** `src/components/clients/ClientDashboard.tsx`
-- Change line 146 condition from `currentSnapshots.length === 0` to check whether ALL metric values across all snapshots are zero (using `Object.values(metrics_data).some(v => v > 0)`)
-- Reset `hasAutoDetected` when `clientId` changes via a separate `useEffect`
+**2. Replace toggle buttons with a Select dropdown:**
+- Use shadcn `Select` component with options: Weekly, Monthly, Quarterly, Year to Date, Last Year, Maximum, Custom
+- When "Custom" is selected, show two date pickers (From / To) using shadcn `Popover` + `Calendar`
 
-## Section 5: Add Missing Metric Labels
-**File:** `src/types/database.ts`
-- Add `cpm: 'CPM'` and `page_views: 'Page Views'` to `METRIC_LABELS`
-- Add `'cpm'` to `AD_METRICS` set (already present — confirm)
+**3. Fix arrow navigation to step by the correct unit:**
+- `weekly`: step by 7 days (adjust month/year accordingly)
+- `monthly`: step by 1 month (current behavior)
+- `quarterly`: step by 3 months
+- `ytd` / `last_year` / `maximum`: hide arrows entirely (fixed ranges)
+- `custom`: hide arrows (user picks dates manually)
 
-## Section 6: Fix Quarterly CPC Averaging
-**File:** `src/components/clients/ClientDashboard.tsx` (lines 119-131)
-- After summing all metrics, recalculate derived rate metrics from totals:
-  - `cpc = spend / clicks`
-  - `cost_per_conversion = spend / conversions`
-  - `ctr = (clicks / impressions) * 100`
-  - `engagement_rate = (engagement / impressions) * 100`
-- Only do this recalculation instead of the current average-by-month approach
+**4. Compute period label dynamically:**
+- Weekly: "Week of Mar 17, 2026"
+- Monthly: "March 2026"
+- Quarterly: "Q1 2026"
+- YTD: "Jan – Mar 2026"
+- Last Year: "2025"
+- Maximum: "All Time"
+- Custom: "Mar 1 – Mar 24, 2026"
 
-## Section 7: Optimise Trend Chart Query
-**File:** `src/components/clients/ClientDashboard.tsx`
-- Calculate 6-months-ago date and add `.or()` filter to trend query for server-side limiting
-- Change trend chart render condition from `trendChartData.length > 1` to `> 0`
+### File: `src/components/clients/ClientDashboard.tsx`
 
-## Section 8: Dashboard Layout Improvements
-**File:** `src/components/clients/ClientDashboard.tsx`
-- KPI grid: change to `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6`
-- Make PlatformMetricsCards collapsible using Collapsible component (default expanded, chevron toggle)
-- Add sync status dot (green/red/amber) in PlatformMetricsCard header — pass connection data from dashboard
-- Add "Last synced X ago" line below DashboardHeader using most recent `last_sync_at`
-- Move Audience & Demographics placeholder after AI Analysis
-- Update PIE_COLORS to AMW brand: `['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6']`
+**5. Update `fetchSnapshots` to handle all period types:**
+- `weekly`: filter snapshots where `report_month` matches the week's month (note: weekly is approximate since data is monthly — show the month containing the selected week)
+- `monthly`: current logic (unchanged)
+- `quarterly`: current logic (unchanged)
+- `ytd`: fetch months 1 through current month of current year
+- `last_year`: fetch all 12 months of previous year
+- `maximum`: fetch all snapshots (no month/year filter)
+- `custom`: fetch all months between `startDate` and `endDate` using `.gte`/`.lte` on year/month
 
-**File:** `src/components/clients/PlatformMetricsCard.tsx`
-- Add `syncStatus?: string`, `lastError?: string` props
-- Render status dot + error banner when sync failed
+**6. Update previous-period comparison logic:**
+- For quarterly: compare to previous quarter
+- For ytd: compare to same period last year
+- For last_year: compare to year before
+- For maximum/custom: no MoM comparison (hide trend arrows)
 
-**File:** `src/components/clients/DashboardHeader.tsx`
-- Remove "Weekly" and "Custom" period types (add TODO comments)
+### File: `src/components/clients/DashboardHeader.tsx` — Custom Date Picker UI
 
-## Section 9: Surface Facebook Sync Errors
-**File:** `supabase/functions/sync-facebook-page/index.ts`
-- Lines 111-112: Change `console.warn` in the insights catch block to also update `platform_connections.last_error` with the error message and set status to `'partial'`
-- Add token expiry check: if `token_expires_at` is past, set error "Token expired" and return early
-
-## Section 10: Minor Fixes
-**File:** `src/types/database.ts` — confirm default currency is GBP (already done)
-**Files with token references** — add security comment about plain text tokens
-**File:** `supabase/functions/generate-report/index.ts` — add `cpm` and `page_views` to report's METRIC_LABELS
-
----
+**7. When `custom` is selected, render:**
+- Two `Popover` + `Calendar` components inline (From date, To date)
+- Styled consistently with the period selector
+- Use `pointer-events-auto` on Calendar as per shadcn guidelines
+- Disable future dates
+- On date selection, call `onPeriodChange` with updated `startDate`/`endDate`
 
 ## Technical Notes
-
-- **No files rewritten from scratch** — all changes are targeted edits
-- **MetricConfigPanel refactor** (Sections 1+2) is the largest change: ~80 lines of new logic replacing ~30 lines
-- **Dashboard changes** (Sections 3,4,6,7,8) are additive — existing query structure preserved, new query added to Promise.all
-- **PlatformMetricsCard** gets 3 new optional props: `enabledMetrics`, `syncStatus`, `lastError`
-- Collapsible wrapping uses existing shadcn `Collapsible` component (already in project)
+- Weekly view shows the monthly snapshot for that week's month (since data granularity is monthly). Add a subtle note: "Showing monthly data — weekly breakdowns require daily snapshots."
+- The quarterly arrow bug is a simple fix: use `subMonths(date, 3)` / `addMonths(date, 3)` when `type === 'quarterly'`.
+- No database changes needed — all filtering uses existing `report_month` / `report_year` columns.
 
