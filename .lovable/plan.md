@@ -1,112 +1,95 @@
 
 
-# Plan: Client Form Enhancements, Logo Upload, Phone Formatting, Currency, Platform Logos, Data Display Fix
+# Plan: Fix Currency, Data Accuracy, and Platform Metric Separation
 
-## Issue Analysis
+## Root Cause Analysis (from database inspection)
 
-After inspecting the database, sync functions, and dashboard:
+**Actual data in monthly_snapshots for AMW Media:**
 
-1. **Data "not showing"**: Data exists in `monthly_snapshots` but the dashboard defaults to the previous month. For Feb 2026, most platforms have zero data. Jan 2026 has real Meta Ads data ($147 spend, 114 clicks). The dashboard shows zeros because it's looking at a month with no activity. The fix is to auto-detect the latest month with actual data instead of blindly defaulting to "previous month."
+| Platform | Months with real data | Issue |
+|----------|-----------------------|-------|
+| Meta Ads | Oct-Jan (spend $147-$650, clicks, impressions) | Working correctly |
+| Google Ads | Oct 2025 only ($112 spend, 35 clicks) | All other months show zeros — likely no ad spend those months |
+| Instagram | Every month: `total_followers: 13303`, all other metrics zero | BUG: follower count is always current snapshot, not historical |
+| Facebook | Every month: all zeros except `pages_count: 25` | API likely returning no data for page insights — possibly permissions issue |
 
-2. **No Google Business Profile integration** exists yet for auto-filling client details.
+**Issues identified:**
 
-3. **No `logo_url` column** on the `clients` table, no storage bucket for logos.
-
-4. **Phone numbers** are stored as-is with no formatting.
-
-5. **Currency** defaults to AUD (hardcoded), should be GBP with a proper dropdown.
-
-6. **Platform logos** are uploaded as images but not used anywhere — the UI uses text labels and lucide icons.
+1. **PDF report uses hardcoded `$` symbol** (line 186, 241 in generate-report). Client currency is GBP but report shows `$`.
+2. **Instagram `total_followers` is always 13,303** for every synced month because `sync-instagram` fetches the CURRENT follower count (`/ig_id?fields=followers_count`) and stores it as if it were the historical value. This is misleading — it should only be stored for the most recent sync, not backdated.
+3. **Instagram shows zero engagement/reach/impressions** — the Instagram Insights API (`/ig_id/insights?metric=impressions,reach,profile_views`) may require the `instagram_manage_insights` scope, or the data genuinely doesn't exist for those periods (IG Insights only keeps 30 days of daily data).
+4. **Facebook shows zero data** — same issue: `page_impressions`, `page_post_engagements` insights may have expired (Graph API keeps ~2 years but daily breakdowns are limited to 90 days).
+5. **PlatformMetricsCard shows ALL metrics** from the snapshot including internal ones like `pages_count`, `campaign_count`, `roas: 0` — these clutter the display and confuse users.
+6. **Dashboard KPI "Followers" shows 13.3K** because it sums `total_followers` across all platforms — but this is just the current Instagram count duplicated across months.
 
 ---
 
 ## Changes
 
-### 1. Google Business Profile Lookup for Client Form
+### 1. Fix Currency in PDF Report
 
-- Create a new edge function `google-places-lookup` that uses the Google Places API (Text Search) to find businesses by name and return address, phone, website
-- Add a "Search Google" button next to Company Name in `ClientForm.tsx` and `ClientEditDialog.tsx`
-- On selection, auto-fill business_address, phone, website fields
-- Uses existing `GOOGLE_CLIENT_ID` / requires a Google Places API key (will check if available or request)
+**File:** `supabase/functions/generate-report/index.ts`
 
-### 2. Client Logo Upload
+- Read `client.preferred_currency` and look up the symbol (GBP→£, EUR→€, USD→$, PLN→zł, etc.)
+- Replace all hardcoded `$` in `formatMetricValue` (line 186) and KPI cards (line 241) with the client's currency symbol
 
-**Database**: Add `logo_url` column to `clients` table.
+### 2. Fix Instagram Follower Count Problem
 
-**Storage**: Create a `client-logos` public bucket with RLS policies for authenticated users.
+**File:** `supabase/functions/sync-instagram/index.ts`
 
-**UI Changes**:
-- `ClientForm.tsx`: Add logo upload area (drag & drop or click) before contact fields
-- `ClientEditDialog.tsx`: Add logo upload/change area
-- `ClientDetail.tsx`: Display logo next to company name in header
-- `ClientDashboard.tsx`: Show logo in KPI header area
-- `generate-report/index.ts`: Fetch and embed client logo on PDF cover page
+- Only store `total_followers` when syncing the CURRENT month (i.e., when month/year matches now or previous month)
+- For historical months, set `total_followers: 0` or omit it entirely — we cannot know what the count was months ago
+- This prevents the misleading "13.3K followers" showing for every historical month
 
-**Type**: Add `logo_url` to the `Client` interface in `types/database.ts`.
+### 3. Filter Out Irrelevant/Internal Metrics from Display
 
-### 3. Phone Number Formatting (No Country Code)
+**File:** `src/components/clients/PlatformMetricsCard.tsx`
 
-- Add a `formatPhone` utility in `src/lib/utils.ts` that strips country codes (e.g., +44, +1, +48) and formats as local number
-- Apply on save in `ClientForm.tsx` and `ClientEditDialog.tsx`
-- Apply on display in `ClientDetail.tsx`
+- Create a `HIDDEN_METRICS` set: `['campaign_count', 'pages_count', 'roas']` — these are internal/derived values that shouldn't show as metric cards
+- Filter them out before rendering
+- Also hide metrics that are zero AND are not relevant to the platform type (e.g., never show `spend`, `cpc`, `cpm`, `cost_per_conversion`, `conversions`, `conversions_value` for Instagram or Facebook organic)
 
-### 4. Currency Selector (Default GBP)
+**File:** `src/types/database.ts`
 
-- Replace the free-text currency `Input` with a `Select` dropdown in both `ClientForm.tsx` and `ClientEditDialog.tsx`
-- Options: GBP (default), EUR, USD, PLN, CAD, AUD, NZD
-- Change default from `'AUD'` to `'GBP'`
-- Update `ClientDashboard.tsx` KPI cards to use the client's currency symbol instead of hardcoded `$`
+- Add a `PLATFORM_ORGANIC_ONLY` set: `['facebook', 'instagram', 'linkedin']` — platforms where ad spend metrics should be hidden
+- Add an `AD_METRICS` set: `['spend', 'cpc', 'cpm', 'cost_per_conversion', 'conversions', 'conversions_value', 'roas', 'campaign_count']`
 
-### 5. Platform Logo Images
+### 4. Fix Dashboard KPI Follower Count
 
-- Copy all 7 uploaded logo images to `src/assets/logos/` (Facebook, Google, Instagram, LinkedIn, Meta, TikTok, All Socials)
-- Create a `PLATFORM_LOGOS` map in `src/types/database.ts` importing these assets
-- Update `ConnectionDialog.tsx`: Show platform logo next to name in connection list and dropdown
-- Update `ClientDashboard.tsx` / `PlatformMetricsCard.tsx`: Show platform logo in section headers and chart legends
-- Update `DashboardHeader.tsx`: Show platform logo in platform selector tabs
-- Update `AccountPickerDialog.tsx`: Show platform logo in header
+**File:** `src/components/clients/ClientDashboard.tsx`
 
-### 6. Fix Dashboard Data Display
+- For the "Followers" KPI, only use the value from the LATEST month's snapshot, not sum across all platforms/months
+- Show followers only if the value comes from the current selected period, not from a stale historical snapshot
 
-The root cause: dashboard defaults to `now.getMonth()` (previous month). If that month has zero data, everything shows zeros even though older months have real data.
+### 5. Hide Zero-Only Platform Cards
 
-**Fix**:
-- In `ClientDashboard.tsx`, after fetching all snapshots, find the most recent month with non-zero data and default to that
-- Add a visual indicator when viewing a month with no data: "No activity recorded for this month. Try selecting a different period."
-- When KPI values are all zero, show the "Data unavailable" placeholder more prominently instead of showing $0.00 cards
+**File:** `src/components/clients/ClientDashboard.tsx`
+
+- When a platform has ALL displayable metrics as zero (after filtering out hidden/irrelevant metrics), show a compact "No activity" placeholder instead of a full card of zeros
+- This prevents showing a full Instagram card with all zeros except "13.3K Followers"
+
+### 6. Apply Currency Symbol to PDF KPI Cards
+
+**File:** `supabase/functions/generate-report/index.ts`
+
+- Pass currency symbol into the KPI card rendering and metric card rendering
+- Ensure MoM comparison text also uses correct symbol
 
 ---
 
 ## Files Modified
 
-- `src/pages/clients/ClientForm.tsx` — logo upload, phone formatting, currency dropdown, default GBP
-- `src/components/clients/ClientEditDialog.tsx` — same updates
-- `src/pages/clients/ClientDetail.tsx` — display logo, formatted phone
-- `src/components/clients/ClientDashboard.tsx` — platform logos, currency-aware formatting, smart month default
-- `src/components/clients/PlatformMetricsCard.tsx` — platform logos
-- `src/components/clients/DashboardHeader.tsx` — platform logos in tabs
-- `src/components/clients/ConnectionDialog.tsx` — platform logos
-- `src/components/clients/AccountPickerDialog.tsx` — platform logos
-- `src/types/database.ts` — add `logo_url` to Client, add PLATFORM_LOGOS map
-- `src/lib/utils.ts` — add formatPhone utility
-- `supabase/functions/generate-report/index.ts` — embed client logo
-
-**New files**:
-- `supabase/functions/google-places-lookup/index.ts` — Google Places search
-- `src/assets/logos/` — 7 logo image files
-
-**Database migration**:
-- Add `logo_url text` column to `clients`
-- Create `client-logos` storage bucket (public)
-- Add storage RLS policies for authenticated uploads
+- `supabase/functions/generate-report/index.ts` — use client currency symbol instead of `$`
+- `supabase/functions/sync-instagram/index.ts` — only store followers for current/recent months
+- `src/components/clients/PlatformMetricsCard.tsx` — filter hidden/irrelevant metrics per platform
+- `src/components/clients/ClientDashboard.tsx` — fix follower KPI, hide zero-only platforms
+- `src/types/database.ts` — add platform-specific metric visibility constants
 
 ## Execution Order
 
-1. Database migration (logo_url column + storage bucket)
-2. Copy logo assets to `src/assets/logos/`
-3. Create PLATFORM_LOGOS map and formatPhone utility
-4. Update ClientForm + ClientEditDialog (logo upload, currency dropdown, phone formatting)
-5. Update dashboard components with platform logos and smart defaults
-6. Create google-places-lookup edge function
-7. Update generate-report to embed client logo
+1. Add metric visibility constants to types
+2. Fix PlatformMetricsCard filtering
+3. Fix dashboard KPI and zero-platform handling
+4. Fix Instagram sync follower logic
+5. Fix PDF report currency
 
