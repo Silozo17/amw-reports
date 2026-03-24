@@ -199,7 +199,35 @@ const ClientForm = () => {
               </div>
               <div className="space-y-2">
                 <Label>Company Name *</Label>
-                <Input value={form.company_name} onChange={e => handleChange('company_name', e.target.value)} required />
+                <div className="flex gap-2">
+                  <Input value={form.company_name} onChange={e => handleChange('company_name', e.target.value)} required className="flex-1" />
+                  <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" size="icon" onClick={handleGoogleSearch} disabled={isSearching} title="Search Google for business details">
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0" align="start">
+                      {searchResults.length > 0 ? (
+                        <div className="max-h-64 overflow-y-auto">
+                          {searchResults.map((r, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className="w-full text-left p-3 hover:bg-muted/50 border-b last:border-b-0 transition-colors"
+                              onClick={() => applySearchResult(r)}
+                            >
+                              <p className="text-sm font-medium">{r.name}</p>
+                              {r.address && <p className="text-xs text-muted-foreground mt-0.5">{r.address}</p>}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="p-3 text-sm text-muted-foreground">No results</p>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Position</Label>
