@@ -1,17 +1,17 @@
 
 
-## Plan: Remove vertical line artifacts from mascot SVG
+## Plan: Replace AMW text with logo image
 
-### Problem
-The `src/assets/mascot.svg` contains two SVG elements that draw thin vertical lines on both edges of the graphic:
-- **Line 10**: A `<path class="cls-2">` tracing the right edge at x=1392
-- **Line 11**: A `<rect class="cls-1">` spanning the left edge at x=0, full height
+### Change
+In `LandingHero.tsx`, replace the text-based "AMW" heading (line 39) with the uploaded `AMW_Logo_White.png` logo image. The "Reports" subtitle stays below it.
 
-These are export artifacts, not part of the mascot illustration.
+### Steps
 
-### Fix
-Edit `src/assets/mascot.svg` to remove lines 10 and 11 (the right-edge path and the left-edge rect), keeping only the mascot body (cls-3 paths).
+1. **Copy logo asset**: Copy `user-uploads://AMW_Logo_White.png` to `src/assets/AMW_Logo_White.png`
+
+2. **Update `LandingHero.tsx`**: Import the logo and replace the `<h1>AMW</h1>` text with an `<img>` tag (~h-10 to match the text size), keeping the "Reports" text beneath it.
 
 ### Files
-- `src/assets/mascot.svg` — Remove the two border-line elements
+- `src/assets/AMW_Logo_White.png` (new — copied from upload)
+- `src/components/landing/LandingHero.tsx` (modified — swap h1 for img)
 
