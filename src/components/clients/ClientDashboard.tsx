@@ -577,31 +577,41 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
-    const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
-    const totalClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
+    const totalReach = filtered.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
+    }, 0);
+    const totalClicks = filtered.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0);
+    }, 0);
     const totalEngagement = filtered.reduce((sum, s) => {
       const m = s.metrics_data;
-      // Use pre-aggregated engagement if available (avoids double-counting for TikTok etc.)
       if (m.engagement) return sum + m.engagement;
       return sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
     }, 0);
     const totalFollowers = Math.max(...filtered.map((s) => s.metrics_data.total_followers || 0), 0);
     const totalLinkClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
-    const totalPageViews = filtered.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
+    const totalPageViews = filtered.reduce((sum, s) => sum + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0), 0);
+    const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
-    const prevReach = filteredPrev.reduce(
-      (sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0),
-      0,
-    );
-    const prevClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
+    const prevReach = filteredPrev.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
+    }, 0);
+    const prevClicks = filteredPrev.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0);
+    }, 0);
     const prevEngagement = filteredPrev.reduce((sum, s) => {
       const m = s.metrics_data;
       if (m.engagement) return sum + m.engagement;
       return sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
     }, 0);
     const prevLinkClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
-    const prevPageViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
+    const prevPageViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0), 0);
+    const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
 
     const calcChange = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
@@ -658,6 +668,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             },
           ]
         : []),
+      ...(totalSessions > 0
+        ? [
+            {
+              label: "Sessions",
+              value: totalSessions,
+              change: calcChange(totalSessions, prevSessions),
+              icon: Activity,
+              metricKey: "sessions",
+            },
+          ]
+        : []),
       ...(totalLinkClicks > 0
         ? [
             {
@@ -681,7 +702,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           ]
         : []),
     ];
-  }, [filtered, filteredPrev]);
+  }, [filtered, filteredPrev, selectedPlatform]);
 
   // ─── Sparkline data per KPI from trend ───────────────────────
   const sparklineMap = useMemo(() => {
