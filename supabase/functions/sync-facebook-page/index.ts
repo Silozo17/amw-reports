@@ -47,6 +47,10 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
+    if (!conn.is_connected || !conn.access_token) {
+      throw new Error("Facebook connection is not authenticated. Please connect via OAuth first.");
+    }
+
     // Token expiry check
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
       await supabaseClient
@@ -59,36 +63,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // For facebook platform connections, we need the meta_ads connection's page tokens
-    const { data: metaConn } = await supabaseClient
-      .from("platform_connections")
-      .select("*")
-      .eq("client_id", clientId)
-      .eq("platform", "meta_ads")
-      .eq("is_connected", true)
-      .single();
-
-    if (!metaConn?.access_token) {
-      throw new Error("No connected Meta Ads account found. Connect Meta Ads first to enable Facebook Page sync.");
-    }
-
-    // Meta token expiry check
-    if (metaConn.token_expires_at && new Date(metaConn.token_expires_at) < new Date()) {
-      await supabaseClient
-        .from("platform_connections")
-        .update({ last_error: "Meta Ads token expired. Please reconnect Meta Ads.", last_sync_status: "failed" })
-        .eq("id", connectionId);
-      return new Response(JSON.stringify({ error: "Token expired" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const metadata = metaConn.metadata as any;
+    // Pages are stored directly on this facebook connection's metadata
+    const metadata = conn.metadata as any;
     const pages = metadata?.pages || [];
 
     if (pages.length === 0) {
-      throw new Error("No Facebook Pages discovered. Reconnect Meta Ads to grant page permissions.");
+      throw new Error("No Facebook Pages discovered. Please reconnect Facebook to grant page permissions.");
     }
 
     // Get org_id from client

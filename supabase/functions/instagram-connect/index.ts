@@ -25,7 +25,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify connection exists
     const { data: conn, error: connError } = await supabase
       .from("platform_connections")
       .select("id, platform, client_id")
@@ -45,7 +44,7 @@ Deno.serve(async (req) => {
     const state = btoa(
       JSON.stringify({
         connection_id,
-        platform: conn.platform,
+        platform: "instagram",
         redirect_url: redirect_url || "https://amw-reports.lovable.app",
       })
     );
@@ -54,7 +53,7 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set("client_id", appId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("scope", "ads_read,ads_management,business_management");
+    authUrl.searchParams.set("scope", "pages_show_list,instagram_basic,instagram_manage_insights");
     authUrl.searchParams.set("state", state);
 
     return new Response(
