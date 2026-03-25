@@ -1167,7 +1167,99 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             </Card>
           )}
 
-          {/* PART 5: Audience Map */}
+          {/* PART 5: Performance by Post */}
+          {filteredPosts.length > 0 && (
+            <div className="space-y-4">
+              <SectionHeader
+                title="Performance by Post"
+                description="How each piece of content performed this period"
+                icon={<FileText className="h-4 w-4 text-primary" />}
+              />
+              <Card>
+                <CardContent className="p-0">
+                  <div className="relative w-full overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[280px]">Post</TableHead>
+                          <TableHead className="text-right">Engagement</TableHead>
+                          <TableHead className="text-right">Reach</TableHead>
+                          <TableHead className="text-right">Eng. Rate</TableHead>
+                          <TableHead className="text-right w-10"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredPosts.map((post, idx) => {
+                          const engagement = post.total_engagement ?? 0;
+                          const reach = post.reach ?? 0;
+                          const engRate = reach > 0 ? ((engagement / reach) * 100).toFixed(1) : "—";
+                          const text = post.message || post.caption || "";
+                          const dateStr = post.created_time || post.timestamp;
+                          const platformLogo = PLATFORM_LOGOS[post.platform];
+
+                          return (
+                            <TableRow key={`${post.permalink_url || idx}-${idx}`}>
+                              <TableCell>
+                                <div className="flex items-start gap-3">
+                                  {post.full_picture ? (
+                                    <img
+                                      src={post.full_picture}
+                                      alt=""
+                                      className="w-12 h-12 rounded-md object-cover shrink-0 bg-muted"
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center shrink-0">
+                                      <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 space-y-1">
+                                    <p className="text-sm leading-snug line-clamp-2">
+                                      {text || <span className="italic text-muted-foreground">No caption</span>}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      {platformLogo && (
+                                        <img src={platformLogo} alt="" className="w-4 h-4 rounded-sm" />
+                                      )}
+                                      {dateStr && (
+                                        <span>{format(new Date(dateStr), "d MMM yyyy")}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-medium tabular-nums">
+                                {engagement.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {reach > 0 ? reach.toLocaleString() : "—"}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {engRate !== "—" ? `${engRate}%` : "—"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {post.permalink_url && (
+                                  <a
+                                    href={post.permalink_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* PART 6: Audience Map */}
           <AudienceMap geoData={geoData} />
 
           {/* Per-Platform Metrics */}
