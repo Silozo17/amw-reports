@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrg } from '@/hooks/useOrg';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Shield, UserPlus, Trash2 } from 'lucide-react';
+import { Shield, UserPlus, Trash2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { PLATFORM_LABELS, METRIC_LABELS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 
 interface TeamMember {
   id: string;
-  user_id: string;
+  org_id: string;
+  user_id: string | null;
   role: 'owner' | 'manager';
+  invited_email: string | null;
+  accepted_at: string | null;
   profiles?: { full_name: string | null; email: string | null } | null;
 }
 
@@ -35,38 +39,44 @@ const ALL_METRICS = Object.keys(METRIC_LABELS);
 
 const SettingsPage = () => {
   const { isOwner, profile, role } = useAuth();
+  const { org, orgId } = useOrg();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [metricDefaults, setMetricDefaults] = useState<MetricDefault[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
-    const [rolesRes, defaultsRes, profilesRes] = await Promise.all([
-      supabase.from('user_roles').select('*'),
+    if (!orgId) return;
+
+    const [membersRes, defaultsRes, profilesRes] = await Promise.all([
+      supabase.from('org_members').select('*').eq('org_id', orgId),
       supabase.from('metric_defaults').select('*'),
       supabase.from('profiles').select('user_id, full_name, email'),
     ]);
 
-    const roles = (rolesRes.data ?? []) as Array<{ id: string; user_id: string; role: 'owner' | 'manager' }>;
+    const members = (membersRes.data ?? []) as Array<{
+      id: string; org_id: string; user_id: string | null; role: 'owner' | 'manager';
+      invited_email: string | null; accepted_at: string | null;
+    }>;
     const profiles = (profilesRes.data ?? []) as Array<{ user_id: string; full_name: string | null; email: string | null }>;
 
-    const members: TeamMember[] = roles.map(r => ({
-      ...r,
-      profiles: profiles.find(p => p.user_id === r.user_id) ?? null,
+    const enriched: TeamMember[] = members.map(m => ({
+      ...m,
+      profiles: m.user_id ? profiles.find(p => p.user_id === m.user_id) ?? null : null,
     }));
-    setTeamMembers(members);
+    setTeamMembers(enriched);
     setMetricDefaults((defaultsRes.data as MetricDefault[]) ?? []);
     setIsLoading(false);
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (orgId) fetchData();
+  }, [orgId]);
 
-  const handleRemoveRole = async (id: string) => {
-    const { error } = await supabase.from('user_roles').delete().eq('id', id);
+  const handleRemoveMember = async (id: string) => {
+    const { error } = await supabase.from('org_members').delete().eq('id', id);
     if (error) toast.error('Failed to remove');
     else {
-      toast.success('Role removed');
+      toast.success('Member removed');
       fetchData();
     }
   };
@@ -117,8 +127,17 @@ const SettingsPage = () => {
       <div className="space-y-6 max-w-4xl">
         <div>
           <h1 className="text-3xl font-display">Settings</h1>
-          <p className="text-muted-foreground font-body mt-1">Platform configuration (Owner only)</p>
+          <p className="text-muted-foreground font-body mt-1">Organisation & platform configuration</p>
         </div>
+
+        {/* Organisation */}
+        <Card>
+          <CardHeader><CardTitle className="font-display text-lg">Organisation</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{org?.name ?? '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Slug</span><span>{org?.slug ?? '—'}</span></div>
+          </CardContent>
+        </Card>
 
         {/* Account */}
         <Card>
@@ -134,7 +153,7 @@ const SettingsPage = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="font-display text-lg">Team Members</CardTitle>
-            <InviteDialog onInvite={fetchData} />
+            {orgId && <InviteDialog orgId={orgId} onInvite={fetchData} />}
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -147,14 +166,19 @@ const SettingsPage = () => {
                   <div key={member.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
                     <div>
                       <p className="text-sm font-body font-medium">
-                        {member.profiles?.full_name ?? member.profiles?.email ?? member.user_id.slice(0, 8)}
+                        {member.profiles?.full_name ?? member.invited_email ?? 'Unknown'}
                       </p>
-                      <p className="text-xs text-muted-foreground">{member.profiles?.email ?? 'No email'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {member.profiles?.email ?? member.invited_email ?? ''}
+                        {!member.accepted_at && member.invited_email && (
+                          <span className="ml-2 text-warning">· Pending invite</span>
+                        )}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="capitalize">{member.role}</Badge>
                       {member.role !== 'owner' && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveRole(member.id)}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveMember(member.id)}>
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       )}
@@ -212,11 +236,36 @@ const SettingsPage = () => {
   );
 };
 
-/* Invite Dialog — simplified since signups are disabled, 
-   this creates a user_role entry. In practice, the owner would 
-   need to re-enable signups temporarily or use an invite flow. */
-const InviteDialog = ({ onInvite }: { onInvite: () => void }) => {
+const InviteDialog = ({ orgId, onInvite }: { orgId: string; onInvite: () => void }) => {
   const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'manager' | 'owner'>('manager');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleInvite = async () => {
+    if (!email.trim()) {
+      toast.error('Email is required');
+      return;
+    }
+    setIsLoading(true);
+
+    const { error } = await supabase.from('org_members').insert({
+      org_id: orgId,
+      invited_email: email.trim().toLowerCase(),
+      role: inviteRole,
+      invited_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      toast.error(error.message.includes('unique') ? 'This email has already been invited' : 'Failed to send invite');
+    } else {
+      toast.success(`Invite sent to ${email}`);
+      setEmail('');
+      setOpen(false);
+      onInvite();
+    }
+    setIsLoading(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -230,12 +279,33 @@ const InviteDialog = ({ onInvite }: { onInvite: () => void }) => {
         <DialogHeader>
           <DialogTitle className="font-display">Invite Team Member</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            To invite a team member, temporarily enable signups, have them create an account, then assign their role here. 
-            Contact support for a streamlined invite flow.
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Email address</Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="colleague@agency.com"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <Select value={inviteRole} onValueChange={v => setInviteRole(v as 'manager' | 'owner')}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="owner">Owner</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            When this person signs up with this email, they will automatically be added to your organisation.
           </p>
-          <Button variant="outline" className="w-full" onClick={() => setOpen(false)}>Close</Button>
+          <Button className="w-full gap-2" onClick={handleInvite} disabled={isLoading}>
+            <Mail className="h-4 w-4" />
+            {isLoading ? 'Inviting...' : 'Send Invite'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -3,6 +3,7 @@ import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useOrg } from '@/hooks/useOrg';
 import AppSidebar from './AppSidebar';
 
 interface AppLayoutProps {
@@ -12,6 +13,9 @@ interface AppLayoutProps {
 const AppLayout = ({ children }: AppLayoutProps) => {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { org } = useOrg();
+
+  const orgName = org?.name ?? 'AMW';
 
   if (isMobile) {
     return (
@@ -27,8 +31,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
               <AppSidebar onNavigate={() => setSidebarOpen(false)} />
             </SheetContent>
           </Sheet>
-          <div>
-            <h1 className="text-lg font-display tracking-wide text-primary">AMW</h1>
+          <div className="flex items-center gap-2">
+            {org?.logo_url ? (
+              <img src={org.logo_url} alt={orgName} className="h-7 w-7 rounded object-contain" />
+            ) : null}
+            <h1 className="text-lg font-display tracking-wide text-primary">{orgName}</h1>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto bg-background">
