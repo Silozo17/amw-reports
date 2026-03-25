@@ -58,6 +58,10 @@ Deno.serve(async (req) => {
       await handleGoogleAds(supabase, authCode, connectionId, supabaseUrl);
     } else if (platform === "meta_ads") {
       await handleMetaAds(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "facebook") {
+      await handleFacebook(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "instagram") {
+      await handleInstagram(supabase, authCode, connectionId, supabaseUrl);
     } else if (platform === "tiktok") {
       await handleTikTok(supabase, authCode, connectionId);
     } else if (platform === "linkedin") {
@@ -200,13 +204,12 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
   if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
 }
 
-// ── Meta Ads (Facebook/Instagram) ──
+// ── Meta Ads (Ads only) ──
 async function handleMetaAds(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const appId = "1473709394207184";
   const appSecret = Deno.env.get("META_APP_SECRET")!;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
-  // Exchange code for short-lived token
   const tokenRes = await fetch(
     `https://graph.facebook.com/v25.0/oauth/access_token?` +
       new URLSearchParams({ client_id: appId, client_secret: appSecret, redirect_uri: redirectUri, code })
@@ -214,7 +217,6 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
   const tokenData = await tokenRes.json();
   if (tokenData.error) throw new Error(tokenData.error.message || tokenData.error);
 
-  // Exchange for long-lived token
   let accessToken = tokenData.access_token;
   let expiresIn = tokenData.expires_in || 3600;
 
@@ -234,7 +236,7 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
 
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Discover ALL ad accounts
+  // Discover ad accounts only
   const adAccounts: Array<{ id: string; name: string }> = [];
   try {
     const acctRes = await fetch(
@@ -250,32 +252,6 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
     console.warn("Could not discover ad accounts:", e);
   }
 
-  // Discover ALL Facebook Pages and linked Instagram accounts
-  const pages: Array<{ id: string; name: string; access_token?: string; instagram?: { id: string; username: string } }> = [];
-  try {
-    const pagesRes = await fetch(
-      `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&access_token=${accessToken}`
-    );
-    const pagesData = await pagesRes.json();
-    console.log("Meta pages discovery:", JSON.stringify(pagesData));
-    if (pagesData.data?.length > 0) {
-      for (const page of pagesData.data) {
-        const entry: any = { id: page.id, name: page.name || page.id };
-        if (page.access_token) entry.access_token = page.access_token;
-        if (page.instagram_business_account) {
-          entry.instagram = {
-            id: page.instagram_business_account.id,
-            username: page.instagram_business_account.username || "",
-          };
-        }
-        pages.push(entry);
-      }
-    }
-  } catch (e) {
-    console.warn("Could not discover pages:", e);
-  }
-
-  // Store all discovered assets but do NOT auto-select
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -286,7 +262,147 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
       last_error: null,
       account_name: null,
       account_id: null,
-      metadata: { token_type: "bearer", long_lived: true, ad_accounts: adAccounts, pages },
+      metadata: { token_type: "bearer", long_lived: true, ad_accounts: adAccounts },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
+// ── Facebook (Pages only) ──
+async function handleFacebook(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const appId = "1473709394207184";
+  const appSecret = Deno.env.get("META_APP_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  const tokenRes = await fetch(
+    `https://graph.facebook.com/v25.0/oauth/access_token?` +
+      new URLSearchParams({ client_id: appId, client_secret: appSecret, redirect_uri: redirectUri, code })
+  );
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) throw new Error(tokenData.error.message || tokenData.error);
+
+  let accessToken = tokenData.access_token;
+  let expiresIn = tokenData.expires_in || 3600;
+
+  try {
+    const longRes = await fetch(
+      `https://graph.facebook.com/v25.0/oauth/access_token?` +
+        new URLSearchParams({ grant_type: "fb_exchange_token", client_id: appId, client_secret: appSecret, fb_exchange_token: accessToken })
+    );
+    const longData = await longRes.json();
+    if (longData.access_token) {
+      accessToken = longData.access_token;
+      expiresIn = longData.expires_in || 5184000;
+    }
+  } catch (e) {
+    console.warn("Could not exchange for long-lived token:", e);
+  }
+
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  // Discover pages with page-level access tokens
+  const pages: Array<{ id: string; name: string; access_token?: string }> = [];
+  try {
+    const pagesRes = await fetch(
+      `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&access_token=${accessToken}`
+    );
+    const pagesData = await pagesRes.json();
+    console.log("Facebook pages discovery:", JSON.stringify(pagesData));
+    if (pagesData.data?.length > 0) {
+      for (const page of pagesData.data) {
+        pages.push({ id: page.id, name: page.name || page.id, access_token: page.access_token });
+      }
+    }
+  } catch (e) {
+    console.warn("Could not discover pages:", e);
+  }
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: accessToken,
+      refresh_token: null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_name: null,
+      account_id: null,
+      metadata: { token_type: "bearer", long_lived: true, pages },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
+// ── Instagram (IG Business accounts via Facebook Pages) ──
+async function handleInstagram(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const appId = "1473709394207184";
+  const appSecret = Deno.env.get("META_APP_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  const tokenRes = await fetch(
+    `https://graph.facebook.com/v25.0/oauth/access_token?` +
+      new URLSearchParams({ client_id: appId, client_secret: appSecret, redirect_uri: redirectUri, code })
+  );
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) throw new Error(tokenData.error.message || tokenData.error);
+
+  let accessToken = tokenData.access_token;
+  let expiresIn = tokenData.expires_in || 3600;
+
+  try {
+    const longRes = await fetch(
+      `https://graph.facebook.com/v25.0/oauth/access_token?` +
+        new URLSearchParams({ grant_type: "fb_exchange_token", client_id: appId, client_secret: appSecret, fb_exchange_token: accessToken })
+    );
+    const longData = await longRes.json();
+    if (longData.access_token) {
+      accessToken = longData.access_token;
+      expiresIn = longData.expires_in || 5184000;
+    }
+  } catch (e) {
+    console.warn("Could not exchange for long-lived token:", e);
+  }
+
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  // Discover pages with linked Instagram Business accounts
+  const igAccounts: Array<{ id: string; username: string; page_id: string; page_name: string; page_token: string }> = [];
+  try {
+    const pagesRes = await fetch(
+      `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&access_token=${accessToken}`
+    );
+    const pagesData = await pagesRes.json();
+    console.log("Instagram discovery via pages:", JSON.stringify(pagesData));
+    if (pagesData.data?.length > 0) {
+      for (const page of pagesData.data) {
+        if (page.instagram_business_account) {
+          igAccounts.push({
+            id: page.instagram_business_account.id,
+            username: page.instagram_business_account.username || "",
+            page_id: page.id,
+            page_name: page.name || page.id,
+            page_token: page.access_token,
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not discover Instagram accounts:", e);
+  }
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: accessToken,
+      refresh_token: null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_name: null,
+      account_id: null,
+      metadata: { token_type: "bearer", long_lived: true, ig_accounts: igAccounts },
     })
     .eq("id", connectionId);
 
