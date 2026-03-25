@@ -557,7 +557,7 @@ const ClientDetail = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="font-display text-lg">Platform Connections</CardTitle>
-                <ConnectionDialog clientId={client.id} connections={connections} onUpdate={fetchData} onOpenPicker={handleOpenPicker} />
+                <ConnectionDialog clientId={client.id} connections={connections} onUpdate={fetchData} />
               </CardHeader>
               <CardContent>
                 {connections.length === 0 ? (
