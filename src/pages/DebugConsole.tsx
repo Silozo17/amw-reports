@@ -130,7 +130,7 @@ const DebugConsole = () => {
     setSyncTestResult(prev => ({ ...prev, [conn.id]: { loading: true, response: null } }));
 
     const { data, error } = await supabase.functions.invoke(funcName, {
-      body: { connectionId: conn.id, clientId: conn.client_id, month, year },
+      body: { connection_id: conn.id, month, year },
     });
 
     setSyncTestResult(prev => ({
