@@ -1,43 +1,33 @@
 
-Goal: fix the YouTube connection flow so users do not see an empty “Select account” modal after OAuth.
 
-What I found:
-- The YouTube connection record is being saved as connected, but with `account_id = null`, `account_name = null`, and `metadata.channels = []`.
-- The OAuth callback is still redirecting with `oauth_pending_selection=...`, which forces the app to open the account picker.
-- The actual backend log shows the real cause: the Google project behind the current production credentials has YouTube Data API v3 disabled, so channel discovery fails with a 403.
-- This means the issue is not that Google already selected the account; it is that the app cannot fetch the YouTube channel list after OAuth.
+## Fix Plan: Three Issues
 
-Implementation plan:
-1. Harden the YouTube OAuth callback
-- Update `supabase/functions/oauth-callback/index.ts` so YouTube channel discovery treats Google API errors explicitly instead of silently falling back to an empty list.
-- Store a friendly `last_error` / metadata error when discovery fails (especially for `SERVICE_DISABLED` / 403 cases).
-- Only set `oauth_pending_selection` when there are actually multiple selectable channels.
-- If exactly one channel exists, keep the current auto-select behavior.
-- If discovery fails or no channels are available, do not send the user into the picker flow.
+### Issue 1: YouTube still shows empty picker after OAuth
+**Root cause**: The redirect in `oauth-callback/index.ts` (line 92) **always** sends `oauth_pending_selection=${connectionId}` regardless of whether auto-selection already happened. The client-side guard works, but the flow is fragile — it re-fetches the connection and checks. The real fix is to skip `oauth_pending_selection` entirely when `account_id` is already set.
 
-2. Improve the client-side redirect handling
-- Update `src/pages/clients/ClientDetail.tsx` so the page only opens `AccountPickerDialog` when the fetched connection has real selectable assets in its metadata.
-- If the connection has no assets and has a YouTube discovery error, show the real error as a toast or inline status instead of opening the empty modal.
+**Change in `supabase/functions/oauth-callback/index.ts`** (lines 81-95):
+- After calling the platform handler, re-fetch the connection to check if `account_id` was set (auto-selected).
+- If `account_id` is present, redirect with `?oauth_connected=1` (success, no picker needed).
+- If `account_id` is null and `last_error` is set, redirect with `?oauth_error=...`.
+- Only use `oauth_pending_selection` when `account_id` is null and there are multiple assets to choose from.
 
-3. Improve connection status messaging
-- Keep the connection row from looking like a generic “Select Account” state when YouTube discovery failed.
-- Show a clearer status based on `last_error` such as “Additional YouTube API setup required” or the exact backend error message.
-- This avoids misleading users into thinking they missed a step in the Google chooser.
+**Change in `src/pages/clients/ClientDetail.tsx`**:
+- Handle the new `oauth_connected` param with a success toast and data refresh.
 
-4. Preserve the intended UX
-- If one YouTube channel is discovered: auto-connect it.
-- If multiple channels are discovered: open the picker.
-- If zero channels are discovered because of a backend/API issue: show an actionable error, not a picker.
+### Issue 2: Google Analytics and Google Business Profile also fail (SERVICE_DISABLED)
+**Change in `supabase/functions/oauth-callback/index.ts`**:
+- Apply the same `discoveryError` pattern from YouTube to `handleGoogleAnalytics` and `handleGoogleBusinessProfile`.
+- When the API returns a 403/SERVICE_DISABLED, store `discovery_error` in metadata and set `is_connected: false` with a descriptive `last_error`.
 
-Technical details:
-- Files to update:
-  - `supabase/functions/oauth-callback/index.ts`
-  - `src/pages/clients/ClientDetail.tsx`
-- No database migration is needed.
-- Root cause from logs: the production Google app needs YouTube Data API v3 enabled. OAuth consent alone is not enough because the app uses the YouTube Data API to discover the channel after sign-in.
-- The sync flow also depends on YouTube Data API for channel stats and video titles, so enabling that API is required beyond just the initial connection flow.
+### Issue 3: Connection dialog shows all existing connections — should only show "Add new"
+**Change in `src/components/clients/ConnectionDialog.tsx`**:
+- Remove the entire existing-connections list block (lines 130-195) that renders all current connections with Select/Change/Connect buttons and badges.
+- Change the dialog title to "Add Connection".
+- Filter the platform dropdown to exclude platforms that already have a connection for this client.
+- The dialog becomes a simple "pick platform + connect" form.
 
-Expected outcome:
-- Users will no longer see an empty YouTube account picker.
-- Real YouTube setup problems will be surfaced clearly.
-- The flow will behave correctly for all three cases: one channel, many channels, or discovery failure.
+### Files to modify
+1. `supabase/functions/oauth-callback/index.ts` — smarter redirect logic + GA/GBP error handling
+2. `src/pages/clients/ClientDetail.tsx` — handle `oauth_connected` param
+3. `src/components/clients/ConnectionDialog.tsx` — remove existing connections list, filter already-connected platforms
+
