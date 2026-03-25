@@ -7,7 +7,7 @@ import metaLogo from '@/assets/logos/meta.webp';
 import tiktokLogo from '@/assets/logos/tiktok.webp';
 
 export type AppRole = 'owner' | 'manager';
-export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin';
+export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
 
 export interface Profile {
@@ -118,6 +118,9 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   instagram: 'Instagram',
   tiktok: 'TikTok',
   linkedin: 'LinkedIn',
+  google_search_console: 'Google Search Console',
+  google_analytics: 'Google Analytics',
+  google_business_profile: 'Google Business Profile',
 };
 
 export const PLATFORM_LOGOS: Record<string, string> = {
@@ -128,6 +131,9 @@ export const PLATFORM_LOGOS: Record<string, string> = {
   instagram: instagramLogo,
   tiktok: tiktokLogo,
   linkedin: linkedinLogo,
+  google_search_console: googleLogo,
+  google_analytics: googleLogo,
+  google_business_profile: googleLogo,
 };
 
 export const CURRENCY_OPTIONS = [
@@ -154,7 +160,7 @@ export const AD_METRICS = new Set([
 ]);
 
 /** Platforms that are organic-only (no ad spend metrics) */
-export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'linkedin']);
+export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile']);
 
 export const METRIC_LABELS: Record<string, string> = {
   spend: 'Spend',
@@ -201,4 +207,28 @@ export const METRIC_LABELS: Record<string, string> = {
   email_contacts: 'Email Taps',
   media_count: 'Total Posts',
   top_posts: 'Top Posts',
+  // Google Search Console
+  search_clicks: 'Search Clicks',
+  search_impressions: 'Search Impressions',
+  search_ctr: 'Search CTR',
+  search_position: 'Avg. Position',
+  top_queries: 'Top Queries',
+  top_pages: 'Top Pages',
+  // Google Analytics
+  sessions: 'Sessions',
+  active_users: 'Active Users',
+  new_users: 'New Users',
+  page_views: 'Page Views',
+  bounce_rate: 'Bounce Rate',
+  avg_session_duration: 'Avg. Session Duration',
+  pages_per_session: 'Pages / Session',
+  traffic_sources: 'Traffic Sources',
+  // Google Business Profile
+  gbp_views: 'Profile Views',
+  gbp_searches: 'Search Appearances',
+  gbp_calls: 'Phone Calls',
+  gbp_direction_requests: 'Direction Requests',
+  gbp_website_clicks: 'Website Clicks (GBP)',
+  gbp_reviews_count: 'Reviews Count',
+  gbp_average_rating: 'Avg. Rating',
 };
