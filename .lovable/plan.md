@@ -1,81 +1,56 @@
 
+Issue found:
 
-## Fix TikTok Connection + Enhance Data Sync
+- The TikTok integration is currently mixing two different TikTok products:
+  - the backend OAuth + sync code is built for TikTok Login Kit / Content API (organic account analytics)
+  - the UI and account-picker still treat TikTok like an advertiser/ads integration
+- Your screenshot is from the TikTok Business/Advertiser app settings page. That flow uses `app_id`, while the current OAuth URL in code uses a Login Kit `client_key`. That mismatch is the most likely reason TikTok is throwing the `client_key` error.
+- There is also a second bug in the app: the OAuth callback stores TikTok accounts in `metadata.accounts`, but the picker reads `metadata.advertisers`. So even if OAuth succeeded, TikTok would still get stuck as not fully connected.
 
-### Redirect URI Issue
+Plan:
 
-Your TikTok app's **Advertiser redirect URL** is set to `https://reports.amwmedia.co.uk`, but the code redirects to:
+1. Align TikTok to the organic metrics flow
+   - Keep the Login Kit + Content API approach, because it matches the metrics you asked for: reach/views, likes, comments, shares, followers, profile views, watch time, completion rate.
+   - Update the TikTok connect function to clearly use Login Kit credentials and add better validation/error messages around missing or invalid TikTok credentials.
 
-```text
-https://kcdixfmjiifpnbtplodv.supabase.co/functions/v1/oauth-callback
-```
+2. Remove advertiser-specific TikTok assumptions in the app
+   - Replace TikTok “ads/advertiser” wording with “TikTok account”.
+   - Update the TikTok account picker to read the same metadata shape the callback actually saves.
+   - If TikTok only returns one connected account, auto-select it so the connection becomes usable immediately.
 
-**You need to add this URL** to your TikTok app's redirect URIs. However, the screenshot shows the **TikTok Business/Marketing API** portal (Advertiser authorization). Your integration uses **Login Kit v2** (Content API for organic data). Make sure the redirect URI is also set under the **Login Kit** configuration section in the TikTok Developer Portal, not just the Advertiser section.
+3. Make OAuth completion consistent
+   - Save `account_id` and `account_name` during the TikTok callback instead of leaving them null.
+   - Ensure TikTok OAuth errors route back to the correct client page with a clearer error state.
 
-Also, the `TIKTOK_APP_ID` secret needs to match the App ID shown: `7621075995757084688`. I'll update this secret value.
+4. Keep the enhanced TikTok sync logic
+   - Preserve the extra fields already added in sync:
+     - profile views
+     - bio link clicks
+     - average time watched
+     - completion rate
+     - per-video reach / likes / comments / shares
 
-### Enhanced Data Sync
+5. Validate the TikTok app setup against the code
+   - Keep the callback URL exactly as:
+     `https://kcdixfmjiifpnbtplodv.supabase.co/functions/v1/oauth-callback`
+   - Verify the app is configured for TikTok Login Kit / Open Platform, not only the Business advertiser flow shown in the screenshot.
+   - If the app is unreleased, account for TikTok’s unreleased-app approval requirement, since that can also surface as a misleading `client_key` error.
 
-Comparing the DashThis screenshot to what we currently pull, here's what's missing:
+Technical details:
 
-| Metric | Status | How to get it |
-|--------|--------|---------------|
-| Reach / Views | Already synced | `video.list` view_count |
-| Likes, Comments, Shares | Already synced | `video.list` |
-| Total Followers | Already synced | `user.info.stats` |
-| Engagement Rate | Already synced | Calculated |
-| **Completion Rate** | Missing | `video.insights` API — `avg_time_watched` / `duration` |
-| **Average Time Watched** | Missing | `video.insights` API — `average_time_watched` field |
-| **Profile Views** | Missing | `user.insights` API — requires `user.insights` scope (already requested) |
-| **Bio Link Clicks** | Missing | `user.insights` API — `bio_link_click` metric |
-| Videos Published | Already synced | Count of videos in period |
+- `supabase/functions/tiktok-ads-connect/index.ts`
+  - tighten credential handling for Login Kit auth
+  - improve failure messages for invalid TikTok setup
+- `supabase/functions/oauth-callback/index.ts`
+  - store TikTok account selection in a consistent shape
+  - set `account_id` / `account_name` on success
+- `src/components/clients/AccountPickerDialog.tsx`
+  - stop expecting `metadata.advertisers` for TikTok
+- `src/components/clients/ConnectionDialog.tsx`
+  - remove advertiser-specific TikTok naming
+- `src/pages/clients/ClientDetail.tsx`
+  - improve OAuth error return handling
 
-### Changes
+Important design note:
 
-#### 1. `supabase/functions/sync-tiktok-ads/index.ts` — Pull additional metrics
-
-**Add video insights** (after fetching video list):
-- For each video in the period, call `POST https://open.tiktokapis.com/v2/video/query/?fields=id,avg_time_watched,total_time_watched,impression_sources,audience_countries` with the video IDs
-- Calculate `completion_rate` per video as `avg_time_watched / duration * 100`
-- Calculate overall `average_time_watched` across all videos
-
-**Add user insights** (new API call):
-- Call `GET https://open.tiktokapis.com/v2/user/info/?fields=profile_view_count,bio_link_click_count` (if available via `user.insights` scope)
-- Store `profile_views` and `bio_link_clicks` in metrics_data
-
-**Updated metricsData shape:**
-```typescript
-{
-  // existing
-  total_followers, reach, video_views, likes, comments, shares,
-  engagement, engagement_rate, videos_published,
-  // new
-  completion_rate,        // avg across all videos
-  average_time_watched,   // in seconds, avg across all videos  
-  profile_views,          // from user insights
-  bio_link_clicks,        // from user insights
-}
-```
-
-**Updated top_content per video:**
-```typescript
-{
-  // existing: id, title, description, views, likes, comments, shares, cover_image_url, create_time
-  // new:
-  avg_time_watched,    // seconds
-  completion_rate,     // percentage
-  reach,               // alias for views (matching DashThis column name)
-}
-```
-
-#### 2. Update `TIKTOK_APP_ID` secret
-- Set to `7621075995757084688` to match the TikTok Developer Portal
-
-### User Action Required
-1. Go to TikTok Developer Portal → your app → **Login Kit** settings
-2. Add redirect URI: `https://kcdixfmjiifpnbtplodv.supabase.co/functions/v1/oauth-callback`
-3. Confirm the `TIKTOK_APP_ID` secret update
-
-### Files to modify
-1. `supabase/functions/sync-tiktok-ads/index.ts` — add video insights + user insights calls
-
+- If you want TikTok Ads reporting later, it should be implemented as a separate TikTok Ads connection instead of being mixed into this organic TikTok connection.
