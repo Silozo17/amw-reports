@@ -1,48 +1,36 @@
 
 
-## Plan: Add Missing Facebook Metrics + Full Post Content
+## Plan: Display All Facebook Metrics on Dashboard
 
-### What's Missing (from Meta Business Suite screenshots)
+### Problem
+The sync now pulls `link_clicks`, `page_views`, `video_views`, `organic_impressions`, `paid_impressions`, `follower_growth`, and `posts_published` — but:
+1. The `metric_defaults` table for facebook doesn't include `link_clicks` or `page_views` in `available_metrics` or `default_metrics`
+2. The top-level KPI cards don't show Link Clicks or Page Views
+3. The KPI sparkline data doesn't track these new metrics
 
-1. **Link clicks** (357 in screenshot) — not fetched at all
-2. **Page visits** (67 in screenshot) — not fetched at all  
-3. **Full post content with images** — currently stores only truncated message text, no images, no reach per post, no permalink
+Since there's no `client_platform_config` row for AMW Media's facebook, the PlatformMetricsCard currently shows all metrics unfiltered — so the per-platform card should already display them. But the metric_defaults should be updated for when metric configuration is used.
 
 ### Changes
 
-#### File: `supabase/functions/sync-facebook-page/index.ts`
-
-**Add page-level metrics:**
-- Fetch `page_views_total` (period=day) — this is the "Visits" metric, still valid in v25
-- Fetch `page_consumptions` (period=day) — this counts content clicks including link clicks
-
-**Enhance post fetching for full content:**
-- Add `permalink_url` to post fields
-- Add inline post insights: `insights.metric(post_impressions_unique,post_clicks){values}` to get per-post reach and clicks
-- Store `full_picture` (already fetched but not saved to top_content)
-- Store ALL posts for the month (increase limit to 100, paginate if needed), not just top 10
-- Each post in `top_content` gets: `message` (full, not truncated), `created_time`, `full_picture`, `permalink_url`, `likes`, `comments`, `shares`, `reach`, `clicks`, `total_engagement`
-
-**Update metricsData output:**
-- Add `link_clicks` (from page_consumptions or sum of post clicks)
-- Add `page_visits` (from page_views_total)
-
-**Post data structure in top_content:**
-```json
-{
-  "message": "Full post text...",
-  "created_time": "2026-03-23T18:06:00+0000",
-  "full_picture": "https://...",
-  "permalink_url": "https://facebook.com/...",
-  "likes": 0,
-  "comments": 0,
-  "shares": 0,
-  "reach": 9,
-  "clicks": 2,
-  "total_engagement": 0
-}
+#### 1. Database Migration — Update `metric_defaults` for Facebook
+Add `link_clicks`, `page_views`, and `video_views` to both `available_metrics` and `default_metrics`:
+```sql
+UPDATE metric_defaults 
+SET available_metrics = '{impressions,organic_impressions,paid_impressions,reach,engagement,page_views,link_clicks,follower_growth,follower_removes,total_followers,video_views,likes,comments,shares,reactions,posts_published,engagement_rate}',
+    default_metrics = '{total_followers,follower_growth,reach,impressions,engagement,likes,comments,shares,video_views,posts_published,engagement_rate,link_clicks,page_views}'
+WHERE platform = 'facebook';
 ```
 
+#### 2. `src/components/clients/ClientDashboard.tsx` — Add Link Clicks + Page Views to KPIs
+- Add `link_clicks` and `page_views` aggregation to the `kpis` useMemo (lines 524-597)
+- Add corresponding sparkline data entries in `sparklineMap` (lines 600-632)
+- Show Link Clicks KPI when value > 0 (with MousePointerClick icon)
+- Show Page Views KPI when value > 0 (with Eye icon)
+
+#### 3. `src/types/database.ts` — Verify labels exist
+Already has `link_clicks: 'Link Clicks'` and `page_views: 'Page Views'` — no change needed.
+
 ### Files to modify
-1. `supabase/functions/sync-facebook-page/index.ts` — add metrics + enhance post data
+1. Database migration (metric_defaults update)
+2. `src/components/clients/ClientDashboard.tsx` — KPI cards + sparklines
 
