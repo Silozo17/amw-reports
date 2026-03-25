@@ -1,35 +1,27 @@
 
 
-# Plan: Remove Emojis, Restructure AI Analysis, Add Rate Limit
+## Plan: Add Test User Account
 
-## Changes
+### What
+Create a test user account (test@test.com / T5sT!) in the authentication system, with a profile automatically created via the existing `handle_new_user` trigger.
 
-### 1. Remove emoji from Audience & Demographics (line 793)
-**File:** `src/components/clients/ClientDashboard.tsx`
-- Replace `👥 Audience & Demographics` with a Lucide `Users` icon + text (same pattern as other card titles)
+### How
+1. **Enable auto-confirm for email signups** temporarily using the auth configuration tool, so the test user can sign in immediately without email verification
+2. **Create the user** by calling the signup endpoint or using a database insert via an edge function
+3. **Disable auto-confirm** after the user is created (to restore the requirement for real users)
 
-### 2. Move AI Analysis: button at top, dialog for output, saved card
-**File:** `src/components/clients/ClientDashboard.tsx`
+Alternatively (simpler approach):
+1. Use the signup form on the app itself — but this requires email confirmation unless we temporarily enable auto-confirm
 
-- Remove the current AI Analysis `<Card>` block (lines 765-788)
-- Add a "Generate AI Analysis" `<Button>` with `<Sparkles>` icon next to the DashboardHeader (top of the page, after the last-synced line)
-- Import `Dialog` components from shadcn
-- On click: call `handleAnalyse`, show result in a `<Dialog>` (scrollable, prose-formatted)
-- Store `aiAnalysis` + `aiAnalysisDate` in state
-- Below the button area, if `aiAnalysis` exists, render a compact saved-analysis `<Card>` showing the analysis text with a timestamp and a "View Full Analysis" button that reopens the dialog
-- Add `analysisDialogOpen` boolean state
+### Recommended Approach
+- Temporarily enable auto-confirm email signups
+- Sign up the test user via the app's auth API
+- Disable auto-confirm afterward
 
-### 3. Rate limit AI analysis (client-side + edge function)
-**File:** `src/components/clients/ClientDashboard.tsx`
-- Track `lastAnalysisTime` in state; disable the button for 60 seconds after each call
-- Show countdown on disabled button: "Wait Xs"
+The `handle_new_user` trigger will automatically create a profile row. Since there's already an owner role assigned (info@amwmedia.co.uk), this test user will get no role by default.
 
-**File:** `supabase/functions/analyze-client/index.ts`
-- Add a simple per-client rate limit: query `monthly_snapshots` or use a timestamp check — actually simpler: check a `last_analysis_at` field. Instead, use in-memory Deno `Map` keyed by `client_id` with a 60-second cooldown. Return 429 if called too soon.
-
-## Technical Details
-- Dialog uses existing shadcn `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`
-- The saved analysis card is a small collapsible card below the header area
-- Rate limit: 60-second cooldown per client, enforced both client-side (button disabled) and server-side (edge function returns 429)
-- No database changes needed
+### Technical Details
+- Tool: `configure_auth` to toggle email auto-confirm
+- The user will exist in `auth.users`, with a corresponding `profiles` row
+- No role will be assigned (the trigger only assigns `owner` to the first-ever user)
 
