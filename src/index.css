@@ -111,3 +111,28 @@
     @apply font-display;
   }
 }
+
+@keyframes star-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+@layer utilities {
+  .animate-star-spin {
+    animation: star-spin 12s linear infinite;
+  }
+  .animate-pulse-glow {
+    animation: pulse-glow 6s ease-in-out infinite;
+  }
+  .text-gradient-purple {
+    background: linear-gradient(135deg, hsl(295 61% 47%), hsl(210 53% 59%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
