@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { BarChart3, TrendingUp, Activity, PieChart, Hash, Table2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, PieChart, Hash, TableIcon } from 'lucide-react';
 import type { WidgetType } from '@/types/widget';
 
 const CHART_TYPE_ICONS: Record<WidgetType, React.ElementType> = {
@@ -16,7 +16,7 @@ const CHART_TYPE_ICONS: Record<WidgetType, React.ElementType> = {
   pie: PieChart,
   donut: PieChart,
   radar: Activity,
-  table: Table2,
+  table: TableIcon,
 };
 
 const CHART_TYPE_LABELS: Record<WidgetType, string> = {
