@@ -7,6 +7,7 @@ import {
   Settings,
   LogOut,
   Plug,
+  Bug,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/hooks/useOrg';
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { to: '/connections', label: 'Connections', icon: Plug },
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings, ownerOnly: true },
+  { to: '/debug', label: 'Debug', icon: Bug, ownerOnly: true },
 ];
 
 interface AppSidebarProps {
