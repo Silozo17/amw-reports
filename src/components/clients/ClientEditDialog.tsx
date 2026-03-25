@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { formatPhone } from '@/lib/utils';
 import type { Client } from '@/types/database';
 import { CURRENCY_OPTIONS } from '@/types/database';
+import { TIMEZONE_OPTIONS } from '@/types/metrics';
 
 interface ClientEditDialogProps {
   client: Client;
@@ -212,6 +213,17 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
                 <SelectContent>
                   {CURRENCY_OPTIONS.map(c => (
                     <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-sm">Timezone</Label>
+              <Select value={form.preferred_timezone} onValueChange={v => handleChange('preferred_timezone', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TIMEZONE_OPTIONS.map(tz => (
+                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

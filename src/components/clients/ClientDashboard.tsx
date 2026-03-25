@@ -37,6 +37,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import PlatformMetricsCard from "./PlatformMetricsCard";
+import SectionHeader from "./SectionHeader";
 import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from "./DashboardHeader";
 import AudienceMap from "./AudienceMap";
 import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
@@ -1098,6 +1099,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             <Users className="h-4 w-4" />
             Audience & Demographics
           </CardTitle>
+          <p className="text-xs text-muted-foreground">Understanding who your audience is — age, location, and interests</p>
         </CardHeader>
         <CardContent className="py-8 text-center space-y-2">
           <Users className="h-10 w-10 mx-auto text-muted-foreground/30" />
