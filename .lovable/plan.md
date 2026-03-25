@@ -1,197 +1,82 @@
 
 
-## Full Analysis: All 10 Integrations vs DashThis
+## Plan: Clear AMW Media Data + Add Debug Console + Fix RLS Recursion
 
-### What DashThis Shows Per Platform (from screenshots)
+### 1. Clear all connection data for AMW Media
 
-```text
-FACEBOOK INSIGHTS (organic page)
-├── Page Likes (total)
-├── New Page Likes (period)
-├── Page Impressions
-├── Engagement (total interactions)
-├── Page Engagement Rate (%)
-├── Top Posts by Impressions (image, text, impressions, engaged)
-└── Page Views (monthly bar chart)
+Delete from these tables where `client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'`:
+- `platform_connections`
+- `monthly_snapshots`
+- `sync_logs`
+- `client_platform_config`
 
-INSTAGRAM (organic)
-├── Total Followers
-├── Profile Views
-├── Website Clicks
-├── Engagement by Post (name, likes, comments)
-└── Performance by Post (engagement, impressions, reach, engagement rate)
+This will be done via the database insert tool (which supports DELETE operations).
 
-LINKEDIN (organic pages only — NO ads)
-├── Total Followers
-├── Social Interactions (likes+comments+shares)
-├── Impressions
-├── Clicks
-└── Engagement Rate (%)
+### 2. Add a Debug Console page
 
-YOUTUBE (organic)
-├── Subscribers
-├── Video Views (total + pie chart breakdown by video)
-└── Top Videos table (title, views)
+Create a new `/debug` page accessible from the sidebar that shows:
+- **Connection inspector**: For any client, show all `platform_connections` rows with full metadata, tokens (masked), account IDs
+- **Sync trigger + log viewer**: Trigger a sync for any connection and see the raw response, plus view `sync_logs` for that client/platform
+- **Snapshot viewer**: Show raw `metrics_data`, `top_content`, and `raw_data` from `monthly_snapshots` for any client/platform/month
+- **Live sync test**: Button to invoke any sync edge function and display the full JSON response inline
 
-TIKTOK (organic — NOT ads)
-├── Reach
-├── Likes
-├── Comments
-├── Engagement
-├── Engagement Rate (%)
-├── Completion Rate (%)
-├── Average Time Watched
-├── Website Clicks
-├── Total Followers
-├── Profile Views
-├── Bio Link Clicks
-└── Video Views Breakdown (thumbnail, views, likes, reach, profile views)
+This gives full visibility into: what data is pulled (sync response), how it's stored (snapshot JSON), and what the dashboard reads.
 
-GSC
-├── Clicks
-├── Impressions
-├── Avg CTR (%)
-├── Avg Position
-└── Top Queries table (query, clicks, impressions, ctr, position)
+**Files:**
+- `src/pages/DebugConsole.tsx` — new page with tabs: Connections, Sync Logs, Snapshots, Live Test
+- `src/App.tsx` — add `/debug` route
+- `src/components/layout/AppSidebar.tsx` — add Debug link in sidebar
 
-GOOGLE MY BUSINESS
-├── Total Views (monthly chart)
-├── Website Clicks
-├── Phone Calls
-├── Views on Maps
-└── Directions Requests
+### 3. Fix org_members RLS infinite recursion
 
-META ADS (paid only)
-├── Amount Spent
-├── CPC
-├── Link Clicks
-└── Impressions
+The "Owners can manage org members" policy has a subquery that references `org_members` inside itself, causing infinite recursion. Fix with a migration:
 
-GOOGLE ADS (paid only)
-└── (not shown in screenshots but same pattern: spend, clicks, impressions, conversions)
+```sql
+DROP POLICY "Owners can manage org members" ON public.org_members;
+
+CREATE POLICY "Owners can manage org members"
+ON public.org_members FOR ALL TO authenticated
+USING (
+  org_id = public.user_org_id(auth.uid())
+  AND public.user_org_id(auth.uid()) IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM public.org_members om
+    WHERE om.user_id = auth.uid()
+      AND om.role = 'owner'
+  )
+);
 ```
 
-### Current Status of Each Integration
+Wait — this still references org_members. The fix is to use a SECURITY DEFINER function instead:
 
-```text
-Platform        Connect  Callback  Sync     Secrets   Status
-──────────────  ───────  ────────  ───────  ────────  ─────────────────────
-Facebook        OK       OK        OK       OK        WORKING (organic)
-Instagram       OK       OK        OK       OK        WORKING (organic)
-Meta Ads        OK       OK        OK       OK        WORKING (paid)
-Google Ads      OK       OK        OK       OK        WORKING (paid)
-GA4             OK       OK        OK       OK        WORKING
-GSC             OK       OK        OK       OK        WORKING
-GBP             OK       OK        OK       OK        WORKING
-YouTube         OK       OK        OK       OK        WORKING
-LinkedIn        OK       OK        WRONG    MISSING   BROKEN (2 issues)
-TikTok          OK       WRONG     WRONG    OK        BROKEN (2 issues)
+```sql
+CREATE OR REPLACE FUNCTION public.is_org_owner(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.org_members
+    WHERE user_id = _user_id AND role = 'owner'
+  )
+$$;
 ```
 
-### Issues Found
+Then rewrite the policy to use `public.is_org_owner(auth.uid())` — this bypasses RLS on the function call, breaking the recursion.
 
-**1. TikTok — 2 critical mismatches**
+### Technical Details
 
-The connect function correctly uses Login Kit v2 (`tiktok.com/v2/auth/authorize/` with organic scopes). But:
+**Debug Console features:**
+- Client selector dropdown
+- Platform filter
+- Month/year selector for snapshots
+- Raw JSON viewer with syntax highlighting (using `<pre>` + JSON.stringify)
+- "Sync Now" button that calls `supabase.functions.invoke('sync-{platform}')` and displays response
+- Copy-to-clipboard for JSON data
 
-- **OAuth callback** (handleTikTok): Exchanges code via Marketing API (`business-api.tiktok.com/open_api/v1.3/oauth2/access_token/`). Login Kit v2 tokens MUST be exchanged at `https://open.tiktokapis.com/v2/oauth/token/` using `client_key`/`client_secret` with `grant_type=authorization_code`. The response format is also different: `{ access_token, open_id, scope, expires_in }` not `{ code: 0, data: { access_token, advertiser_ids } }`.
-
-- **Sync function** (`sync-tiktok-ads`): Pulls paid ad campaign data (spend, impressions, clicks, campaigns) via Marketing API. This is completely wrong for organic TikTok. Should use TikTok Content API v2:
-  - `GET https://open.tiktokapis.com/v2/user/info/` for follower count, profile views, bio link clicks
-  - `GET https://open.tiktokapis.com/v2/video/list/` for video-level data (views, likes, comments, shares, reach, avg watch time)
-  - Uses `Authorization: Bearer {token}` header (not `Access-Token`)
-
-**2. LinkedIn — 2 issues**
-
-- **Missing secrets**: `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET` are not configured. LinkedIn will fail at token exchange.
-
-- **Sync function pulls ad data**: The current `sync-linkedin` fetches ad account analytics (spend, impressions, clicks, conversions) AND organic page stats. Per the user's requirement, LinkedIn should be **pages only** — no ads. The sync should only pull: followers, social interactions, organic impressions, organic clicks, engagement rate. The connect scopes also include `r_ads` and `r_ads_reporting` which aren't needed.
-
-**3. TikTok — ORGANIC_PLATFORMS not updated**
-
-`database.ts` has `ORGANIC_PLATFORMS` set but `tiktok` is NOT in it. Since TikTok is organic-only, it needs to be added so ad metrics (spend, cpc, cpm) are hidden from the dashboard.
-
----
-
-### Changes Required
-
-#### Fix 1: TikTok OAuth Callback — Rewrite for Login Kit v2
-**File:** `supabase/functions/oauth-callback/index.ts` (handleTikTok)
-- Change token exchange URL to `https://open.tiktokapis.com/v2/oauth/token/`
-- Use POST with `client_key`, `client_secret`, `code`, `grant_type=authorization_code`, `redirect_uri`
-- Parse response as `{ access_token, open_id, scope, expires_in, token_type }`
-- Store `open_id` in metadata (user identifier for Content API)
-- Remove advertiser discovery entirely
-
-#### Fix 2: TikTok Sync — Complete rewrite for organic content
-**File:** `supabase/functions/sync-tiktok-ads/index.ts`
-- Remove all Marketing API calls
-- Use TikTok Content API v2 with `Authorization: Bearer {token}`:
-  - `GET /v2/user/info/?fields=follower_count,following_count,likes_count,video_count` for account stats
-  - `GET /v2/video/list/?fields=id,title,video_description,duration,cover_image_url,view_count,like_count,comment_count,share_count,create_time` for video data
-- Aggregate metrics: reach (sum of views), likes, comments, shares, engagement, total followers
-- Calculate engagement rate, completion rate (not available via API — omit for now), avg watch time (not directly available via v2 list endpoint — omit for now)
-- Store video breakdown in `top_content`
-- Remove `advertiser_id` requirement — use `open_id` from metadata
-- Platform name stays `tiktok` in snapshots
-
-#### Fix 3: TikTok Connect — Update scopes
-**File:** `supabase/functions/tiktok-ads-connect/index.ts`
-- Add missing scopes from DashThis: `user.info.username,user.info.stats,user.info.profile,user.account.type,comment.list`
-- Full scope string: `user.info.basic,user.info.username,user.info.stats,user.info.profile,user.account.type,user.insights,video.list,video.insights,comment.list`
-
-#### Fix 4: LinkedIn Sync — Remove ad data, pages only
-**File:** `supabase/functions/sync-linkedin/index.ts`
-- Remove all ad account analytics code (lines 80-107)
-- Remove ad-related metrics from output (spend, clicks, conversions, ctr, cpc, cpm, cost_per_conversion, campaign_count)
-- Keep: follower stats, organic post engagement (likes, comments, shares, impressions, clicks)
-- Output metrics: `total_followers`, `engagement` (likes+comments+shares), `impressions` (organic), `clicks` (organic), `engagement_rate`, `likes`, `comments`, `shares`
-
-#### Fix 5: LinkedIn Connect — Remove ad scopes
-**File:** `supabase/functions/linkedin-connect/index.ts`
-- Change scope from `r_ads r_ads_reporting r_organization_social r_organization_admin` to `r_organization_social rw_organization_admin r_basicprofile`
-- Match DashThis scopes (from URL analysis): `r_basicprofile,rw_organization_admin,r_organization_social`
-
-#### Fix 6: LinkedIn Callback — Remove ad account discovery
-**File:** `supabase/functions/oauth-callback/index.ts` (handleLinkedIn)
-- Remove ad account discovery (lines 502-526)
-- Keep organization discovery
-- Store only `organizations` in metadata (no `ad_accounts`)
-
-#### Fix 7: Add tiktok to ORGANIC_PLATFORMS
-**File:** `src/types/database.ts`
-- Add `'tiktok'` to the `ORGANIC_PLATFORMS` set
-
-#### Fix 8: Request LinkedIn secrets
-- Use `add_secret` to request `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET`
-
-### Files to modify:
-1. `supabase/functions/oauth-callback/index.ts` — Rewrite handleTikTok, simplify handleLinkedIn
-2. `supabase/functions/sync-tiktok-ads/index.ts` — Complete rewrite for organic Content API
-3. `supabase/functions/tiktok-ads-connect/index.ts` — Update scopes
-4. `supabase/functions/sync-linkedin/index.ts` — Remove ad analytics, pages only
-5. `supabase/functions/linkedin-connect/index.ts` — Remove ad scopes
-6. `src/types/database.ts` — Add tiktok to ORGANIC_PLATFORMS
-
-### What is already correct (no changes needed):
-- Facebook connect/callback/sync — organic pages, working
-- Instagram connect/callback/sync — organic, working
-- Meta Ads connect/callback/sync — paid ads only, working
-- Google Ads connect/callback/sync — paid ads, working
-- GA4 connect/callback/sync — working
-- GSC connect/callback/sync — working
-- GBP connect/callback/sync — working
-- YouTube connect/callback/sync — working
-- ConnectionDialog.tsx — all platforms already listed
-- AccountPickerDialog.tsx — already handles all platforms
-
-### Secrets status:
-- `GOOGLE_CLIENT_ID` — present
-- `GOOGLE_CLIENT_SECRET` — present
-- `GOOGLE_ADS_DEVELOPER_TOKEN` — present
-- `META_APP_SECRET` — present
-- `TIKTOK_APP_ID` — present
-- `TIKTOK_APP_SECRET` — present
-- `LINKEDIN_CLIENT_ID` — **MISSING** (must request)
-- `LINKEDIN_CLIENT_SECRET` — **MISSING** (must request)
+**Migration for RLS fix:**
+1. Create `is_org_owner` SECURITY DEFINER function
+2. Drop the recursive "Owners can manage org members" policy
+3. Recreate it using `is_org_owner(auth.uid())`
+4. Also fix the `organisations` UPDATE policy which has the same recursion pattern
 
