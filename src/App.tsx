@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import Login from "./pages/Login";
+import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import ClientList from "./pages/clients/ClientList";
 import ClientForm from "./pages/clients/ClientForm";
@@ -32,7 +32,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -42,15 +42,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 }
 
 const AppRoutes = () => (
   <Routes>
-    <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-    <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+    <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+    <Route path="/login" element={<Navigate to="/" replace />} />
+    <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/clients" element={<ProtectedRoute><ClientList /></ProtectedRoute>} />
     <Route path="/clients/new" element={<ProtectedRoute><ClientForm /></ProtectedRoute>} />
     <Route path="/clients/:id" element={<ProtectedRoute><ClientDetail /></ProtectedRoute>} />

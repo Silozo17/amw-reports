@@ -572,11 +572,11 @@ Deno.serve(async (req) => {
     if (existingReport) {
       await supabase.from("reports").update(reportData).eq("id", existingReport.id);
     } else {
-      await supabase.from("reports").insert({ client_id, report_month, report_year, ...reportData });
+      await supabase.from("reports").insert({ client_id, report_month, report_year, org_id: client.org_id, ...reportData });
     }
 
     await supabase.from("report_logs").insert({
-      client_id, report_id: existingReport?.id ?? null, status: "success",
+      client_id, report_id: existingReport?.id ?? null, status: "success", org_id: client.org_id,
     });
 
     return new Response(JSON.stringify({

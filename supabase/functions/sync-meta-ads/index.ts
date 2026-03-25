@@ -62,6 +62,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get org_id from client
+    const { data: clientData } = await supabase.from("clients").select("org_id").eq("id", clientId).single();
+    const orgId = clientData?.org_id;
+
     // Create sync log
     const { data: syncLog } = await supabase
       .from("sync_logs")
@@ -71,6 +75,7 @@ Deno.serve(async (req) => {
         status: "running",
         report_month: month,
         report_year: year,
+        org_id: orgId,
       })
       .select("id")
       .single();

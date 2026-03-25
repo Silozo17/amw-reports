@@ -91,10 +91,14 @@ Deno.serve(async (req) => {
       throw new Error("No Facebook Pages discovered. Reconnect Meta Ads to grant page permissions.");
     }
 
+    // Get org_id from client
+    const { data: clientData } = await supabaseClient.from("clients").select("org_id").eq("id", clientId).single();
+    const orgId = clientData?.org_id;
+
     // Create sync log
     const { data: syncLog } = await supabaseClient
       .from("sync_logs")
-      .insert({ client_id: clientId, platform: "facebook", status: "running", report_month: month, report_year: year })
+      .insert({ client_id: clientId, platform: "facebook", status: "running", report_month: month, report_year: year, org_id: orgId })
       .select("id")
       .single();
 

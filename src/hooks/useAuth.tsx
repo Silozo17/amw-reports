@@ -39,12 +39,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .single();
             setProfile(profileData as Profile | null);
 
-            const { data: roleData } = await supabase
-              .from('user_roles')
+            // Get role from org_members
+            const { data: memberData } = await supabase
+              .from('org_members')
               .select('role')
               .eq('user_id', session.user.id)
+              .limit(1)
               .single();
-            setRole((roleData?.role as AppRole) ?? null);
+            setRole((memberData?.role as AppRole) ?? null);
           }, 0);
         } else {
           setProfile(null);

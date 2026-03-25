@@ -16,10 +16,12 @@ import { toast } from 'sonner';
 import { formatPhone } from '@/lib/utils';
 import { CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
+import { useOrg } from '@/hooks/useOrg';
 
 const ClientForm = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { orgId } = useOrg();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -127,6 +129,7 @@ const ClientForm = () => {
       phone: formatPhone(form.phone),
       logo_url: logoUrl,
       created_by: user?.id,
+      org_id: orgId!,
     });
 
     if (error) {

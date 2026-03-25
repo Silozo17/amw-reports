@@ -107,6 +107,7 @@ export type Database = {
           is_active: boolean
           logo_url: string | null
           notes: string | null
+          org_id: string
           phone: string | null
           position: string | null
           preferred_currency: string | null
@@ -134,6 +135,7 @@ export type Database = {
           is_active?: boolean
           logo_url?: string | null
           notes?: string | null
+          org_id: string
           phone?: string | null
           position?: string | null
           preferred_currency?: string | null
@@ -161,6 +163,7 @@ export type Database = {
           is_active?: boolean
           logo_url?: string | null
           notes?: string | null
+          org_id?: string
           phone?: string | null
           position?: string | null
           preferred_currency?: string | null
@@ -172,7 +175,15 @@ export type Database = {
           updated_at?: string
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_logs: {
         Row: {
@@ -180,6 +191,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          org_id: string
           recipient_email: string
           report_id: string | null
           sent_at: string | null
@@ -190,6 +202,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          org_id: string
           recipient_email: string
           report_id?: string | null
           sent_at?: string | null
@@ -200,6 +213,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          org_id?: string
           recipient_email?: string
           report_id?: string | null
           sent_at?: string | null
@@ -211,6 +225,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
           {
@@ -296,6 +317,80 @@ export type Database = {
           },
         ]
       }
+      org_members: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          invited_at: string | null
+          invited_email: string | null
+          org_id: string
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_email?: string | null
+          org_id: string
+          role?: string
+          user_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_email?: string | null
+          org_id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organisations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          primary_color: string | null
+          slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          primary_color?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          primary_color?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       platform_connections: {
         Row: {
           access_token: string | null
@@ -365,6 +460,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          org_id: string | null
           updated_at: string
           user_id: string
         }
@@ -374,6 +470,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          org_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -383,10 +480,19 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          org_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_logs: {
         Row: {
@@ -394,6 +500,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          org_id: string
           report_id: string | null
           status: Database["public"]["Enums"]["job_status"]
           triggered_by: string | null
@@ -403,6 +510,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          org_id: string
           report_id?: string | null
           status: Database["public"]["Enums"]["job_status"]
           triggered_by?: string | null
@@ -412,6 +520,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          org_id?: string
           report_id?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           triggered_by?: string | null
@@ -422,6 +531,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
           {
@@ -442,6 +558,7 @@ export type Database = {
           created_at: string
           generated_at: string | null
           id: string
+          org_id: string
           pdf_storage_path: string | null
           report_month: number
           report_year: number
@@ -456,6 +573,7 @@ export type Database = {
           created_at?: string
           generated_at?: string | null
           id?: string
+          org_id: string
           pdf_storage_path?: string | null
           report_month: number
           report_year: number
@@ -470,6 +588,7 @@ export type Database = {
           created_at?: string
           generated_at?: string | null
           id?: string
+          org_id?: string
           pdf_storage_path?: string | null
           report_month?: number
           report_year?: number
@@ -484,6 +603,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       sync_logs: {
@@ -492,6 +618,7 @@ export type Database = {
           completed_at: string | null
           error_message: string | null
           id: string
+          org_id: string
           platform: Database["public"]["Enums"]["platform_type"]
           report_month: number
           report_year: number
@@ -504,6 +631,7 @@ export type Database = {
           completed_at?: string | null
           error_message?: string | null
           id?: string
+          org_id: string
           platform: Database["public"]["Enums"]["platform_type"]
           report_month: number
           report_year: number
@@ -516,6 +644,7 @@ export type Database = {
           completed_at?: string | null
           error_message?: string | null
           id?: string
+          org_id?: string
           platform?: Database["public"]["Enums"]["platform_type"]
           report_month?: number
           report_year?: number
@@ -529,6 +658,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -563,6 +699,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_org_id: { Args: { _user_id: string }; Returns: string }
     }
     Enums: {
       app_role: "owner" | "manager"

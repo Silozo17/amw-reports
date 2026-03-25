@@ -9,10 +9,11 @@ import {
   Plug,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrg } from '@/hooks/useOrg';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clients', label: 'Clients', icon: Users },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/connections', label: 'Connections', icon: Plug },
@@ -26,25 +27,36 @@ interface AppSidebarProps {
 
 const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const { signOut, profile, role, isOwner } = useAuth();
+  const { org } = useOrg();
   const location = useLocation();
 
   const handleNavClick = () => {
     onNavigate?.();
   };
 
+  const orgName = org?.name ?? 'AMW';
+  const orgInitial = orgName.charAt(0).toUpperCase();
+
   return (
     <aside className="flex h-full w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-sidebar-border">
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
+        {org?.logo_url ? (
+          <img src={org.logo_url} alt={orgName} className="h-9 w-9 rounded object-contain" />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded bg-primary text-primary-foreground font-display text-lg">
+            {orgInitial}
+          </div>
+        )}
         <div>
-          <h1 className="text-2xl font-display tracking-wide text-primary">AMW</h1>
-          <p className="text-[10px] tracking-[0.3em] text-sidebar-foreground/60 uppercase font-body">Media · Reports</p>
+          <h1 className="text-xl font-display tracking-wide text-primary">{orgName}</h1>
+          <p className="text-[10px] tracking-[0.3em] text-sidebar-foreground/60 uppercase font-body">Reports</p>
         </div>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV_ITEMS.filter(item => !item.ownerOnly || isOwner).map((item) => {
-          const isActive = item.to === '/'
-            ? location.pathname === '/'
+          const isActive = item.to === '/dashboard'
+            ? location.pathname === '/dashboard'
             : location.pathname.startsWith(item.to);
 
           return (
