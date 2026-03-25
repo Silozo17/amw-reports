@@ -82,13 +82,10 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
   };
 
   const triggerOAuth = async (conn: PlatformConnection) => {
-    setConnectingId(conn.id);
-
     try {
       const functionName = CONNECT_FUNCTION_MAP[conn.platform];
       if (!functionName) {
         toast.info(`OAuth for ${PLATFORM_LABELS[conn.platform]} is not yet available.`);
-        setConnectingId(null);
         return;
       }
 
@@ -106,7 +103,6 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
     } catch (e) {
       console.error('OAuth error:', e);
       toast.error('Failed to start OAuth flow');
-      setConnectingId(null);
     }
   };
 
