@@ -19,15 +19,18 @@ interface ConnectionDialogProps {
   onOpenPicker: (conn: PlatformConnection) => void;
 }
 
-const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'tiktok', 'linkedin'];
+const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile'];
 
-const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'tiktok', 'linkedin'];
+const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile'];
 
 const CONNECT_FUNCTION_MAP: Record<string, string> = {
   google_ads: 'google-ads-connect',
   meta_ads: 'meta-ads-connect',
   tiktok: 'tiktok-ads-connect',
   linkedin: 'linkedin-connect',
+  google_search_console: 'google-search-console-connect',
+  google_analytics: 'google-analytics-connect',
+  google_business_profile: 'google-business-connect',
 };
 
 const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: ConnectionDialogProps) => {
