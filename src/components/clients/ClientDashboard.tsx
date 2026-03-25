@@ -493,8 +493,24 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`dashboard-widgets-${clientId}`);
-      if (saved) setSavedWidgetState(JSON.parse(saved));
-    } catch { /* ignore */ }
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved) as Record<string, { visible?: boolean; type?: WidgetType; position?: { x?: number; y?: number; w?: number; h?: number } }>;
+      const sanitized = Object.fromEntries(
+        Object.entries(parsed || {}).map(([widgetId, config]) => [
+          widgetId,
+          {
+            ...(typeof config?.visible === 'boolean' ? { visible: config.visible } : {}),
+            ...(typeof config?.type === 'string' ? { type: config.type as WidgetType } : {}),
+            ...(config?.position ? { position: config.position } : {}),
+          },
+        ]),
+      ) as Record<string, { visible: boolean; type: WidgetType; position: { x: number; y: number; w: number; h: number } }>;
+
+      setSavedWidgetState(sanitized);
+    } catch {
+      setSavedWidgetState({});
+    }
   }, [clientId]);
 
   useEffect(() => { setHasAutoDetected(false); }, [clientId]);
@@ -773,10 +789,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   // Merge saved state with defaults
   const widgets = useMemo(() => {
-    return defaultWidgets.map(w => {
+    return defaultWidgets.map((w) => {
       const saved = savedWidgetState[w.id];
-      if (saved) return { ...w, visible: saved.visible, type: saved.type, position: { ...w.position, ...saved.position } };
-      return w;
+      if (!saved) return w;
+
+      const safeType = saved.type && w.compatibleTypes.includes(saved.type) ? saved.type : w.type;
+      return {
+        ...w,
+        visible: typeof saved.visible === 'boolean' ? saved.visible : w.visible,
+        type: safeType,
+        position: saved.position ? { ...w.position, ...saved.position } : w.position,
+      };
     });
   }, [defaultWidgets, savedWidgetState]);
 

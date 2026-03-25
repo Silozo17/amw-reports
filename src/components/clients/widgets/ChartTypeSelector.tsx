@@ -5,10 +5,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { BarChart3, TrendingUp, Activity, PieChart, Hash, TableIcon } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, PieChart, Hash, Table2 } from 'lucide-react';
 import type { WidgetType } from '@/types/widget';
 
-const CHART_TYPE_ICONS: Record<WidgetType, React.ElementType> = {
+const CHART_TYPE_ICONS: Partial<Record<WidgetType, React.ElementType>> = {
   number: Hash,
   line: TrendingUp,
   area: Activity,
@@ -16,7 +16,7 @@ const CHART_TYPE_ICONS: Record<WidgetType, React.ElementType> = {
   pie: PieChart,
   donut: PieChart,
   radar: Activity,
-  table: TableIcon,
+  table: Table2,
 };
 
 const CHART_TYPE_LABELS: Record<WidgetType, string> = {
@@ -36,10 +36,14 @@ interface ChartTypeSelectorProps {
   onChange: (type: WidgetType) => void;
 }
 
-const ChartTypeSelector = ({ currentType, compatibleTypes, onChange }: ChartTypeSelectorProps) => {
-  const CurrentIcon = CHART_TYPE_ICONS[currentType];
+const FALLBACK_TYPE: WidgetType = 'bar';
 
-  if (compatibleTypes.length <= 1) return null;
+const ChartTypeSelector = ({ currentType, compatibleTypes, onChange }: ChartTypeSelectorProps) => {
+  const safeTypes = compatibleTypes.filter((type) => CHART_TYPE_ICONS[type]);
+  const activeType = safeTypes.includes(currentType) ? currentType : safeTypes[0] ?? FALLBACK_TYPE;
+  const CurrentIcon = CHART_TYPE_ICONS[activeType] ?? BarChart3;
+
+  if (safeTypes.length <= 1) return null;
 
   return (
     <DropdownMenu>
@@ -49,15 +53,15 @@ const ChartTypeSelector = ({ currentType, compatibleTypes, onChange }: ChartType
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[140px]">
-        {compatibleTypes.map((type) => {
-          const Icon = CHART_TYPE_ICONS[type];
+        {safeTypes.map((type) => {
+          const Icon = CHART_TYPE_ICONS[type] ?? BarChart3;
           return (
             <DropdownMenuItem
               key={type}
               onClick={() => onChange(type)}
-              className={currentType === type ? 'bg-accent/20 font-medium' : ''}
+              className={activeType === type ? 'bg-accent/20 font-medium' : ''}
             >
-              <Icon className="h-4 w-4 mr-2" />
+              <Icon className="mr-2 h-4 w-4" />
               {CHART_TYPE_LABELS[type]}
             </DropdownMenuItem>
           );
