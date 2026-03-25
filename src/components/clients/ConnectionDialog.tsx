@@ -16,7 +16,6 @@ interface ConnectionDialogProps {
   clientId: string;
   connections: PlatformConnection[];
   onUpdate: () => void;
-  onOpenPicker: (conn: PlatformConnection) => void;
 }
 
 const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube'];
