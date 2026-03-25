@@ -8,9 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3, CalendarIcon, History } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3, CalendarIcon, History, Trash2 } from 'lucide-react';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
-import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
+import { PLATFORM_LABELS, PLATFORM_LOGOS, CURRENCY_OPTIONS } from '@/types/database';
+import { TIMEZONE_OPTIONS } from '@/types/metrics';
 import { formatPhone } from '@/lib/utils';
 import RecipientDialog from '@/components/clients/RecipientDialog';
 import ConnectionDialog from '@/components/clients/ConnectionDialog';
@@ -19,6 +22,7 @@ import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
 import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
+import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
@@ -29,6 +33,7 @@ const ClientDetail = () => {
   const [recipients, setRecipients] = useState<ClientRecipient[]>([]);
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Account picker state
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
@@ -45,9 +50,7 @@ const ClientDetail = () => {
     }
 
     if (pendingConnectionId) {
-      // Clear the param immediately
       setSearchParams({}, { replace: true });
-      // Fetch the connection and open the picker
       supabase
         .from('platform_connections')
         .select('*')
@@ -168,10 +171,11 @@ const ClientDetail = () => {
       return;
     }
 
-    // Sync last 12 months
     const now = new Date();
-    let m = now.getMonth() === 0 ? 12 : now.getMonth();
-    let y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    let m = currentMonth;
+    let y = currentYear;
     let totalSynced = 0;
     const allErrors: string[] = [];
     const MONTH_NAMES_SHORT = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -207,6 +211,106 @@ const ClientDetail = () => {
   const handleOpenPicker = (conn: PlatformConnection) => {
     setPickerConnection(conn);
     setPickerOpen(true);
+  };
+
+  const handleDeleteClient = async () => {
+    if (!client) return;
+    setIsDeleting(true);
+    const { error } = await supabase.from('clients').delete().eq('id', client.id);
+    if (error) {
+      toast.error('Failed to delete client');
+      setIsDeleting(false);
+    } else {
+      toast.success('Client deleted');
+      navigate('/clients');
+    }
+  };
+
+  // Auto-sync historical data after picker completes
+  const handlePickerComplete = async () => {
+    await fetchData();
+
+    // Get updated connections to check for newly connected platforms
+    const { data: updatedConns } = await supabase
+      .from('platform_connections')
+      .select('*')
+      .eq('client_id', id!)
+      .eq('is_connected', true)
+      .not('account_id', 'is', null);
+
+    if (!updatedConns || updatedConns.length === 0) return;
+
+    // Check if any connected platform has no snapshots (newly connected)
+    const { data: existingSnapshots } = await supabase
+      .from('monthly_snapshots')
+      .select('platform')
+      .eq('client_id', id!)
+      .limit(100);
+
+    const platformsWithData = new Set((existingSnapshots ?? []).map(s => s.platform));
+    const newPlatforms = (updatedConns as PlatformConnection[]).filter(c => !platformsWithData.has(c.platform));
+
+    if (newPlatforms.length === 0) return;
+
+    // Auto-sync historical data for new platforms
+    toast.info('Syncing historical data for newly connected platform...');
+    
+    const syncMap: Record<string, string> = {
+      google_ads: 'sync-google-ads',
+      meta_ads: 'sync-meta-ads',
+      facebook: 'sync-facebook-page',
+      instagram: 'sync-instagram',
+      tiktok: 'sync-tiktok-ads',
+      linkedin: 'sync-linkedin',
+    };
+
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    let m = currentMonth;
+    let y = currentYear;
+    const MONTH_NAMES_SHORT = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    for (let i = 0; i < 12; i++) {
+      toast.info(`Syncing historical data... ${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/12)`);
+      for (const conn of newPlatforms) {
+        const fn = syncMap[conn.platform];
+        if (!fn) continue;
+        try {
+          await supabase.functions.invoke(fn, {
+            body: { connection_id: conn.id, month: m, year: y },
+          });
+        } catch (e) {
+          console.error(`Auto-sync error for ${conn.platform}:`, e);
+        }
+      }
+      m--;
+      if (m === 0) { m = 12; y--; }
+    }
+
+    toast.success('Historical data sync complete');
+    fetchData();
+  };
+
+  const handleRemoveConnection = async (conn: PlatformConnection) => {
+    const { error } = await removeConnectionAndData(conn.id, conn.client_id, conn.platform);
+    if (error) {
+      toast.error('Failed to remove connection');
+    } else {
+      toast.success('Connection and data removed');
+      fetchData();
+    }
+  };
+
+  const handleSettingChange = async (field: string, value: string | boolean) => {
+    if (!client) return;
+    const { error } = await supabase.from('clients').update({ [field]: value }).eq('id', client.id);
+    if (error) {
+      toast.error('Failed to update setting');
+    } else {
+      setClient(prev => prev ? { ...prev, [field]: value } : null);
+      toast.success('Setting updated');
+    }
   };
 
   if (isLoading) {
@@ -251,6 +355,28 @@ const ClientDetail = () => {
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
             <ClientEditDialog client={client} onUpdate={fetchData} />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Delete</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {client.company_name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete this client and all associated data including connections, snapshots, reports, and sync logs. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {isDeleting ? 'Deleting...' : 'Delete Client'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Popover open={syncMenuOpen} onOpenChange={setSyncMenuOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2" disabled={isSyncing || isBulkSyncing}>
@@ -412,6 +538,27 @@ const ClientDetail = () => {
                             <Badge variant={conn.is_connected && conn.account_id ? 'default' : needsSelection ? 'secondary' : 'destructive'}>
                               {conn.is_connected && conn.account_id ? 'Connected' : needsSelection ? 'Select Account' : 'Disconnected'}
                             </Badge>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" className="h-7 w-7">
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove {PLATFORM_LABELS[conn.platform]}?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will remove the connection and delete all associated data (snapshots, sync history, and metric configuration) for this platform.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleRemoveConnection(conn)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Remove & Delete Data
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </div>
                       );
@@ -455,14 +602,68 @@ const ClientDetail = () => {
           <TabsContent value="settings" className="mt-4">
             <Card>
               <CardHeader><CardTitle className="font-display text-lg">Report Configuration</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Detail Level</span><span className="capitalize">{client.report_detail_level}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">MoM Comparison</span><Badge variant={client.enable_mom_comparison ? 'default' : 'secondary'}>{client.enable_mom_comparison ? 'On' : 'Off'}</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">YoY Comparison</span><Badge variant={client.enable_yoy_comparison ? 'default' : 'secondary'}>{client.enable_yoy_comparison ? 'On' : 'Off'}</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">AI Explanations</span><Badge variant={client.enable_explanations ? 'default' : 'secondary'}>{client.enable_explanations ? 'On' : 'Off'}</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Upsell Section</span><Badge variant={client.enable_upsell ? 'default' : 'secondary'}>{client.enable_upsell ? 'On' : 'Off'}</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Currency</span><span>{client.preferred_currency}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Timezone</span><span>{client.preferred_timezone}</span></div>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Detail Level</p>
+                    <p className="text-xs text-muted-foreground">How detailed reports should be</p>
+                  </div>
+                  <Select value={client.report_detail_level} onValueChange={v => handleSettingChange('report_detail_level', v)}>
+                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simple">Simple</SelectItem>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="detailed">Detailed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {[
+                  { key: 'enable_mom_comparison', label: 'MoM Comparison', desc: 'Compare with previous month' },
+                  { key: 'enable_yoy_comparison', label: 'YoY Comparison', desc: 'Compare with same month last year' },
+                  { key: 'enable_explanations', label: 'AI Explanations', desc: 'Plain-English insights in reports' },
+                  { key: 'enable_upsell', label: 'Upsell Section', desc: 'Recommend AMW services in reports' },
+                ].map(item => (
+                  <div key={item.key} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    </div>
+                    <Switch
+                      checked={client[item.key as keyof Client] as boolean}
+                      onCheckedChange={v => handleSettingChange(item.key, v)}
+                    />
+                  </div>
+                ))}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-sm font-medium">Currency</p>
+                      <p className="text-xs text-muted-foreground">Currency used in reports</p>
+                    </div>
+                    <Select value={client.preferred_currency} onValueChange={v => handleSettingChange('preferred_currency', v)}>
+                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CURRENCY_OPTIONS.map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Timezone</p>
+                      <p className="text-xs text-muted-foreground">Timezone for data reporting</p>
+                    </div>
+                    <Select value={client.preferred_timezone} onValueChange={v => handleSettingChange('preferred_timezone', v)}>
+                      <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIMEZONE_OPTIONS.map(tz => (
+                          <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -474,7 +675,7 @@ const ClientDetail = () => {
         connection={pickerConnection}
         open={pickerOpen}
         onOpenChange={setPickerOpen}
-        onComplete={fetchData}
+        onComplete={handlePickerComplete}
         clientId={client.id}
       />
     </AppLayout>
