@@ -566,7 +566,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     [prevSnapshots, selectedPlatform],
   );
 
-  // ─── KPI Aggregates ──────────────────────────────────────────
+  const filteredPosts = useMemo(
+    () => (selectedPlatform === "all" ? allPosts : allPosts.filter((p) => p.platform === selectedPlatform)),
+    [allPosts, selectedPlatform],
+  );
+
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
