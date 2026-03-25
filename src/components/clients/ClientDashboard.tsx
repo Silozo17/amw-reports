@@ -1182,8 +1182,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                       <TableHeader>
                         <TableRow>
                           <TableHead className="min-w-[280px]">Post</TableHead>
-                          <TableHead className="text-right">Engagement</TableHead>
                           <TableHead className="text-right">Reach</TableHead>
+                          <TableHead className="text-right">Likes & Reactions</TableHead>
+                          <TableHead className="text-right">Comments</TableHead>
+                          <TableHead className="text-right">Shares</TableHead>
                           <TableHead className="text-right">Eng. Rate</TableHead>
                           <TableHead className="text-right w-10"></TableHead>
                         </TableRow>
