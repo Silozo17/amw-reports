@@ -37,6 +37,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import PlatformMetricsCard from "./PlatformMetricsCard";
+import SectionHeader from "./SectionHeader";
 import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from "./DashboardHeader";
 import AudienceMap from "./AudienceMap";
 import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
