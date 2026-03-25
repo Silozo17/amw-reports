@@ -460,9 +460,7 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
     console.warn("Could not fetch TikTok user info:", e);
   }
 
-  // Store as a single account (the authenticated user)
-  const accounts = [{ id: openId, name: displayName }];
-
+  // TikTok Login Kit returns a single user — auto-select as the account
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -471,9 +469,9 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
-      account_name: null,
-      account_id: null,
-      metadata: { open_id: openId, token_type: "bearer", accounts },
+      account_id: openId,
+      account_name: displayName,
+      metadata: { open_id: openId, token_type: "bearer", accounts: [{ id: openId, name: displayName }] },
     })
     .eq("id", connectionId);
 
