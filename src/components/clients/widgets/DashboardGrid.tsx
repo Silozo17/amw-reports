@@ -1,14 +1,13 @@
 import { useMemo, useCallback } from 'react';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const ReactGridLayout = require('react-grid-layout');
-const { Responsive: ResponsiveBase, WidthProvider: WP } = ReactGridLayout;
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
 import WidgetRenderer from './WidgetRenderer';
 import { cn } from '@/lib/utils';
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
+// react-grid-layout uses CJS exports
+import RGL from 'react-grid-layout';
+const ResponsiveReactGridLayout = RGL.WidthProvider(RGL.Responsive);
 
 interface DashboardGridProps {
   widgets: DashboardWidget[];
