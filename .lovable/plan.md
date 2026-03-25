@@ -1,51 +1,48 @@
 
 
-## Analysis: Facebook Sync Issues
+## Plan: Add Missing Facebook Metrics + Full Post Content
 
-### Root Causes Found
+### What's Missing (from Meta Business Suite screenshots)
 
-**Issue 1: Sync pulls ALL pages, not just the selected one**
+1. **Link clicks** (357 in screenshot) — not fetched at all
+2. **Page visits** (67 in screenshot) — not fetched at all  
+3. **Full post content with images** — currently stores only truncated message text, no images, no reach per post, no permalink
 
-The oauth-callback discovers ALL 25+ pages the user manages and stores them in `metadata.pages`. When the user picks "AMW Media" in the AccountPickerDialog, it saves `account_id = "342811868918578"` on the connection. But `sync-facebook-page` reads `metadata.pages` and loops over ALL of them (line 98: `for (const page of pages)`), aggregating metrics from every page. This is why you see wrong metrics — they're a mix of all 25+ pages.
+### Changes
 
-**Issue 2: Deprecated metrics cause 100% failure on insights**
+#### File: `supabase/functions/sync-facebook-page/index.ts`
 
-The sync requests these metrics: `page_impressions, page_impressions_paid, page_post_engagements, page_media_view, page_daily_follows_unique, page_daily_unfollows_unique, page_follows`
+**Add page-level metrics:**
+- Fetch `page_views_total` (period=day) — this is the "Visits" metric, still valid in v25
+- Fetch `page_consumptions` (period=day) — this counts content clicks including link clicks
 
-Per Meta's November 15, 2025 deprecation:
-- `page_impressions` — **DEPRECATED** (replacement: `page_media_view`)
-- `page_impressions_paid` — **DEPRECATED** (replacement: `page_media_view` with `is_from_ads` breakdown)
-- `page_daily_follows_unique` — **DEPRECATED**
-- `page_daily_unfollows_unique` — **DEPRECATED**
+**Enhance post fetching for full content:**
+- Add `permalink_url` to post fields
+- Add inline post insights: `insights.metric(post_impressions_unique,post_clicks){values}` to get per-post reach and clicks
+- Store `full_picture` (already fetched but not saved to top_content)
+- Store ALL posts for the month (increase limit to 100, paginate if needed), not just top 10
+- Each post in `top_content` gets: `message` (full, not truncated), `created_time`, `full_picture`, `permalink_url`, `likes`, `comments`, `shares`, `reach`, `clicks`, `total_engagement`
 
-Since deprecated and valid metrics are mixed in one API call, the entire request fails with `(#100) The value must be a valid insights metric`. This means NO insights data is returned at all — zero follower growth, zero impressions, zero views.
+**Update metricsData output:**
+- Add `link_clicks` (from page_consumptions or sum of post clicks)
+- Add `page_visits` (from page_views_total)
 
-**Issue 3: Debug Console sends wrong param name**
+**Post data structure in top_content:**
+```json
+{
+  "message": "Full post text...",
+  "created_time": "2026-03-23T18:06:00+0000",
+  "full_picture": "https://...",
+  "permalink_url": "https://facebook.com/...",
+  "likes": 0,
+  "comments": 0,
+  "shares": 0,
+  "reach": 9,
+  "clicks": 2,
+  "total_engagement": 0
+}
+```
 
-DebugConsole sends `{ connectionId, clientId, month, year }` but the sync function expects `{ connection_id, month, year }`. The sync ignores the camelCase param and fails.
-
-### Fix Plan
-
-#### Fix 1: Filter sync to selected page only
-**File:** `supabase/functions/sync-facebook-page/index.ts`
-- After loading `metadata.pages`, filter to only the page matching `conn.account_id`
-- If `account_id` is set, use only that page; otherwise fall back to all pages (backward compat)
-
-#### Fix 2: Update to v25-valid metrics only
-**File:** `supabase/functions/sync-facebook-page/index.ts`
-- Replace the insights API call with v25-valid metrics:
-  - `page_media_view` (replaces page_impressions) — period=day
-  - `page_post_engagements` — still valid, period=day
-  - `page_follows` — still valid (running total), period=day
-- Fetch `page_media_view` with breakdown `is_from_ads` separately to get paid vs organic split
-- Remove all deprecated metrics: `page_impressions`, `page_impressions_paid`, `page_daily_follows_unique`, `page_daily_unfollows_unique`
-- Add follower count from `page_follows` (last day's value = total followers)
-
-#### Fix 3: Fix Debug Console param names
-**File:** `src/pages/DebugConsole.tsx`
-- Change `{ connectionId, clientId, month, year }` to `{ connection_id: conn.id, month, year }` to match what the edge function expects
-
-### Files to modify:
-1. `supabase/functions/sync-facebook-page/index.ts` — Filter to selected page + fix metrics
-2. `src/pages/DebugConsole.tsx` — Fix param naming
+### Files to modify
+1. `supabase/functions/sync-facebook-page/index.ts` — add metrics + enhance post data
 
