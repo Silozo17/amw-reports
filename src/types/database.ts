@@ -267,4 +267,8 @@ export const METRIC_LABELS: Record<string, string> = {
   videos_published: 'Videos Published',
   avg_view_duration: 'Avg. View Duration (s)',
   top_videos: 'Top Videos',
+  completion_rate: 'Completion Rate',
+  average_time_watched: 'Avg. Watch Time (s)',
+  profile_views: 'Profile Views',
+  bio_link_clicks: 'Bio Link Clicks',
 };
