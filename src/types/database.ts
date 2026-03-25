@@ -14,18 +14,42 @@ export type AppRole = 'owner' | 'manager';
 export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
 
+export interface Organisation {
+  id: string;
+  name: string;
+  slug: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrgMember {
+  id: string;
+  org_id: string;
+  user_id: string | null;
+  role: 'owner' | 'manager';
+  invited_email: string | null;
+  invited_at: string | null;
+  accepted_at: string | null;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   user_id: string;
   full_name: string | null;
   email: string | null;
   avatar_url: string | null;
+  org_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface Client {
   id: string;
+  org_id: string;
   full_name: string;
   position: string | null;
   company_name: string;
@@ -79,6 +103,7 @@ export interface PlatformConnection {
 export interface Report {
   id: string;
   client_id: string;
+  org_id: string;
   report_month: number;
   report_year: number;
   status: JobStatus;
@@ -94,6 +119,7 @@ export interface Report {
 export interface SyncLog {
   id: string;
   client_id: string;
+  org_id: string;
   platform: PlatformType;
   status: JobStatus;
   report_month: number;
@@ -108,6 +134,7 @@ export interface EmailLog {
   id: string;
   report_id: string | null;
   client_id: string;
+  org_id: string;
   recipient_email: string;
   status: string;
   error_message: string | null;
@@ -213,14 +240,12 @@ export const METRIC_LABELS: Record<string, string> = {
   email_contacts: 'Email Taps',
   media_count: 'Total Posts',
   top_posts: 'Top Posts',
-  // Google Search Console
   search_clicks: 'Search Clicks',
   search_impressions: 'Search Impressions',
   search_ctr: 'Search CTR',
   search_position: 'Avg. Position',
   top_queries: 'Top Queries',
   gsc_top_pages: 'Top Pages (Search)',
-  // Google Analytics
   sessions: 'Sessions',
   active_users: 'Active Users',
   new_users: 'New Users',
@@ -229,7 +254,6 @@ export const METRIC_LABELS: Record<string, string> = {
   avg_session_duration: 'Avg. Session Duration',
   pages_per_session: 'Pages / Session',
   traffic_sources: 'Traffic Sources',
-  // Google Business Profile
   gbp_views: 'Profile Views',
   gbp_searches: 'Search Appearances',
   gbp_calls: 'Phone Calls',
@@ -237,7 +261,6 @@ export const METRIC_LABELS: Record<string, string> = {
   gbp_website_clicks: 'Website Clicks (GBP)',
   gbp_reviews_count: 'Reviews Count',
   gbp_average_rating: 'Avg. Rating',
-  // YouTube
   subscribers: 'Net Subscribers',
   views: 'Views',
   watch_time: 'Watch Time (min)',
