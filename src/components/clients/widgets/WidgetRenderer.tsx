@@ -1,0 +1,395 @@
+import { useEffect, useState, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
+import ChartTypeSelector from './ChartTypeSelector';
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as RechartsTooltip,
+  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+} from 'recharts';
+import { cn } from '@/lib/utils';
+
+const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
+
+// ─── Animated Counter ──────────────────────────────────────────
+function useAnimatedCounter(target: number, duration = 700): number {
+  const [current, setCurrent] = useState(0);
+  const prevTarget = useRef(0);
+  const rafId = useRef<number>();
+
+  useEffect(() => {
+    const start = prevTarget.current;
+    const diff = target - start;
+    if (diff === 0) { setCurrent(target); return; }
+    const startTime = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCurrent(start + diff * eased);
+      if (progress < 1) rafId.current = requestAnimationFrame(tick);
+      else prevTarget.current = target;
+    };
+    rafId.current = requestAnimationFrame(tick);
+    return () => { if (rafId.current) cancelAnimationFrame(rafId.current); };
+  }, [target, duration]);
+
+  return current;
+}
+
+const formatKpiValue = (val: number, isCurrency: boolean, currSymbol: string): string => {
+  if (isCurrency)
+    return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
+  return Math.round(val).toLocaleString();
+};
+
+// ─── Number Widget ─────────────────────────────────────────────
+const NumberWidget = ({ data }: { data: WidgetData }) => {
+  const animatedValue = useAnimatedCounter(data.value ?? 0);
+  const isCost = data.isCost ?? false;
+  const change = data.change;
+  const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
+  const currSymbol = data.currSymbol ?? '';
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-2xl font-display font-bold leading-none">
+        {formatKpiValue(animatedValue, isCost, currSymbol)}
+      </p>
+      {change !== undefined && (
+        <div
+          className={cn(
+            'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full',
+            isPositive === true
+              ? 'bg-accent/10 text-accent'
+              : isPositive === false
+                ? 'bg-destructive/10 text-destructive'
+                : 'bg-muted text-muted-foreground',
+          )}
+        >
+          <span>
+            {change > 0 ? '↑' : change < 0 ? '↓' : '→'} {Math.abs(change).toFixed(1)}%
+          </span>
+        </div>
+      )}
+      {/* Sparkline */}
+      {data.sparklineData && data.sparklineData.length > 1 && (
+        <div className="mt-1 -mx-1">
+          <ResponsiveContainer width="100%" height={44}>
+            <AreaChart data={data.sparklineData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`spark-${data.value}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#b32fbf" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#b32fbf" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="v"
+                stroke="#b32fbf"
+                strokeWidth={1.5}
+                fill={`url(#spark-${data.value})`}
+                dot={false}
+                activeDot={{ r: 3, fill: '#b32fbf', stroke: '#fff', strokeWidth: 2 }}
+              />
+              <RechartsTooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.[0]) return null;
+                  const { v, name } = payload[0].payload as { v: number; name: string };
+                  return (
+                    <div className="rounded-md border bg-popover px-2 py-1 text-xs shadow-md">
+                      <p className="font-medium">{name}</p>
+                      <p className="text-muted-foreground">
+                        {isCost
+                          ? `${currSymbol}${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                          : v.toLocaleString()}
+                      </p>
+                    </div>
+                  );
+                }}
+                cursor={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Sparkline-as-chart (for KPI widgets shown as line/area/bar) ─
+const SparklineChart = ({ data, type }: { data: WidgetData; type: 'line' | 'area' | 'bar' }) => {
+  const chartData = data.sparklineData ?? [];
+  if (chartData.length < 2) return <p className="text-xs text-muted-foreground italic">Insufficient data</p>;
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      {type === 'bar' ? (
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} />
+          <RechartsTooltip />
+          <Bar dataKey="v" name="Value" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      ) : type === 'line' ? (
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} />
+          <RechartsTooltip />
+          <Line type="monotone" dataKey="v" name="Value" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3 }} />
+        </LineChart>
+      ) : (
+        <AreaChart data={chartData}>
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={CHART_COLORS[0]} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={CHART_COLORS[0]} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} />
+          <RechartsTooltip />
+          <Area type="monotone" dataKey="v" name="Value" stroke={CHART_COLORS[0]} strokeWidth={2} fill="url(#areaGrad)" />
+        </AreaChart>
+      )}
+    </ResponsiveContainer>
+  );
+};
+
+// ─── Generic Chart Widget ──────────────────────────────────────
+const ChartWidget = ({ data, type }: { data: WidgetData; type: WidgetType }) => {
+  const chartData = (data.chartData ?? []) as Record<string, any>[];
+  const config = data.chartConfig;
+  if (!chartData.length || !config) return <p className="text-xs text-muted-foreground italic">No data available</p>;
+
+  const { dataKeys, colors, xAxisKey = 'name', stacked, innerRadius = 0 } = config;
+
+  if (type === 'pie' || type === 'donut') {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={chartData}
+            dataKey={dataKeys[0]}
+            nameKey={xAxisKey}
+            cx="50%"
+            cy="50%"
+            outerRadius="75%"
+            innerRadius={type === 'donut' ? '50%' : 0}
+            paddingAngle={2}
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            labelLine={false}
+          >
+            {chartData.map((_, i) => (
+              <Cell key={i} fill={colors[i % colors.length]} />
+            ))}
+          </Pie>
+          <RechartsTooltip />
+          <Legend />
+          {type === 'donut' && data.totalValue && (
+            <>
+              <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central" className="fill-foreground text-sm font-bold font-display">
+                {data.totalValue}
+              </text>
+              <text x="50%" y="56%" textAnchor="middle" dominantBaseline="central" className="fill-muted-foreground text-[10px]">
+                {data.totalLabel ?? 'Total'}
+              </text>
+            </>
+          )}
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  if (type === 'radar') {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={chartData}>
+          <PolarGrid stroke="hsl(var(--border))" />
+          <PolarAngleAxis dataKey={xAxisKey} tick={{ fontSize: 10 }} />
+          <PolarRadiusAxis tick={{ fontSize: 9 }} />
+          {dataKeys.map((key, i) => (
+            <Radar key={key} name={config.names?.[i] ?? key} dataKey={key} stroke={colors[i % colors.length]} fill={colors[i % colors.length]} fillOpacity={0.2} />
+          ))}
+          <RechartsTooltip />
+          <Legend />
+        </RadarChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  if (type === 'line') {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <XAxis dataKey={xAxisKey} tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} />
+          <RechartsTooltip />
+          {dataKeys.map((key, i) => (
+            <Line key={key} type="monotone" dataKey={key} name={config.names?.[i] ?? key} stroke={colors[i % colors.length]} strokeWidth={2} dot={{ r: 3 }} />
+          ))}
+          <Legend />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  if (type === 'area') {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData}>
+          {dataKeys.map((key, i) => (
+            <defs key={`def-${key}`}>
+              <linearGradient id={`grad-${key}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={colors[i % colors.length]} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={colors[i % colors.length]} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+          ))}
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <XAxis dataKey={xAxisKey} tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} />
+          <RechartsTooltip />
+          {dataKeys.map((key, i) => (
+            <Area key={key} type="monotone" dataKey={key} name={config.names?.[i] ?? key} stroke={colors[i % colors.length]} strokeWidth={2} fill={`url(#grad-${key})`} dot={{ r: 3, fill: colors[i % colors.length] }} />
+          ))}
+          <Legend />
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Default: bar chart
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chartData} barCategoryGap="20%">
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <XAxis dataKey={xAxisKey} tick={{ fontSize: 11 }} />
+        <YAxis tick={{ fontSize: 11 }} />
+        <RechartsTooltip />
+        {dataKeys.map((key, i) => (
+          <Bar
+            key={key}
+            dataKey={key}
+            name={config.names?.[i] ?? key}
+            stackId={stacked ? 'stack' : undefined}
+            fill={colors[i % colors.length]}
+            radius={i === dataKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+          />
+        ))}
+        <Legend />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+};
+
+// ─── Table Widget ──────────────────────────────────────────────
+const TableWidget = ({ data }: { data: WidgetData }) => {
+  const columns = data.tableColumns ?? [];
+  const rows = (data.tableData ?? []) as Record<string, any>[];
+  if (!rows.length) return <p className="text-xs text-muted-foreground italic">No data</p>;
+
+  return (
+    <div className="relative w-full overflow-auto max-h-full">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {columns.map((col) => (
+              <TableHead key={col.key} className={col.align === 'right' ? 'text-right' : ''}>
+                {col.label}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.slice(0, 10).map((row, idx) => (
+            <TableRow key={idx}>
+              {columns.map((col) => (
+                <TableCell key={col.key} className={cn('text-sm', col.align === 'right' && 'text-right tabular-nums')}>
+                  {typeof row[col.key] === 'number'
+                    ? (row[col.key] as number).toLocaleString()
+                    : (row[col.key] as string) ?? '—'}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
+
+// ─── Main WidgetRenderer ───────────────────────────────────────
+interface WidgetRendererProps {
+  widget: DashboardWidget;
+  data: WidgetData;
+  onTypeChange: (widgetId: string, newType: WidgetType) => void;
+  isEditMode: boolean;
+}
+
+const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRendererProps) => {
+  const { type, category } = widget;
+
+  // KPI widgets shown as chart use sparkline data
+  const isKpiAsChart = category === 'kpi' && type !== 'number';
+  const isPlatformAsChart = category === 'platform' && type !== 'number';
+
+  return (
+    <Card className={cn('h-full overflow-hidden flex flex-col', isEditMode && 'ring-2 ring-primary/20 ring-dashed')}>
+      <CardHeader className="pb-1 flex flex-row items-start justify-between space-y-0 px-4 pt-3">
+        <div className="space-y-0 min-w-0 flex-1">
+          <CardTitle className="text-xs font-display leading-tight truncate">{widget.label}</CardTitle>
+          <p className="text-[10px] text-muted-foreground leading-tight line-clamp-1">{widget.description}</p>
+        </div>
+        <ChartTypeSelector
+          currentType={widget.type}
+          compatibleTypes={widget.compatibleTypes}
+          onChange={(newType) => onTypeChange(widget.id, newType)}
+        />
+      </CardHeader>
+      <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0">
+        {type === 'number' && <NumberWidget data={data} />}
+        {type === 'table' && <TableWidget data={data} />}
+        {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
+          <SparklineChart data={data} type={type} />
+        )}
+        {category === 'chart' && type !== 'table' && (
+          <ChartWidget data={data} type={type} />
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default WidgetRenderer;
