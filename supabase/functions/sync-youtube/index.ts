@@ -1,0 +1,232 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { connection_id, report_month, report_year } = await req.json();
+
+    if (!connection_id || !report_month || !report_year) {
+      return new Response(
+        JSON.stringify({ error: "connection_id, report_month, and report_year are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: conn, error: connError } = await supabase
+      .from("platform_connections")
+      .select("*")
+      .eq("id", connection_id)
+      .single();
+
+    if (connError || !conn) {
+      return new Response(
+        JSON.stringify({ error: "Connection not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create sync log
+    const { data: syncLog } = await supabase
+      .from("sync_logs")
+      .insert({
+        client_id: conn.client_id,
+        platform: "youtube",
+        status: "running",
+        report_month,
+        report_year,
+      })
+      .select("id")
+      .single();
+
+    try {
+      let accessToken = conn.access_token;
+
+      // Refresh token if expired
+      if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
+        const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+        const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+
+        const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: conn.refresh_token!,
+            grant_type: "refresh_token",
+          }),
+        });
+        const refreshData = await refreshRes.json();
+        if (refreshData.error) throw new Error(refreshData.error_description || refreshData.error);
+
+        accessToken = refreshData.access_token;
+        const expiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
+
+        await supabase
+          .from("platform_connections")
+          .update({ access_token: accessToken, token_expires_at: expiresAt })
+          .eq("id", connection_id);
+      }
+
+      const channelId = conn.account_id;
+      if (!channelId) throw new Error("No YouTube channel selected");
+
+      // Date range for the month
+      const startDate = `${report_year}-${String(report_month).padStart(2, "0")}-01`;
+      const lastDay = new Date(report_year, report_month, 0).getDate();
+      const endDate = `${report_year}-${String(report_month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+      // Query YouTube Analytics API
+      const metricsParam = "views,estimatedMinutesWatched,likes,comments,shares,subscribersGained,subscribersLost,impressions,impressionClickThroughRate,averageViewDuration";
+      const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${channelId}&startDate=${startDate}&endDate=${endDate}&metrics=${metricsParam}&dimensions=&sort=`;
+
+      const analyticsRes = await fetch(analyticsUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const analyticsData = await analyticsRes.json();
+      console.log("YouTube Analytics response:", JSON.stringify(analyticsData));
+
+      if (analyticsData.error) {
+        throw new Error(analyticsData.error.message || "YouTube Analytics API error");
+      }
+
+      const row = analyticsData.rows?.[0] || [];
+      const metricsData: Record<string, number> = {
+        views: row[0] || 0,
+        watch_time: row[1] || 0, // estimated minutes watched
+        likes: row[2] || 0,
+        comments: row[3] || 0,
+        shares: row[4] || 0,
+        subscribers: (row[5] || 0) - (row[6] || 0), // net subscribers gained
+        impressions: row[7] || 0,
+        ctr: (row[8] || 0) * 100, // convert fraction to percentage
+        avg_view_duration: row[9] || 0, // seconds
+      };
+
+      // Fetch channel stats for total subscriber count
+      try {
+        const channelRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const channelData = await channelRes.json();
+        if (channelData.items?.[0]?.statistics) {
+          metricsData.total_followers = parseInt(channelData.items[0].statistics.subscriberCount || "0", 10);
+          metricsData.video_views = parseInt(channelData.items[0].statistics.viewCount || "0", 10);
+          metricsData.videos_published = parseInt(channelData.items[0].statistics.videoCount || "0", 10);
+        }
+      } catch (e) {
+        console.warn("Could not fetch channel stats:", e);
+      }
+
+      // Fetch top videos for the period
+      let topContent: any[] = [];
+      try {
+        const topVideosUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${channelId}&startDate=${startDate}&endDate=${endDate}&metrics=views,likes,comments&dimensions=video&sort=-views&maxResults=5`;
+        const topRes = await fetch(topVideosUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const topData = await topRes.json();
+        if (topData.rows?.length > 0) {
+          // Fetch video titles
+          const videoIds = topData.rows.map((r: any[]) => r[0]).join(",");
+          const videosRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoIds}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          const videosData = await videosRes.json();
+          const titleMap: Record<string, string> = {};
+          for (const item of videosData.items || []) {
+            titleMap[item.id] = item.snippet?.title || item.id;
+          }
+
+          topContent = topData.rows.map((r: any[]) => ({
+            id: r[0],
+            title: titleMap[r[0]] || r[0],
+            views: r[1],
+            likes: r[2],
+            comments: r[3],
+          }));
+        }
+      } catch (e) {
+        console.warn("Could not fetch top videos:", e);
+      }
+
+      // Upsert monthly snapshot
+      const { error: upsertError } = await supabase
+        .from("monthly_snapshots")
+        .upsert(
+          {
+            client_id: conn.client_id,
+            platform: "youtube",
+            report_month,
+            report_year,
+            metrics_data: metricsData,
+            top_content: topContent,
+          },
+          { onConflict: "client_id,platform,report_month,report_year" }
+        );
+
+      if (upsertError) throw new Error(`Snapshot upsert failed: ${upsertError.message}`);
+
+      // Update sync log
+      await supabase
+        .from("sync_logs")
+        .update({ status: "success", completed_at: new Date().toISOString() })
+        .eq("id", syncLog?.id);
+
+      // Update connection
+      await supabase
+        .from("platform_connections")
+        .update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null })
+        .eq("id", connection_id);
+
+      return new Response(
+        JSON.stringify({ success: true, metrics: metricsData }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (syncError) {
+      console.error("YouTube sync error:", syncError);
+
+      if (syncLog?.id) {
+        await supabase
+          .from("sync_logs")
+          .update({
+            status: "failed",
+            error_message: syncError instanceof Error ? syncError.message : "Unknown error",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", syncLog.id);
+      }
+
+      await supabase
+        .from("platform_connections")
+        .update({
+          last_sync_status: "failed",
+          last_error: syncError instanceof Error ? syncError.message : "Unknown error",
+        })
+        .eq("id", connection_id);
+
+      throw syncError;
+    }
+  } catch (e) {
+    console.error("Error:", e);
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
