@@ -451,3 +451,183 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
 
   if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
 }
+
+// ── Google Search Console ──
+async function handleGoogleSearchConsole(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code, client_id: clientId, client_secret: clientSecret,
+      redirect_uri: redirectUri, grant_type: "authorization_code",
+    }),
+  });
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
+
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+
+  // Discover verified sites
+  const sites: Array<{ id: string; name: string }> = [];
+  try {
+    const sitesRes = await fetch("https://www.googleapis.com/webmasters/v3/sites", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const sitesData = await sitesRes.json();
+    console.log("GSC sites discovery:", JSON.stringify(sitesData));
+    if (sitesData.siteEntry?.length > 0) {
+      for (const site of sitesData.siteEntry) {
+        sites.push({ id: site.siteUrl, name: site.siteUrl });
+      }
+    }
+  } catch (e) {
+    console.error("Could not discover GSC sites:", e);
+  }
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_name: null,
+      account_id: null,
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, sites },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
+// ── Google Analytics (GA4) ──
+async function handleGoogleAnalytics(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code, client_id: clientId, client_secret: clientSecret,
+      redirect_uri: redirectUri, grant_type: "authorization_code",
+    }),
+  });
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
+
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+
+  // Discover GA4 properties
+  const properties: Array<{ id: string; name: string }> = [];
+  try {
+    const acctRes = await fetch("https://analyticsadmin.googleapis.com/v1beta/accounts", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const acctData = await acctRes.json();
+    console.log("GA4 accounts:", JSON.stringify(acctData));
+    if (acctData.accounts?.length > 0) {
+      for (const acct of acctData.accounts) {
+        const accountName = acct.name; // e.g. "accounts/123456"
+        const propsRes = await fetch(
+          `https://analyticsadmin.googleapis.com/v1beta/properties?filter=parent:${accountName}`,
+          { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+        );
+        const propsData = await propsRes.json();
+        if (propsData.properties?.length > 0) {
+          for (const prop of propsData.properties) {
+            const propId = prop.name.replace("properties/", "");
+            properties.push({ id: propId, name: prop.displayName || propId });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Could not discover GA4 properties:", e);
+  }
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_name: null,
+      account_id: null,
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, properties },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
+// ── Google Business Profile ──
+async function handleGoogleBusinessProfile(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code, client_id: clientId, client_secret: clientSecret,
+      redirect_uri: redirectUri, grant_type: "authorization_code",
+    }),
+  });
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
+
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+
+  // Discover business locations
+  const locations: Array<{ id: string; name: string }> = [];
+  try {
+    const acctRes = await fetch("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const acctData = await acctRes.json();
+    console.log("GBP accounts:", JSON.stringify(acctData));
+    if (acctData.accounts?.length > 0) {
+      for (const acct of acctData.accounts) {
+        const locRes = await fetch(
+          `https://mybusinessbusinessinformation.googleapis.com/v1/${acct.name}/locations?readMask=name,title`,
+          { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+        );
+        const locData = await locRes.json();
+        if (locData.locations?.length > 0) {
+          for (const loc of locData.locations) {
+            const locId = loc.name; // e.g. "locations/123"
+            locations.push({ id: locId, name: loc.title || locId });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Could not discover GBP locations:", e);
+  }
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_name: null,
+      account_id: null,
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, locations },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
