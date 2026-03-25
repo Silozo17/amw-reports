@@ -5,9 +5,13 @@ import instagramLogo from '@/assets/logos/instagram.webp';
 import linkedinLogo from '@/assets/logos/linkedin.webp';
 import metaLogo from '@/assets/logos/meta.webp';
 import tiktokLogo from '@/assets/logos/tiktok.webp';
+import gscLogo from '@/assets/logos/google-search-console.webp';
+import gaLogo from '@/assets/logos/google-analytics.webp';
+import gbpLogo from '@/assets/logos/google-business.webp';
+import youtubeLogo from '@/assets/logos/youtube.webp';
 
 export type AppRole = 'owner' | 'manager';
-export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile';
+export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
 
 export interface Profile {
@@ -121,6 +125,7 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   google_search_console: 'Google Search Console',
   google_analytics: 'Google Analytics',
   google_business_profile: 'Google Business Profile',
+  youtube: 'YouTube',
 };
 
 export const PLATFORM_LOGOS: Record<string, string> = {
@@ -131,9 +136,10 @@ export const PLATFORM_LOGOS: Record<string, string> = {
   instagram: instagramLogo,
   tiktok: tiktokLogo,
   linkedin: linkedinLogo,
-  google_search_console: googleLogo,
-  google_analytics: googleLogo,
-  google_business_profile: googleLogo,
+  google_search_console: gscLogo,
+  google_analytics: gaLogo,
+  google_business_profile: gbpLogo,
+  youtube: youtubeLogo,
 };
 
 export const CURRENCY_OPTIONS = [
@@ -160,7 +166,7 @@ export const AD_METRICS = new Set([
 ]);
 
 /** Platforms that are organic-only (no ad spend metrics) */
-export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile']);
+export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube']);
 
 export const METRIC_LABELS: Record<string, string> = {
   spend: 'Spend',
@@ -231,4 +237,11 @@ export const METRIC_LABELS: Record<string, string> = {
   gbp_website_clicks: 'Website Clicks (GBP)',
   gbp_reviews_count: 'Reviews Count',
   gbp_average_rating: 'Avg. Rating',
+  // YouTube
+  subscribers: 'Net Subscribers',
+  views: 'Views',
+  watch_time: 'Watch Time (min)',
+  videos_published: 'Videos Published',
+  avg_view_duration: 'Avg. View Duration (s)',
+  top_videos: 'Top Videos',
 };
