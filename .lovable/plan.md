@@ -1,82 +1,51 @@
 
 
-## Plan: Clear AMW Media Data + Add Debug Console + Fix RLS Recursion
+## Analysis: Facebook Sync Issues
 
-### 1. Clear all connection data for AMW Media
+### Root Causes Found
 
-Delete from these tables where `client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'`:
-- `platform_connections`
-- `monthly_snapshots`
-- `sync_logs`
-- `client_platform_config`
+**Issue 1: Sync pulls ALL pages, not just the selected one**
 
-This will be done via the database insert tool (which supports DELETE operations).
+The oauth-callback discovers ALL 25+ pages the user manages and stores them in `metadata.pages`. When the user picks "AMW Media" in the AccountPickerDialog, it saves `account_id = "342811868918578"` on the connection. But `sync-facebook-page` reads `metadata.pages` and loops over ALL of them (line 98: `for (const page of pages)`), aggregating metrics from every page. This is why you see wrong metrics — they're a mix of all 25+ pages.
 
-### 2. Add a Debug Console page
+**Issue 2: Deprecated metrics cause 100% failure on insights**
 
-Create a new `/debug` page accessible from the sidebar that shows:
-- **Connection inspector**: For any client, show all `platform_connections` rows with full metadata, tokens (masked), account IDs
-- **Sync trigger + log viewer**: Trigger a sync for any connection and see the raw response, plus view `sync_logs` for that client/platform
-- **Snapshot viewer**: Show raw `metrics_data`, `top_content`, and `raw_data` from `monthly_snapshots` for any client/platform/month
-- **Live sync test**: Button to invoke any sync edge function and display the full JSON response inline
+The sync requests these metrics: `page_impressions, page_impressions_paid, page_post_engagements, page_media_view, page_daily_follows_unique, page_daily_unfollows_unique, page_follows`
 
-This gives full visibility into: what data is pulled (sync response), how it's stored (snapshot JSON), and what the dashboard reads.
+Per Meta's November 15, 2025 deprecation:
+- `page_impressions` — **DEPRECATED** (replacement: `page_media_view`)
+- `page_impressions_paid` — **DEPRECATED** (replacement: `page_media_view` with `is_from_ads` breakdown)
+- `page_daily_follows_unique` — **DEPRECATED**
+- `page_daily_unfollows_unique` — **DEPRECATED**
 
-**Files:**
-- `src/pages/DebugConsole.tsx` — new page with tabs: Connections, Sync Logs, Snapshots, Live Test
-- `src/App.tsx` — add `/debug` route
-- `src/components/layout/AppSidebar.tsx` — add Debug link in sidebar
+Since deprecated and valid metrics are mixed in one API call, the entire request fails with `(#100) The value must be a valid insights metric`. This means NO insights data is returned at all — zero follower growth, zero impressions, zero views.
 
-### 3. Fix org_members RLS infinite recursion
+**Issue 3: Debug Console sends wrong param name**
 
-The "Owners can manage org members" policy has a subquery that references `org_members` inside itself, causing infinite recursion. Fix with a migration:
+DebugConsole sends `{ connectionId, clientId, month, year }` but the sync function expects `{ connection_id, month, year }`. The sync ignores the camelCase param and fails.
 
-```sql
-DROP POLICY "Owners can manage org members" ON public.org_members;
+### Fix Plan
 
-CREATE POLICY "Owners can manage org members"
-ON public.org_members FOR ALL TO authenticated
-USING (
-  org_id = public.user_org_id(auth.uid())
-  AND public.user_org_id(auth.uid()) IS NOT NULL
-  AND EXISTS (
-    SELECT 1 FROM public.org_members om
-    WHERE om.user_id = auth.uid()
-      AND om.role = 'owner'
-  )
-);
-```
+#### Fix 1: Filter sync to selected page only
+**File:** `supabase/functions/sync-facebook-page/index.ts`
+- After loading `metadata.pages`, filter to only the page matching `conn.account_id`
+- If `account_id` is set, use only that page; otherwise fall back to all pages (backward compat)
 
-Wait — this still references org_members. The fix is to use a SECURITY DEFINER function instead:
+#### Fix 2: Update to v25-valid metrics only
+**File:** `supabase/functions/sync-facebook-page/index.ts`
+- Replace the insights API call with v25-valid metrics:
+  - `page_media_view` (replaces page_impressions) — period=day
+  - `page_post_engagements` — still valid, period=day
+  - `page_follows` — still valid (running total), period=day
+- Fetch `page_media_view` with breakdown `is_from_ads` separately to get paid vs organic split
+- Remove all deprecated metrics: `page_impressions`, `page_impressions_paid`, `page_daily_follows_unique`, `page_daily_unfollows_unique`
+- Add follower count from `page_follows` (last day's value = total followers)
 
-```sql
-CREATE OR REPLACE FUNCTION public.is_org_owner(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.org_members
-    WHERE user_id = _user_id AND role = 'owner'
-  )
-$$;
-```
+#### Fix 3: Fix Debug Console param names
+**File:** `src/pages/DebugConsole.tsx`
+- Change `{ connectionId, clientId, month, year }` to `{ connection_id: conn.id, month, year }` to match what the edge function expects
 
-Then rewrite the policy to use `public.is_org_owner(auth.uid())` — this bypasses RLS on the function call, breaking the recursion.
-
-### Technical Details
-
-**Debug Console features:**
-- Client selector dropdown
-- Platform filter
-- Month/year selector for snapshots
-- Raw JSON viewer with syntax highlighting (using `<pre>` + JSON.stringify)
-- "Sync Now" button that calls `supabase.functions.invoke('sync-{platform}')` and displays response
-- Copy-to-clipboard for JSON data
-
-**Migration for RLS fix:**
-1. Create `is_org_owner` SECURITY DEFINER function
-2. Drop the recursive "Owners can manage org members" policy
-3. Recreate it using `is_org_owner(auth.uid())`
-4. Also fix the `organisations` UPDATE policy which has the same recursion pattern
+### Files to modify:
+1. `supabase/functions/sync-facebook-page/index.ts` — Filter to selected page + fix metrics
+2. `src/pages/DebugConsole.tsx` — Fix param naming
 
