@@ -46,6 +46,10 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
+    if (!conn.is_connected || !conn.access_token) {
+      throw new Error("Instagram connection is not authenticated. Please connect via OAuth first.");
+    }
+
     // Token expiry check
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
       await supabaseClient.from("platform_connections")
@@ -54,46 +58,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Find meta_ads connection to get Instagram business account IDs
-    const { data: metaConn } = await supabaseClient
-      .from("platform_connections")
-      .select("*")
-      .eq("client_id", clientId)
-      .eq("platform", "meta_ads")
-      .eq("is_connected", true)
-      .single();
-
-    if (!metaConn?.access_token) {
-      throw new Error("No connected Meta Ads account found. Connect Meta Ads first to enable Instagram sync.");
-    }
-
-    // Meta token expiry check
-    if (metaConn.token_expires_at && new Date(metaConn.token_expires_at) < new Date()) {
-      await supabaseClient.from("platform_connections")
-        .update({ last_error: "Meta Ads token expired. Please reconnect Meta Ads.", last_sync_status: "failed" })
-        .eq("id", connectionId);
-      return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const metadata = metaConn.metadata as any;
-    const pages = metadata?.pages || [];
-    const igAccounts = pages
-      .filter((p: any) => p.instagram?.id)
-      .map((p: any) => {
-        if (!p.access_token) {
-          console.error(`No Page token for IG account ${p.instagram?.id}. Reconnect Meta.`);
-          return null;
-        }
-        return { ig_id: p.instagram.id, ig_username: p.instagram.username, page_token: p.access_token };
-      })
-      .filter(Boolean);
+    // IG accounts are stored directly on this instagram connection's metadata
+    const metadata = conn.metadata as any;
+    const igAccounts = (metadata?.ig_accounts || [])
+      .filter((ig: any) => ig.id && ig.page_token)
+      .map((ig: any) => ({ ig_id: ig.id, ig_username: ig.username, page_token: ig.page_token }));
 
     const connMetadata = conn.metadata as any;
-    const targetIgId = conn.account_id || connMetadata?.ig_user_id;
+    const targetIgId = conn.account_id;
     const filteredAccounts = targetIgId ? igAccounts.filter((ig: any) => ig.ig_id === targetIgId) : igAccounts;
 
     if (filteredAccounts.length === 0) {
-      throw new Error("No Instagram Business accounts found. Make sure your Facebook Pages have linked Instagram accounts.");
+      throw new Error("No Instagram Business accounts found. Please reconnect Instagram and ensure your Facebook Pages have linked Instagram accounts.");
     }
 
     // Get org_id from client
