@@ -93,8 +93,7 @@ interface TopContentItem {
   impressions?: number;
   ctr?: number;
   position?: number;
-  // GA4 fields
-  pagePath?: string;
+  // GA4 fields (sync stores as "page", not "pagePath")
   sessions?: number;
   views?: number;
   users?: number;
@@ -1431,11 +1430,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           {/* PART 5c: Top Pages (GA4) */}
           {(() => {
             const gaPosts = (selectedPlatform === "all" || selectedPlatform === "google_analytics")
-              ? allPosts.filter((p) => p.platform === "google_analytics" && (p.pagePath || p.source))
+              ? allPosts.filter((p) => p.platform === "google_analytics" && (p.page || p.source))
               : [];
             if (gaPosts.length === 0) return null;
-            const topPages = gaPosts.filter((p) => p.pagePath);
-            const trafficSources = gaPosts.filter((p) => p.source && !p.pagePath);
+            const topPages = gaPosts.filter((p) => p.page);
+            const trafficSources = gaPosts.filter((p) => p.source && !p.page);
             return (
               <div className="space-y-4">
                 {topPages.length > 0 && (
@@ -1460,7 +1459,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                             <TableBody>
                               {topPages.slice(0, 10).map((item, idx) => (
                                 <TableRow key={idx}>
-                                  <TableCell className="font-medium text-sm truncate max-w-[300px]">{item.pagePath}</TableCell>
+                                  <TableCell className="font-medium text-sm truncate max-w-[300px]">{item.page}</TableCell>
                                   <TableCell className="text-right tabular-nums">{(item.views ?? 0).toLocaleString()}</TableCell>
                                   <TableCell className="text-right tabular-nums">{(item.sessions ?? 0).toLocaleString()}</TableCell>
                                   <TableCell className="text-right tabular-nums">{(item.users ?? 0).toLocaleString()}</TableCell>
