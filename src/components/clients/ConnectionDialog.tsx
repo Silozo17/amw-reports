@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
