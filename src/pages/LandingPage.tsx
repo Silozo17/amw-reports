@@ -128,8 +128,8 @@ const LandingPage = () => {
   return (
     <div className="flex min-h-screen">
       {/* Left: Auth Forms */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-background">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex-1 flex flex-col justify-center p-6 sm:p-12 bg-background">
+        <div className="w-full max-w-md mx-auto space-y-8">
           {/* Mobile header */}
           <div className="lg:hidden text-center mb-8">
             <h1 className="text-3xl font-heading tracking-wide text-primary">AMW</h1>

@@ -82,7 +82,6 @@ const LandingHero = () => {
         </div>
 
       </div>
-      </div>
     </section>
   );
 };
