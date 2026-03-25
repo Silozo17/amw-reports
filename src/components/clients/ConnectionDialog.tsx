@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
+import ConnectionDisclaimer from './ConnectionDisclaimer';
 
 interface ConnectionDialogProps {
   clientId: string;
@@ -215,6 +216,8 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
             Select a platform and click to add. You'll be redirected to sign in via OAuth.
           </p>
         </div>
+
+        <ConnectionDisclaimer />
       </DialogContent>
     </Dialog>
   );

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Save, Undo2 } from 'lucide-react';
-import { PLATFORM_LABELS, METRIC_LABELS } from '@/types/database';
+import { PLATFORM_LABELS, METRIC_LABELS, ORGANIC_PLATFORMS, AD_METRICS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 
 interface PlatformConfig {
@@ -198,7 +198,12 @@ const MetricConfigPanel = ({ clientId, connectedPlatforms }: MetricConfigPanelPr
       {connectedPlatforms.map(platform => {
         const local = localState.get(platform);
         const def = defaults.find(d => d.platform === platform);
-        const availableMetrics = def?.available_metrics ?? Object.keys(METRIC_LABELS);
+        const availableMetrics = def?.available_metrics ?? Object.keys(METRIC_LABELS).filter(k => {
+          const isOrganic = ORGANIC_PLATFORMS.has(platform);
+          if (isOrganic && AD_METRICS.has(k)) return false;
+          if (!isOrganic && ['total_followers', 'new_followers', 'profile_visits', 'stories_count', 'reels_count'].includes(k)) return false;
+          return true;
+        });
         const enabledMetrics = local?.enabledMetrics ?? [];
         const isEnabled = local?.isEnabled ?? true;
 
