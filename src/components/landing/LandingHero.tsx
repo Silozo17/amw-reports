@@ -2,6 +2,7 @@ import { BarChart3, FileText, Users, Palette } from 'lucide-react';
 import WarpedGrid from './WarpedGrid';
 import StarDecoration from './StarDecoration';
 import mascot from '@/assets/mascot.svg';
+import amwLogo from '@/assets/AMW_Logo_White.png';
 
 const FEATURES = [
   { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Google, Meta, TikTok, LinkedIn & more — all in one place' },
@@ -36,7 +37,7 @@ const LandingHero = () => {
           <div className="animate-fade-up-in">
             {/* Branding */}
             <div className="mb-8">
-              <h1 className="text-4xl font-heading tracking-wide text-primary">AMW</h1>
+              <img src={amwLogo} alt="AMW Media" className="h-10 w-auto" />
               <p className="text-xs tracking-[0.3em] text-amw-offwhite/60 uppercase font-body">Reports</p>
             </div>
 
