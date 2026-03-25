@@ -18,7 +18,19 @@ import {
   Clock,
   Loader2,
   TrendingUp,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { PLATFORM_LOGOS } from "@/types/database";
 import {
   PieChart,
   Pie,
@@ -54,9 +66,29 @@ interface ClientDashboardProps {
   currencyCode?: string;
 }
 
+interface TopContentItem {
+  page_name?: string;
+  message?: string;
+  caption?: string;
+  created_time?: string;
+  timestamp?: string;
+  full_picture?: string | null;
+  permalink_url?: string | null;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  reach?: number;
+  clicks?: number;
+  total_engagement?: number;
+  media_type?: string;
+  video_views?: number;
+}
+
 interface SnapshotData {
   platform: PlatformType;
   metrics_data: Record<string, number>;
+  top_content?: TopContentItem[];
   report_month: number;
   report_year: number;
 }
@@ -305,6 +337,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [allPosts, setAllPosts] = useState<(TopContentItem & { platform: PlatformType })[]>([]);
 
   useEffect(() => {
     setHasAutoDetected(false);
@@ -316,7 +349,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
     let query = supabase
       .from("monthly_snapshots")
-      .select("platform, metrics_data, report_month, report_year")
+      .select("platform, metrics_data, top_content, report_month, report_year")
       .eq("client_id", clientId);
 
     let isMultiMonth = false;
@@ -429,6 +462,19 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       });
     }
 
+    // Collect all top_content posts from raw snapshots (before aggregation)
+    const rawSnapshots = (currentRes.data ?? []) as SnapshotData[];
+    const collectedPosts: (TopContentItem & { platform: PlatformType })[] = [];
+    for (const s of rawSnapshots) {
+      if (Array.isArray(s.top_content) && s.top_content.length > 0) {
+        for (const post of s.top_content) {
+          collectedPosts.push({ ...post, platform: s.platform });
+        }
+      }
+    }
+    collectedPosts.sort((a, b) => (b.total_engagement ?? 0) - (a.total_engagement ?? 0));
+    setAllPosts(collectedPosts);
+
     setSnapshots(currentSnapshots);
     setPrevSnapshots((prevRes.data ?? []) as SnapshotData[]);
     setTrendData((trendRes.data ?? []) as SnapshotData[]);
@@ -520,7 +566,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     [prevSnapshots, selectedPlatform],
   );
 
-  // ─── KPI Aggregates ──────────────────────────────────────────
+  const filteredPosts = useMemo(
+    () => (selectedPlatform === "all" ? allPosts : allPosts.filter((p) => p.platform === selectedPlatform)),
+    [allPosts, selectedPlatform],
+  );
+
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
@@ -1117,7 +1167,99 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             </Card>
           )}
 
-          {/* PART 5: Audience Map */}
+          {/* PART 5: Performance by Post */}
+          {filteredPosts.length > 0 && (
+            <div className="space-y-4">
+              <SectionHeader
+                title="Performance by Post"
+                description="How each piece of content performed this period"
+                icon={<FileText className="h-4 w-4 text-primary" />}
+              />
+              <Card>
+                <CardContent className="p-0">
+                  <div className="relative w-full overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[280px]">Post</TableHead>
+                          <TableHead className="text-right">Engagement</TableHead>
+                          <TableHead className="text-right">Reach</TableHead>
+                          <TableHead className="text-right">Eng. Rate</TableHead>
+                          <TableHead className="text-right w-10"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredPosts.map((post, idx) => {
+                          const engagement = post.total_engagement ?? 0;
+                          const reach = post.reach ?? 0;
+                          const engRate = reach > 0 ? ((engagement / reach) * 100).toFixed(1) : "—";
+                          const text = post.message || post.caption || "";
+                          const dateStr = post.created_time || post.timestamp;
+                          const platformLogo = PLATFORM_LOGOS[post.platform];
+
+                          return (
+                            <TableRow key={`${post.permalink_url || idx}-${idx}`}>
+                              <TableCell>
+                                <div className="flex items-start gap-3">
+                                  {post.full_picture ? (
+                                    <img
+                                      src={post.full_picture}
+                                      alt=""
+                                      className="w-12 h-12 rounded-md object-cover shrink-0 bg-muted"
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center shrink-0">
+                                      <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 space-y-1">
+                                    <p className="text-sm leading-snug line-clamp-2">
+                                      {text || <span className="italic text-muted-foreground">No caption</span>}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      {platformLogo && (
+                                        <img src={platformLogo} alt="" className="w-4 h-4 rounded-sm" />
+                                      )}
+                                      {dateStr && (
+                                        <span>{format(new Date(dateStr), "d MMM yyyy")}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-medium tabular-nums">
+                                {engagement.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {reach > 0 ? reach.toLocaleString() : "—"}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {engRate !== "—" ? `${engRate}%` : "—"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {post.permalink_url && (
+                                  <a
+                                    href={post.permalink_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* PART 6: Audience Map */}
           <AudienceMap geoData={geoData} />
 
           {/* Per-Platform Metrics */}
