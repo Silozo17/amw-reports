@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const appId = Deno.env.get("TIKTOK_APP_ID")!;
+    const clientKey = Deno.env.get("TIKTOK_APP_ID")!;
     const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
     const state = btoa(
@@ -49,9 +49,11 @@ Deno.serve(async (req) => {
       })
     );
 
-    const authUrl = new URL("https://business-api.tiktok.com/portal/auth");
-    authUrl.searchParams.set("app_id", appId);
+    const authUrl = new URL("https://www.tiktok.com/v2/auth/authorize/");
+    authUrl.searchParams.set("client_key", clientKey);
     authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("scope", "user.info.basic,user.insights,video.list,video.insights");
     authUrl.searchParams.set("state", state);
 
     return new Response(

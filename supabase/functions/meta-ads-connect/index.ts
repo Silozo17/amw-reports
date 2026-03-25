@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set("client_id", appId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("scope", "pages_show_list,pages_read_engagement,read_insights,instagram_basic,instagram_manage_insights,ads_read,ads_management,business_management");
+    authUrl.searchParams.set("scope", "ads_read,ads_management,business_management");
     authUrl.searchParams.set("state", state);
 
     return new Response(
