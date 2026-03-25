@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Slowdex';
+  src: url('/fonts/Slowdex.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -6,33 +14,33 @@
 
 @layer base {
   :root {
-    --background: 30 25% 93%;
-    --foreground: 348 8% 13%;
+    --background: 32 44% 92%;
+    --foreground: 340 7% 13%;
 
-    --card: 30 25% 95%;
-    --card-foreground: 348 8% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 340 7% 13%;
 
-    --popover: 30 25% 95%;
-    --popover-foreground: 348 8% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 340 7% 13%;
 
-    --primary: 295 61% 47%;
-    --primary-foreground: 30 25% 93%;
+    --primary: 295 60% 47%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 53% 59%;
+    --secondary: 212 64% 59%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 30 15% 87%;
-    --muted-foreground: 348 5% 40%;
+    --muted: 32 20% 86%;
+    --muted-foreground: 340 7% 40%;
 
-    --accent: 148 58% 57%;
-    --accent-foreground: 348 8% 13%;
+    --accent: 148 60% 57%;
+    --accent-foreground: 340 7% 13%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 12% 82%;
-    --input: 30 12% 82%;
-    --ring: 295 61% 47%;
+    --border: 32 20% 82%;
+    --input: 32 20% 82%;
+    --ring: 295 60% 47%;
 
     --radius: 0.75rem;
 
@@ -40,61 +48,69 @@
     --warning-foreground: 0 0% 100%;
 
     --success: 148 58% 57%;
-    --success-foreground: 348 8% 13%;
+    --success-foreground: 340 7% 13%;
 
-    --sidebar-background: 348 8% 13%;
-    --sidebar-foreground: 30 25% 93%;
-    --sidebar-primary: 295 61% 47%;
-    --sidebar-primary-foreground: 30 25% 93%;
-    --sidebar-accent: 348 8% 20%;
-    --sidebar-accent-foreground: 30 25% 93%;
-    --sidebar-border: 348 8% 22%;
-    --sidebar-ring: 295 61% 47%;
+    /* AMW Extended */
+    --amw-offwhite: 32 44% 92%;
+    --amw-black: 340 7% 13%;
+    --amw-purple: 295 60% 47%;
+    --amw-blue: 212 64% 59%;
+    --amw-green: 148 60% 57%;
+    --amw-orange: 27 84% 57%;
+
+    --sidebar-background: 340 7% 13%;
+    --sidebar-foreground: 32 44% 92%;
+    --sidebar-primary: 295 60% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 340 7% 18%;
+    --sidebar-accent-foreground: 32 44% 92%;
+    --sidebar-border: 340 7% 20%;
+    --sidebar-ring: 295 60% 47%;
   }
 
   .dark {
-    --background: 348 8% 10%;
-    --foreground: 30 25% 93%;
+    --background: 340 7% 13%;
+    --foreground: 32 44% 92%;
 
-    --card: 348 8% 13%;
-    --card-foreground: 30 25% 93%;
+    --card: 340 7% 16%;
+    --card-foreground: 32 44% 92%;
 
-    --popover: 348 8% 13%;
-    --popover-foreground: 30 25% 93%;
+    --popover: 340 7% 16%;
+    --popover-foreground: 32 44% 92%;
 
-    --primary: 295 61% 47%;
-    --primary-foreground: 30 25% 93%;
+    --primary: 295 60% 47%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 53% 59%;
+    --secondary: 212 64% 59%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 348 8% 18%;
-    --muted-foreground: 30 10% 60%;
+    --muted: 340 7% 20%;
+    --muted-foreground: 32 20% 70%;
 
-    --accent: 148 58% 57%;
-    --accent-foreground: 348 8% 10%;
+    --accent: 148 60% 57%;
+    --accent-foreground: 340 7% 13%;
 
     --destructive: 0 62% 30%;
-    --destructive-foreground: 30 25% 93%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 348 8% 22%;
-    --input: 348 8% 22%;
-    --ring: 295 61% 47%;
+    --border: 340 7% 20%;
+    --input: 340 7% 20%;
+    --ring: 295 60% 47%;
 
     --warning: 27 83% 57%;
     --warning-foreground: 0 0% 100%;
 
     --success: 148 58% 57%;
-    --success-foreground: 348 8% 10%;
+    --success-foreground: 340 7% 13%;
 
-    --sidebar-background: 348 8% 8%;
-    --sidebar-foreground: 30 25% 93%;
-    --sidebar-primary: 295 61% 47%;
-    --sidebar-primary-foreground: 30 25% 93%;
-    --sidebar-accent: 348 8% 15%;
-    --sidebar-accent-foreground: 30 25% 93%;
-    --sidebar-border: 348 8% 18%;
-    --sidebar-ring: 295 61% 47%;
+    --sidebar-background: 340 7% 8%;
+    --sidebar-foreground: 32 44% 92%;
+    --sidebar-primary: 295 60% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 340 7% 15%;
+    --sidebar-accent-foreground: 32 44% 92%;
+    --sidebar-border: 340 7% 18%;
+    --sidebar-ring: 295 60% 47%;
   }
 }
 
@@ -108,7 +124,27 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display;
+    @apply font-heading uppercase;
+  }
+}
+
+@layer utilities {
+  .text-gradient-purple {
+    background: linear-gradient(135deg, hsl(var(--amw-purple)), hsl(var(--amw-blue)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-orange {
+    background: linear-gradient(135deg, hsl(var(--amw-orange)), hsl(var(--amw-purple)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-brand {
+    background: linear-gradient(135deg, hsl(var(--amw-purple)), hsl(var(--amw-blue)));
   }
 }
 
@@ -118,21 +154,34 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.05); }
+  0%, 100% { opacity: 0.6; filter: blur(80px); }
+  50% { opacity: 1; filter: blur(120px); }
 }
 
-@layer utilities {
-  .animate-star-spin {
-    animation: star-spin 12s linear infinite;
-  }
-  .animate-pulse-glow {
-    animation: pulse-glow 6s ease-in-out infinite;
-  }
-  .text-gradient-purple {
-    background: linear-gradient(135deg, hsl(295 61% 47%), hsl(210 53% 59%));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+@keyframes fade-up-in {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hero-grow-in {
+  0% { opacity: 0; transform: scale(0.15) rotate(-40deg); }
+  70% { opacity: 1; transform: scale(1.08) rotate(3deg); }
+  85% { transform: scale(0.97) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+.animate-fade-up-in {
+  animation: fade-up-in 0.6s ease-out both;
+}
+
+.animate-hero-grow-in {
+  animation: hero-grow-in 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-star-spin {
+  animation: star-spin 20s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 4s ease-in-out infinite;
 }
