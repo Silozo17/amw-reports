@@ -38,7 +38,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    const clientKey = Deno.env.get("TIKTOK_APP_ID")!;
+    const clientKey = Deno.env.get("TIKTOK_APP_ID");
+    const clientSecret = Deno.env.get("TIKTOK_APP_SECRET");
+
+    if (!clientKey || !clientSecret) {
+      console.error("Missing TikTok credentials. TIKTOK_APP_ID set:", !!clientKey, "TIKTOK_APP_SECRET set:", !!clientSecret);
+      return new Response(
+        JSON.stringify({
+          error: "TikTok Login Kit credentials are not configured. Ensure TIKTOK_APP_ID (client_key) and TIKTOK_APP_SECRET are set as secrets. These must be the Login Kit credentials from the TikTok Developer Portal, not the Business/Advertiser API credentials.",
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
     const state = btoa(
@@ -55,6 +67,8 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("scope", "user.info.basic,user.info.username,user.info.stats,user.info.profile,user.account.type,user.insights,video.list,video.insights,comment.list");
     authUrl.searchParams.set("state", state);
+
+    console.log("TikTok OAuth URL generated. client_key length:", clientKey.length, "redirect_uri:", redirectUri);
 
     return new Response(
       JSON.stringify({ auth_url: authUrl.toString() }),
