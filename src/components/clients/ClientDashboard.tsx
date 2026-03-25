@@ -348,7 +348,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
     let query = supabase
       .from("monthly_snapshots")
-      .select("platform, metrics_data, report_month, report_year")
+      .select("platform, metrics_data, top_content, report_month, report_year")
       .eq("client_id", clientId);
 
     let isMultiMonth = false;
