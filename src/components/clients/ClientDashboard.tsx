@@ -1141,24 +1141,50 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                         return value.toLocaleString();
                       }}
                     />
-                    <Area
-                      type="monotone"
-                      dataKey="impressions"
-                      name="Impressions"
-                      stroke="#b32fbf"
-                      strokeWidth={2}
-                      fill="url(#trendGradient)"
-                      dot={{ r: 4, fill: "#b32fbf" }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="clicks"
-                      name="Clicks"
-                      stroke="#539BDB"
-                      strokeWidth={2}
-                      fill="url(#trendGradientBlue)"
-                      dot={{ r: 4, fill: "#539BDB" }}
-                    />
+                    {trendChartData.some((d) => (d as any).impressions > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="impressions"
+                        name="Impressions"
+                        stroke="#b32fbf"
+                        strokeWidth={2}
+                        fill="url(#trendGradient)"
+                        dot={{ r: 4, fill: "#b32fbf" }}
+                      />
+                    )}
+                    {trendChartData.some((d) => (d as any).video_views > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="video_views"
+                        name="Video Views"
+                        stroke="#b32fbf"
+                        strokeWidth={2}
+                        fill="url(#trendGradient)"
+                        dot={{ r: 4, fill: "#b32fbf" }}
+                      />
+                    )}
+                    {trendChartData.some((d) => (d as any).reach > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="reach"
+                        name="Reach"
+                        stroke="#EE8733"
+                        strokeWidth={2}
+                        fill="none"
+                        dot={{ r: 4, fill: "#EE8733" }}
+                      />
+                    )}
+                    {trendChartData.some((d) => (d as any).clicks > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="clicks"
+                        name="Clicks"
+                        stroke="#539BDB"
+                        strokeWidth={2}
+                        fill="url(#trendGradientBlue)"
+                        dot={{ r: 4, fill: "#539BDB" }}
+                      />
+                    )}
                     <Area
                       type="monotone"
                       dataKey="engagement"
