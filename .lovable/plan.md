@@ -1,36 +1,38 @@
 
 
-## Plan: Display All Facebook Metrics on Dashboard
+## Analysis: Facebook Organic vs Paid Overlap
 
-### Problem
-The sync now pulls `link_clicks`, `page_views`, `video_views`, `organic_impressions`, `paid_impressions`, `follower_growth`, and `posts_published` — but:
-1. The `metric_defaults` table for facebook doesn't include `link_clicks` or `page_views` in `available_metrics` or `default_metrics`
-2. The top-level KPI cards don't show Link Clicks or Page Views
-3. The KPI sparkline data doesn't track these new metrics
+You're right to be concerned. The Facebook Page insights API (`page_media_view`) includes **both organic and paid views** in its totals — the 27.7K views in your screenshot includes ad-driven views. When Meta Ads is also synced, the paid impressions/views would indeed be counted twice.
 
-Since there's no `client_platform_config` row for AMW Media's facebook, the PlatformMetricsCard currently shows all metrics unfiltered — so the per-platform card should already display them. But the metric_defaults should be updated for when metric configuration is used.
+### What we already have
 
-### Changes
+The sync already fetches the `page_media_view` breakdown by `is_from_ads`, splitting into:
+- `totalMediaViewsPaid` (views from ads = `true`)
+- `totalMediaViewsOrganic` (views not from ads = `false`)
 
-#### 1. Database Migration — Update `metric_defaults` for Facebook
-Add `link_clicks`, `page_views`, and `video_views` to both `available_metrics` and `default_metrics`:
-```sql
-UPDATE metric_defaults 
-SET available_metrics = '{impressions,organic_impressions,paid_impressions,reach,engagement,page_views,link_clicks,follower_growth,follower_removes,total_followers,video_views,likes,comments,shares,reactions,posts_published,engagement_rate}',
-    default_metrics = '{total_followers,follower_growth,reach,impressions,engagement,likes,comments,shares,video_views,posts_published,engagement_rate,link_clicks,page_views}'
-WHERE platform = 'facebook';
-```
+But currently these are stored as separate fields while `impressions` and `reach` still use the **total** (organic + paid combined).
 
-#### 2. `src/components/clients/ClientDashboard.tsx` — Add Link Clicks + Page Views to KPIs
-- Add `link_clicks` and `page_views` aggregation to the `kpis` useMemo (lines 524-597)
-- Add corresponding sparkline data entries in `sparklineMap` (lines 600-632)
-- Show Link Clicks KPI when value > 0 (with MousePointerClick icon)
-- Show Page Views KPI when value > 0 (with Eye icon)
+### Fix
 
-#### 3. `src/types/database.ts` — Verify labels exist
-Already has `link_clicks: 'Link Clicks'` and `page_views: 'Page Views'` — no change needed.
+**File: `supabase/functions/sync-facebook-page/index.ts`**
+
+Update the `metricsData` output so the primary metrics reflect **organic only**:
+
+- `impressions` → use `totalMediaViewsOrganic` instead of `totalMediaViews`
+- `reach` → use `totalMediaViewsOrganic` instead of `totalMediaViews`
+- `engagement_rate` → calculate against organic impressions only
+- Keep `paid_impressions` and `organic_impressions` as-is for reference
+- Keep the total in a separate field (`total_impressions`) if needed for debugging
+
+This ensures:
+1. The Facebook Page card shows **organic-only** numbers
+2. Meta Ads shows **paid-only** numbers
+3. No duplication when both are synced
+
+### Posts filtering
+
+The post fetch (`published_posts`) already only returns **organic posts** — Facebook doesn't return ads through this endpoint. So `top_content` is already clean.
 
 ### Files to modify
-1. Database migration (metric_defaults update)
-2. `src/components/clients/ClientDashboard.tsx` — KPI cards + sparklines
+1. `supabase/functions/sync-facebook-page/index.ts` — switch primary metrics to organic-only values
 
