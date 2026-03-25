@@ -1,180 +1,113 @@
 
 
-## Plan: Platform Improvements — Metrics, Reports, Connections Disclaimer, Interactive Dashboard, and Competitive Overhaul
+## Plan: Add Google Search Console, Google Analytics, and Google Business Profile Integrations
 
-This is a large improvement plan organized into 5 sections matching your requests, plus a competitive analysis section.
+### What's Needed
 
----
+You already have Google Cloud Console set up with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` secrets configured. The existing Google Ads integration pattern (connect → OAuth → callback → sync) can be reused for all three new platforms.
 
-### 1. Verify Metric Settings for Each Platform
+### Prerequisites (Google Cloud Console Steps — You Do These)
 
-**Problem:** The `metric_defaults` table already has platform-specific `available_metrics` and `default_metrics` for all 6 platforms. However, the MetricConfigPanel falls back to `Object.keys(METRIC_LABELS)` (all 40+ metrics) when no defaults exist, which can show irrelevant metrics.
+Before I build the code, you need to enable these APIs in your Google Cloud Console project:
 
-**Fix:**
-- Ensure `MetricConfigPanel.tsx` line 201 uses a filtered fallback instead of all METRIC_LABELS keys — only show metrics relevant to the platform type (use `AD_METRICS` and `ORGANIC_PLATFORMS` sets to filter)
-- Add missing metrics to `METRIC_LABELS` and `METRIC_EXPLANATIONS` if any `available_metrics` from the defaults table aren't covered (current coverage looks complete)
-- No database changes needed — defaults are already correctly populated
+1. **Google Search Console API** — Enable "Google Search Console API" in APIs & Services → Library
+2. **Google Analytics Data API** (GA4) — Enable "Google Analytics Data API" in APIs & Services → Library  
+3. **Google My Business API / Business Profile Performance API** — Enable "Business Profile Performance API" and "My Business Business Information API"
 
-**Files:** `src/components/clients/MetricConfigPanel.tsx`
-
----
-
-### 2. Verify Email Templates and Report Sending
-
-**Problem:** Email sending uses the `send-report-email` edge function with Resend. The function and template exist and appear functional.
-
-**Verification steps:**
-- Confirm the `RESEND_API_KEY` secret is set (it is)
-- Confirm the `send-report-email` edge function is deployed
-- Ensure the Reports page has "Send" buttons that call `sendReportEmail` (it does)
-- Add a "Send Test Email" button on the Reports page or per-report so you can verify delivery without waiting for the automation cycle
-- Add visual confirmation on the Reports page showing email delivery status from `email_logs` table
-
-**Files:** `src/pages/Reports.tsx`, `supabase/functions/send-report-email/index.ts` (redeploy to ensure latest version is live)
+No new secrets are needed — the existing `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` work for all Google APIs. The OAuth consent screen just needs the additional scopes added (Google auto-approves most read-only scopes).
 
 ---
 
-### 3. Connection Data Disclaimer
+### Implementation
 
-**Problem:** No data privacy/usage disclaimer is shown in the Connections tab.
+#### 1. Database: Extend PlatformType Enum
 
-**What to add:** Below the connections list (and inside the ConnectionDialog), add a collapsible disclaimer card explaining:
-- **What data is collected:** Platform performance data (impressions, reach, engagement, ad spend, followers) via official APIs (Google Ads API, Meta Graph API, TikTok Marketing API, LinkedIn Marketing API)
-- **Why:** To generate automated marketing performance reports
-- **How it's stored:** Securely in cloud infrastructure, encrypted at rest, access tokens stored server-side
-- **Data retention:** Data is retained while the connection is active. When a connection is removed, all associated performance data, sync logs, and configuration are permanently deleted
-- **Meta-specific clause:** "Data obtained through Meta APIs is used solely to provide reporting and analytics features. We do not share, sell, or transfer Meta user data to third parties."
-- **Google-specific:** "Google Ads data is accessed in compliance with Google API Services User Data Policy"
+Add `google_search_console`, `google_analytics`, and `google_business_profile` to the `platform_type` enum via migration.
 
-**Files:** New component `src/components/clients/ConnectionDisclaimer.tsx`, modify `src/pages/clients/ClientDetail.tsx` (Connections tab), modify `src/components/clients/ConnectionDialog.tsx`
+Add rows to `metric_defaults` for each new platform with appropriate available/default metrics.
 
----
+#### 2. Frontend Types & Labels
 
-### 4. Interactive Dashboard with Explanations and Hover Data
+Update `src/types/database.ts`:
+- Extend `PlatformType` union with the 3 new types
+- Add entries to `PLATFORM_LABELS`, `PLATFORM_LOGOS` (use the Google logo for all three, or add distinct logos)
+- Add to `ORGANIC_PLATFORMS` set (none of these have ad spend)
+- Add new metric keys to `METRIC_LABELS` (e.g., `search_clicks`, `search_impressions`, `search_ctr`, `search_position`, `sessions`, `active_users`, `bounce_rate`, `avg_session_duration`, `page_views_per_session`, `gbp_views`, `gbp_searches`, `gbp_calls`, `gbp_direction_requests`, `gbp_website_clicks`, `gbp_reviews_count`, `gbp_average_rating`)
 
-**Problem:** (a) Metric explanations from `METRIC_EXPLANATIONS` exist in code but aren't prominently visible on the dashboard — they only show as tiny text at the bottom of each metric tile in `PlatformMetricsCard`. (b) KPI sparkline cards and charts don't show interactive hover tooltips with historical data points.
+#### 3. Connection Dialog
 
-**Fixes:**
+Update `src/components/clients/ConnectionDialog.tsx`:
+- Add the 3 new platforms to the `PLATFORMS` array
+- Add to `OAUTH_SUPPORTED` and `CONNECT_FUNCTION_MAP`
 
-**(a) Prominent metric explanations:**
-- Add visible explanation text below each section header in `ClientDashboard.tsx` (e.g., under "Platform Details" add "Detailed breakdown of how each connected platform performed this period")
-- In `PlatformMetricsCard.tsx`, make the explanation text more prominent — increase font size from 10px to 12px, use slightly darker color, and add an info icon
-- Add section descriptions to charts: "Spend Distribution — See how your ad budget is split across platforms", "Engagement Breakdown — How people are interacting with your content", "Performance Trend — How your key metrics have changed over the last 6 months"
+#### 4. OAuth Connect Functions (3 new edge functions)
 
-**(b) Interactive hover on charts and cards:**
-- **KPI Sparkline Cards:** Add `<RechartsTooltip>` to each sparkline `<AreaChart>` so hovering shows the value and month name for each data point. Add `activeDot` to show a highlighted dot on hover. Pass month labels into sparkline data (currently only `{ v: number }`, change to `{ v: number, name: string }`)
-- **Trend Area Chart:** Already has `<RechartsTooltip>` but uses default formatter — add a custom formatter showing currency for spend, formatted numbers for other metrics, and the month label
-- **Bar Charts:** Already have tooltips — enhance the formatter to show formatted values (currency symbol for spend)
-- **Donut Chart:** Already has tooltip — enhance to show percentage and formatted currency
-- **PlatformMetricsCard individual tiles:** Add a mini sparkline to each metric tile using the 6-month trend data. Pass `trendData` down to `PlatformMetricsCard` so each metric can show its own historical sparkline with hover interaction
+Each follows the same pattern as `google-ads-connect/index.ts` but with different OAuth scopes:
 
-**Files:** `src/components/clients/ClientDashboard.tsx`, `src/components/clients/PlatformMetricsCard.tsx`, `src/components/clients/SectionHeader.tsx`
+- **`google-search-console-connect`** — scope: `https://www.googleapis.com/auth/webmasters.readonly`
+- **`google-analytics-connect`** — scope: `https://www.googleapis.com/auth/analytics.readonly`
+- **`google-business-connect`** — scopes: `https://www.googleapis.com/auth/business.manage` (for reading performance data and business info)
 
----
+#### 5. OAuth Callback Handler
 
-### 5. Competitive Analysis and Platform Improvement Plan
+Update `supabase/functions/oauth-callback/index.ts`:
+- Add `handleGoogleSearchConsole`, `handleGoogleAnalytics`, `handleGoogleBusinessProfile` cases
+- Each exchanges the auth code for tokens (same Google token endpoint) and discovers available properties/accounts to store in `metadata` for the Account Picker
 
-After analyzing DashThis, AgencyAnalytics, Whatagraph, Swydo, and your AMW PDF report style, here are the key features that would elevate the platform from 3/10 to 10/10:
+**Discovery logic per platform:**
+- **GSC**: Call `https://www.googleapis.com/webmasters/v3/sites` to list verified sites
+- **GA4**: Call `https://analyticsadmin.googleapis.com/v1beta/accounts` then list properties per account
+- **GBP**: Call `https://mybusinessbusinessinformation.googleapis.com/v1/accounts` then list locations
 
-#### Tier 1 — High Impact, Implement Now
+#### 6. Account Picker Updates
 
-**A. White-label Client Portal (read-only shareable dashboards)**
-- Like DashThis's "share URL" feature — generate a read-only link clients can bookmark
-- Clients see their own dashboard without needing to log in (token-based access)
-- Branded with client's logo, AMW branding optional
-- This is the #1 feature every competitor has that you're missing
+Update `src/components/clients/AccountPickerDialog.tsx`:
+- Add rendering for GSC (list of verified sites to pick from)
+- Add rendering for GA4 (list of properties to pick from)
+- Add rendering for GBP (list of business locations to pick from)
 
-**B. Goal Tracking & Benchmarks**
-- Set target KPIs per client/platform (e.g., "Target: 50K reach/month")
-- Show progress bars and goal achievement % on dashboard
-- Industry benchmarks: "Your CTR of 2.1% is above the industry average of 1.8%"
-- DashThis, AgencyAnalytics, and Whatagraph all have this
+#### 7. Sync Functions (3 new edge functions)
 
-**C. Annotations & Notes on Timeline**
-- Allow adding notes to specific months ("Launched new campaign", "Christmas sale")
-- Show as markers on trend charts
-- Critical for explaining data spikes/dips to clients
+- **`sync-google-search-console`** — Queries the Search Analytics API for the selected month: `https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query`. Stores clicks, impressions, CTR, average position, top queries, top pages.
 
-**D. Enhanced Data Visualization**
-- **Cross-platform comparison charts:** Side-by-side bar charts comparing the same metric across all platforms
-- **Conversion funnel:** Impressions → Clicks → Conversions visualized as a funnel
-- **Period-over-period overlay:** Overlay current period's trend line on top of previous period for visual comparison
-- **Heatmap calendar:** Show daily/weekly performance intensity (like GitHub contribution graph)
+- **`sync-google-analytics`** — Queries the GA4 Data API: `https://analyticsdata.googleapis.com/v1beta/properties/{propertyId}:runReport`. Stores sessions, active users, page views, bounce rate, avg session duration, new vs returning users, top pages, traffic sources.
 
-#### Tier 2 — Medium Impact, Build Next
+- **`sync-google-business-profile`** — Queries the Business Profile Performance API: `https://businessprofileperformance.googleapis.com/v1/locations/{locationId}:getDailyMetricsTimeSeries`. Stores views, searches, calls, direction requests, website clicks, reviews count, average rating.
 
-**E. Automated Insights & Anomaly Detection**
-- Automatically flag when metrics deviate significantly from normal (e.g., "Spend increased 150% this week")
-- Weekly email digest with top insights per client
-- Currently you have on-demand AI analysis — make it automatic and persistent
+Each follows the existing pattern: refresh token → query API → aggregate monthly data → upsert `monthly_snapshots`.
 
-**F. Report Templates & Customization**
-- Multiple PDF report templates (executive summary, detailed, social-only, ads-only)
-- Drag-and-drop section ordering for reports
-- Custom branding per client (colors, logo placement)
-- DashThis and Whatagraph excel at this
+#### 8. Metric Explanations
 
-**G. Multi-Client Overview Dashboard**
-- The main Dashboard page is currently sparse — add an aggregate view showing all clients' KPIs in a table/grid
-- Quick health indicators (green/amber/red) per client based on metric trends
-- "Clients needing attention" section highlighting failed syncs, declining metrics
-
-**H. CSV/Excel Export**
-- Export any dashboard view or date range as CSV/Excel
-- Scheduled export delivery via email
-- Every competitor has this
-
-#### Tier 3 — Polish & Differentiation
-
-**I. Mobile-Responsive Dashboard**
-- Ensure all charts, KPI cards, and tables work well on mobile
-- DashThis specifically markets "mobile-friendly dashboards"
-
-**J. Comparison/Competitive Analysis**
-- Compare client's performance against their own historical averages
-- "Best performing month" and "Worst performing month" highlights
-
-**K. Widget/Card Customization**
-- Let users toggle which charts appear on the dashboard
-- Reorder sections via drag-and-drop
-- Choose between chart types (bar vs line vs area) per widget
-
-**L. Notification System**
-- In-app notifications for completed syncs, failed syncs, new reports
-- Bell icon in the header with notification count
+Add to `src/types/metrics.ts` explanations for all new metrics (e.g., `search_position: "Average ranking position in Google search results"`, `gbp_calls: "Number of phone calls made from your Google Business Profile"`).
 
 ---
 
-### Implementation Priority for This Session
+### Files Summary
 
-Given the scope, I recommend implementing in this order:
-
-1. **Connection Disclaimer** (new component + integration) — 1 file created, 2 modified
-2. **Interactive Dashboard Hover + Explanations** — 3 files modified  
-3. **Metric Config Filtering Fix** — 1 file modified
-4. **Report Email Verification Enhancement** — 1 file modified
-5. **Multi-Client Overview on Main Dashboard** — 1 file modified (Index.tsx)
-6. **Cross-platform Comparison Chart** — added to ClientDashboard
-7. **Goal Tracking UI** (requires 1 new DB table + UI components)
-
-### Technical Details
-
-**Database changes needed:**
-- New table `client_goals` for goal tracking: `id, client_id, platform, metric_key, target_value, period_type, created_at`
-- New table `dashboard_annotations` for timeline notes: `id, client_id, note_text, annotation_month, annotation_year, created_at, created_by`
-- New table `shared_dashboard_tokens` for white-label client portal: `id, client_id, token, expires_at, is_active, created_at`
-
-**New files:**
-- `src/components/clients/ConnectionDisclaimer.tsx`
-- `src/components/clients/CrossPlatformChart.tsx`  
-- `src/components/clients/ConversionFunnel.tsx`
+**New edge functions (6 files):**
+- `supabase/functions/google-search-console-connect/index.ts`
+- `supabase/functions/google-analytics-connect/index.ts`
+- `supabase/functions/google-business-connect/index.ts`
+- `supabase/functions/sync-google-search-console/index.ts`
+- `supabase/functions/sync-google-analytics/index.ts`
+- `supabase/functions/sync-google-business-profile/index.ts`
 
 **Modified files:**
-- `src/components/clients/ClientDashboard.tsx` — section descriptions, enhanced tooltips, per-metric sparklines, new chart sections
-- `src/components/clients/PlatformMetricsCard.tsx` — mini sparklines per metric, bigger explanations, accept trendData prop
-- `src/components/clients/MetricConfigPanel.tsx` — filter fallback metrics by platform type
-- `src/pages/clients/ClientDetail.tsx` — add disclaimer to connections tab
-- `src/components/clients/ConnectionDialog.tsx` — add disclaimer
-- `src/pages/Index.tsx` — multi-client overview with health indicators
-- `src/pages/Reports.tsx` — email status display, test send button
+- `supabase/functions/oauth-callback/index.ts` — 3 new platform handlers
+- `src/types/database.ts` — Extended PlatformType, labels, logos, metrics
+- `src/types/metrics.ts` — New metric explanations
+- `src/components/clients/ConnectionDialog.tsx` — 3 new platform options
+- `src/components/clients/AccountPickerDialog.tsx` — Picker UI for new platforms
+- `src/components/clients/MetricConfigPanel.tsx` — Ensure new platforms filter correctly
+
+**Database migration:**
+- Alter `platform_type` enum to add 3 values
+- Insert `metric_defaults` rows for new platforms
+
+### Your Action Items Before I Build
+
+1. Enable **Google Search Console API** in Google Cloud Console
+2. Enable **Google Analytics Data API** in Google Cloud Console
+3. Enable **Business Profile Performance API** and **My Business Business Information API** in Google Cloud Console
+4. Confirm these are enabled, then I'll implement everything
 
