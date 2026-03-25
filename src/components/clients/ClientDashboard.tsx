@@ -337,6 +337,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [allPosts, setAllPosts] = useState<(TopContentItem & { platform: PlatformType })[]>([]);
 
   useEffect(() => {
     setHasAutoDetected(false);
@@ -460,6 +461,19 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
         return { platform, metrics_data: a, report_month: month, report_year: year };
       });
     }
+
+    // Collect all top_content posts from raw snapshots (before aggregation)
+    const rawSnapshots = (currentRes.data ?? []) as SnapshotData[];
+    const collectedPosts: (TopContentItem & { platform: PlatformType })[] = [];
+    for (const s of rawSnapshots) {
+      if (Array.isArray(s.top_content) && s.top_content.length > 0) {
+        for (const post of s.top_content) {
+          collectedPosts.push({ ...post, platform: s.platform });
+        }
+      }
+    }
+    collectedPosts.sort((a, b) => (b.total_engagement ?? 0) - (a.total_engagement ?? 0));
+    setAllPosts(collectedPosts);
 
     setSnapshots(currentSnapshots);
     setPrevSnapshots((prevRes.data ?? []) as SnapshotData[]);
