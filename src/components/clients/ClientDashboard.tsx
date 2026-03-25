@@ -21,6 +21,10 @@ import {
   ExternalLink,
   FileText,
   Image as ImageIcon,
+  Globe,
+  Search,
+  PlayCircle,
+  Activity,
 } from "lucide-react";
 import {
   Table,
