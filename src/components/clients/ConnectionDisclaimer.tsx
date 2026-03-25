@@ -60,8 +60,9 @@ const ConnectionDisclaimer = () => {
               Developer Policies.
             </p>
             <p>
-              <strong>Google Ads:</strong> Google Ads data is accessed and used in compliance with
-              the Google API Services User Data Policy, including the Limited Use requirements.
+              <strong>Google (Ads, Search Console, Analytics, Business Profile):</strong> Google
+              data is accessed and used in compliance with the Google API Services User Data Policy,
+              including the Limited Use requirements.
             </p>
             <p>
               <strong>TikTok:</strong> TikTok Marketing API data is used exclusively for performance
