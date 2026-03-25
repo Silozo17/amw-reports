@@ -18,6 +18,9 @@ interface ReportWithClient {
   generated_at: string | null;
   client_id: string;
   clients: { company_name: string; full_name: string } | null;
+  emailStatus?: string;
+  emailSentAt?: string;
+  emailError?: string;
 }
 
 const MONTH_NAMES = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -45,15 +48,34 @@ const Reports = () => {
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
 
   const fetchReports = async () => {
-    const [reportsRes, clientsRes] = await Promise.all([
+    const [reportsRes, clientsRes, emailLogsRes] = await Promise.all([
       supabase
         .from('reports')
         .select('*, clients(company_name, full_name)')
         .order('report_year', { ascending: false })
         .order('report_month', { ascending: false }),
       supabase.from('clients').select('id, company_name').eq('is_active', true).order('company_name'),
+      supabase.from('email_logs').select('report_id, status, sent_at, error_message').order('created_at', { ascending: false }),
     ]);
-    setReports((reportsRes.data as ReportWithClient[]) ?? []);
+
+    const emailMap = new Map<string, { status: string; sent_at: string | null; error_message: string | null }>();
+    for (const log of emailLogsRes.data ?? []) {
+      if (log.report_id && !emailMap.has(log.report_id)) {
+        emailMap.set(log.report_id, log);
+      }
+    }
+
+    const enrichedReports = ((reportsRes.data ?? []) as ReportWithClient[]).map(r => {
+      const emailLog = emailMap.get(r.id);
+      return {
+        ...r,
+        emailStatus: emailLog?.status,
+        emailSentAt: emailLog?.sent_at ?? undefined,
+        emailError: emailLog?.error_message ?? undefined,
+      };
+    });
+
+    setReports(enrichedReports);
     setClients((clientsRes.data as ClientOption[]) ?? []);
     setIsLoading(false);
   };
@@ -156,6 +178,13 @@ const Reports = () => {
                           {MONTH_NAMES[report.report_month]} {report.report_year}
                           {report.generated_at && ` · Generated ${new Date(report.generated_at).toLocaleDateString()}`}
                         </p>
+                        {report.emailStatus && (
+                          <p className={`text-xs mt-0.5 ${report.emailStatus === 'sent' ? 'text-accent' : report.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            {report.emailStatus === 'sent' ? `✓ Emailed${report.emailSentAt ? ` on ${new Date(report.emailSentAt).toLocaleDateString()}` : ''}` :
+                             report.emailStatus === 'failed' ? `✗ Email failed${report.emailError ? `: ${report.emailError}` : ''}` :
+                             '○ Email pending'}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -194,6 +223,7 @@ const Reports = () => {
                         onClick={async () => {
                           setSendingIds(prev => new Set(prev).add(report.id));
                           await sendReportEmail(report.id);
+                          await fetchReports();
                           setSendingIds(prev => {
                             const next = new Set(prev);
                             next.delete(report.id);

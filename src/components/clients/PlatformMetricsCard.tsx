@@ -107,7 +107,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {metricEntries.map(([key, value]) => {
                 const prevValue = prevMetrics?.[key];
                 const change = prevValue && prevValue !== 0
@@ -123,7 +123,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
                 return (
                   <div key={key} className="rounded-xl border bg-card p-5 space-y-2">
                     <div className="flex items-center gap-1.5">
-                      <p className="text-[11px] text-muted-foreground truncate uppercase tracking-wider font-medium">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
                         {METRIC_LABELS[key] || key}
                       </p>
                       <MetricTooltip metricKey={key} />
@@ -144,7 +144,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
                       <p className="text-[10px] text-muted-foreground/50 italic">No data</p>
                     ) : null}
                     {explanation && (
-                      <p className="text-[10px] text-muted-foreground/60 leading-relaxed mt-1">{explanation}</p>
+                      <p className="text-xs text-muted-foreground/70 leading-relaxed mt-1.5">{explanation}</p>
                     )}
                   </div>
                 );
