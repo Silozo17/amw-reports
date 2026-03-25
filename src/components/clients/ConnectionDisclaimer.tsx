@@ -18,8 +18,10 @@ const ConnectionDisclaimer = () => {
             <p className="font-semibold text-foreground mb-1">What data we collect</p>
             <p>
               We collect platform performance data including impressions, reach, engagement metrics,
-              ad spend, follower counts, and content performance via official APIs (Google Ads API,
-              Meta Graph API, TikTok Marketing API, LinkedIn Marketing API). We do not collect
+              ad spend, follower counts, search performance, website analytics, and business profile
+              insights via official APIs (Google Ads API, Google Search Console API, Google Analytics
+              Data API, Business Profile Performance API, Meta Graph API, TikTok Marketing API,
+              LinkedIn Marketing API). We do not collect
               personal messages, private user data, or data from individual end-users of your pages.
             </p>
           </div>
