@@ -12,6 +12,7 @@ import ClientDetail from "./pages/clients/ClientDetail";
 import Reports from "./pages/Reports";
 import Connections from "./pages/Connections";
 import Logs from "./pages/Logs";
+import DebugConsole from "./pages/DebugConsole";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
@@ -59,6 +60,7 @@ const AppRoutes = () => (
     <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
     <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+    <Route path="/debug" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
