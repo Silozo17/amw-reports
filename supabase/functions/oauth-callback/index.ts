@@ -750,6 +750,7 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
 
   // Discover YouTube channels
   const channels: Array<{ id: string; name: string }> = [];
+  let discoveryError: string | null = null;
   try {
     const channelRes = await fetch(
       "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
@@ -757,13 +758,23 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
     );
     const channelData = await channelRes.json();
     console.log("YouTube channels discovery:", JSON.stringify(channelData));
-    if (channelData.items?.length > 0) {
+
+    if (!channelRes.ok) {
+      // Handle API errors explicitly (e.g. SERVICE_DISABLED / 403)
+      if (channelData.error?.errors?.[0]?.reason === "accessNotConfigured") {
+        discoveryError = "YouTube Data API v3 is not enabled. Please enable it in your Google Cloud Console and retry.";
+      } else {
+        discoveryError = `YouTube API error: ${channelData.error?.message || channelRes.statusText}`;
+      }
+      console.error("YouTube discovery error:", discoveryError);
+    } else if (channelData.items?.length > 0) {
       for (const ch of channelData.items) {
         channels.push({ id: ch.id, name: ch.snippet?.title || ch.id });
       }
     }
   } catch (e) {
     console.error("Could not discover YouTube channels:", e);
+    discoveryError = e instanceof Error ? e.message : "Failed to discover YouTube channels";
   }
 
   // Auto-select if exactly one channel (same pattern as TikTok)
@@ -776,11 +787,11 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token || null,
       token_expires_at: expiresAt,
-      is_connected: true,
-      last_error: null,
+      is_connected: discoveryError ? false : true,
+      last_error: discoveryError,
       account_name: autoName,
       account_id: autoId,
-      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, channels },
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, channels, discovery_error: discoveryError },
     })
     .eq("id", connectionId);
 
