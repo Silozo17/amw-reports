@@ -68,6 +68,12 @@ Deno.serve(async (req) => {
     const metadata = conn.metadata as any;
     const organizations = metadata?.organizations || [];
 
+    // Date range for the target month
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+    const monthStartMs = monthStart.getTime();
+    const monthEndMs = monthEnd.getTime();
+
     // ── Fetch follower stats for each organization ──
     let totalFollowers = 0;
 
@@ -86,33 +92,81 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Fetch organic post engagement for each organization ──
+    // ── Fetch organic post engagement for each organization (filtered by month) ──
     let totalLikes = 0;
     let totalComments = 0;
     let totalShares = 0;
     let totalImpressions = 0;
     let totalClicks = 0;
 
+    interface LinkedInPost {
+      id: string;
+      text: string;
+      permalink: string;
+      created_time: string;
+      likes: number;
+      comments: number;
+      shares: number;
+      impressions: number;
+      clicks: number;
+      total_engagement: number;
+    }
+
+    const allPostsData: LinkedInPost[] = [];
+
     for (const org of organizations) {
       try {
-        const postsUrl = `https://api.linkedin.com/rest/ugcPosts?q=authors&authors=List(urn:li:organization:${org.id})&count=50`;
+        const postsUrl = `https://api.linkedin.com/rest/ugcPosts?q=authors&authors=List(urn:li:organization:${org.id})&count=100`;
         const postsRes = await fetch(postsUrl, { headers: LI_HEADERS(accessToken) });
         const postsData = await postsRes.json();
 
         for (const post of postsData.elements || []) {
+          // Filter by creation date — only include posts from the target month
+          const createdAt = post.created?.time || post.firstPublishedAt;
+          if (!createdAt) continue;
+          const postTime = typeof createdAt === "number" ? createdAt : new Date(createdAt).getTime();
+          if (postTime < monthStartMs || postTime > monthEndMs) continue;
+
+          // Fetch stats for this post
           try {
             const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${org.id}&ugcPosts=List(${post.id})`;
             const statsRes = await fetch(statsUrl, { headers: LI_HEADERS(accessToken) });
             const statsData = await statsRes.json();
 
+            let postLikes = 0, postComments = 0, postShares = 0, postImpressions = 0, postClicks = 0;
+
             for (const stat of statsData.elements || []) {
               const s = stat.totalShareStatistics || {};
-              totalLikes += Number(s.likeCount || 0);
-              totalComments += Number(s.commentCount || 0);
-              totalShares += Number(s.shareCount || 0);
-              totalImpressions += Number(s.impressionCount || 0);
-              totalClicks += Number(s.clickCount || 0);
+              postLikes += Number(s.likeCount || 0);
+              postComments += Number(s.commentCount || 0);
+              postShares += Number(s.shareCount || 0);
+              postImpressions += Number(s.impressionCount || 0);
+              postClicks += Number(s.clickCount || 0);
             }
+
+            totalLikes += postLikes;
+            totalComments += postComments;
+            totalShares += postShares;
+            totalImpressions += postImpressions;
+            totalClicks += postClicks;
+
+            // Extract post text
+            const specificContent = post.specificContent?.["com.linkedin.ugc.ShareContent"];
+            const postText = specificContent?.shareCommentary?.text || "";
+            const postPermalink = `https://www.linkedin.com/feed/update/${post.id}`;
+
+            allPostsData.push({
+              id: post.id,
+              text: postText,
+              permalink: postPermalink,
+              created_time: new Date(postTime).toISOString(),
+              likes: postLikes,
+              comments: postComments,
+              shares: postShares,
+              impressions: postImpressions,
+              clicks: postClicks,
+              total_engagement: postLikes + postComments + postShares,
+            });
           } catch {} // non-blocking per post
         }
       } catch (e) {
@@ -121,6 +175,20 @@ Deno.serve(async (req) => {
     }
 
     const totalEngagement = totalLikes + totalComments + totalShares;
+
+    // Sort top content by engagement descending, keep top 10
+    allPostsData.sort((a, b) => b.total_engagement - a.total_engagement);
+    const topContent = allPostsData.slice(0, 10).map((p) => ({
+      message: p.text,
+      permalink_url: p.permalink,
+      created_time: p.created_time,
+      likes: p.likes,
+      comments: p.comments,
+      shares: p.shares,
+      impressions: p.impressions,
+      clicks: p.clicks,
+      total_engagement: p.total_engagement,
+    }));
 
     const metricsData = {
       total_followers: totalFollowers,
@@ -132,9 +200,10 @@ Deno.serve(async (req) => {
       engagement: totalEngagement,
       engagement_rate: totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0,
       organizations_count: organizations.length,
+      posts_published: allPostsData.length,
     };
 
-    // Upsert monthly snapshot
+    // Select-then-update/insert pattern
     const { data: existing } = await supabase
       .from("monthly_snapshots")
       .select("id, snapshot_locked")
@@ -147,9 +216,9 @@ Deno.serve(async (req) => {
     if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
 
     if (existing) {
-      await supabase.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: [], raw_data: {} }).eq("id", existing.id);
+      await supabase.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: topContent, raw_data: {} }).eq("id", existing.id);
     } else {
-      await supabase.from("monthly_snapshots").insert({ client_id: clientId, platform: "linkedin", report_month: month, report_year: year, metrics_data: metricsData, top_content: [], raw_data: {} });
+      await supabase.from("monthly_snapshots").insert({ client_id: clientId, platform: "linkedin", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent, raw_data: {} });
     }
 
     await supabase.from("platform_connections").update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null }).eq("id", connectionId);

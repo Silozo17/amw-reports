@@ -111,14 +111,14 @@ Deno.serve(async (req) => {
       const row = analyticsData.rows?.[0] || [];
       const metricsData: Record<string, number> = {
         views: row[0] || 0,
-        watch_time: row[1] || 0, // estimated minutes watched
+        watch_time: row[1] || 0,
         likes: row[2] || 0,
         comments: row[3] || 0,
         shares: row[4] || 0,
-        subscribers: (row[5] || 0) - (row[6] || 0), // net subscribers gained
+        subscribers: (row[5] || 0) - (row[6] || 0),
         impressions: row[7] || 0,
-        ctr: (row[8] || 0) * 100, // convert fraction to percentage
-        avg_view_duration: row[9] || 0, // seconds
+        ctr: (row[8] || 0) * 100,
+        avg_view_duration: row[9] || 0,
       };
 
       // Fetch channel stats for total subscriber count
@@ -146,7 +146,6 @@ Deno.serve(async (req) => {
         });
         const topData = await topRes.json();
         if (topData.rows?.length > 0) {
-          // Fetch video titles
           const videoIds = topData.rows.map((r: any[]) => r[0]).join(",");
           const videosRes = await fetch(
             `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoIds}`,
@@ -170,22 +169,35 @@ Deno.serve(async (req) => {
         console.warn("Could not fetch top videos:", e);
       }
 
-      // Upsert monthly snapshot
-      const { error: upsertError } = await supabase
+      // Select-then-update/insert (same pattern as other syncs) to prevent duplicates
+      const { data: existing } = await supabase
         .from("monthly_snapshots")
-        .upsert(
-          {
+        .select("id, snapshot_locked")
+        .eq("client_id", conn.client_id)
+        .eq("platform", "youtube")
+        .eq("report_month", report_month)
+        .eq("report_year", report_year)
+        .single();
+
+      if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
+
+      if (existing) {
+        await supabase
+          .from("monthly_snapshots")
+          .update({ metrics_data: metricsData, top_content: topContent })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("monthly_snapshots")
+          .insert({
             client_id: conn.client_id,
             platform: "youtube",
             report_month,
             report_year,
             metrics_data: metricsData,
             top_content: topContent,
-          },
-          { onConflict: "client_id,platform,report_month,report_year" }
-        );
-
-      if (upsertError) throw new Error(`Snapshot upsert failed: ${upsertError.message}`);
+          });
+      }
 
       // Update sync log
       await supabase
