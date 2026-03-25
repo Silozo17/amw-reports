@@ -240,6 +240,24 @@ const LandingPage = () => {
             </div>
           )}
         </div>
+
+          <footer role="contentinfo" className="mt-auto pt-8 space-y-2 text-left">
+            <p className="text-xs text-foreground/60 font-body leading-relaxed">
+              AMW Reports is operated by{' '}
+              <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website" className="text-foreground/80 hover:text-primary transition-colors underline">AMW Media</a>.
+            </p>
+            <p className="text-xs text-foreground/50 font-body">
+              © {new Date().getFullYear()} AMW Reports. All rights reserved.
+            </p>
+            <div className="flex items-center gap-3 text-xs font-body">
+              <a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy" className="text-foreground/60 hover:text-primary transition-colors">Privacy Policy</a>
+              <span className="text-foreground/30" aria-hidden="true">·</span>
+              <a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions" className="text-foreground/60 hover:text-primary transition-colors">Terms &amp; Conditions</a>
+              <span className="text-foreground/30" aria-hidden="true">·</span>
+              <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="AMW Media website" className="text-foreground/60 hover:text-primary transition-colors">amwmedia.co.uk</a>
+            </div>
+          </footer>
+        </div>
       </div>
 
       {/* Right: Dark Hero */}

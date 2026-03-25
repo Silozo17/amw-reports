@@ -81,23 +81,7 @@ const LandingHero = () => {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="absolute bottom-6 left-8 right-8 space-y-2">
-          <p className="text-xs text-amw-offwhite/50 font-body leading-relaxed">
-            AMW Reports is operated by{' '}
-            <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">AMW Media</a>.
-          </p>
-          <p className="text-xs text-amw-offwhite/40 font-body">
-            © {new Date().getFullYear()} AMW Reports. All rights reserved.
-          </p>
-          <div className="flex items-center gap-3 text-xs font-body">
-            <a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-amw-offwhite/50 hover:text-primary transition-colors">Privacy Policy</a>
-            <span className="text-amw-offwhite/30">·</span>
-            <a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-amw-offwhite/50 hover:text-primary transition-colors">Terms & Conditions</a>
-            <span className="text-amw-offwhite/30">·</span>
-            <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" className="text-amw-offwhite/50 hover:text-primary transition-colors">amwmedia.co.uk</a>
-          </div>
-        </div>
+      </div>
       </div>
     </section>
   );
