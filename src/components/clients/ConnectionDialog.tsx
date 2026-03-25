@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, ExternalLink, Loader2, Settings2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Plus, Loader2 } from 'lucide-react';
+
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
@@ -16,7 +16,6 @@ interface ConnectionDialogProps {
   clientId: string;
   connections: PlatformConnection[];
   onUpdate: () => void;
-  onOpenPicker: (conn: PlatformConnection) => void;
 }
 
 const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube'];
@@ -36,11 +35,14 @@ const CONNECT_FUNCTION_MAP: Record<string, string> = {
   youtube: 'youtube-connect',
 };
 
-const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: ConnectionDialogProps) => {
+const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogProps) => {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<PlatformType | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [connectingId, setConnectingId] = useState<string | null>(null);
+
+  // Filter out platforms that already have a connection
+  const connectedPlatforms = new Set(connections.map(c => c.platform));
+  const availablePlatforms = PLATFORMS.filter(p => !connectedPlatforms.has(p));
 
   const handleAddAndConnect = async () => {
     if (!platform) {
@@ -79,13 +81,10 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
   };
 
   const triggerOAuth = async (conn: PlatformConnection) => {
-    setConnectingId(conn.id);
-
     try {
       const functionName = CONNECT_FUNCTION_MAP[conn.platform];
       if (!functionName) {
         toast.info(`OAuth for ${PLATFORM_LABELS[conn.platform]} is not yet available.`);
-        setConnectingId(null);
         return;
       }
 
@@ -103,7 +102,6 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
     } catch (e) {
       console.error('OAuth error:', e);
       toast.error('Failed to start OAuth flow');
-      setConnectingId(null);
     }
   };
 
@@ -124,76 +122,8 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display">Platform Connections</DialogTitle>
+          <DialogTitle className="font-display">Add Connection</DialogTitle>
         </DialogHeader>
-
-        {connections.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {connections.map(conn => {
-              const canOAuth = OAUTH_SUPPORTED.includes(conn.platform);
-              const needsSelection = conn.is_connected && !conn.account_id;
-              return (
-                <div key={conn.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        {PLATFORM_LOGOS[conn.platform] && <img src={PLATFORM_LOGOS[conn.platform]} alt="" className="h-4 w-4 object-contain" />}
-                        <p className="text-sm font-body font-medium">{PLATFORM_LABELS[conn.platform]}</p>
-                      </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {conn.account_name || conn.account_id || (needsSelection ? 'Account not selected' : 'Not connected')}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {needsSelection && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => { setOpen(false); onOpenPicker(conn); }}
-                      >
-                        <Settings2 className="h-3 w-3" />
-                        Select
-                      </Button>
-                    )}
-                    {conn.is_connected && conn.account_id && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => { setOpen(false); onOpenPicker(conn); }}
-                      >
-                        <Settings2 className="h-3 w-3" />
-                        Change
-                      </Button>
-                    )}
-                    {!conn.is_connected && canOAuth && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs gap-1"
-                        disabled={connectingId === conn.id}
-                        onClick={() => triggerOAuth(conn)}
-                      >
-                        {connectingId === conn.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <ExternalLink className="h-3 w-3" />
-                        )}
-                        Connect
-                      </Button>
-                    )}
-                    <Badge variant={conn.is_connected && conn.account_id ? 'default' : needsSelection ? 'secondary' : 'destructive'} className="text-xs">
-                      {conn.is_connected && conn.account_id ? 'Ready' : needsSelection ? 'Pending' : 'Disconnected'}
-                    </Badge>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemove(conn)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -203,7 +133,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
                 <SelectValue placeholder="Select platform" />
               </SelectTrigger>
               <SelectContent>
-                {PLATFORMS.map(p => (
+                {availablePlatforms.map(p => (
                   <SelectItem key={p} value={p}>
                     <span className="flex items-center gap-2">
                       {PLATFORM_LOGOS[p] && <img src={PLATFORM_LOGOS[p]} alt="" className="h-4 w-4 object-contain" />}

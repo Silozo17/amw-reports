@@ -78,10 +78,10 @@ Deno.serve(async (req) => {
       throw new Error(`Unsupported platform: ${platform}`);
     }
 
-    // Redirect to client page with pending selection flag
+    // Re-fetch the connection to determine redirect behaviour
     const { data: connData } = await supabase
       .from("platform_connections")
-      .select("client_id")
+      .select("client_id, account_id, last_error, metadata")
       .eq("id", connectionId)
       .single();
 
@@ -89,6 +89,23 @@ Deno.serve(async (req) => {
       ? `/clients/${connData.client_id}`
       : "/clients";
 
+    // If auto-selected (account_id set), redirect with success flag
+    if (connData?.account_id) {
+      return Response.redirect(
+        `${frontendUrl}${clientPath}?oauth_connected=${connectionId}`,
+        302
+      );
+    }
+
+    // If discovery failed, redirect with error
+    if (connData?.last_error) {
+      return Response.redirect(
+        `${frontendUrl}${clientPath}?oauth_error=${encodeURIComponent(connData.last_error)}`,
+        302
+      );
+    }
+
+    // Otherwise open the picker (multiple assets to choose from)
     return Response.redirect(
       `${frontendUrl}${clientPath}?oauth_pending_selection=${connectionId}`,
       302
@@ -623,15 +640,24 @@ async function handleGoogleAnalytics(supabase: any, code: string, connectionId: 
 
   // Discover GA4 properties
   const properties: Array<{ id: string; name: string }> = [];
+  let discoveryError: string | null = null;
   try {
     const acctRes = await fetch("https://analyticsadmin.googleapis.com/v1beta/accounts", {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const acctData = await acctRes.json();
     console.log("GA4 accounts:", JSON.stringify(acctData));
-    if (acctData.accounts?.length > 0) {
+
+    if (!acctRes.ok) {
+      if (acctData.error?.status === "PERMISSION_DENIED" || acctRes.status === 403) {
+        discoveryError = "Google Analytics Admin API is not enabled. Please enable it in your Google Cloud Console and retry.";
+      } else {
+        discoveryError = `Google Analytics API error: ${acctData.error?.message || acctRes.statusText}`;
+      }
+      console.error("GA4 discovery error:", discoveryError);
+    } else if (acctData.accounts?.length > 0) {
       for (const acct of acctData.accounts) {
-        const accountName = acct.name; // e.g. "accounts/123456"
+        const accountName = acct.name;
         const propsRes = await fetch(
           `https://analyticsadmin.googleapis.com/v1beta/properties?filter=parent:${accountName}`,
           { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
@@ -647,7 +673,12 @@ async function handleGoogleAnalytics(supabase: any, code: string, connectionId: 
     }
   } catch (e) {
     console.error("Could not discover GA4 properties:", e);
+    discoveryError = e instanceof Error ? e.message : "Failed to discover GA4 properties";
   }
+
+  // Auto-select if exactly one property
+  const autoName = properties.length === 1 ? properties[0].name : null;
+  const autoId = properties.length === 1 ? properties[0].id : null;
 
   const { error: updateError } = await supabase
     .from("platform_connections")
@@ -655,11 +686,11 @@ async function handleGoogleAnalytics(supabase: any, code: string, connectionId: 
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token || null,
       token_expires_at: expiresAt,
-      is_connected: true,
-      last_error: null,
-      account_name: null,
-      account_id: null,
-      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, properties },
+      is_connected: discoveryError ? false : true,
+      last_error: discoveryError,
+      account_name: autoName,
+      account_id: autoId,
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, properties, discovery_error: discoveryError },
     })
     .eq("id", connectionId);
 
@@ -687,13 +718,22 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
 
   // Discover business locations
   const locations: Array<{ id: string; name: string }> = [];
+  let discoveryError: string | null = null;
   try {
     const acctRes = await fetch("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const acctData = await acctRes.json();
     console.log("GBP accounts:", JSON.stringify(acctData));
-    if (acctData.accounts?.length > 0) {
+
+    if (!acctRes.ok) {
+      if (acctData.error?.status === "PERMISSION_DENIED" || acctRes.status === 403) {
+        discoveryError = "My Business Account Management API is not enabled. Please enable it in your Google Cloud Console and retry.";
+      } else {
+        discoveryError = `Google Business Profile API error: ${acctData.error?.message || acctRes.statusText}`;
+      }
+      console.error("GBP discovery error:", discoveryError);
+    } else if (acctData.accounts?.length > 0) {
       for (const acct of acctData.accounts) {
         const locRes = await fetch(
           `https://mybusinessbusinessinformation.googleapis.com/v1/${acct.name}/locations?readMask=name,title`,
@@ -702,7 +742,7 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
         const locData = await locRes.json();
         if (locData.locations?.length > 0) {
           for (const loc of locData.locations) {
-            const locId = loc.name; // e.g. "locations/123"
+            const locId = loc.name;
             locations.push({ id: locId, name: loc.title || locId });
           }
         }
@@ -710,7 +750,12 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
     }
   } catch (e) {
     console.error("Could not discover GBP locations:", e);
+    discoveryError = e instanceof Error ? e.message : "Failed to discover GBP locations";
   }
+
+  // Auto-select if exactly one location
+  const autoName = locations.length === 1 ? locations[0].name : null;
+  const autoId = locations.length === 1 ? locations[0].id : null;
 
   const { error: updateError } = await supabase
     .from("platform_connections")
@@ -718,11 +763,11 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token || null,
       token_expires_at: expiresAt,
-      is_connected: true,
-      last_error: null,
-      account_name: null,
-      account_id: null,
-      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, locations },
+      is_connected: discoveryError ? false : true,
+      last_error: discoveryError,
+      account_name: autoName,
+      account_id: autoId,
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, locations, discovery_error: discoveryError },
     })
     .eq("id", connectionId);
 
