@@ -1229,11 +1229,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right font-medium tabular-nums">
-                                {engagement.toLocaleString()}
-                              </TableCell>
                               <TableCell className="text-right tabular-nums">
                                 {reach > 0 ? reach.toLocaleString() : "—"}
+                              </TableCell>
+                              <TableCell className="text-right font-medium tabular-nums">
+                                {(post.likes ?? 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {(post.comments ?? 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {(post.shares ?? 0).toLocaleString()}
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
                                 {engRate !== "—" ? `${engRate}%` : "—"}
