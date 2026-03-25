@@ -59,7 +59,42 @@ const ClientDetail = () => {
         .single()
         .then(({ data }) => {
           if (data) {
-            setPickerConnection(data as PlatformConnection);
+            const conn = data as PlatformConnection;
+            const meta = conn.metadata as Record<string, unknown> | null;
+
+            // Check if there's a discovery error (e.g. YouTube API disabled)
+            if (meta?.discovery_error) {
+              toast.error(String(meta.discovery_error));
+              fetchData();
+              return;
+            }
+
+            // Check if connection already has an account selected (auto-selected)
+            if (conn.account_id) {
+              toast.success(`${PLATFORM_LABELS[conn.platform]} connected successfully`);
+              fetchData();
+              return;
+            }
+
+            // Check if there are actually selectable assets before opening picker
+            const hasAssets = (meta?.channels as unknown[])?.length > 0 ||
+              (meta?.customers as unknown[])?.length > 0 ||
+              (meta?.ad_accounts as unknown[])?.length > 0 ||
+              (meta?.pages as unknown[])?.length > 0 ||
+              (meta?.ig_accounts as unknown[])?.length > 0 ||
+              (meta?.accounts as unknown[])?.length > 0 ||
+              (meta?.sites as unknown[])?.length > 0 ||
+              (meta?.properties as unknown[])?.length > 0 ||
+              (meta?.locations as unknown[])?.length > 0 ||
+              (meta?.organizations as unknown[])?.length > 0;
+
+            if (!hasAssets) {
+              toast.error('No accounts were discovered. Please check that the required APIs are enabled and permissions were granted.');
+              fetchData();
+              return;
+            }
+
+            setPickerConnection(conn);
             setPickerOpen(true);
           }
         });
