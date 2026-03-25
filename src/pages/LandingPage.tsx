@@ -7,9 +7,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
-import { BarChart3, FileText, Users, Palette, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, BarChart3, FileText, Users, Palette } from 'lucide-react';
+import WarpedGrid from '@/components/landing/WarpedGrid';
+import StarDecoration from '@/components/landing/StarDecoration';
 
 type View = 'login' | 'signup' | 'otp';
+
+const FEATURES = [
+  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Google, Meta, TikTok, LinkedIn & more — all in one place' },
+  { icon: FileText, title: 'Automated Reports', desc: 'Beautiful branded PDFs generated and emailed monthly' },
+  { icon: Users, title: 'Client Management', desc: 'Manage clients, recipients, and platform connections' },
+  { icon: Palette, title: 'White-Label Ready', desc: 'Your brand, your logo, your colours — fully customisable' },
+];
 
 const LandingPage = () => {
   const [view, setView] = useState<View>('login');
@@ -17,11 +26,9 @@ const LandingPage = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
 
-  // Login state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Signup state
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
@@ -30,7 +37,6 @@ const LandingPage = () => {
   const [signupPassword, setSignupPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // OTP state
   const [otpCode, setOtpCode] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -47,18 +53,9 @@ const LandingPage = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (signupPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-    if (signupPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return;
-    }
-    if (!companyName.trim()) {
-      toast.error('Company name is required');
-      return;
-    }
+    if (signupPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
+    if (signupPassword.length < 8) { toast.error('Password must be at least 8 characters'); return; }
+    if (!companyName.trim()) { toast.error('Company name is required'); return; }
 
     setIsLoading(true);
     const { error } = await supabase.auth.signUp({
@@ -92,13 +89,8 @@ const LandingPage = () => {
       type: 'signup',
     });
 
-    if (error) {
-      toast.error(error.message);
-      setIsLoading(false);
-      return;
-    }
+    if (error) { toast.error(error.message); setIsLoading(false); return; }
 
-    // Create org for new user
     if (data.user) {
       const { data: orgData, error: orgError } = await supabase
         .from('organisations')
@@ -117,7 +109,6 @@ const LandingPage = () => {
         return;
       }
 
-      // Create org membership
       await supabase.from('org_members').insert({
         org_id: orgData.id,
         user_id: data.user.id,
@@ -125,7 +116,6 @@ const LandingPage = () => {
         accepted_at: new Date().toISOString(),
       });
 
-      // Update profile with org_id and phone
       await supabase
         .from('profiles')
         .update({ org_id: orgData.id })
@@ -138,65 +128,14 @@ const LandingPage = () => {
   };
 
   const handleResendOtp = async () => {
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: signupEmail,
-    });
+    const { error } = await supabase.auth.resend({ type: 'signup', email: signupEmail });
     if (error) toast.error(error.message);
     else toast.success('Verification code resent');
   };
 
-  const FEATURES = [
-    { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Google, Meta, TikTok, LinkedIn & more — all in one place' },
-    { icon: FileText, title: 'Automated Reports', desc: 'Beautiful branded PDFs generated and emailed monthly' },
-    { icon: Users, title: 'Client Management', desc: 'Manage clients, recipients, and platform connections' },
-    { icon: Palette, title: 'White-Label Ready', desc: 'Your brand, your logo, your colours — fully customisable' },
-  ];
-
   return (
     <div className="flex min-h-screen">
-      {/* Left: Hero */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-gradient-to-br from-sidebar-background via-sidebar-background to-primary/20 text-sidebar-foreground relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-primary rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative z-10">
-          <h1 className="text-4xl font-display tracking-wide text-primary">AMW</h1>
-          <p className="text-xs tracking-[0.3em] text-sidebar-foreground/60 uppercase font-body">Reports</p>
-        </div>
-
-        <div className="relative z-10 space-y-8">
-          <div>
-            <h2 className="text-4xl font-display leading-tight">
-              Automated Marketing<br />
-              <span className="text-primary">Reports for Agencies</span>
-            </h2>
-            <p className="mt-4 text-lg text-sidebar-foreground/70 font-body max-w-md">
-              Connect your marketing platforms, generate stunning branded reports, and deliver insights to your clients — automatically.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex gap-3 p-3 rounded-lg bg-sidebar-accent/40 backdrop-blur-sm">
-                <Icon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-body font-semibold">{title}</p>
-                  <p className="text-xs text-sidebar-foreground/60 mt-0.5">{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <p className="relative z-10 text-xs text-sidebar-foreground/40 font-body">
-          © {new Date().getFullYear()} AMW Media. All rights reserved.
-        </p>
-      </div>
-
-      {/* Right: Auth Forms */}
+      {/* Left: Auth Forms */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-background">
         <div className="w-full max-w-md space-y-8">
           {/* Mobile header */}
@@ -226,9 +165,7 @@ const LandingPage = () => {
               </form>
               <p className="text-center text-sm text-muted-foreground font-body">
                 Don't have an account?{' '}
-                <button onClick={() => setView('signup')} className="text-primary font-medium hover:underline">
-                  Create one
-                </button>
+                <button onClick={() => setView('signup')} className="text-primary font-medium hover:underline">Create one</button>
               </p>
             </>
           )}
@@ -276,9 +213,7 @@ const LandingPage = () => {
               </form>
               <p className="text-center text-sm text-muted-foreground font-body">
                 Already have an account?{' '}
-                <button onClick={() => setView('login')} className="text-primary font-medium hover:underline">
-                  Sign in
-                </button>
+                <button onClick={() => setView('login')} className="text-primary font-medium hover:underline">Sign in</button>
               </p>
             </>
           )}
@@ -308,13 +243,68 @@ const LandingPage = () => {
               </Button>
               <p className="text-sm text-muted-foreground font-body">
                 Didn't receive the code?{' '}
-                <button onClick={handleResendOtp} className="text-primary font-medium hover:underline">
-                  Resend
-                </button>
+                <button onClick={handleResendOtp} className="text-primary font-medium hover:underline">Resend</button>
               </p>
             </div>
           )}
         </div>
+      </div>
+
+      {/* Right: Dark Hero */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-sidebar-background text-sidebar-foreground relative overflow-hidden">
+        <WarpedGrid />
+
+        {/* Glowing orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px] animate-pulse-glow" />
+          <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] rounded-full bg-secondary/10 blur-[100px] animate-pulse-glow" />
+        </div>
+
+        {/* Star decorations */}
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={32} color="purple" className="absolute top-[15%] right-[10%]" />
+          <StarDecoration size={18} color="blue" className="absolute top-[25%] right-[25%]" animated={false} />
+          <StarDecoration size={24} color="green" className="absolute bottom-[20%] left-[8%]" />
+          <StarDecoration size={14} color="orange" className="absolute top-[40%] left-[15%]" animated={false} />
+          <StarDecoration size={20} color="offwhite" className="absolute bottom-[30%] right-[15%] opacity-20" />
+        </div>
+
+        {/* Branding */}
+        <div className="relative z-10">
+          <h1 className="text-4xl font-display tracking-wide text-primary">AMW</h1>
+          <p className="text-xs tracking-[0.3em] text-sidebar-foreground/60 uppercase font-body">Reports</p>
+        </div>
+
+        {/* Hero content */}
+        <div className="relative z-10 space-y-8">
+          <div>
+            <h2 className="text-4xl xl:text-5xl font-display leading-[0.95] uppercase">
+              Automated Marketing<br />
+              Reports That<br />
+              <span className="text-gradient-purple">Elevate</span> Your Agency
+            </h2>
+            <p className="mt-6 text-lg text-sidebar-foreground/70 font-body max-w-md">
+              Connect your marketing platforms, generate stunning branded reports, and deliver insights to your clients — automatically.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {FEATURES.map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="flex gap-3 p-3 rounded-lg bg-sidebar-accent/40 backdrop-blur-sm border border-sidebar-border/50">
+                <Icon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-body font-semibold">{title}</p>
+                  <p className="text-xs text-sidebar-foreground/60 mt-0.5">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="relative z-10 text-xs text-sidebar-foreground/40 font-body">
+          © {new Date().getFullYear()} AMW Media. All rights reserved.
+        </p>
       </div>
     </div>
   );
