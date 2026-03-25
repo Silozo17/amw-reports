@@ -1,6 +1,7 @@
 import { useMemo, useCallback } from 'react';
-import Responsive from 'react-grid-layout';
-import WidthProvider from 'react-grid-layout/build/components/WidthProvider';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ReactGridLayout = require('react-grid-layout');
+const { Responsive: ResponsiveBase, WidthProvider: WP } = ReactGridLayout;
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
