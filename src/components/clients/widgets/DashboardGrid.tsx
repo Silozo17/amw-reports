@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react';
-import { Responsive, WidthProvider } from 'react-grid-layout';
+import Responsive from 'react-grid-layout';
+import WidthProvider from 'react-grid-layout/build/components/WidthProvider';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
