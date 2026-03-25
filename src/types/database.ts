@@ -222,6 +222,7 @@ export const METRIC_LABELS: Record<string, string> = {
   audience_growth_rate: 'Audience Growth Rate',
   page_likes: 'Page Likes',
   page_views: 'Page Views',
+  link_clicks: 'Link Clicks',
   profile_visits: 'Profile Visits',
   engagement: 'Engagement',
   engagement_rate: 'Engagement Rate',
