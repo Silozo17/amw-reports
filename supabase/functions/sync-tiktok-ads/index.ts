@@ -65,8 +65,22 @@ Deno.serve(async (req) => {
     // ── Fetch videos for the period ──
     const allVideos = await fetchVideosForPeriod(accessToken, month, year);
 
-    // ── Fetch video insights for additional metrics ──
-    const enrichedVideos = await enrichVideosWithInsights(accessToken, allVideos);
+    // ── Map videos to enriched format (no insights scope available yet) ──
+    const enrichedVideos: EnrichedVideo[] = allVideos.map((v) => ({
+      id: v.id,
+      title: v.title || v.video_description?.substring(0, 80) || "Untitled",
+      description: v.video_description || "",
+      duration: v.duration || 0,
+      cover_image_url: v.cover_image_url || "",
+      views: Number(v.view_count || 0),
+      reach: Number(v.view_count || 0),
+      likes: Number(v.like_count || 0),
+      comments: Number(v.comment_count || 0),
+      shares: Number(v.share_count || 0),
+      create_time: v.create_time,
+      avg_time_watched: 0,
+      completion_rate: 0,
+    }));
 
     // ── Aggregate metrics ──
     const aggregated = aggregateVideoMetrics(enrichedVideos);
