@@ -66,6 +66,13 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   gbp_website_clicks: 'Number of clicks to your website from your Google Business Profile',
   gbp_reviews_count: 'Total number of reviews on your Google Business Profile',
   gbp_average_rating: 'Average star rating of your Google Business Profile reviews',
+  // YouTube
+  subscribers: 'Net new subscribers gained during this period',
+  views: 'Total number of times your videos were viewed',
+  watch_time: 'Total minutes people spent watching your videos',
+  videos_published: 'Total number of videos on your channel',
+  avg_view_duration: 'Average time in seconds viewers watched your videos',
+  top_videos: 'Your best-performing videos during this period',
 };
 
 /** Timezone options for client configuration */

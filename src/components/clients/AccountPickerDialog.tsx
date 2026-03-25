@@ -57,6 +57,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
       case 'google_search_console': return (metadata.sites as DiscoveredAccount[]) || [];
       case 'google_analytics': return (metadata.properties as DiscoveredAccount[]) || [];
       case 'google_business_profile': return (metadata.locations as DiscoveredAccount[]) || [];
+      case 'youtube': return (metadata.channels as DiscoveredAccount[]) || [];
       default: return [];
     }
   };
@@ -383,6 +384,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                    platform === 'google_search_console' ? 'Select a verified site:' :
                    platform === 'google_analytics' ? 'Select a GA4 property:' :
                    platform === 'google_business_profile' ? 'Select a business location:' :
+                   platform === 'youtube' ? 'Select a YouTube channel:' :
                    'Select an Ad Account:'}
                 </p>
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">

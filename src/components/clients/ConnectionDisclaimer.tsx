@@ -72,6 +72,11 @@ const ConnectionDisclaimer = () => {
               <strong>LinkedIn:</strong> LinkedIn Marketing API data is processed in accordance with
               LinkedIn's API Terms of Use and is used solely for analytics reporting.
             </p>
+            <p>
+              <strong>YouTube:</strong> YouTube API data is accessed in compliance with the YouTube
+              Terms of Service and Google API Services User Data Policy. Data is used solely for
+              channel performance reporting and analytics.
+            </p>
           </div>
         </div>
       </CollapsibleContent>

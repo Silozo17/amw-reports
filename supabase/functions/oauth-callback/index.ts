@@ -68,6 +68,8 @@ Deno.serve(async (req) => {
       await handleGoogleAnalytics(supabase, authCode, connectionId, supabaseUrl);
     } else if (platform === "google_business_profile") {
       await handleGoogleBusinessProfile(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "youtube") {
+      await handleYouTube(supabase, authCode, connectionId, supabaseUrl);
     } else {
       throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -626,6 +628,60 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
       account_name: null,
       account_id: null,
       metadata: { scope: tokenData.scope, token_type: tokenData.token_type, locations },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
+// ── YouTube ──
+async function handleYouTube(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code, client_id: clientId, client_secret: clientSecret,
+      redirect_uri: redirectUri, grant_type: "authorization_code",
+    }),
+  });
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
+
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+
+  // Discover YouTube channels
+  const channels: Array<{ id: string; name: string }> = [];
+  try {
+    const channelRes = await fetch(
+      "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
+      { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+    );
+    const channelData = await channelRes.json();
+    console.log("YouTube channels discovery:", JSON.stringify(channelData));
+    if (channelData.items?.length > 0) {
+      for (const ch of channelData.items) {
+        channels.push({ id: ch.id, name: ch.snippet?.title || ch.id });
+      }
+    }
+  } catch (e) {
+    console.error("Could not discover YouTube channels:", e);
+  }
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_name: null,
+      account_id: null,
+      metadata: { scope: tokenData.scope, token_type: tokenData.token_type, channels },
     })
     .eq("id", connectionId);
 

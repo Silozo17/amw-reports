@@ -31,6 +31,8 @@ const C = {
 const PLATFORM_LABELS: Record<string, string> = {
   google_ads: "Google Ads", meta_ads: "Meta Ads", facebook: "Facebook",
   instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn",
+  google_search_console: "Google Search Console", google_analytics: "Google Analytics",
+  google_business_profile: "Google Business Profile", youtube: "YouTube",
 };
 
 const METRIC_LABELS: Record<string, string> = {
