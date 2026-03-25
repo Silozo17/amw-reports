@@ -96,10 +96,14 @@ Deno.serve(async (req) => {
       throw new Error("No Instagram Business accounts found. Make sure your Facebook Pages have linked Instagram accounts.");
     }
 
+    // Get org_id from client
+    const { data: clientData } = await supabaseClient.from("clients").select("org_id").eq("id", clientId).single();
+    const orgId = clientData?.org_id;
+
     // Create sync log
     const { data: syncLog } = await supabaseClient
       .from("sync_logs")
-      .insert({ client_id: clientId, platform: "instagram", status: "running", report_month: month, report_year: year })
+      .insert({ client_id: clientId, platform: "instagram", status: "running", report_month: month, report_year: year, org_id: orgId })
       .select("id")
       .single();
 
