@@ -1556,7 +1556,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                 </Card>
               </div>
             );
-          })()
+          })()}
+
           {/* PART 6: Audience Map */}
           <AudienceMap geoData={geoData} />
 
