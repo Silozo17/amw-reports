@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     const metadata = conn.metadata as any;
     const allPages = metadata?.pages || [];
 
-    // --- FIX 1: Filter to the selected page (account_id) only ---
+    // Filter to the selected page (account_id) only
     let pages: any[];
     if (conn.account_id) {
       const selectedPage = allPages.find((p: any) => String(p.id) === String(conn.account_id));
@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
     let totalMediaViews = 0;
     let totalMediaViewsPaid = 0;
     let totalMediaViewsOrganic = 0;
+    let totalPageViews = 0;
+    let totalLinkClicks = 0;
     const metricsAccum: Record<string, number> = {};
     const allTopPosts: any[] = [];
 
@@ -115,8 +117,7 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // --- FIX 2: Use only v25-valid metrics ---
-      // Fetch page_post_engagements and page_follows (both still valid in v25)
+      // 1. Fetch core insights: page_post_engagements + page_follows
       try {
         const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_post_engagements,page_follows&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         console.log(`Fetching insights for page ${pageId} (${page.name})`);
@@ -127,24 +128,16 @@ Deno.serve(async (req) => {
         }
         const insightsData = await insightsRes.json();
 
-        if (insightsData.error) {
-          console.error(`Insights error for page ${pageId}:`, insightsData.error.message);
-        }
-
         if (insightsData.data) {
           for (const metric of insightsData.data) {
             const values = metric.values || [];
             if (metric.name === "page_post_engagements") {
-              const total = values.reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-              totalEngagement += total;
+              totalEngagement += values.reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
             } else if (metric.name === "page_follows") {
-              // Running total — take the last day's value for total followers
               const lastValue = values.at(-1)?.value || 0;
               const firstValue = values.at(0)?.value || 0;
               metricsAccum.total_fans = (metricsAccum.total_fans || 0) + Number(lastValue);
-              // Follower growth = last value - first value in the period
-              const growth = Number(lastValue) - Number(firstValue);
-              metricsAccum.follower_growth = (metricsAccum.follower_growth || 0) + growth;
+              metricsAccum.follower_growth = (metricsAccum.follower_growth || 0) + (Number(lastValue) - Number(firstValue));
             }
           }
         }
@@ -157,7 +150,7 @@ Deno.serve(async (req) => {
           .eq("id", connectionId);
       }
 
-      // Fetch page_media_view separately (replaces deprecated page_impressions)
+      // 2. Fetch page_media_view (replaces deprecated page_impressions)
       try {
         const mediaViewUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const mediaViewRes = await fetch(mediaViewUrl);
@@ -165,14 +158,13 @@ Deno.serve(async (req) => {
           const mediaViewData = await mediaViewRes.json();
           if (mediaViewData.data) {
             for (const metric of mediaViewData.data) {
-              const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-              totalMediaViews += total;
+              totalMediaViews += (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
             }
           }
         }
       } catch {} // non-blocking
 
-      // Fetch page_media_view with is_from_ads breakdown for paid vs organic split
+      // 3. Fetch page_media_view with is_from_ads breakdown for paid vs organic
       try {
         const breakdownUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&period=day&since=${startDate}&until=${endDate}&breakdowns=is_from_ads&access_token=${pageToken}`;
         const breakdownRes = await fetch(breakdownUrl);
@@ -191,7 +183,35 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // Fetch video stats
+      // 4. Fetch page_views_total (Page Visits)
+      try {
+        const pageViewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_views_total&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const pageViewsRes = await fetch(pageViewsUrl);
+        if (pageViewsRes.ok) {
+          const pageViewsData = await pageViewsRes.json();
+          if (pageViewsData.data) {
+            for (const metric of pageViewsData.data) {
+              totalPageViews += (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
+            }
+          }
+        }
+      } catch {} // non-blocking
+
+      // 5. Fetch page_consumptions (Link Clicks / Content Clicks)
+      try {
+        const consumptionsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_consumptions&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const consumptionsRes = await fetch(consumptionsUrl);
+        if (consumptionsRes.ok) {
+          const consumptionsData = await consumptionsRes.json();
+          if (consumptionsData.data) {
+            for (const metric of consumptionsData.data) {
+              totalLinkClicks += (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
+            }
+          }
+        }
+      } catch {} // non-blocking
+
+      // 6. Fetch video stats
       try {
         const videoUrl = `${GRAPH_BASE}/${pageId}/video_posts?fields=length,description,created_time,video_insights{name,values}&since=${startDate}&until=${endDate}&limit=25&access_token=${pageToken}`;
         const videoRes = await fetch(videoUrl);
@@ -207,31 +227,55 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // Fetch top posts
+      // 7. Fetch ALL posts with full content, images, and per-post insights
       try {
-        const postsUrl = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,likes.summary(true),comments.summary(true),shares,reactions.summary(true),full_picture&since=${startDate}&until=${endDate}&limit=25&access_token=${pageToken}`;
-        const postsRes = await fetch(postsUrl);
-        if (!postsRes.ok) {
-          const errorBody = await postsRes.text();
-          throw new Error(`Posts API error (${postsRes.status}): ${errorBody}`);
-        }
-        const postsData = await postsRes.json();
+        let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,full_picture,permalink_url,likes.summary(true),comments.summary(true),shares,reactions.summary(true),insights.metric(post_impressions_unique,post_clicks){values}&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
 
-        if (postsData.data) {
-          for (const post of postsData.data) {
-            const likes = post.likes?.summary?.total_count || 0;
-            const comments = post.comments?.summary?.total_count || 0;
-            const shares = post.shares?.count || 0;
-            allTopPosts.push({
-              page_name: page.name,
-              message: (post.message || "").substring(0, 100),
-              created_time: post.created_time,
-              likes,
-              comments,
-              shares,
-              total_engagement: likes + comments + shares,
-            });
+        while (postsUrl) {
+          const postsRes = await fetch(postsUrl);
+          if (!postsRes.ok) {
+            const errorBody = await postsRes.text();
+            throw new Error(`Posts API error (${postsRes.status}): ${errorBody}`);
           }
+          const postsData = await postsRes.json();
+
+          if (postsData.data) {
+            for (const post of postsData.data) {
+              const likes = post.likes?.summary?.total_count || 0;
+              const comments = post.comments?.summary?.total_count || 0;
+              const shares = post.shares?.count || 0;
+
+              // Extract per-post reach and clicks from inline insights
+              let postReach = 0;
+              let postClicks = 0;
+              if (post.insights?.data) {
+                for (const insight of post.insights.data) {
+                  if (insight.name === "post_impressions_unique") {
+                    postReach = insight.values?.[0]?.value || 0;
+                  } else if (insight.name === "post_clicks") {
+                    postClicks = insight.values?.[0]?.value || 0;
+                  }
+                }
+              }
+
+              allTopPosts.push({
+                page_name: page.name,
+                message: post.message || "",
+                created_time: post.created_time,
+                full_picture: post.full_picture || null,
+                permalink_url: post.permalink_url || null,
+                likes,
+                comments,
+                shares,
+                reach: postReach,
+                clicks: postClicks,
+                total_engagement: likes + comments + shares,
+              });
+            }
+          }
+
+          // Paginate if more posts exist
+          postsUrl = postsData.paging?.next || null;
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
@@ -243,7 +287,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement).slice(0, 10);
+    // Sort all posts by engagement, keep all of them
+    const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement);
 
     const metricsData = {
       impressions: totalMediaViews,
@@ -251,7 +296,8 @@ Deno.serve(async (req) => {
       paid_impressions: totalMediaViewsPaid,
       reach: totalMediaViews,
       engagement: totalEngagement,
-      page_views: totalMediaViews,
+      page_views: totalPageViews,
+      link_clicks: totalLinkClicks,
       follower_growth: metricsAccum.follower_growth || 0,
       total_followers: metricsAccum.total_fans || 0,
       video_views: metricsAccum.video_views || 0,
@@ -309,7 +355,7 @@ Deno.serve(async (req) => {
 
     console.log(`Facebook sync complete. Pages synced: ${pages.length}, Metrics:`, JSON.stringify(metricsData));
 
-    return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length }), {
+    return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
