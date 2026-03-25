@@ -54,6 +54,9 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
       case 'meta_ads': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
       case 'tiktok': return (metadata.advertisers as DiscoveredAccount[]) || [];
       case 'linkedin': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
+      case 'google_search_console': return (metadata.sites as DiscoveredAccount[]) || [];
+      case 'google_analytics': return (metadata.properties as DiscoveredAccount[]) || [];
+      case 'google_business_profile': return (metadata.locations as DiscoveredAccount[]) || [];
       default: return [];
     }
   };
@@ -376,7 +379,11 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
                   {platform === 'google_ads' ? 'Select a Google Ads Account:' :
-                   platform === 'tiktok' ? 'Select an Advertiser Account:' : 'Select an Ad Account:'}
+                   platform === 'tiktok' ? 'Select an Advertiser Account:' :
+                   platform === 'google_search_console' ? 'Select a verified site:' :
+                   platform === 'google_analytics' ? 'Select a GA4 property:' :
+                   platform === 'google_business_profile' ? 'Select a business location:' :
+                   'Select an Ad Account:'}
                 </p>
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {accounts.map(acct => {

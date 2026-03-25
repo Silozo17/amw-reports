@@ -574,6 +574,9 @@ export type Database = {
         | "instagram"
         | "tiktok"
         | "linkedin"
+        | "google_search_console"
+        | "google_analytics"
+        | "google_business_profile"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -710,6 +713,9 @@ export const Constants = {
         "instagram",
         "tiktok",
         "linkedin",
+        "google_search_console",
+        "google_analytics",
+        "google_business_profile",
       ],
     },
   },

@@ -42,6 +42,30 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   website_clicks: 'Clicks to your website from your profile',
   email_contacts: 'Number of email taps from your profile',
   media_count: 'Total number of posts on your profile',
+  // Google Search Console
+  search_clicks: 'Number of clicks from Google search results to your website',
+  search_impressions: 'Number of times your site appeared in Google search results',
+  search_ctr: 'Percentage of search impressions that resulted in a click',
+  search_position: 'Average ranking position of your pages in Google search results',
+  top_queries: 'Search terms people used to find your website',
+  gsc_top_pages: 'Pages on your site that received the most search traffic',
+  // Google Analytics
+  sessions: 'Total number of visits to your website',
+  active_users: 'Number of unique users who engaged with your site',
+  new_users: 'First-time visitors to your website during this period',
+  ga_page_views: 'Total number of pages viewed on your website',
+  bounce_rate: 'Percentage of visitors who left after viewing only one page',
+  avg_session_duration: 'Average time a visitor spends on your website per visit',
+  pages_per_session: 'Average number of pages viewed per visit',
+  traffic_sources: 'Where your website traffic comes from (search, social, direct, etc.)',
+  // Google Business Profile
+  gbp_views: 'Number of times your Google Business Profile was viewed',
+  gbp_searches: 'Number of times your business appeared in Google Search or Maps',
+  gbp_calls: 'Number of phone calls made from your Google Business Profile',
+  gbp_direction_requests: 'Number of times people requested directions to your business',
+  gbp_website_clicks: 'Number of clicks to your website from your Google Business Profile',
+  gbp_reviews_count: 'Total number of reviews on your Google Business Profile',
+  gbp_average_rating: 'Average star rating of your Google Business Profile reviews',
 };
 
 /** Timezone options for client configuration */
