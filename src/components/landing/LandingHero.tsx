@@ -2,6 +2,7 @@ import { BarChart3, FileText, Users, Palette } from 'lucide-react';
 import WarpedGrid from './WarpedGrid';
 import StarDecoration from './StarDecoration';
 import mascot from '@/assets/mascot.svg';
+import amwLogo from '@/assets/AMW_Logo_White.png';
 
 const FEATURES = [
   { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Google, Meta, TikTok, LinkedIn & more — all in one place' },
