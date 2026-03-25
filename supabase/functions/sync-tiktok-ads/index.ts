@@ -115,7 +115,13 @@ Deno.serve(async (req) => {
 
     const topContent = enrichedVideos
       .sort((a, b) => b.total_engagement - a.total_engagement)
-      .slice(0, 20);
+      .slice(0, 20)
+      .map((v) => ({
+        ...v,
+        message: v.title || v.description || "Untitled",
+        full_picture: v.cover_image_url || null,
+        created_time: new Date(v.create_time * 1000).toISOString(),
+      }));
 
     // ── Upsert monthly snapshot ──
     const { data: existing } = await supabase
@@ -268,7 +274,7 @@ async function fetchVideosForPeriod(accessToken: string, month: number, year: nu
     const data = await res.json();
     console.log("TikTok video list page:", data.data?.videos?.length || 0, "videos");
 
-    if (data.error?.code) {
+    if (data.error?.code && data.error.code !== "ok") {
       console.error("TikTok video list error:", JSON.stringify(data.error));
       break;
     }
