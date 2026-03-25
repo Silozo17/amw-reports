@@ -66,49 +66,11 @@ Deno.serve(async (req) => {
 
     const accessToken = conn.access_token;
     const metadata = conn.metadata as any;
-
-    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-
-    let totalSpend = 0;
-    let totalImpressions = 0;
-    let totalClicks = 0;
-    let totalConversions = 0;
-    const campaigns: any[] = [];
-
-    // Fetch ad analytics if ad accounts exist
-    const adAccounts = metadata?.ad_accounts || [];
-    for (const adAcct of adAccounts) {
-      try {
-        const analyticsUrl = `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=CAMPAIGN&dateRange=(start:(year:${year},month:${month},day:1),end:(year:${year},month:${month},day:${lastDay}))&accounts=urn:li:sponsoredAccount:${adAcct.id}&fields=impressions,clicks,costInLocalCurrency,externalWebsiteConversions`;
-        const analyticsRes = await fetch(analyticsUrl, { headers: LI_HEADERS(accessToken) });
-        const analyticsData = await analyticsRes.json();
-        console.log("LinkedIn analytics:", JSON.stringify(analyticsData).substring(0, 500));
-
-        if (analyticsData.elements) {
-          for (const el of analyticsData.elements) {
-            const spend = Number(el.costInLocalCurrency || 0) / 10000; // LinkedIn returns in micro-currency
-            const impressions = Number(el.impressions || 0);
-            const clicks = Number(el.clicks || 0);
-            const conversions = Number(el.externalWebsiteConversions || 0);
-
-            totalSpend += spend;
-            totalImpressions += impressions;
-            totalClicks += clicks;
-            totalConversions += conversions;
-
-            campaigns.push({ spend, impressions, clicks, conversions });
-          }
-        }
-      } catch (e) {
-        console.warn(`LinkedIn ad analytics error for account ${adAcct.id}:`, e);
-      }
-    }
-
-    // Fetch organization page stats
-    let totalFollowers = 0;
     const organizations = metadata?.organizations || [];
+
+    // ── Fetch follower stats for each organization ──
+    let totalFollowers = 0;
+
     for (const org of organizations) {
       try {
         const followerUrl = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${org.id}`;
@@ -124,12 +86,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch organic post engagement for each organization
+    // ── Fetch organic post engagement for each organization ──
     let totalLikes = 0;
     let totalComments = 0;
     let totalShares = 0;
-    let totalOrgImpressions = 0;
-    let totalOrgClicks = 0;
+    let totalImpressions = 0;
+    let totalClicks = 0;
 
     for (const org of organizations) {
       try {
@@ -148,8 +110,8 @@ Deno.serve(async (req) => {
               totalLikes += Number(s.likeCount || 0);
               totalComments += Number(s.commentCount || 0);
               totalShares += Number(s.shareCount || 0);
-              totalOrgImpressions += Number(s.impressionCount || 0);
-              totalOrgClicks += Number(s.clickCount || 0);
+              totalImpressions += Number(s.impressionCount || 0);
+              totalClicks += Number(s.clickCount || 0);
             }
           } catch {} // non-blocking per post
         }
@@ -158,30 +120,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    const totalEngagement = totalLikes + totalComments + totalShares;
+
     const metricsData = {
-      spend: totalSpend,
+      total_followers: totalFollowers,
       impressions: totalImpressions,
       clicks: totalClicks,
-      conversions: totalConversions,
-      ctr: totalImpressions > 0 ? totalClicks / totalImpressions : 0,
-      cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
-      cpm: totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0,
-      cost_per_conversion: totalConversions > 0 ? totalSpend / totalConversions : 0,
-      total_followers: totalFollowers,
-      campaign_count: campaigns.length,
-      organizations_count: organizations.length,
       likes: totalLikes,
       comments: totalComments,
       shares: totalShares,
-      organic_impressions: totalOrgImpressions,
-      organic_clicks: totalOrgClicks,
-      engagement: totalLikes + totalComments + totalShares,
-      engagement_rate: totalOrgImpressions > 0 ? ((totalLikes + totalComments + totalShares) / totalOrgImpressions) * 100 : 0,
+      engagement: totalEngagement,
+      engagement_rate: totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0,
+      organizations_count: organizations.length,
     };
-
-    const topContent = campaigns
-      .sort((a, b) => b.spend - a.spend)
-      .slice(0, 10);
 
     // Upsert monthly snapshot
     const { data: existing } = await supabase
@@ -196,9 +147,9 @@ Deno.serve(async (req) => {
     if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
 
     if (existing) {
-      await supabase.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: topContent, raw_data: { campaigns } }).eq("id", existing.id);
+      await supabase.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: [], raw_data: {} }).eq("id", existing.id);
     } else {
-      await supabase.from("monthly_snapshots").insert({ client_id: clientId, platform: "linkedin", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent, raw_data: { campaigns } });
+      await supabase.from("monthly_snapshots").insert({ client_id: clientId, platform: "linkedin", report_month: month, report_year: year, metrics_data: metricsData, top_content: [], raw_data: {} });
     }
 
     await supabase.from("platform_connections").update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null }).eq("id", connectionId);
