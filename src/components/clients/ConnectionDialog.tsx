@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
+import { removeConnectionAndData } from '@/lib/connectionHelpers';
 
 interface ConnectionDialogProps {
   clientId: string;
@@ -17,11 +18,9 @@ interface ConnectionDialogProps {
   onOpenPicker: (conn: PlatformConnection) => void;
 }
 
-const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin'];
+const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'tiktok', 'linkedin'];
 
 const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'tiktok', 'linkedin'];
-
-const META_DEPENDENT: PlatformType[] = ['facebook', 'instagram'];
 
 const CONNECT_FUNCTION_MAP: Record<string, string> = {
   google_ads: 'google-ads-connect',
@@ -42,14 +41,6 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
       return;
     }
 
-    if (META_DEPENDENT.includes(platform)) {
-      const metaConn = connections.find(c => c.platform === 'meta_ads' && c.is_connected);
-      if (!metaConn) {
-        toast.error(`Connect Meta Ads first — ${PLATFORM_LABELS[platform]} data comes through your Meta Business connection.`);
-        return;
-      }
-    }
-
     setIsSubmitting(true);
 
     const { data: newConn, error } = await supabase
@@ -57,7 +48,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
       .insert({
         client_id: clientId,
         platform: platform as PlatformType,
-        is_connected: META_DEPENDENT.includes(platform),
+        is_connected: false,
       })
       .select('*')
       .single();
@@ -73,11 +64,6 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
     if (OAUTH_SUPPORTED.includes(platform)) {
       await triggerOAuth(newConn as PlatformConnection);
     } else {
-      // For meta-dependent platforms, open the picker to select from Meta's discovered assets
-      const metaConn = connections.find(c => c.platform === 'meta_ads' && c.is_connected);
-      if (metaConn) {
-        onOpenPicker(metaConn);
-      }
       toast.success(`${PLATFORM_LABELS[platform]} connection added.`);
     }
 
@@ -114,12 +100,12 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
     }
   };
 
-  const handleRemove = async (id: string) => {
-    const { error } = await supabase.from('platform_connections').delete().eq('id', id);
+  const handleRemove = async (conn: PlatformConnection) => {
+    const { error } = await removeConnectionAndData(conn.id, clientId, conn.platform);
     if (error) {
       toast.error('Failed to remove connection');
     } else {
-      toast.success('Connection removed');
+      toast.success('Connection and associated data removed');
       onUpdate();
     }
   };
@@ -192,7 +178,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
                     <Badge variant={conn.is_connected && conn.account_id ? 'default' : needsSelection ? 'secondary' : 'destructive'} className="text-xs">
                       {conn.is_connected && conn.account_id ? 'Ready' : needsSelection ? 'Pending' : 'Disconnected'}
                     </Badge>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemove(conn.id)}>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemove(conn)}>
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </div>
@@ -215,7 +201,6 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
                     <span className="flex items-center gap-2">
                       {PLATFORM_LOGOS[p] && <img src={PLATFORM_LOGOS[p]} alt="" className="h-4 w-4 object-contain" />}
                       {PLATFORM_LABELS[p]}
-                      {OAUTH_SUPPORTED.includes(p) ? ' (OAuth)' : META_DEPENDENT.includes(p) ? ' (via Meta)' : ''}
                     </span>
                   </SelectItem>
                 ))}
@@ -224,10 +209,10 @@ const ConnectionDialog = ({ clientId, connections, onUpdate, onOpenPicker }: Con
           </div>
           <Button onClick={handleAddAndConnect} disabled={isSubmitting || !platform} className="w-full gap-2">
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            {isSubmitting ? 'Connecting...' : OAUTH_SUPPORTED.includes(platform as PlatformType) ? 'Add & Connect' : 'Add Connection'}
+            {isSubmitting ? 'Connecting...' : 'Add & Connect'}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            Select a platform and click to add. OAuth platforms will redirect you to sign in.
+            Select a platform and click to add. You'll be redirected to sign in via OAuth.
           </p>
         </div>
       </DialogContent>
