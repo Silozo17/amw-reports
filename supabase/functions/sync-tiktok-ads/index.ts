@@ -293,61 +293,6 @@ async function fetchVideosForPeriod(accessToken: string, month: number, year: nu
   return allVideos;
 }
 
-async function enrichVideosWithInsights(accessToken: string, videos: RawVideo[]): Promise<EnrichedVideo[]> {
-  const enriched: EnrichedVideo[] = videos.map((v) => ({
-    id: v.id,
-    title: v.title || v.video_description?.substring(0, 80) || "Untitled",
-    description: v.video_description || "",
-    duration: v.duration || 0,
-    cover_image_url: v.cover_image_url || "",
-    views: Number(v.view_count || 0),
-    reach: Number(v.view_count || 0),
-    likes: Number(v.like_count || 0),
-    comments: Number(v.comment_count || 0),
-    shares: Number(v.share_count || 0),
-    create_time: v.create_time,
-    avg_time_watched: 0,
-    completion_rate: 0,
-  }));
-
-  if (videos.length === 0) return enriched;
-
-  // Fetch video insights in batches of 20
-  const videoIds = videos.map((v) => v.id);
-  const batchSize = 20;
-
-  for (let i = 0; i < videoIds.length; i += batchSize) {
-    const batch = videoIds.slice(i, i + batchSize);
-    try {
-      const res = await fetch(
-        "https://open.tiktokapis.com/v2/video/query/?fields=id,avg_time_watched,total_time_watched,impression_sources,audience_countries",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ filters: { video_ids: batch } }),
-        }
-      );
-      const data = await res.json();
-      console.log("TikTok video insights batch:", batch.length, "ids, response videos:", data.data?.videos?.length || 0);
-
-      if (data.data?.videos) {
-        for (const insight of data.data.videos) {
-          const match = enriched.find((e) => e.id === insight.id);
-          if (match) {
-            match.avg_time_watched = Number(insight.avg_time_watched || 0);
-            if (match.duration > 0) {
-              match.completion_rate = (match.avg_time_watched / match.duration) * 100;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Could not fetch video insights batch:", e);
-    }
-  }
-
-  return enriched;
-}
 
 interface AggregatedMetrics {
   views: number;
