@@ -766,6 +766,10 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
     console.error("Could not discover YouTube channels:", e);
   }
 
+  // Auto-select if exactly one channel (same pattern as TikTok)
+  const autoName = channels.length === 1 ? channels[0].name : null;
+  const autoId = channels.length === 1 ? channels[0].id : null;
+
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -774,8 +778,8 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
-      account_name: null,
-      account_id: null,
+      account_name: autoName,
+      account_id: autoId,
       metadata: { scope: tokenData.scope, token_type: tokenData.token_type, channels },
     })
     .eq("id", connectionId);
