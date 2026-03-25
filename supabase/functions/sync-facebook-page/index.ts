@@ -124,9 +124,9 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // Fetch Page Insights (comprehensive metrics)
+      // Fetch Page Insights (v25-valid metrics only)
       try {
-        const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_impressions,page_impressions_organic,page_impressions_paid,page_post_engagements,page_views_total,page_fans,page_reach,page_video_views&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_impressions,page_impressions_paid,page_post_engagements,page_media_view,page_daily_follows_unique,page_daily_unfollows_unique,page_follows&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
@@ -153,39 +153,33 @@ Deno.serve(async (req) => {
               case "page_impressions":
                 totalImpressions += total;
                 break;
-              case "page_impressions_organic":
-                metricsAccum.organic_impressions = (metricsAccum.organic_impressions || 0) + total;
-                break;
               case "page_impressions_paid":
                 metricsAccum.paid_impressions = (metricsAccum.paid_impressions || 0) + total;
                 break;
               case "page_post_engagements":
                 totalEngagement += total;
                 break;
-              case "page_views_total":
+              case "page_media_view":
                 totalPageViews += total;
                 break;
-              case "page_fan_adds":
+              case "page_daily_follows_unique":
                 totalFollowerAdds += total;
                 break;
-              case "page_fan_removes":
+              case "page_daily_unfollows_unique":
                 metricsAccum.follower_removes = (metricsAccum.follower_removes || 0) + total;
                 break;
-              case "page_fans":
-                metricsAccum.total_fans = Math.max(metricsAccum.total_fans || 0, total);
+              case "page_follows": {
+                // page_follows returns the running total — take the last day's value
+                const lastValue = (metric.values || []).at(-1)?.value || 0;
+                metricsAccum.total_fans = (metricsAccum.total_fans || 0) + Number(lastValue);
                 break;
-              case "page_reach":
-                metricsAccum.reach = (metricsAccum.reach || 0) + total;
-                break;
-              case "page_video_views":
-                metricsAccum.video_views = (metricsAccum.video_views || 0) + total;
-                break;
+              }
             }
           }
         }
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
-        console.error(`Sync error:`, errorMsg);
+        console.error(`Sync error for page ${pageId}:`, errorMsg);
         await supabaseClient
           .from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
@@ -249,9 +243,9 @@ Deno.serve(async (req) => {
 
     const metricsData = {
       impressions: totalImpressions,
-      organic_impressions: metricsAccum.organic_impressions || 0,
+      organic_impressions: Math.max(totalImpressions - (metricsAccum.paid_impressions || 0), 0),
       paid_impressions: metricsAccum.paid_impressions || 0,
-      reach: metricsAccum.reach || 0,
+      reach: totalImpressions,
       engagement: totalEngagement,
       page_views: totalPageViews,
       follower_growth: totalFollowerAdds,
