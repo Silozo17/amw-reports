@@ -699,6 +699,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_org_owner: { Args: { _user_id: string }; Returns: boolean }
       user_org_id: { Args: { _user_id: string }; Returns: string }
     }
     Enums: {
