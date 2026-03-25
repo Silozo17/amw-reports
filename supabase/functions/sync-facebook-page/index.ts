@@ -290,11 +290,15 @@ Deno.serve(async (req) => {
     // Sort all posts by engagement, keep all of them
     const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement);
 
+    // Use organic-only values for primary metrics to avoid duplication with Meta Ads
+    const organicImpressions = totalMediaViewsOrganic || Math.max(totalMediaViews - totalMediaViewsPaid, 0);
+
     const metricsData = {
-      impressions: totalMediaViews,
-      organic_impressions: totalMediaViewsOrganic || Math.max(totalMediaViews - totalMediaViewsPaid, 0),
+      impressions: organicImpressions,
+      organic_impressions: organicImpressions,
       paid_impressions: totalMediaViewsPaid,
-      reach: totalMediaViews,
+      total_impressions: totalMediaViews,
+      reach: organicImpressions,
       engagement: totalEngagement,
       page_views: totalPageViews,
       link_clicks: totalLinkClicks,
@@ -305,7 +309,7 @@ Deno.serve(async (req) => {
       comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
       posts_published: allTopPosts.length,
-      engagement_rate: totalMediaViews > 0 ? (totalEngagement / totalMediaViews) * 100 : 0,
+      engagement_rate: organicImpressions > 0 ? (totalEngagement / organicImpressions) * 100 : 0,
       pages_count: pages.length,
     };
 
