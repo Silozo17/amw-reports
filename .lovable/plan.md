@@ -1,32 +1,50 @@
-## Current State: Multi-Tenant SaaS — Complete
 
-All 5 phases implemented:
 
-### ✅ Phase 1: Database Migration
-- Created `organisations` and `org_members` tables
-- Added `org_id` column to `clients`, `reports`, `sync_logs`, `report_logs`, `email_logs`, `profiles`
-- Migrated existing data to "AMW Media" organisation
-- Rewrote all RLS policies to scope by organisation via `user_org_id()` helper
-- Updated `handle_new_user()` trigger to auto-link invited users
+## Plan: Redesign Landing Page — Login Left, AMW Hero Right
 
-### ✅ Phase 2: Landing Page & Auth
-- New 50/50 split-screen landing page at `/` with login + signup
-- OTP email verification on signup
-- Organisation auto-created after verification
-- Route restructured: `/` = landing, `/dashboard` = main app
+### What Changes
 
-### ✅ Phase 3: Frontend — Org Context
-- `useOrg()` hook provides org data throughout the app
-- Sidebar shows org name/logo (white-label ready)
-- `useAuth` reads roles from `org_members`
-- `ClientForm` includes `org_id` on insert
+Swap the 50/50 layout: **login/signup forms on the left** (light background), **dark AMW-style hero on the right** matching the `amwmedia.co.uk` website design with the warped grid, star decorations, glowing orbs, and bold typography.
 
-### ✅ Phase 4: Edge Functions Update
-- All 10 sync functions include `org_id` in `sync_logs` inserts
-- `generate-report` includes `org_id` in `reports` and `report_logs` inserts
-- `send-report-email` includes `org_id` in `email_logs` inserts
+### Implementation
 
-### ✅ Phase 5: Settings Page
-- Team management uses `org_members` instead of `user_roles`
-- Invite dialog: enter email + role → invited user auto-joins on signup
-- Organisation info displayed
+#### 1. Create `WarpedGrid` component (`src/components/landing/WarpedGrid.tsx`)
+
+Port the `WarpedGrid` component from the AMW Media project. This renders the animated SVG grid background with mouse-tracking displacement. Use the `"dark"` variant with stroke color `hsl(32 44% 92% / 0.06)`. Simplified version — no CMS dependencies, just the core SVG animation logic.
+
+#### 2. Create `StarDecoration` component (`src/components/landing/StarDecoration.tsx`)
+
+Port the `StarDecoration` component — simple 8-pointed star SVG with optional spin animation. Supports purple, blue, green, orange, offwhite color variants.
+
+#### 3. Add CSS animations (`src/index.css`)
+
+Add `@keyframes star-spin` (slow 360deg rotation) and `animate-star-spin` utility, plus `animate-pulse-glow` for the background orbs. Also add `.text-gradient-purple` utility class for the gradient text effect.
+
+#### 4. Redesign `LandingPage.tsx`
+
+Restructure the layout:
+
+**Left side (light, `bg-background`):** Login/signup/OTP forms — same functionality, just moved to the left panel. Mobile header stays for small screens.
+
+**Right side (dark, `bg-sidebar-background`):** AMW hero section matching the website:
+- `WarpedGrid` component as full background
+- Glowing purple and blue orbs with blur (matching hero's `.bg-primary/10` and `.bg-secondary/10` blurred circles)
+- `StarDecoration` elements scattered (purple top-right, blue mid-right, green bottom-left, orange mid-left, offwhite bottom-right)
+- Bold headline: `AUTOMATED MARKETING REPORTS THAT` + `ELEVATE` (in gradient purple) + `YOUR AGENCY`
+- Subtitle text explaining the product
+- 4 feature cards in a 2x2 grid with dark card backgrounds (`bg-sidebar-accent/40 backdrop-blur-sm`)
+- AMW branding top-left, copyright bottom-left
+- Hidden on mobile (forms go full-width)
+
+All auth logic (login, signup, OTP, org creation) remains identical — only the visual layout changes.
+
+### Files
+
+**New files:**
+- `src/components/landing/WarpedGrid.tsx` — Ported from AMW project
+- `src/components/landing/StarDecoration.tsx` — Ported from AMW project
+
+**Modified files:**
+- `src/pages/LandingPage.tsx` — Swap left/right panels, add hero components
+- `src/index.css` — Add star-spin, pulse-glow keyframes, text-gradient-purple
+
