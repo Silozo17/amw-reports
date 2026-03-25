@@ -54,9 +54,13 @@ Deno.serve(async (req) => {
       throw new Error("Connection is not authenticated. Please connect via OAuth first.");
     }
 
+    // Get org_id from client
+    const { data: clientData } = await supabase.from("clients").select("org_id").eq("id", clientId).single();
+    const orgId = clientData?.org_id;
+
     const { data: syncLog } = await supabase
       .from("sync_logs")
-      .insert({ client_id: clientId, platform: "linkedin", status: "running", report_month: month, report_year: year })
+      .insert({ client_id: clientId, platform: "linkedin", status: "running", report_month: month, report_year: year, org_id: orgId })
       .select("id")
       .single();
 
