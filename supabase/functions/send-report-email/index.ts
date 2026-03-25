@@ -215,6 +215,7 @@ Deno.serve(async (req) => {
             recipient_email: recipient.email,
             status: "failed",
             error_message: errMsg,
+            org_id: client.org_id,
           });
         } else {
           results.push({ email: recipient.email, status: "sent" });
@@ -225,6 +226,7 @@ Deno.serve(async (req) => {
             recipient_email: recipient.email,
             status: "sent",
             sent_at: new Date().toISOString(),
+            org_id: client.org_id,
           });
         }
       } catch (sendErr) {
@@ -237,6 +239,7 @@ Deno.serve(async (req) => {
           recipient_email: recipient.email,
           status: "failed",
           error_message: errMsg,
+          org_id: client.org_id,
         });
       }
     }
