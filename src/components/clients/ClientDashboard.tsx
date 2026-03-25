@@ -535,6 +535,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       0,
     );
     const totalFollowers = Math.max(...filtered.map((s) => s.metrics_data.total_followers || 0), 0);
+    const totalLinkClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
+    const totalPageViews = filtered.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const prevReach = filteredPrev.reduce(
@@ -551,6 +553,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
         (s.metrics_data.shares || 0),
       0,
     );
+    const prevLinkClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
+    const prevPageViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
 
     const calcChange = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
@@ -593,6 +597,28 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             },
           ]
         : []),
+      ...(totalLinkClicks > 0
+        ? [
+            {
+              label: "Link Clicks",
+              value: totalLinkClicks,
+              change: calcChange(totalLinkClicks, prevLinkClicks),
+              icon: MousePointerClick,
+              metricKey: "link_clicks",
+            },
+          ]
+        : []),
+      ...(totalPageViews > 0
+        ? [
+            {
+              label: "Page Views",
+              value: totalPageViews,
+              change: calcChange(totalPageViews, prevPageViews),
+              icon: Eye,
+              metricKey: "page_views",
+            },
+          ]
+        : []),
     ];
   }, [filtered, filteredPrev]);
 
@@ -616,13 +642,15 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
         (s.metrics_data.comments || 0) +
         (s.metrics_data.shares || 0);
       existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
+      existing.link_clicks = (existing.link_clicks || 0) + (s.metrics_data.link_clicks || 0);
+      existing.page_views = (existing.page_views || 0) + (s.metrics_data.page_views || 0);
       monthMap.set(key, existing);
     }
 
     const sorted = Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6);
-    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers"]) {
+    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views"]) {
       map[metricKey] = sorted.map(([key, data]) => {
         const [y, m] = key.split("-");
         return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` };
