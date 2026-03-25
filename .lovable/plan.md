@@ -1,28 +1,12 @@
 
 
-## Reset TikTok Secrets and Verify Integration
+## Fix TikTok Scope Error
 
-The code is already correctly built for TikTok Login Kit v2 (organic content, not ads). The connect function, OAuth callback, and sync logic are all aligned. We just need to replace the secrets with your new Login Kit credentials.
+Your sandbox app has exactly 4 scopes approved: `user.info.basic`, `user.info.profile`, `user.info.stats`, `video.list`. The connect function currently requests 9 scopes (including `user.info.username`, `user.account.type`, `user.insights`, `video.insights`, `comment.list`) which TikTok rejects.
 
-### Steps
+### Changes
 
-1. **Update `TIKTOK_APP_ID`** — Replace with your new Login Kit **Client Key**
-2. **Update `TIKTOK_APP_SECRET`** — Replace with your new Login Kit **Client Secret**
+1. **`supabase/functions/tiktok-ads-connect/index.ts`** — Change the scope parameter from the current 9 scopes to exactly: `user.info.basic,user.info.profile,user.info.stats,video.list`
 
-### What you need from the TikTok Developer Portal
-
-From your **new Login Kit app** (not the Business app):
-- **Client Key** → stored as `TIKTOK_APP_ID`
-- **Client Secret** → stored as `TIKTOK_APP_SECRET`
-- **Redirect URI** must be set to: `https://kcdixfmjiifpnbtplodv.supabase.co/functions/v1/oauth-callback`
-
-### Checklist for your TikTok app configuration
-- App type: **Content** (not Commerce/Ads)
-- Product enabled: **Login Kit**
-- Redirect URI added in Login Kit settings
-- Required scopes requested: `user.info.basic`, `user.info.profile`, `user.info.stats`, `video.list`
-- Optional enhanced scopes: `user.insights`, `video.insights`, `comment.list`
-- If app is in sandbox/development mode: your TikTok account must be added as a test user
-
-No code changes needed — the integration is ready. Just the two secrets need updating.
+2. **`supabase/functions/sync-tiktok-ads/index.ts`** — Remove the `enrichVideosWithInsights` call (requires `video.insights` scope) and skip `comment.list` data. The video list endpoint already returns `view_count`, `like_count`, `comment_count`, `share_count` so metrics will still work. Set `avg_time_watched` and `completion_rate` to 0 until those scopes are approved.
 
