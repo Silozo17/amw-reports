@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set("client_key", clientKey);
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("scope", "user.info.basic,user.insights,video.list,video.insights");
+    authUrl.searchParams.set("scope", "user.info.basic,user.info.username,user.info.stats,user.info.profile,user.account.type,user.insights,video.list,video.insights,comment.list");
     authUrl.searchParams.set("state", state);
 
     return new Response(

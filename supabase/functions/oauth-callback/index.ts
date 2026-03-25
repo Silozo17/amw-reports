@@ -409,64 +409,71 @@ async function handleInstagram(supabase: any, code: string, connectionId: string
   if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
 }
 
-// ── TikTok ──
+// ── TikTok (Login Kit v2 — organic content) ──
 async function handleTikTok(supabase: any, authCode: string, connectionId: string) {
-  const appId = Deno.env.get("TIKTOK_APP_ID")!;
-  const appSecret = Deno.env.get("TIKTOK_APP_SECRET")!;
+  const clientKey = Deno.env.get("TIKTOK_APP_ID")!;
+  const clientSecret = Deno.env.get("TIKTOK_APP_SECRET")!;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
-  const tokenRes = await fetch(
-    "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ app_id: appId, secret: appSecret, auth_code: authCode }),
-    }
-  );
+  // Login Kit v2 token exchange
+  const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_key: clientKey,
+      client_secret: clientSecret,
+      code: authCode,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+    }),
+  });
+
   const tokenData = await tokenRes.json();
-  console.log("TikTok token response:", JSON.stringify(tokenData));
+  console.log("TikTok Login Kit v2 token response:", JSON.stringify(tokenData));
 
-  if (tokenData.code !== 0) {
-    throw new Error(tokenData.message || "TikTok token exchange failed");
+  if (tokenData.error || !tokenData.access_token) {
+    throw new Error(
+      tokenData.error_description || tokenData.error || "TikTok token exchange failed"
+    );
   }
 
-  const accessToken = tokenData.data.access_token;
-  const advertiserIds = tokenData.data.advertiser_ids || [];
+  const accessToken = tokenData.access_token;
+  const openId = tokenData.open_id || "";
+  const expiresIn = tokenData.expires_in || 86400;
+  const refreshToken = tokenData.refresh_token || null;
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Discover ALL advertiser accounts
-  const advertisers: Array<{ id: string; name: string }> = [];
-
-  if (advertiserIds.length > 0) {
-    try {
-      const infoRes = await fetch(
-        `https://business-api.tiktok.com/open_api/v1.3/advertiser/info/?advertiser_ids=["${advertiserIds.join('","')}"]`,
-        { headers: { "Access-Token": accessToken } }
-      );
-      const infoData = await infoRes.json();
-      if (infoData.code === 0 && infoData.data?.list) {
-        for (const adv of infoData.data.list) {
-          advertisers.push({ id: String(adv.advertiser_id), name: adv.advertiser_name || String(adv.advertiser_id) });
-        }
-      }
-    } catch (e) {
-      console.warn("Could not fetch TikTok advertiser info:", e);
-      for (const id of advertiserIds) {
-        advertisers.push({ id: String(id), name: `TikTok Ads (${id})` });
-      }
+  // Fetch user info to get display name
+  let displayName = "TikTok User";
+  try {
+    const userRes = await fetch(
+      "https://open.tiktokapis.com/v2/user/info/?fields=display_name,follower_count,avatar_url",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const userData = await userRes.json();
+    console.log("TikTok user info:", JSON.stringify(userData));
+    if (userData.data?.user?.display_name) {
+      displayName = userData.data.user.display_name;
     }
+  } catch (e) {
+    console.warn("Could not fetch TikTok user info:", e);
   }
 
-  // Store all but do NOT auto-select
+  // Store as a single account (the authenticated user)
+  const accounts = [{ id: openId, name: displayName }];
+
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
       access_token: accessToken,
-      refresh_token: null,
-      token_expires_at: new Date(Date.now() + 86400 * 1000).toISOString(),
+      refresh_token: refreshToken,
+      token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
       account_name: null,
       account_id: null,
-      metadata: { advertisers, token_type: "bearer" },
+      metadata: { open_id: openId, token_type: "bearer", accounts },
     })
     .eq("id", connectionId);
 
@@ -499,33 +506,7 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   const accessToken = tokenData.access_token;
   const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
-  // Discover ALL ad accounts
-  const adAccounts: Array<{ id: string; name: string }> = [];
-
-  try {
-    const adRes = await fetch(
-      "https://api.linkedin.com/rest/adAccounts?q=search&search=(status:(values:List(ACTIVE)))&count=50",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "LinkedIn-Version": "202401",
-          "X-Restli-Protocol-Version": "2.0.0",
-        },
-      }
-    );
-    const adData = await adRes.json();
-    console.log("LinkedIn ad accounts:", JSON.stringify(adData));
-    if (adData.elements?.length > 0) {
-      for (const el of adData.elements) {
-        const adId = String(el.id);
-        adAccounts.push({ id: adId, name: el.name || adId });
-      }
-    }
-  } catch (e) {
-    console.warn("Could not discover LinkedIn ad accounts:", e);
-  }
-
-  // Discover ALL organization pages
+  // Discover ALL organization pages (NO ad accounts — pages only)
   const organizations: Array<{ id: string; name: string }> = [];
   try {
     const orgRes = await fetch(
@@ -552,7 +533,7 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
     console.warn("Could not discover LinkedIn organizations:", e);
   }
 
-  // Store all but do NOT auto-select
+  // Store organizations only — no ad accounts
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -563,7 +544,7 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
       last_error: null,
       account_name: null,
       account_id: null,
-      metadata: { ad_accounts: adAccounts, organizations, token_type: "bearer" },
+      metadata: { organizations, token_type: "bearer" },
     })
     .eq("id", connectionId);
 

@@ -193,7 +193,7 @@ export const AD_METRICS = new Set([
 ]);
 
 /** Platforms that are organic-only (no ad spend metrics) */
-export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube']);
+export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube']);
 
 export const METRIC_LABELS: Record<string, string> = {
   spend: 'Spend',
