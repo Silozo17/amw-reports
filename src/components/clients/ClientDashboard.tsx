@@ -18,7 +18,19 @@ import {
   Clock,
   Loader2,
   TrendingUp,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { PLATFORM_LOGOS } from "@/types/database";
 import {
   PieChart,
   Pie,
@@ -54,9 +66,29 @@ interface ClientDashboardProps {
   currencyCode?: string;
 }
 
+interface TopContentItem {
+  page_name?: string;
+  message?: string;
+  caption?: string;
+  created_time?: string;
+  timestamp?: string;
+  full_picture?: string | null;
+  permalink_url?: string | null;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  reach?: number;
+  clicks?: number;
+  total_engagement?: number;
+  media_type?: string;
+  video_views?: number;
+}
+
 interface SnapshotData {
   platform: PlatformType;
   metrics_data: Record<string, number>;
+  top_content?: TopContentItem[];
   report_month: number;
   report_year: number;
 }
