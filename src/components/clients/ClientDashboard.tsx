@@ -41,6 +41,7 @@ import SectionHeader from "./SectionHeader";
 import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from "./DashboardHeader";
 import AudienceMap from "./AudienceMap";
 import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
+import { METRIC_EXPLANATIONS } from "@/types/metrics";
 import type { PlatformType, JobStatus } from "@/types/database";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -120,19 +121,34 @@ const formatKpiValue = (val: number, isCurrency: boolean, currSymbol: string): s
 // ─── KPI Sparkline Card ────────────────────────────────────────
 interface KpiCardProps {
   label: string;
+  metricKey: string;
   value: number;
   change?: number;
   icon: React.ElementType;
   isCost?: boolean;
-  sparklineData: Array<{ v: number }>;
+  sparklineData: Array<{ v: number; name: string }>;
   currSymbol: string;
 }
 
-const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, currSymbol }: KpiCardProps) => {
+const SparklineTooltipContent = ({ active, payload, currSymbol, isCost }: any) => {
+  if (!active || !payload?.[0]) return null;
+  const { v, name } = payload[0].payload;
+  return (
+    <div className="rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-md">
+      <p className="font-medium">{name}</p>
+      <p className="text-muted-foreground">
+        {isCost ? `${currSymbol}${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : v.toLocaleString()}
+      </p>
+    </div>
+  );
+};
+
+const KpiCard = ({ label, metricKey, value, change, icon: Icon, isCost, sparklineData, currSymbol }: KpiCardProps) => {
   const animatedValue = useAnimatedCounter(value);
   const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
   const bgTint =
     change !== undefined ? (isPositive ? "rgba(78, 214, 142, 0.05)" : "rgba(239, 68, 68, 0.05)") : undefined;
+  const explanation = METRIC_EXPLANATIONS[metricKey];
 
   return (
     <Card className="relative overflow-hidden" style={bgTint ? { backgroundColor: bgTint } : undefined}>
@@ -151,16 +167,16 @@ const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, curr
         {change !== undefined && (
           <div
             className={cn(
-              "flex items-center gap-1 text-[11px] font-medium",
-              isPositive === true ? "text-accent" : isPositive === false ? "text-destructive" : "text-muted-foreground",
+              "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full",
+              isPositive === true ? "bg-accent/10 text-accent" : isPositive === false ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
             )}
           >
             <span>
-              {isPositive ? "▲" : "▼"} {Math.abs(change).toFixed(1)}%
+              {change > 0 ? "↑" : change < 0 ? "↓" : "→"} {Math.abs(change).toFixed(1)}% from last month
             </span>
           </div>
         )}
-        {/* Sparkline */}
+        {/* Sparkline with interactive tooltip */}
         {sparklineData.length > 1 && (
           <div className="mt-2 -mx-1">
             <ResponsiveContainer width="100%" height={50}>
@@ -178,12 +194,20 @@ const KpiCard = ({ label, value, change, icon: Icon, isCost, sparklineData, curr
                   strokeWidth={1.5}
                   fill={`url(#spark-${label.replace(/\s/g, "")})`}
                   dot={false}
+                  activeDot={{ r: 4, fill: "#b32fbf", stroke: "#fff", strokeWidth: 2 }}
+                />
+                <RechartsTooltip
+                  content={<SparklineTooltipContent currSymbol={currSymbol} isCost={isCost} />}
+                  cursor={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         )}
-        {value === 0 && <p className="text-[10px] text-muted-foreground/50 mt-1 italic">Data unavailable</p>}
+        {explanation && (
+          <p className="text-[11px] text-muted-foreground/70 mt-2 leading-relaxed">{explanation}</p>
+        )}
+        {value === 0 && !explanation && <p className="text-[10px] text-muted-foreground/50 mt-1 italic">Data unavailable</p>}
       </CardContent>
     </Card>
   );
@@ -574,7 +598,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   // ─── Sparkline data per KPI from trend ───────────────────────
   const sparklineMap = useMemo(() => {
-    const map: Record<string, Array<{ v: number }>> = {};
+    const map: Record<string, Array<{ v: number; name: string }>> = {};
     const relevantTrend =
       selectedPlatform === "all" ? trendData : trendData.filter((s) => s.platform === selectedPlatform);
     const monthMap = new Map<string, Record<string, number>>();
@@ -599,7 +623,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6);
     for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers"]) {
-      map[metricKey] = sorted.map(([, data]) => ({ v: data[metricKey] || 0 }));
+      map[metricKey] = sorted.map(([key, data]) => {
+        const [y, m] = key.split("-");
+        return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` };
+      });
     }
     return map;
   }, [trendData, selectedPlatform]);
@@ -814,11 +841,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       ) : (
         <>
           {/* PART 1: KPI Cards with Sparklines */}
+          <SectionHeader
+            title="Key Performance Indicators"
+            description="Your top-level metrics at a glance — hover over the sparklines to see historical values"
+            icon={<TrendingUp className="h-4 w-4 text-primary" />}
+          />
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {kpis.map((kpi) => (
               <KpiCard
                 key={kpi.label}
                 label={kpi.label}
+                metricKey={kpi.metricKey}
                 value={kpi.value}
                 change={kpi.change}
                 icon={kpi.icon}
@@ -830,6 +863,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           </div>
 
           {/* PART 2: Charts */}
+          <SectionHeader
+            title="Spend & Engagement"
+            description="How your budget is distributed and how people are interacting with your content"
+            icon={<Banknote className="h-4 w-4 text-primary" />}
+          />
           <div className="grid gap-6 md:grid-cols-2">
             {/* Spend Distribution — Donut */}
             {spendByPlatform.length > 1 ? (
@@ -838,6 +876,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                   <CardTitle className="text-sm font-display flex items-center gap-1.5">
                     <Banknote className="h-4 w-4" /> Spend Distribution
                   </CardTitle>
+                  <p className="text-xs text-muted-foreground">See how your ad budget is split across platforms</p>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={260}>
@@ -919,6 +958,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                   <CardTitle className="text-sm font-display flex items-center gap-1.5">
                     <MessageCircle className="h-4 w-4" /> Engagement Breakdown
                   </CardTitle>
+                  <p className="text-xs text-muted-foreground">How people are interacting with your content across platforms</p>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={260}>
@@ -957,6 +997,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                 <CardTitle className="text-sm font-display flex items-center gap-1.5">
                   <BarChart3 className="h-4 w-4" /> Impressions & Clicks by Platform
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">How many people saw your content vs how many took action</p>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -975,12 +1016,18 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           )}
 
           {/* Performance Trend — Area Chart */}
+          <SectionHeader
+            title="Performance Trend"
+            description="How your key metrics have changed over the last 6 months — hover to see exact values"
+            icon={<TrendingUp className="h-4 w-4 text-primary" />}
+          />
           {trendChartData.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-display flex items-center gap-1.5">
                   <TrendingUp className="h-4 w-4" /> Performance Trend
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">Track your impressions, clicks, and engagement over time</p>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -1002,7 +1049,12 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <RechartsTooltip />
+                    <RechartsTooltip
+                      formatter={(value: number, name: string) => {
+                        if (name === "Spend" || name === "spend") return `${currSymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+                        return value.toLocaleString();
+                      }}
+                    />
                     <Area
                       type="monotone"
                       dataKey="impressions"
@@ -1042,7 +1094,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
           {/* Per-Platform Metrics */}
           <div className="space-y-5">
-            <h3 className="text-lg font-display">Platform Details</h3>
+            <SectionHeader
+              title="Platform Details"
+              description="Detailed breakdown of how each connected platform performed this period"
+              icon={<BarChart3 className="h-4 w-4 text-primary" />}
+            />
             {filtered.length > 0 ? (
               filtered
                 .filter((snapshot) => {

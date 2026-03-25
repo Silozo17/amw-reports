@@ -23,6 +23,7 @@ import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
+import ConnectionDisclaimer from '@/components/clients/ConnectionDisclaimer';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
@@ -566,6 +567,9 @@ const ClientDetail = () => {
                   </div>
                 )}
               </CardContent>
+              <div className="px-6 pb-4">
+                <ConnectionDisclaimer />
+              </div>
             </Card>
           </TabsContent>
 
