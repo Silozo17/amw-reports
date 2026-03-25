@@ -5,9 +5,8 @@ import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
 import WidgetRenderer from './WidgetRenderer';
 import { cn } from '@/lib/utils';
 
-// react-grid-layout uses CJS exports
-import RGL from 'react-grid-layout';
-const ResponsiveReactGridLayout = RGL.WidthProvider(RGL.Responsive);
+// @ts-expect-error react-grid-layout CJS default export
+import GridLayout from 'react-grid-layout';
 
 interface DashboardGridProps {
   widgets: DashboardWidget[];
@@ -20,60 +19,31 @@ interface DashboardGridProps {
 const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditMode }: DashboardGridProps) => {
   const visibleWidgets = useMemo(() => widgets.filter((w) => w.visible), [widgets]);
 
-  const layouts = useMemo(() => {
-    const lg = visibleWidgets.map((w) => ({
-      i: w.id,
-      x: w.position.x,
-      y: w.position.y,
-      w: w.position.w,
-      h: w.position.h,
-      minW: w.position.minW ?? 2,
-      minH: w.position.minH ?? 2,
-      isDraggable: isEditMode,
-      isResizable: isEditMode,
-    }));
-
-    // Medium breakpoint: reduce to 8 columns
-    const md = visibleWidgets.map((w) => ({
-      i: w.id,
-      x: Math.min(w.position.x, 8 - Math.min(w.position.w, 8)),
-      y: w.position.y,
-      w: Math.min(w.position.w, 8),
-      h: w.position.h,
-      minW: Math.min(w.position.minW ?? 2, 4),
-      minH: w.position.minH ?? 2,
-    }));
-
-    // Small breakpoint: everything full width
-    const sm = visibleWidgets.map((w, i) => ({
-      i: w.id,
-      x: 0,
-      y: i * w.position.h,
-      w: 4,
-      h: w.position.h,
-      minW: 2,
-      minH: w.position.minH ?? 2,
-    }));
-
-    return { lg, md, sm };
-  }, [visibleWidgets, isEditMode]);
+  const layout = useMemo(
+    () =>
+      visibleWidgets.map((w) => ({
+        i: w.id,
+        x: w.position.x,
+        y: w.position.y,
+        w: w.position.w,
+        h: w.position.h,
+        minW: w.position.minW ?? 2,
+        minH: w.position.minH ?? 2,
+        isDraggable: isEditMode,
+        isResizable: isEditMode,
+      })),
+    [visibleWidgets, isEditMode],
+  );
 
   const handleLayoutChange = useCallback(
-    (_currentLayout: any[], allLayouts: Record<string, any[]>) => {
+    (newLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) => {
       if (!isEditMode) return;
-      const lgLayout = allLayouts.lg ?? _currentLayout;
       const updated = widgets.map((w) => {
-        const item = lgLayout.find((l: any) => l.i === w.id);
+        const item = newLayout.find((l) => l.i === w.id);
         if (!item) return w;
         return {
           ...w,
-          position: {
-            ...w.position,
-            x: item.x,
-            y: item.y,
-            w: item.w,
-            h: item.h,
-          },
+          position: { ...w.position, x: item.x, y: item.y, w: item.w, h: item.h },
         };
       });
       onLayoutChange(updated);
@@ -91,12 +61,12 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
 
   return (
     <div className={cn('dashboard-grid', isEditMode && 'dashboard-grid-editing')}>
-      <ResponsiveGridLayout
-        layouts={layouts}
-        breakpoints={{ lg: 1200, md: 900, sm: 0 }}
-        cols={{ lg: 12, md: 8, sm: 4 }}
+      <GridLayout
+        layout={layout}
+        cols={12}
         rowHeight={72}
-        margin={[16, 16]}
+        width={1200}
+        margin={[16, 16] as [number, number]}
         compactType="vertical"
         isDraggable={isEditMode}
         isResizable={isEditMode}
@@ -113,7 +83,7 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
             />
           </div>
         ))}
-      </ResponsiveGridLayout>
+      </GridLayout>
     </div>
   );
 };
