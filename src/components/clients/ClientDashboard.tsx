@@ -1182,8 +1182,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                       <TableHeader>
                         <TableRow>
                           <TableHead className="min-w-[280px]">Post</TableHead>
-                          <TableHead className="text-right">Engagement</TableHead>
                           <TableHead className="text-right">Reach</TableHead>
+                          <TableHead className="text-right">Likes & Reactions</TableHead>
+                          <TableHead className="text-right">Comments</TableHead>
+                          <TableHead className="text-right">Shares</TableHead>
                           <TableHead className="text-right">Eng. Rate</TableHead>
                           <TableHead className="text-right w-10"></TableHead>
                         </TableRow>
@@ -1227,11 +1229,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right font-medium tabular-nums">
-                                {engagement.toLocaleString()}
-                              </TableCell>
                               <TableCell className="text-right tabular-nums">
                                 {reach > 0 ? reach.toLocaleString() : "—"}
+                              </TableCell>
+                              <TableCell className="text-right font-medium tabular-nums">
+                                {(post.likes ?? 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {(post.comments ?? 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {(post.shares ?? 0).toLocaleString()}
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
                                 {engRate !== "—" ? `${engRate}%` : "—"}
