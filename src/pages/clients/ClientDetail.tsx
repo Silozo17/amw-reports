@@ -44,10 +44,29 @@ const ClientDetail = () => {
   useEffect(() => {
     const oauthError = searchParams.get('oauth_error');
     const pendingConnectionId = searchParams.get('oauth_pending_selection');
+    const oauthConnected = searchParams.get('oauth_connected');
 
     if (oauthError) {
       toast.error(`OAuth error: ${oauthError}`);
       setSearchParams({}, { replace: true });
+    }
+
+    if (oauthConnected) {
+      setSearchParams({}, { replace: true });
+      supabase
+        .from('platform_connections')
+        .select('platform, account_name')
+        .eq('id', oauthConnected)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const label = PLATFORM_LABELS[data.platform as PlatformType];
+            toast.success(`${label} connected successfully${data.account_name ? ` — ${data.account_name}` : ''}`);
+          } else {
+            toast.success('Platform connected successfully');
+          }
+          fetchData();
+        });
     }
 
     if (pendingConnectionId) {
