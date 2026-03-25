@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
     };
 
     const topContent = enrichedVideos
-      .sort((a, b) => b.views - a.views)
+      .sort((a, b) => b.total_engagement - a.total_engagement)
       .slice(0, 20);
 
     // ── Upsert monthly snapshot ──
