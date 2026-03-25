@@ -21,6 +21,10 @@ import {
   ExternalLink,
   FileText,
   Image as ImageIcon,
+  Globe,
+  Search,
+  PlayCircle,
+  Activity,
 } from "lucide-react";
 import {
   Table,
@@ -83,6 +87,21 @@ interface TopContentItem {
   total_engagement?: number;
   media_type?: string;
   video_views?: number;
+  // GSC fields
+  query?: string;
+  page?: string;
+  impressions?: number;
+  ctr?: number;
+  position?: number;
+  // GA4 fields
+  pagePath?: string;
+  sessions?: number;
+  views?: number;
+  users?: number;
+  source?: string;
+  // YouTube fields
+  title?: string;
+  videoId?: string;
 }
 
 interface SnapshotData {
@@ -573,31 +592,41 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
-    const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
-    const totalClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
+    const totalReach = filtered.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
+    }, 0);
+    const totalClicks = filtered.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0);
+    }, 0);
     const totalEngagement = filtered.reduce((sum, s) => {
       const m = s.metrics_data;
-      // Use pre-aggregated engagement if available (avoids double-counting for TikTok etc.)
       if (m.engagement) return sum + m.engagement;
       return sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
     }, 0);
     const totalFollowers = Math.max(...filtered.map((s) => s.metrics_data.total_followers || 0), 0);
     const totalLinkClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
-    const totalPageViews = filtered.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
+    const totalPageViews = filtered.reduce((sum, s) => sum + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0), 0);
+    const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
-    const prevReach = filteredPrev.reduce(
-      (sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0),
-      0,
-    );
-    const prevClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
+    const prevReach = filteredPrev.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
+    }, 0);
+    const prevClicks = filteredPrev.reduce((sum, s) => {
+      const m = s.metrics_data;
+      return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0);
+    }, 0);
     const prevEngagement = filteredPrev.reduce((sum, s) => {
       const m = s.metrics_data;
       if (m.engagement) return sum + m.engagement;
       return sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
     }, 0);
     const prevLinkClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
-    const prevPageViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
+    const prevPageViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0), 0);
+    const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
 
     const calcChange = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
@@ -654,6 +683,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             },
           ]
         : []),
+      ...(totalSessions > 0
+        ? [
+            {
+              label: "Sessions",
+              value: totalSessions,
+              change: calcChange(totalSessions, prevSessions),
+              icon: Activity,
+              metricKey: "sessions",
+            },
+          ]
+        : []),
       ...(totalLinkClicks > 0
         ? [
             {
@@ -677,7 +717,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           ]
         : []),
     ];
-  }, [filtered, filteredPrev]);
+  }, [filtered, filteredPrev, selectedPlatform]);
 
   // ─── Sparkline data per KPI from trend ───────────────────────
   const sparklineMap = useMemo(() => {
@@ -690,8 +730,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
       const existing = monthMap.get(key) || {};
       existing.spend = (existing.spend || 0) + (s.metrics_data.spend || 0);
-      existing.reach = (existing.reach || 0) + (s.metrics_data.reach || s.metrics_data.impressions || 0);
-      existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0);
+      existing.reach = (existing.reach || 0) + (s.metrics_data.reach || s.metrics_data.impressions || s.metrics_data.search_impressions || s.metrics_data.views || s.metrics_data.gbp_views || 0);
+      existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0) + (s.metrics_data.search_clicks || 0) + (s.metrics_data.gbp_website_clicks || 0);
       existing.engagement =
         (existing.engagement || 0) +
         (s.metrics_data.engagement
@@ -699,15 +739,16 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0));
       existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
       existing.link_clicks = (existing.link_clicks || 0) + (s.metrics_data.link_clicks || 0);
-      existing.page_views = (existing.page_views || 0) + (s.metrics_data.page_views || 0);
+      existing.page_views = (existing.page_views || 0) + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0);
       existing.video_views = (existing.video_views || 0) + (s.metrics_data.video_views || 0);
+      existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
       monthMap.set(key, existing);
     }
 
     const sorted = Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6);
-    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views", "video_views"]) {
+    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views", "video_views", "sessions"]) {
       map[metricKey] = sorted.map(([key, data]) => {
         const [y, m] = key.split("-");
         return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` };
@@ -1300,6 +1341,222 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
               </Card>
             </div>
           )}
+
+          {/* PART 5b: Top Search Queries (GSC) */}
+          {(() => {
+            const gscPosts = (selectedPlatform === "all" || selectedPlatform === "google_search_console")
+              ? allPosts.filter((p) => p.platform === "google_search_console" && (p.query || p.page))
+              : [];
+            if (gscPosts.length === 0) return null;
+            const queries = gscPosts.filter((p) => p.query);
+            const pages = gscPosts.filter((p) => p.page && !p.query);
+            return (
+              <div className="space-y-4">
+                {queries.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Top Search Queries"
+                      description="Search terms people used to find your website on Google"
+                      icon={<Search className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[240px]">Query</TableHead>
+                                <TableHead className="text-right">Clicks</TableHead>
+                                <TableHead className="text-right">Impressions</TableHead>
+                                <TableHead className="text-right">CTR</TableHead>
+                                <TableHead className="text-right">Avg. Position</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {queries.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium">{item.query}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.clicks ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.impressions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{item.ctr != null ? `${(item.ctr * 100).toFixed(1)}%` : "—"}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{item.position != null ? item.position.toFixed(1) : "—"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+                {pages.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Top Pages (Search)"
+                      description="Pages on your site that received the most search traffic"
+                      icon={<Globe className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[280px]">Page</TableHead>
+                                <TableHead className="text-right">Clicks</TableHead>
+                                <TableHead className="text-right">Impressions</TableHead>
+                                <TableHead className="text-right">CTR</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {pages.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium text-sm truncate max-w-[300px]">{item.page}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.clicks ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.impressions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{item.ctr != null ? `${(item.ctr * 100).toFixed(1)}%` : "—"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* PART 5c: Top Pages (GA4) */}
+          {(() => {
+            const gaPosts = (selectedPlatform === "all" || selectedPlatform === "google_analytics")
+              ? allPosts.filter((p) => p.platform === "google_analytics" && (p.pagePath || p.source))
+              : [];
+            if (gaPosts.length === 0) return null;
+            const topPages = gaPosts.filter((p) => p.pagePath);
+            const trafficSources = gaPosts.filter((p) => p.source && !p.pagePath);
+            return (
+              <div className="space-y-4">
+                {topPages.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Top Pages (Analytics)"
+                      description="Pages on your website that received the most traffic"
+                      icon={<Globe className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[280px]">Page Path</TableHead>
+                                <TableHead className="text-right">Views</TableHead>
+                                <TableHead className="text-right">Sessions</TableHead>
+                                <TableHead className="text-right">Users</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {topPages.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium text-sm truncate max-w-[300px]">{item.pagePath}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.views ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.sessions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.users ?? 0).toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+                {trafficSources.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Traffic Sources"
+                      description="Where your website visitors are coming from"
+                      icon={<Globe className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[200px]">Source</TableHead>
+                                <TableHead className="text-right">Sessions</TableHead>
+                                <TableHead className="text-right">Users</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {trafficSources.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium">{item.source}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.sessions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.users ?? 0).toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* PART 5d: Top Videos (YouTube) */}
+          {(() => {
+            const ytPosts = (selectedPlatform === "all" || selectedPlatform === "youtube")
+              ? allPosts.filter((p) => p.platform === "youtube" && p.title)
+              : [];
+            if (ytPosts.length === 0) return null;
+            return (
+              <div className="space-y-4">
+                <SectionHeader
+                  title="Top Videos"
+                  description="Your best-performing YouTube videos this period"
+                  icon={<PlayCircle className="h-4 w-4 text-primary" />}
+                />
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="relative w-full overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="min-w-[280px]">Video</TableHead>
+                            <TableHead className="text-right">Views</TableHead>
+                            <TableHead className="text-right">Likes</TableHead>
+                            <TableHead className="text-right">Comments</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ytPosts.slice(0, 10).map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <PlayCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  <span className="text-sm font-medium line-clamp-1">{item.title}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">{(item.views ?? item.video_views ?? 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-right tabular-nums">{(item.likes ?? 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-right tabular-nums">{(item.comments ?? 0).toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
 
           {/* PART 6: Audience Map */}
           <AudienceMap geoData={geoData} />
