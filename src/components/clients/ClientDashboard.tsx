@@ -87,6 +87,21 @@ interface TopContentItem {
   total_engagement?: number;
   media_type?: string;
   video_views?: number;
+  // GSC fields
+  query?: string;
+  page?: string;
+  impressions?: number;
+  ctr?: number;
+  position?: number;
+  // GA4 fields
+  pagePath?: string;
+  sessions?: number;
+  views?: number;
+  users?: number;
+  source?: string;
+  // YouTube fields
+  title?: string;
+  videoId?: string;
 }
 
 interface SnapshotData {
@@ -1327,6 +1342,221 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             </div>
           )}
 
+          {/* PART 5b: Top Search Queries (GSC) */}
+          {(() => {
+            const gscPosts = (selectedPlatform === "all" || selectedPlatform === "google_search_console")
+              ? allPosts.filter((p) => p.platform === "google_search_console" && (p.query || p.page))
+              : [];
+            if (gscPosts.length === 0) return null;
+            const queries = gscPosts.filter((p) => p.query);
+            const pages = gscPosts.filter((p) => p.page && !p.query);
+            return (
+              <div className="space-y-4">
+                {queries.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Top Search Queries"
+                      description="Search terms people used to find your website on Google"
+                      icon={<Search className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[240px]">Query</TableHead>
+                                <TableHead className="text-right">Clicks</TableHead>
+                                <TableHead className="text-right">Impressions</TableHead>
+                                <TableHead className="text-right">CTR</TableHead>
+                                <TableHead className="text-right">Avg. Position</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {queries.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium">{item.query}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.clicks ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.impressions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{item.ctr != null ? `${(item.ctr * 100).toFixed(1)}%` : "—"}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{item.position != null ? item.position.toFixed(1) : "—"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+                {pages.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Top Pages (Search)"
+                      description="Pages on your site that received the most search traffic"
+                      icon={<Globe className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[280px]">Page</TableHead>
+                                <TableHead className="text-right">Clicks</TableHead>
+                                <TableHead className="text-right">Impressions</TableHead>
+                                <TableHead className="text-right">CTR</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {pages.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium text-sm truncate max-w-[300px]">{item.page}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.clicks ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.impressions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{item.ctr != null ? `${(item.ctr * 100).toFixed(1)}%` : "—"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* PART 5c: Top Pages (GA4) */}
+          {(() => {
+            const gaPosts = (selectedPlatform === "all" || selectedPlatform === "google_analytics")
+              ? allPosts.filter((p) => p.platform === "google_analytics" && (p.pagePath || p.source))
+              : [];
+            if (gaPosts.length === 0) return null;
+            const topPages = gaPosts.filter((p) => p.pagePath);
+            const trafficSources = gaPosts.filter((p) => p.source && !p.pagePath);
+            return (
+              <div className="space-y-4">
+                {topPages.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Top Pages (Analytics)"
+                      description="Pages on your website that received the most traffic"
+                      icon={<Globe className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[280px]">Page Path</TableHead>
+                                <TableHead className="text-right">Views</TableHead>
+                                <TableHead className="text-right">Sessions</TableHead>
+                                <TableHead className="text-right">Users</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {topPages.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium text-sm truncate max-w-[300px]">{item.pagePath}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.views ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.sessions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.users ?? 0).toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+                {trafficSources.length > 0 && (
+                  <>
+                    <SectionHeader
+                      title="Traffic Sources"
+                      description="Where your website visitors are coming from"
+                      icon={<Globe className="h-4 w-4 text-primary" />}
+                    />
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="relative w-full overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[200px]">Source</TableHead>
+                                <TableHead className="text-right">Sessions</TableHead>
+                                <TableHead className="text-right">Users</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {trafficSources.slice(0, 10).map((item, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell className="font-medium">{item.source}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.sessions ?? 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{(item.users ?? 0).toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* PART 5d: Top Videos (YouTube) */}
+          {(() => {
+            const ytPosts = (selectedPlatform === "all" || selectedPlatform === "youtube")
+              ? allPosts.filter((p) => p.platform === "youtube" && p.title)
+              : [];
+            if (ytPosts.length === 0) return null;
+            return (
+              <div className="space-y-4">
+                <SectionHeader
+                  title="Top Videos"
+                  description="Your best-performing YouTube videos this period"
+                  icon={<PlayCircle className="h-4 w-4 text-primary" />}
+                />
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="relative w-full overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="min-w-[280px]">Video</TableHead>
+                            <TableHead className="text-right">Views</TableHead>
+                            <TableHead className="text-right">Likes</TableHead>
+                            <TableHead className="text-right">Comments</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ytPosts.slice(0, 10).map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <PlayCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  <span className="text-sm font-medium line-clamp-1">{item.title}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">{(item.views ?? item.video_views ?? 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-right tabular-nums">{(item.likes ?? 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-right tabular-nums">{(item.comments ?? 0).toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()
           {/* PART 6: Audience Map */}
           <AudienceMap geoData={geoData} />
 
