@@ -66,21 +66,29 @@ Deno.serve(async (req) => {
     const allVideos = await fetchVideosForPeriod(accessToken, month, year);
 
     // ── Map videos to enriched format (no insights scope available yet) ──
-    const enrichedVideos: EnrichedVideo[] = allVideos.map((v) => ({
-      id: v.id,
-      title: v.title || v.video_description?.substring(0, 80) || "Untitled",
-      description: v.video_description || "",
-      duration: v.duration || 0,
-      cover_image_url: v.cover_image_url || "",
-      views: Number(v.view_count || 0),
-      reach: Number(v.view_count || 0),
-      likes: Number(v.like_count || 0),
-      comments: Number(v.comment_count || 0),
-      shares: Number(v.share_count || 0),
-      create_time: v.create_time,
-      avg_time_watched: 0,
-      completion_rate: 0,
-    }));
+    const enrichedVideos: EnrichedVideo[] = allVideos.map((v) => {
+      const views = Number(v.view_count || 0);
+      const likes = Number(v.like_count || 0);
+      const comments = Number(v.comment_count || 0);
+      const shares = Number(v.share_count || 0);
+      return {
+        id: v.id,
+        title: v.title || v.video_description?.substring(0, 80) || "Untitled",
+        description: v.video_description || "",
+        duration: v.duration || 0,
+        cover_image_url: v.cover_image_url || "",
+        permalink_url: v.share_url || "",
+        views,
+        reach: views,
+        likes,
+        comments,
+        shares,
+        total_engagement: likes + comments + shares,
+        create_time: v.create_time,
+        avg_time_watched: 0,
+        completion_rate: 0,
+      };
+    });
 
     // ── Aggregate metrics ──
     const aggregated = aggregateVideoMetrics(enrichedVideos);
@@ -90,6 +98,7 @@ Deno.serve(async (req) => {
 
     const metricsData = {
       total_followers: accountMetrics.followers,
+      following: accountMetrics.following,
       reach: aggregated.views,
       video_views: aggregated.views,
       likes: aggregated.likes,
@@ -100,9 +109,6 @@ Deno.serve(async (req) => {
       videos_published: allVideos.length,
       total_video_count: accountMetrics.videoCount,
       total_likes_received: accountMetrics.likesReceived,
-      following: accountMetrics.following,
-      profile_views: accountMetrics.profileViews,
-      bio_link_clicks: accountMetrics.bioLinkClicks,
       completion_rate: aggregated.avgCompletionRate,
       average_time_watched: aggregated.avgTimeWatched,
     };
@@ -180,19 +186,16 @@ interface AccountMetrics {
   following: number;
   likesReceived: number;
   videoCount: number;
-  profileViews: number;
-  bioLinkClicks: number;
 }
 
 async function fetchUserInfo(accessToken: string): Promise<AccountMetrics> {
   const result: AccountMetrics = {
     followers: 0, following: 0, likesReceived: 0, videoCount: 0,
-    profileViews: 0, bioLinkClicks: 0,
   };
 
   try {
     const res = await fetch(
-      "https://open.tiktokapis.com/v2/user/info/?fields=follower_count,following_count,likes_count,video_count,profile_view_count,bio_link_click_count",
+      "https://open.tiktokapis.com/v2/user/info/?fields=follower_count,following_count,likes_count,video_count",
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const data = await res.json();
@@ -204,8 +207,6 @@ async function fetchUserInfo(accessToken: string): Promise<AccountMetrics> {
       result.following = Number(u.following_count || 0);
       result.likesReceived = Number(u.likes_count || 0);
       result.videoCount = Number(u.video_count || 0);
-      result.profileViews = Number(u.profile_view_count || 0);
-      result.bioLinkClicks = Number(u.bio_link_click_count || 0);
     }
   } catch (e) {
     console.warn("Could not fetch TikTok user info:", e);
@@ -220,6 +221,7 @@ interface RawVideo {
   video_description?: string;
   duration?: number;
   cover_image_url?: string;
+  share_url?: string;
   view_count?: number;
   like_count?: number;
   comment_count?: number;
@@ -233,11 +235,13 @@ interface EnrichedVideo {
   description: string;
   duration: number;
   cover_image_url: string;
+  permalink_url: string;
   views: number;
   reach: number;
   likes: number;
   comments: number;
   shares: number;
+  total_engagement: number;
   create_time: number;
   avg_time_watched: number;
   completion_rate: number;
@@ -253,7 +257,7 @@ async function fetchVideosForPeriod(accessToken: string, month: number, year: nu
     if (cursor !== undefined) body.cursor = cursor;
 
     const res = await fetch(
-      "https://open.tiktokapis.com/v2/video/list/?fields=id,title,video_description,duration,cover_image_url,view_count,like_count,comment_count,share_count,create_time",
+      "https://open.tiktokapis.com/v2/video/list/?fields=id,title,video_description,duration,cover_image_url,share_url,view_count,like_count,comment_count,share_count,create_time",
       {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },

@@ -608,6 +608,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
     const calcChange = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
+    const totalVideoViews = filtered.reduce((sum, s) => sum + (s.metrics_data.video_views || 0), 0);
+    const prevVideoViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.video_views || 0), 0);
+
     return [
       ...(["all", "meta_ads", "google_ads"].includes(selectedPlatform)
         ? [
@@ -618,6 +621,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
               icon: Banknote,
               isCost: true,
               metricKey: "spend",
+            },
+          ]
+        : []),
+      ...(selectedPlatform === "tiktok"
+        ? [
+            {
+              label: "Video Views",
+              value: totalVideoViews,
+              change: calcChange(totalVideoViews, prevVideoViews),
+              icon: Eye,
+              metricKey: "video_views",
             },
           ]
         : []),
