@@ -575,15 +575,12 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const totalReach = filtered.reduce((sum, s) => sum + (s.metrics_data.reach || s.metrics_data.impressions || 0), 0);
     const totalClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
-    const totalEngagement = filtered.reduce(
-      (sum, s) =>
-        sum +
-        (s.metrics_data.engagement || 0) +
-        (s.metrics_data.likes || 0) +
-        (s.metrics_data.comments || 0) +
-        (s.metrics_data.shares || 0),
-      0,
-    );
+    const totalEngagement = filtered.reduce((sum, s) => {
+      const m = s.metrics_data;
+      // Use pre-aggregated engagement if available (avoids double-counting for TikTok etc.)
+      if (m.engagement) return sum + m.engagement;
+      return sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
+    }, 0);
     const totalFollowers = Math.max(...filtered.map((s) => s.metrics_data.total_followers || 0), 0);
     const totalLinkClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
     const totalPageViews = filtered.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
@@ -594,15 +591,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       0,
     );
     const prevClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.clicks || 0), 0);
-    const prevEngagement = filteredPrev.reduce(
-      (sum, s) =>
-        sum +
-        (s.metrics_data.engagement || 0) +
-        (s.metrics_data.likes || 0) +
-        (s.metrics_data.comments || 0) +
-        (s.metrics_data.shares || 0),
-      0,
-    );
+    const prevEngagement = filteredPrev.reduce((sum, s) => {
+      const m = s.metrics_data;
+      if (m.engagement) return sum + m.engagement;
+      return sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
+    }, 0);
     const prevLinkClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
     const prevPageViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.page_views || 0), 0);
 
@@ -701,20 +694,20 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0);
       existing.engagement =
         (existing.engagement || 0) +
-        (s.metrics_data.engagement || 0) +
-        (s.metrics_data.likes || 0) +
-        (s.metrics_data.comments || 0) +
-        (s.metrics_data.shares || 0);
+        (s.metrics_data.engagement
+          ? s.metrics_data.engagement
+          : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0));
       existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
       existing.link_clicks = (existing.link_clicks || 0) + (s.metrics_data.link_clicks || 0);
       existing.page_views = (existing.page_views || 0) + (s.metrics_data.page_views || 0);
+      existing.video_views = (existing.video_views || 0) + (s.metrics_data.video_views || 0);
       monthMap.set(key, existing);
     }
 
     const sorted = Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6);
-    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views"]) {
+    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views", "video_views"]) {
       map[metricKey] = sorted.map(([key, data]) => {
         const [y, m] = key.split("-");
         return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` };
@@ -773,20 +766,21 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   // Trend data for area chart
   const trendChartData = useMemo(() => {
-    const monthMap = new Map<string, { spend: number; impressions: number; clicks: number; engagement: number }>();
+    const monthMap = new Map<string, { spend: number; impressions: number; clicks: number; engagement: number; video_views: number; reach: number }>();
     const relevantTrend =
       selectedPlatform === "all" ? trendData : trendData.filter((s) => s.platform === selectedPlatform);
     for (const s of relevantTrend) {
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
-      const existing = monthMap.get(key) || { spend: 0, impressions: 0, clicks: 0, engagement: 0 };
+      const existing = monthMap.get(key) || { spend: 0, impressions: 0, clicks: 0, engagement: 0, video_views: 0, reach: 0 };
       existing.spend += s.metrics_data.spend || 0;
       existing.impressions += s.metrics_data.impressions || 0;
       existing.clicks += s.metrics_data.clicks || 0;
+      existing.video_views += s.metrics_data.video_views || 0;
+      existing.reach += s.metrics_data.reach || 0;
       existing.engagement +=
-        (s.metrics_data.engagement || 0) +
-        (s.metrics_data.likes || 0) +
-        (s.metrics_data.comments || 0) +
-        (s.metrics_data.shares || 0);
+        s.metrics_data.engagement
+          ? s.metrics_data.engagement
+          : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0);
       monthMap.set(key, existing);
     }
     return Array.from(monthMap.entries())
@@ -1147,24 +1141,50 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                         return value.toLocaleString();
                       }}
                     />
-                    <Area
-                      type="monotone"
-                      dataKey="impressions"
-                      name="Impressions"
-                      stroke="#b32fbf"
-                      strokeWidth={2}
-                      fill="url(#trendGradient)"
-                      dot={{ r: 4, fill: "#b32fbf" }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="clicks"
-                      name="Clicks"
-                      stroke="#539BDB"
-                      strokeWidth={2}
-                      fill="url(#trendGradientBlue)"
-                      dot={{ r: 4, fill: "#539BDB" }}
-                    />
+                    {trendChartData.some((d) => (d as any).impressions > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="impressions"
+                        name="Impressions"
+                        stroke="#b32fbf"
+                        strokeWidth={2}
+                        fill="url(#trendGradient)"
+                        dot={{ r: 4, fill: "#b32fbf" }}
+                      />
+                    )}
+                    {trendChartData.some((d) => (d as any).video_views > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="video_views"
+                        name="Video Views"
+                        stroke="#b32fbf"
+                        strokeWidth={2}
+                        fill="url(#trendGradient)"
+                        dot={{ r: 4, fill: "#b32fbf" }}
+                      />
+                    )}
+                    {trendChartData.some((d) => (d as any).reach > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="reach"
+                        name="Reach"
+                        stroke="#EE8733"
+                        strokeWidth={2}
+                        fill="none"
+                        dot={{ r: 4, fill: "#EE8733" }}
+                      />
+                    )}
+                    {trendChartData.some((d) => (d as any).clicks > 0) && (
+                      <Area
+                        type="monotone"
+                        dataKey="clicks"
+                        name="Clicks"
+                        stroke="#539BDB"
+                        strokeWidth={2}
+                        fill="url(#trendGradientBlue)"
+                        dot={{ r: 4, fill: "#539BDB" }}
+                      />
+                    )}
                     <Area
                       type="monotone"
                       dataKey="engagement"
