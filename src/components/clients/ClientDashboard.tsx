@@ -694,8 +694,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
       const existing = monthMap.get(key) || {};
       existing.spend = (existing.spend || 0) + (s.metrics_data.spend || 0);
-      existing.reach = (existing.reach || 0) + (s.metrics_data.reach || s.metrics_data.impressions || 0);
-      existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0);
+      existing.reach = (existing.reach || 0) + (s.metrics_data.reach || s.metrics_data.impressions || s.metrics_data.search_impressions || s.metrics_data.views || s.metrics_data.gbp_views || 0);
+      existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0) + (s.metrics_data.search_clicks || 0) + (s.metrics_data.gbp_website_clicks || 0);
       existing.engagement =
         (existing.engagement || 0) +
         (s.metrics_data.engagement
@@ -703,15 +703,16 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0));
       existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
       existing.link_clicks = (existing.link_clicks || 0) + (s.metrics_data.link_clicks || 0);
-      existing.page_views = (existing.page_views || 0) + (s.metrics_data.page_views || 0);
+      existing.page_views = (existing.page_views || 0) + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0);
       existing.video_views = (existing.video_views || 0) + (s.metrics_data.video_views || 0);
+      existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
       monthMap.set(key, existing);
     }
 
     const sorted = Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6);
-    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views", "video_views"]) {
+    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views", "video_views", "sessions"]) {
       map[metricKey] = sorted.map(([key, data]) => {
         const [y, m] = key.split("-");
         return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` };
