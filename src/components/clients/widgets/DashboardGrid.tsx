@@ -5,15 +5,7 @@ import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
 import WidgetRenderer from './WidgetRenderer';
 import { cn } from '@/lib/utils';
 
-/* react-grid-layout ships CJS; use dynamic require-style import */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let RGLModule: any = null;
-try {
-  // Vite resolves the default export
-  RGLModule = await import('react-grid-layout');
-} catch {
-  // fallback
-}
+/* react-grid-layout is imported but we use a custom grid instead */
 
 interface DashboardGridProps {
   widgets: DashboardWidget[];
