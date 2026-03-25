@@ -62,6 +62,12 @@ Deno.serve(async (req) => {
       await handleTikTok(supabase, authCode, connectionId);
     } else if (platform === "linkedin") {
       await handleLinkedIn(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "google_search_console") {
+      await handleGoogleSearchConsole(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "google_analytics") {
+      await handleGoogleAnalytics(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "google_business_profile") {
+      await handleGoogleBusinessProfile(supabase, authCode, connectionId, supabaseUrl);
     } else {
       throw new Error(`Unsupported platform: ${platform}`);
     }
