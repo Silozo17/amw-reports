@@ -14,8 +14,10 @@ export default {
     },
     extend: {
       fontFamily: {
+        heading: ["Anton", "sans-serif"],
         display: ["Anton", "sans-serif"],
         body: ["Montserrat", "sans-serif"],
+        accent: ["Slowdex", "cursive"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -58,6 +60,14 @@ export default {
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
+        },
+        amw: {
+          offwhite: "hsl(var(--amw-offwhite))",
+          black: "hsl(var(--amw-black))",
+          purple: "hsl(var(--amw-purple))",
+          blue: "hsl(var(--amw-blue))",
+          green: "hsl(var(--amw-green))",
+          orange: "hsl(var(--amw-orange))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

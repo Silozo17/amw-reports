@@ -7,18 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { toast } from 'sonner';
-import { ArrowRight, Loader2, BarChart3, FileText, Users, Palette } from 'lucide-react';
-import WarpedGrid from '@/components/landing/WarpedGrid';
-import StarDecoration from '@/components/landing/StarDecoration';
+import { ArrowRight, Loader2 } from 'lucide-react';
+import LandingHero from '@/components/landing/LandingHero';
 
 type View = 'login' | 'signup' | 'otp';
-
-const FEATURES = [
-  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Google, Meta, TikTok, LinkedIn & more — all in one place' },
-  { icon: FileText, title: 'Automated Reports', desc: 'Beautiful branded PDFs generated and emailed monthly' },
-  { icon: Users, title: 'Client Management', desc: 'Manage clients, recipients, and platform connections' },
-  { icon: Palette, title: 'White-Label Ready', desc: 'Your brand, your logo, your colours — fully customisable' },
-];
 
 const LandingPage = () => {
   const [view, setView] = useState<View>('login');
@@ -140,14 +132,14 @@ const LandingPage = () => {
         <div className="w-full max-w-md space-y-8">
           {/* Mobile header */}
           <div className="lg:hidden text-center mb-8">
-            <h1 className="text-3xl font-display tracking-wide text-primary">AMW</h1>
+            <h1 className="text-3xl font-heading tracking-wide text-primary">AMW</h1>
             <p className="text-xs tracking-[0.3em] text-muted-foreground uppercase font-body">Reports</p>
           </div>
 
           {view === 'login' && (
             <>
               <div>
-                <h2 className="text-2xl font-display">Welcome back</h2>
+                <h2 className="text-2xl font-heading">Welcome back</h2>
                 <p className="text-muted-foreground font-body mt-1">Sign in to your account</p>
               </div>
               <form onSubmit={handleLogin} className="space-y-4">
@@ -173,7 +165,7 @@ const LandingPage = () => {
           {view === 'signup' && (
             <>
               <div>
-                <h2 className="text-2xl font-display">Create your account</h2>
+                <h2 className="text-2xl font-heading">Create your account</h2>
                 <p className="text-muted-foreground font-body mt-1">Set up your organisation in minutes</p>
               </div>
               <form onSubmit={handleSignup} className="space-y-4">
@@ -221,7 +213,7 @@ const LandingPage = () => {
           {view === 'otp' && (
             <div className="space-y-6 text-center">
               <div>
-                <h2 className="text-2xl font-display">Verify your email</h2>
+                <h2 className="text-2xl font-heading">Verify your email</h2>
                 <p className="text-muted-foreground font-body mt-1">
                   We sent a 6-digit code to <span className="font-medium text-foreground">{signupEmail}</span>
                 </p>
@@ -251,60 +243,8 @@ const LandingPage = () => {
       </div>
 
       {/* Right: Dark Hero */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-sidebar-background text-sidebar-foreground relative overflow-hidden">
-        <WarpedGrid />
-
-        {/* Glowing orbs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px] animate-pulse-glow" />
-          <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] rounded-full bg-secondary/10 blur-[100px] animate-pulse-glow" />
-        </div>
-
-        {/* Star decorations */}
-        <div className="absolute inset-0 pointer-events-none">
-          <StarDecoration size={32} color="purple" className="absolute top-[15%] right-[10%]" />
-          <StarDecoration size={18} color="blue" className="absolute top-[25%] right-[25%]" animated={false} />
-          <StarDecoration size={24} color="green" className="absolute bottom-[20%] left-[8%]" />
-          <StarDecoration size={14} color="orange" className="absolute top-[40%] left-[15%]" animated={false} />
-          <StarDecoration size={20} color="offwhite" className="absolute bottom-[30%] right-[15%] opacity-20" />
-        </div>
-
-        {/* Branding */}
-        <div className="relative z-10">
-          <h1 className="text-4xl font-display tracking-wide text-primary">AMW</h1>
-          <p className="text-xs tracking-[0.3em] text-sidebar-foreground/60 uppercase font-body">Reports</p>
-        </div>
-
-        {/* Hero content */}
-        <div className="relative z-10 space-y-8">
-          <div>
-            <h2 className="text-4xl xl:text-5xl font-display leading-[0.95] uppercase">
-              Automated Marketing<br />
-              Reports That<br />
-              <span className="text-gradient-purple">Elevate</span> Your Agency
-            </h2>
-            <p className="mt-6 text-lg text-sidebar-foreground/70 font-body max-w-md">
-              Connect your marketing platforms, generate stunning branded reports, and deliver insights to your clients — automatically.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex gap-3 p-3 rounded-lg bg-sidebar-accent/40 backdrop-blur-sm border border-sidebar-border/50">
-                <Icon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-body font-semibold">{title}</p>
-                  <p className="text-xs text-sidebar-foreground/60 mt-0.5">{desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <p className="relative z-10 text-xs text-sidebar-foreground/40 font-body">
-          © {new Date().getFullYear()} AMW Media. All rights reserved.
-        </p>
+      <div className="hidden lg:block lg:w-1/2">
+        <LandingHero />
       </div>
     </div>
   );
