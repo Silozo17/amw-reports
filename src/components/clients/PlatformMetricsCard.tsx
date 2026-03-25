@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PLATFORM_LABELS, METRIC_LABELS, PLATFORM_LOGOS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from '@/types/database';
+import { METRIC_EXPLANATIONS } from '@/types/metrics';
 import type { PlatformType, JobStatus } from '@/types/database';
 import MetricTooltip from './MetricTooltip';
 import { TrendingUp, TrendingDown, Minus, ChevronDown, AlertTriangle } from 'lucide-react';
@@ -106,7 +107,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {metricEntries.map(([key, value]) => {
                 const prevValue = prevMetrics?.[key];
                 const change = prevValue && prevValue !== 0
@@ -117,30 +118,34 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
                 const isPositive = change !== undefined
                   ? isCostMetric ? change < 0 : change > 0
                   : undefined;
+                const explanation = METRIC_EXPLANATIONS[key];
 
                 return (
-                  <div key={key} className="rounded-xl border bg-card p-4 space-y-2">
+                  <div key={key} className="rounded-xl border bg-card p-5 space-y-2">
                     <div className="flex items-center gap-1.5">
                       <p className="text-[11px] text-muted-foreground truncate uppercase tracking-wider font-medium">
                         {METRIC_LABELS[key] || key}
                       </p>
                       <MetricTooltip metricKey={key} />
                     </div>
-                    <p className="text-xl font-bold font-display">{formatValue(key, value, currencySymbol)}</p>
+                    <p className="text-2xl font-bold font-display">{formatValue(key, value, currencySymbol)}</p>
                     {change !== undefined ? (
                       <div className={cn(
-                        'flex items-center gap-1 text-xs font-medium',
-                        isPositive === true ? 'text-accent' :
-                        isPositive === false ? 'text-destructive' : 'text-muted-foreground'
+                        'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
+                        isPositive === true ? 'bg-accent/10 text-accent' :
+                        isPositive === false ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
                       )}>
                         {change > 0 ? <TrendingUp className="h-3 w-3" /> :
                          change < 0 ? <TrendingDown className="h-3 w-3" /> :
                          <Minus className="h-3 w-3" />}
-                        <span>{change > 0 ? '+' : ''}{change.toFixed(1)}% MoM</span>
+                        <span>{change > 0 ? '+' : ''}{change.toFixed(1)}% from last month</span>
                       </div>
                     ) : value === 0 ? (
                       <p className="text-[10px] text-muted-foreground/50 italic">No data</p>
                     ) : null}
+                    {explanation && (
+                      <p className="text-[10px] text-muted-foreground/60 leading-relaxed mt-1">{explanation}</p>
+                    )}
                   </div>
                 );
               })}
