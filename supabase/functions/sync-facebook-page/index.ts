@@ -361,6 +361,8 @@ Deno.serve(async (req) => {
       comments:        allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares:          allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
       post_clicks:     allTopPosts.reduce((s, p) => s + (p.clicks || 0), 0),
+      impressions:     totalViews,          // organic-only alias — avoids double-counting with Meta Ads
+      clicks:          allTopPosts.reduce((s, p) => s + (p.clicks || 0), 0),  // alias for post_clicks
       posts_published: allTopPosts.length,
       pages_count:     pages.length,
     };
