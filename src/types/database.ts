@@ -324,7 +324,6 @@ export const METRIC_LABELS: Record<string, string> = {
   total_video_count: 'Total Videos',
   total_likes_received: 'Total Likes Received',
   following: 'Following',
-  paid_impressions: 'Paid Impressions',
   paid_reach: 'Paid Reach',
   paid_video_views: 'Paid Video Views',
   total_impressions: 'Total Impressions',
