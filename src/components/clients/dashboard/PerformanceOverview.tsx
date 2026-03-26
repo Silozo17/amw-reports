@@ -35,6 +35,7 @@ interface PerformanceOverviewProps {
   impressionsByPlatform: Array<Record<string, unknown>>;
   trendChartData: Array<Record<string, unknown>>;
   trendPlatforms?: PlatformType[];
+  gscTrendData?: Array<Record<string, unknown>>;
 }
 
 const PerformanceOverview = ({
@@ -45,6 +46,7 @@ const PerformanceOverview = ({
   impressionsByPlatform,
   trendChartData,
   trendPlatforms,
+  gscTrendData,
 }: PerformanceOverviewProps) => {
   const hasSpend = spendByPlatform.length > 1;
   const hasEngagement = engagementStackedData.length > 0;
