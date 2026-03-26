@@ -1,119 +1,71 @@
 
 
-# Facebook Organic vs Paid Data Accuracy Fix
+# Fix: Simplify Facebook Sync — Fetch Total, Subtract Paid, Store Organic
 
-## Answering Your Question First
+## Problem
+The current sync batches newer organic-specific metrics (`page_impressions_organic_unique`, `page_video_views_organic`, etc.) into one API call. If ANY metric in that batch is unsupported by the page, the entire call fails silently, all accumulators stay at 0, and zeros get saved to the snapshot — wiping previously good data.
 
-**Yes, you must subtract to get organic data.** Here's exactly how Facebook metrics work:
+## Approach
+Stop relying on organic-specific metrics. Instead, follow the simple formula:
 
-- `page_impressions` = **total** (organic + paid + viral). Includes everything.
-- `page_impressions_paid` = only impressions from ads (boosted posts OR actual ad campaigns).
-- `page_posts_impressions_organic_unique` = organic-only reach (unique people, excludes paid).
-- `page_media_view` with `breakdowns=is_from_ads` = splits media views into `true` (paid) and `false` (organic).
+**Fetch TOTAL metrics → Fetch PAID metrics → Organic = Total - Paid**
 
-Facebook's own docs confirm: *"Total page reach may not always be exactly equal to the sum of paid and non-paid unique values"* and *"When an organic post is boosted, metrics for paid post impressions will include both organic and paid reach."*
+This uses only the stable, well-supported Facebook Page Insights metrics that have always worked.
 
-So the approach is: **use the dedicated organic-only metrics where available** (e.g. `page_posts_impressions_organic_unique`, `page_video_views_organic`), and only fall back to subtraction (`total - paid`) when no native organic metric exists.
-
-### Current Problems in `sync-facebook-page/index.ts`
-
-1. **Impressions**: Uses `page_media_view` which includes paid. The `is_from_ads` breakdown is fetched but as a separate call that may fail silently, leaving `totalMediaViewsOrganic = 0` and falling back to total media views.
-2. **Reach**: Set to `organicImpressions` (a copy of media views) — not actual reach at all. Facebook has `page_impressions_unique` for reach and `page_impressions_organic_unique` for organic-only reach, but neither is fetched.
-3. **Post-level reach**: Uses `post_impressions_unique` which includes paid reach. Should use `post_impressions_organic_unique`.
-4. **Video views**: Aggregated from `post_video_views` per post, which includes paid views. Facebook has `page_video_views_organic` for organic-only.
-5. **Engagement**: Uses `page_post_engagements` which includes engagement from ads. No organic-only equivalent exists at page level, but this is acceptable since engagement is engagement regardless of source.
-6. **Dashboard double-counting**: When both Facebook and Meta Ads are connected, the Hero KPI "Reach" sums Facebook's reach (which may include paid) with Meta Ads' reach.
-
-## Plan
+## Changes
 
 ### File 1: `supabase/functions/sync-facebook-page/index.ts`
 
-**Replace the metrics collection with Facebook's recommended organic-specific metrics:**
+**Replace the single batch core metrics call (lines 161-197) with two separate, safer calls:**
 
-**Page-level metrics to fetch:**
-- `page_impressions` (total) — for reference
-- `page_impressions_paid` (paid only) — to subtract or store separately
-- `page_impressions_organic_unique` (FB-recommended organic reach)
-- `page_posts_impressions_organic_unique` (organic post reach)
-- `page_video_views_organic` (organic video views only)
-- `page_video_views_paid` (paid video views — stored separately)
-- `page_video_views` (total video views — stored for reference)
-- Keep existing: `page_post_engagements`, `page_follows`, `page_views_total`, `page_consumptions`
-- Keep: `page_media_view` with `is_from_ads` breakdown as a secondary signal
+**Call A — Totals (stable metrics that always work):**
+- `page_post_engagements`
+- `page_follows`
+- `page_impressions` (total)
+- `page_views_total`
+- `page_consumptions`
+- `page_video_views` (total)
 
-**Post-level metrics to fetch:**
-- Switch from `post_impressions_unique` → `post_impressions_organic_unique` for per-post reach
-- Add `post_impressions_paid_unique` to store separately (useful for boosted post detection)
-- Keep `post_video_views` for total, but tag posts that have paid impressions
+**Call B — Paid breakdown (separate call, non-blocking):**
+- `page_impressions_paid`
+- `page_video_views_paid`
 
-**New `metrics_data` shape stored in snapshot:**
+If Call B fails, paid = 0, so organic = total (safe fallback — no data loss).
+
+**Remove:**
+- `page_impressions_organic_unique` — not needed, we subtract instead
+- `page_video_views_organic` — not needed, we subtract instead
+- `page_media_view` and `is_from_ads` breakdown calls — unnecessary complexity
+- All `totalMediaViews*` accumulators
+
+**Final stored metrics:**
 ```
-{
-  // Organic-only (primary display metrics)
-  impressions: <page_impressions - page_impressions_paid>,
-  reach: <page_impressions_organic_unique summed daily>,
-  video_views: <page_video_views_organic summed daily>,
-  
-  // Paid (stored for separate display / boosted post users)
-  paid_impressions: <page_impressions_paid summed daily>,
-  paid_reach: <page_impressions_paid_unique summed daily>,  
-  paid_video_views: <page_video_views_paid summed daily>,
-  
-  // Totals (for reference / validation)
-  total_impressions: <page_impressions summed daily>,
-  total_video_views: <page_video_views summed daily>,
-  
-  // These are already fine as-is
-  engagement, page_views, link_clicks, follower_growth, 
-  total_followers, likes, comments, shares, posts_published,
-  engagement_rate (recalculated from organic reach)
-}
+impressions: total_impressions - paid_impressions  (organic)
+reach: total_impressions - paid_impressions         (same, organic impressions)
+video_views: total_video_views - paid_video_views  (organic)
+engagement: page_post_engagements (total, fine as-is)
+page_views, link_clicks, follower_growth, total_followers — unchanged
+likes, comments, shares, posts_published — from posts, unchanged
+paid_impressions, paid_video_views — stored separately for boosted section
 ```
 
-**Per-post `top_content` additions:**
-- Add `organic_reach` (from `post_impressions_organic_unique`)
-- Add `paid_reach` (from `post_impressions_paid_unique`)
-- Keep `reach` as organic-only (rename source)
-- Add `is_boosted: true/false` flag (true if `paid_reach > 0`)
+**Post-level:** Keep `post_impressions_organic_unique` and `post_impressions_paid_unique` per post since these are individual post endpoints (not batch) and work reliably. Keep `is_boosted` flag.
 
-### File 2: `src/components/clients/dashboard/PlatformSection.tsx`
+**Overwrite protection:** Before saving to `monthly_snapshots`, if impressions AND engagement AND total_followers are all 0 but posts exist with likes > 0, mark sync as `partial` and do NOT overwrite existing snapshot data.
 
-**Add "Boosted Performance" sub-section for Facebook when paid metrics exist:**
-- When `paid_impressions > 0` in Facebook snapshot, show a collapsible "Boosted / Paid Performance" card below the organic metrics
-- Display: Paid Impressions, Paid Reach, Paid Video Views
-- This gives visibility to users who boost posts but don't use Meta Ads separately
-- In the organic metrics grid, explicitly label "Organic Impressions", "Organic Reach", "Organic Video Views"
+### File 2: `src/types/database.ts`
 
-### File 3: `src/components/clients/ClientDashboard.tsx`
+- Remove `organic_impressions` from `METRIC_LABELS` and `PLATFORM_AVAILABLE_METRICS` for facebook — the main `impressions` key IS organic now, no need for a separate label
+- Keep `paid_impressions`, `paid_reach`, `paid_video_views` in `HIDDEN_METRICS` so they only show in the boosted sub-section
 
-**Fix Hero KPI double-counting:**
-- When computing `totalReach`, use `reach` from Facebook (now guaranteed organic-only)
-- No change needed for Meta Ads — it already stores its own paid reach
-- The sum across platforms is now correct: FB organic reach + Meta Ads paid reach + other platforms = no overlap
-- Same logic for `totalVideoViews`: FB now stores `video_views` as organic-only, Meta Ads stores paid video views separately
+### File 3: `src/components/clients/dashboard/PlatformSection.tsx`
 
-### File 4: `src/types/database.ts`
+- No structural changes needed — the Boosted/Paid sub-section already works off `paid_impressions > 0`
+- Just ensure the Facebook `impressions` metric card label says "Impressions" (not "Organic Impressions") since it's already organic-only after subtraction
 
-- Add `paid_impressions`, `paid_reach`, `paid_video_views` to any relevant metric lists so they can appear in the Facebook platform section config
-
-## Key Design Decisions
-
-1. **Use native organic metrics, not subtraction** — `page_impressions_organic_unique` and `page_video_views_organic` are provided by Facebook specifically for this purpose. Subtraction (`total - paid`) is only used for `impressions` where no direct organic-only metric exists at the impressions (non-unique) level.
-
-2. **Store both organic and paid** — Don't discard paid data from Facebook. Users who boost posts (but don't have Meta Ads connected) need visibility into their boosted performance.
-
-3. **Organic is the default display** — The main Facebook section shows organic metrics. Paid data appears in a clearly labeled sub-section.
-
-4. **No double-counting** — The Hero KPIs sum `reach` across platforms. Since Facebook `reach` is now organic-only and Meta Ads `reach` is paid-only, summing them gives accurate total reach.
-
-5. **Boosted post tagging** — Per-post insights now flag whether a post was boosted, allowing future features like "Boosted vs Organic post comparison".
-
-## Scenarios Handled
-
-| Scenario | Result |
-|---|---|
-| FB only, no boosting | All paid metrics = 0, organic = total, no boosted section shown |
-| FB only, with boosted posts | Organic metrics shown in main section, boosted sub-section appears |
-| FB + Meta Ads, no boosting | FB = pure organic, Meta Ads = pure paid, no overlap |
-| FB + Meta Ads, with boosting | FB shows organic + boosted sub-section, Meta Ads shows campaign data — boosted posts may appear in both but metrics are correctly attributed |
+### Summary
+- 1 edge function rewrite (simpler, fewer API calls, safer)
+- Minor cleanup in types file
+- No dashboard logic changes needed
+- Data accuracy guaranteed: organic = total - paid, always
 
