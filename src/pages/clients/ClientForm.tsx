@@ -21,7 +21,7 @@ import { useOrg } from '@/hooks/useOrg';
 const ClientForm = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { orgId } = useOrg();
+  const { orgId, isLoading: isOrgLoading } = useOrg();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -122,6 +122,12 @@ const ClientForm = () => {
       }
       const { data: urlData } = supabase.storage.from('client-logos').getPublicUrl(path);
       logoUrl = urlData.publicUrl;
+    }
+
+    if (isOrgLoading) {
+      toast.error('Still loading organisation — please try again');
+      setIsSubmitting(false);
+      return;
     }
 
     if (!orgId) {
@@ -336,8 +342,8 @@ const ClientForm = () => {
           </Card>
 
           <div className="flex gap-3">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Client'}
+            <Button type="submit" disabled={isSubmitting || isOrgLoading}>
+              {isOrgLoading ? 'Loading...' : isSubmitting ? 'Creating...' : 'Create Client'}
             </Button>
             <Button type="button" variant="outline" onClick={() => navigate('/clients')}>
               Cancel
