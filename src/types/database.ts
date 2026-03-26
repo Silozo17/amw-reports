@@ -9,9 +9,10 @@ import gscLogo from '@/assets/logos/google-search-console.webp';
 import gaLogo from '@/assets/logos/google-analytics.webp';
 import gbpLogo from '@/assets/logos/google-business.webp';
 import youtubeLogo from '@/assets/logos/youtube.webp';
+import pinterestLogo from '@/assets/logos/pinterest.webp';
 
 export type AppRole = 'owner' | 'manager';
-export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube';
+export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube' | 'pinterest';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
 
 export interface Organisation {
@@ -161,6 +162,7 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   google_analytics: 'Google Analytics',
   google_business_profile: 'Google Business Profile',
   youtube: 'YouTube',
+  pinterest: 'Pinterest',
 };
 
 export const PLATFORM_LOGOS: Record<string, string> = {
@@ -175,6 +177,7 @@ export const PLATFORM_LOGOS: Record<string, string> = {
   google_analytics: gaLogo,
   google_business_profile: gbpLogo,
   youtube: youtubeLogo,
+  pinterest: pinterestLogo,
 };
 
 export const CURRENCY_OPTIONS = [
@@ -244,7 +247,7 @@ export const AD_METRICS = new Set([
 ]);
 
 /** Platforms that are organic-only (no ad spend metrics) */
-export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube']);
+export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest']);
 
 export const METRIC_LABELS: Record<string, string> = {
   spend: 'Spend',
@@ -335,6 +338,11 @@ export const METRIC_LABELS: Record<string, string> = {
   post_views:     'Post Views',
   post_clicks:    'Post Clicks',
   engaged_users:  'Engaged Users',
+  pin_clicks:     'Pin Clicks',
+  outbound_clicks: 'Outbound Clicks',
+  total_pins:     'Total Pins',
+  total_boards:   'Total Boards',
+  top_boards:     'Top Boards',
 };
 
 /** Platform-specific metrics — only these metrics are relevant per platform */
@@ -389,5 +397,10 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
   youtube: [
     'subscribers', 'views', 'watch_time', 'videos_published',
     'avg_view_duration', 'top_videos',
+  ],
+  pinterest: [
+    'impressions', 'saves', 'pin_clicks', 'outbound_clicks',
+    'engagement', 'engagement_rate', 'total_followers',
+    'total_pins', 'total_boards', 'top_boards',
   ],
 };

@@ -85,6 +85,12 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   reaction_haha:  'Number of Haha reactions',
   reaction_sorry: 'Number of Sorry reactions',
   reaction_anger: 'Number of Angry reactions',
+  // Pinterest
+  pin_clicks: 'Clicks on your pins that take people to on-Pinterest or off-Pinterest destinations',
+  outbound_clicks: 'Clicks that take people off Pinterest to your website or landing page',
+  total_pins: 'Total number of pins on your Pinterest profile',
+  total_boards: 'Total number of boards on your Pinterest profile',
+  top_boards: 'Your boards with the most pins',
 };
 
 /** Timezone options for client configuration */

@@ -20,9 +20,9 @@ interface ConnectionDialogProps {
   onUpdate: () => void;
 }
 
-const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube'];
+const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
 
-const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube'];
+const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
 
 const CONNECT_FUNCTION_MAP: Record<string, string> = {
   google_ads: 'google-ads-connect',
@@ -35,6 +35,7 @@ const CONNECT_FUNCTION_MAP: Record<string, string> = {
   google_analytics: 'google-analytics-connect',
   google_business_profile: 'google-business-connect',
   youtube: 'youtube-connect',
+  pinterest: 'pinterest-connect',
 };
 
 const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogProps) => {
