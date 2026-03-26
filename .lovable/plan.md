@@ -1,65 +1,77 @@
 
 
-# Dashboard Widget Enhancements: Platform Logos, Sort, Resize, Focus Fix
+# Compact vs Extended Dashboard View Mode
 
-## 1. Add platform logo to every widget
+## Concept
 
-**Problem**: Widget labels like "Impressions" appear for multiple platforms with no way to tell them apart.
+Add a **Compact / Extended** toggle to the dashboard controls. This changes how platform-level metrics are displayed:
 
-**Solution**: Add a `platform` field to `DashboardWidget` type. When generating widgets in `ClientDashboard.tsx`, extract the platform from the widget ID (e.g., `platform-google_ads-impressions` → `google_ads`) and store it. In `WidgetRenderer.tsx`, render the platform logo (from `PLATFORM_LOGOS`) as a small 16x16 image next to the widget title.
+- **Compact**: Similar metrics across platforms are merged into single widgets. For example, instead of separate "Google Ads — Impressions", "Meta Ads — Impressions", "Facebook — Impressions" widgets, there is one "Impressions" widget that aggregates all platforms and includes a platform filter dropdown to drill down. Charts like Engagement Breakdown already work this way. The Posts table already has a platform filter.
 
-### Files
-- `src/types/widget.ts` — add optional `platform?: PlatformType` to `DashboardWidget`
-- `src/components/clients/ClientDashboard.tsx` — set `platform` field on each widget during generation (KPI widgets get no platform, platform widgets get their platform, chart/table widgets get assigned based on context)
-- `src/components/clients/widgets/WidgetRenderer.tsx` — render the platform logo in the card header next to the title
+- **Extended** (current behavior): Every platform gets its own separate metric widgets, showing the full breakout.
 
-## 2. Add sort button to dashboard controls
+## What Changes
 
-**Problem**: No way to sort/group widgets by platform or other criteria.
+### 1. Add view mode toggle (`ClientDashboard.tsx`)
 
-**Solution**: Add a sort dropdown next to the Edit Dashboard button with options: "Default", "By Platform", "By Type", "By Name". Sorting reorders the `widgets` array before passing to `DashboardGrid`, recalculating positions based on sort order.
+- Add `viewMode` state: `'compact' | 'extended'` (default: `'compact'`)
+- Add a segmented toggle (two buttons or a Select) next to the existing sort dropdown
+- Persist choice in localStorage per client
 
-### Files
-- `src/components/clients/ClientDashboard.tsx` — add `sortMode` state, a `Select` dropdown in the controls bar, and a `useMemo` that reorders widgets based on sort selection before passing to `DashboardGrid`
+### 2. Compact mode widget generation (`ClientDashboard.tsx` — `generateDefaultWidgets`)
 
-## 3. Enable widget resize via corner drag handle
+When `viewMode === 'compact'`:
+- **Skip individual platform widgets** entirely (the `platform-{name}-{metric}` widgets)
+- Instead, generate **one widget per unique metric key** across all platforms (e.g., one "Impressions" widget, one "Reach" widget)
+- Each compact widget gets a new field `platformSources: PlatformType[]` listing which platforms contribute data
+- KPI and chart widgets remain unchanged (they're already cross-platform)
 
-**Problem**: Users cannot resize widgets.
+When `viewMode === 'extended'`:
+- Current behavior — individual platform widgets are generated as-is
 
-**Solution**: Add a resize handle (bottom-right corner) visible in edit mode. When the user drags the handle, update `position.w` and `position.h` in grid units, respecting `minW`/`minH` constraints and a max of 12 columns wide / 8 rows tall.
+### 3. Compact widget data with platform filter (`buildWidgetDataMap`)
 
-### Files
-- `src/types/widget.ts` — add `maxW?: number; maxH?: number` to `WidgetPosition`
-- `src/components/clients/widgets/DashboardGrid.tsx` — add resize state (`ResizeInfo`), a resize handle element on each widget in edit mode, pointer handlers for resize (separate from drag), update widget dimensions on release and reflow layout
-- `src/components/clients/ClientDashboard.tsx` — add `handleWidgetResize` callback to persist resized dimensions, pass it to `DashboardGrid`
+For compact metric widgets:
+- Aggregate the metric value across all platforms by default
+- Store per-platform breakdown in a new `WidgetData` field: `platformBreakdown?: Record<string, number>`
+- When user selects a specific platform in the widget's filter, show only that platform's value
 
-## 4. Remove purple focus ring from buttons/selectors
+### 4. Platform filter inside compact widgets (`WidgetRenderer.tsx`)
 
-**Problem**: The `--ring` CSS variable is set to the purple primary color (`295 60% 47%`), causing all focus rings to appear purple.
+For widgets that have `platformSources` with 2+ platforms:
+- Add a small platform filter dropdown (similar to the posts table filter) in the widget header
+- Default: "All" (shows aggregated value)
+- Options: each platform with its logo
+- Filtering updates the displayed value/change without regenerating the widget
 
-**Solution**: Change `--ring` to a neutral color that doesn't look like an active/selected state. Use the border color value instead.
+### 5. Types update (`src/types/widget.ts`)
 
-### Files
-- `src/index.css` — change `--ring` from `295 60% 47%` to `32 20% 82%` (light mode) and from `295 60% 47%` to `340 7% 20%` (dark mode), matching `--border` values
+- Add `platformSources?: string[]` to `DashboardWidget`
+- Add `platformBreakdown?: Record<string, number>` and `platformBreakdownChange?: Record<string, number>` to `WidgetData`
 
-## Technical Details
+## Files Modified
 
-### Platform extraction logic
-Widget IDs follow patterns: `kpi-spend`, `chart-spend-distribution`, `platform-google_ads-impressions`, `table-gsc-queries`. Platform is extracted:
-- `platform-{platform}-{metric}` → platform field set directly
-- `kpi-*` → undefined (aggregated across platforms)
-- `chart-*` → undefined (cross-platform charts)
-- `table-gsc-*` → `google_search_console`, `table-ga-*` → `google_analytics`, `table-yt-*` → `youtube`
+- `src/types/widget.ts` — new fields on `DashboardWidget` and `WidgetData`
+- `src/components/clients/ClientDashboard.tsx` — view mode state, toggle UI, conditional widget generation, compact data map building
+- `src/components/clients/widgets/WidgetRenderer.tsx` — platform filter dropdown inside compact widgets, read `platformBreakdown` when filtered
 
-### Resize constraints
-- Min: `minW` (default 2), `minH` (default 2)
-- Max: `maxW` (default 12), `maxH` (default 8)
-- Snap to grid units during resize
-- Reflows other widgets via `compactLayout` after resize commit
+## How It Looks
 
-### Sort modes
-- **Default**: Original position order
-- **By Platform**: Group widgets by platform, then alphabetical
-- **By Type**: Group by category (KPI → Chart → Table → Platform)
-- **By Name**: Alphabetical by label
+```text
+Controls bar:
+[Last synced 2h ago]     [Compact|Extended]  [Sort ▾]  [Edit]  [Widgets]  [AI Analysis]
+
+Compact mode:
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│Impressions│ │  Reach   │ │  Clicks  │ │  Spend   │
+│ All ▾    │ │ All ▾    │ │ All ▾    │ │ All ▾    │
+│ 45.2K    │ │ 32.1K    │ │ 2.3K     │ │ £1,250   │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘
+
+Extended mode (current):
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│G.Ads Imp │ │Meta Imp  │ │FB Imp    │ │IG Imp    │
+│ 12.1K    │ │ 15.3K    │ │ 10.2K    │ │ 7.6K     │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘
+```
 
