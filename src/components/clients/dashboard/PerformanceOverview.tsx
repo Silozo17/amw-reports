@@ -3,7 +3,7 @@ import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
+  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
 } from 'recharts';
 
@@ -59,6 +59,51 @@ const PerformanceOverview = ({
   if (trendChartData.some(d => (d as Record<string, number>).clicks > 0)) trendKeys.push({ key: 'clicks', name: 'Clicks', color: '#539BDB' });
   if (trendChartData.some(d => (d as Record<string, number>).engagement > 0)) trendKeys.push({ key: 'engagement', name: 'Engagement', color: '#4ED68E' });
   if (trendChartData.some(d => (d as Record<string, number>).reach > 0)) trendKeys.push({ key: 'reach', name: 'Reach', color: '#EE8733' });
+
+  // Normalize trend data so each metric has its own 0–1 scale
+  const normalizedTrendData = (() => {
+    if (!hasTrend || trendKeys.length === 0) return trendChartData;
+    const ranges = trendKeys.reduce<Record<string, { min: number; max: number }>>((acc, tk) => {
+      let min = Infinity, max = -Infinity;
+      for (const d of trendChartData) {
+        const v = (d as Record<string, number>)[tk.key] ?? 0;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      acc[tk.key] = { min, max };
+      return acc;
+    }, {});
+    return trendChartData.map(d => {
+      const row: Record<string, unknown> = { name: (d as Record<string, unknown>).name };
+      for (const tk of trendKeys) {
+        const v = (d as Record<string, number>)[tk.key] ?? 0;
+        const { min, max } = ranges[tk.key];
+        row[`_orig_${tk.key}`] = v;
+        row[`_norm_${tk.key}`] = max === min ? 0.5 : (v - min) / (max - min);
+      }
+      return row;
+    });
+  })();
+
+  const TrendTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="rounded-lg border bg-popover px-3 py-2 shadow-xl text-xs space-y-1">
+        <p className="font-medium text-foreground">{label}</p>
+        {payload.map((entry: any, i: number) => {
+          const origKey = entry.dataKey.replace('_norm_', '_orig_');
+          const origVal = entry.payload?.[origKey] ?? 0;
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+              <span className="text-muted-foreground">{entry.dataKey.replace('_norm_', '').replace(/^\w/, (c: string) => c.toUpperCase())}:</span>
+              <span className="font-medium text-foreground tabular-nums">{fmtNum(origVal)}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -177,33 +222,24 @@ const PerformanceOverview = ({
               </div>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendChartData}>
-                    {trendKeys.map((tk) => (
-                      <defs key={`def-${tk.key}`}>
-                        <linearGradient id={`trend-grad-${tk.key}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={tk.color} stopOpacity={0.2} />
-                          <stop offset="100%" stopColor={tk.color} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                    ))}
+                  <LineChart data={normalizedTrendData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={fmtNum} />
-                    <RechartsTooltip content={<CustomTooltip />} />
+                    <YAxis hide domain={[0, 1]} />
+                    <RechartsTooltip content={<TrendTooltip />} />
                     {trendKeys.map((tk) => (
-                      <Area
+                      <Line
                         key={tk.key}
                         type="monotone"
-                        dataKey={tk.key}
+                        dataKey={`_norm_${tk.key}`}
                         name={tk.name}
                         stroke={tk.color}
                         strokeWidth={2}
-                        fill={`url(#trend-grad-${tk.key})`}
                         dot={{ r: 2, fill: tk.color }}
                       />
                     ))}
-                    <Legend />
-                  </AreaChart>
+                    <Legend formatter={(value: string) => value.replace('_norm_', '').replace(/^\w/, (c: string) => c.toUpperCase())} />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
