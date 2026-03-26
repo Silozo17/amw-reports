@@ -1,65 +1,46 @@
 
 
-# Public Marketing Website — Home, Features, Pricing
+# Fix: Admin Panel Responsiveness, Missing Org, and Homepage Button Text
 
-## Overview
+## Issues Identified
 
-Replace the current single landing page (auth-only split screen) with a full public marketing website consisting of three pages. The existing login/signup flow moves to a dedicated `/login` route. Logged-in users still redirect to `/dashboard`.
+1. **Admin panel not responsive on mobile** — The `AdminLayout` uses a fixed `w-64` sidebar with `flex` layout. On mobile (402px viewport from your screenshot), both sidebar and content try to render side-by-side, causing content overflow and truncation ("PLATFORM OVERVIEW" text gets cut off).
 
-## Current State
+2. **Re Digital organisation not visible** — The `AdminOrgList` query fetches all organisations but filters connections globally (`platform_connections` without filtering by org). More importantly, Re Digital may not have an `org_subscriptions` record yet (the seed migration may not have matched their actual org ID). Need to verify and ensure the query works regardless.
 
-- `/` — Split-screen: auth forms on the left, dark hero panel on the right
-- No public marketing pages exist
-- The `LandingHero` component has brand assets (mascot, logo, warped grid, star decorations) that can be reused
+3. **Homepage white "See Features" button has invisible text** — The outline button on the dark homepage uses `variant="outline"` which applies `border-input bg-background` — `bg-background` is the light beige/cream colour (`32 44% 92%`), making the button background light while the text colour `text-amw-offwhite` is also light/white. The text becomes invisible against the light background.
 
-## New Route Structure
+---
 
-| Route | Page | Purpose |
-|-------|------|---------|
-| `/` | HomePage | Full marketing homepage |
-| `/features` | FeaturesPage | Detailed platform capabilities |
-| `/pricing` | PricingPage | Plan comparison and CTA |
-| `/login` | LoginPage (existing `LandingPage.tsx` renamed) | Auth forms with hero panel |
+## Plan
 
-## Shared Components
+### 1. Make AdminLayout responsive (mobile-friendly)
 
-### `PublicNavbar.tsx`
-Sticky top nav with AMW Reports logo, links (Home, Features, Pricing), and Login / Get Started buttons. Mobile hamburger menu. Dark background matching the brand.
+**File: `src/components/admin/AdminLayout.tsx`**
+- On mobile (`< md`), hide the sidebar by default and show a hamburger/sheet trigger
+- Use the shadcn `Sheet` component for a slide-out sidebar on mobile
+- Keep the fixed sidebar on `md:` and above
+- Add a mobile header bar with "AMW Admin" title and menu button
 
-### `PublicFooter.tsx`
-Full footer with: AMW Media branding, links (Privacy, Terms, Features, Pricing), social links, copyright. Reuses existing footer content from `LandingPage.tsx`.
+### 2. Fix homepage outline button text visibility
 
-### `PublicLayout.tsx`
-Wraps all public pages with `PublicNavbar` + `PublicFooter`. Keeps the dark premium aesthetic (`bg-amw-black text-amw-offwhite`).
+**File: `src/pages/HomePage.tsx`**
+- The "See Features" button uses `variant="outline"` which inherits `bg-background` (light beige). On the dark homepage this makes text invisible.
+- Remove `variant="outline"` and use explicit dark-compatible classes instead: transparent background, visible border, white text. E.g. `className="border border-amw-offwhite/30 bg-transparent text-amw-offwhite hover:bg-amw-offwhite/10"`
 
-## Page 1: HomePage (`/`)
+### 3. Investigate and fix missing Re Digital organisation
 
-Sections top to bottom:
+**Database check needed** — The `AdminOrgList` connection count query doesn't filter by org (`platform_connections` has no `org_id` column — it links to clients which link to orgs). This means every org shows the same global connection count. Fix:
+- Join through `clients` to count connections per org: query `platform_connections` joined with `clients.org_id`
+- Verify Re Digital's organisation exists in the `organisations` table and has a subscription record
 
-1. **Hero** — Reuse/adapt the existing `LandingHero` component. Full-width dark section with the mascot, headline ("Automated Marketing Reports That Elevate Your Agency"), subtitle, and two CTAs: "Get Started Free" → `/login` (signup view) and "See Features" → `/features`.
+---
 
-2. **Platform Logos** — "Trusted integrations" strip showing Google Ads, Meta Ads, GA4, Search Console, YouTube, Facebook, Instagram, LinkedIn, TikTok, Google Business Profile icons/logos.
+## Files to Modify
 
-3. **How It Works** — 3-step visual: Connect → Sync → Report. Brief explanation of the automated workflow.
+| File | Change |
+|------|--------|
+| `src/components/admin/AdminLayout.tsx` | Add mobile sheet sidebar with hamburger toggle, keep desktop sidebar |
+| `src/pages/HomePage.tsx` | Fix "See Features" button styling for dark background |
+| `src/pages/admin/AdminOrgList.tsx` | Fix connection count query to filter by org via clients table |
 
-4. **Stats at a Glance** — Grid of key metrics the platform tracks, grouped by category (Ads, SEO, Social, Web Analytics). Reference the `METRIC_EXPLANATIONS` data to show breadth. E.g. "70+ metrics across 10 platforms."
-
-5. **Why AMW Reports** — Comparison points vs. competitors: white-label, automated delivery, multi-platform in one place, no per-seat pricing, built by marketers for marketers.
-
-6. **Founder Quote** — Quote block from Amir (AMW Media founder). Photo placeholder, name, title, short testimonial about why they built the platform.
-
-7. **CTA Banner** — "Ready to elevate your reporting?" with Get Started Free button.
-
-## Page 2: FeaturesPage (`/features`)
-
-Sections:
-
-1. **Hero** — "Everything You Need to Report Like a Pro." Subtitle explaining the platform.
-
-2. **Platform Deep Dives** — One card/section per integration (Google Ads, Meta Ads, GA4, GSC, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, Google Business Profile). Each shows: platform icon, name, list of metrics synced (pulled from `METRIC_EXPLANATIONS` keys), and a brief description of what data is collected.
-
-3. **Reporting Features** — Branded PDF generation, automated monthly email delivery, white-label customisation, client portal with shared links.
-
-4. **Client Management** — Multi-client dashboard, per-client connections, audience demographics, top content tracking.
-
-5. **Agency Tools** — White-labelling (custom logo, colours, domain
