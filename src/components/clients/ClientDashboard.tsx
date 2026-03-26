@@ -172,11 +172,11 @@ function generateDefaultWidgets(
       type: 'number',
       category: 'kpi',
       visible: true,
-      position: { x: (i % 4) * 3, y: Math.floor(i / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
+      position: { x: (i % 4) * 3, y: Math.floor(i / 4) * 4, w: 3, h: 4, minW: 2, minH: 3 },
       compatibleTypes: COMPATIBLE_TYPES.kpi,
     });
   });
-  y = Math.ceil(kpis.length / 4) * 3;
+  y = Math.ceil(kpis.length / 4) * 4;
 
   // Chart widgets
   if (hasSpendDistribution) {
