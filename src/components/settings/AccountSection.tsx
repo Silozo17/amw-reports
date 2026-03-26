@@ -9,9 +9,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Camera, Save, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import AvatarCropDialog from './AvatarCropDialog';
 
 const AccountSection = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, refetchProfile } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
@@ -29,19 +30,44 @@ const AccountSection = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  // Crop dialog state
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [showCrop, setShowCrop] = useState(false);
+
   const initials = (fullName || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    // Check if image is square by loading it
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      if (img.width === img.height) {
+        // Already square, upload directly
+        uploadBlob(file);
+      } else {
+        // Show crop dialog
+        setCropFile(file);
+        setShowCrop(true);
+      }
+    };
+    img.src = URL.createObjectURL(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const uploadBlob = async (blob: Blob) => {
+    if (!user) return;
     setIsUploading(true);
-    const ext = file.name.split('.').pop();
+
+    const ext = blob.type === 'image/png' ? 'png' : 'jpg';
     const path = `avatars/${user.id}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from('org-assets')
-      .upload(path, file, { upsert: true });
+      .upload(path, blob, { upsert: true, contentType: blob.type });
 
     if (uploadError) {
       toast.error('Failed to upload avatar');
@@ -62,6 +88,8 @@ const AccountSection = () => {
     } else {
       setAvatarUrl(url);
       toast.success('Avatar updated');
+      setShowCrop(false);
+      refetchProfile();
     }
     setIsUploading(false);
   };
@@ -70,7 +98,6 @@ const AccountSection = () => {
     if (!user) return;
     setIsSaving(true);
 
-    // Update profile fields
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
@@ -86,7 +113,6 @@ const AccountSection = () => {
       return;
     }
 
-    // Update email if changed
     if (email.trim() !== (user.email ?? '')) {
       const { error: emailError } = await supabase.auth.updateUser({ email: email.trim() });
       if (emailError) {
@@ -98,6 +124,7 @@ const AccountSection = () => {
     }
 
     toast.success('Profile updated');
+    refetchProfile();
     setIsSaving(false);
   };
 
@@ -124,104 +151,114 @@ const AccountSection = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-display text-lg">Your Account</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Avatar */}
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={avatarUrl} />
-              <AvatarFallback className="bg-primary/10 text-primary font-display text-lg">{initials}</AvatarFallback>
-            </Avatar>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-              disabled={isUploading}
-            >
-              {isUploading ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Camera className="h-4 w-4 text-white" />}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg">Your Account</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Avatar */}
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={avatarUrl} />
+                <AvatarFallback className="bg-primary/10 text-primary font-display text-lg">{initials}</AvatarFallback>
+              </Avatar>
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                disabled={isUploading}
+              >
+                {isUploading ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Camera className="h-4 w-4 text-white" />}
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelected} />
+            </div>
+            <div>
+              <p className="text-sm font-medium">{fullName || 'Your Name'}</p>
+              <p className="text-xs text-muted-foreground">Click the avatar to upload a new photo</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium">{fullName || 'Your Name'}</p>
-            <p className="text-xs text-muted-foreground">Click the avatar to upload a new photo</p>
-          </div>
-        </div>
 
-        {/* Profile Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Full Name</Label>
-            <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name" />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
-          </div>
-          <div className="space-y-2">
-            <Label>Phone</Label>
-            <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+44 7..." />
-          </div>
-          <div className="space-y-2">
-            <Label>Position / Title</Label>
-            <Input value={position} onChange={e => setPosition(e.target.value)} placeholder="e.g. Account Manager" />
-          </div>
-        </div>
-
-        <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Profile
-        </Button>
-
-        <Separator />
-
-        {/* Change Password */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-display font-semibold">Change Password</h3>
+          {/* Profile Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>New Password</Label>
-              <div className="relative">
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  placeholder="Min 8 characters"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+              <Label>Full Name</Label>
+              <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name" />
             </div>
             <div className="space-y-2">
-              <Label>Confirm Password</Label>
-              <Input
-                type={showPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Repeat password"
-              />
+              <Label>Email</Label>
+              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+44 7..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Position / Title</Label>
+              <Input value={position} onChange={e => setPosition(e.target.value)} placeholder="e.g. Account Manager" />
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={handleChangePassword}
-            disabled={isChangingPassword || !newPassword}
-            className="gap-2"
-          >
-            {isChangingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Change Password
+
+          <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save Profile
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+
+          <Separator />
+
+          {/* Change Password */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-display font-semibold">Change Password</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Min 8 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Confirm Password</Label>
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat password"
+                />
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleChangePassword}
+              disabled={isChangingPassword || !newPassword}
+              className="gap-2"
+            >
+              {isChangingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Change Password
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AvatarCropDialog
+        open={showCrop}
+        onOpenChange={setShowCrop}
+        imageFile={cropFile}
+        onCropComplete={uploadBlob}
+        isUploading={isUploading}
+      />
+    </>
   );
 };
 
