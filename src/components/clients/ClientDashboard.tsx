@@ -831,6 +831,30 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     });
   }, [defaultWidgets, savedWidgetState]);
 
+  // Sort widgets
+  const CATEGORY_ORDER: Record<string, number> = { kpi: 0, chart: 1, table: 2, platform: 3 };
+  const sortedWidgets = useMemo(() => {
+    if (sortMode === 'default') return widgets;
+    const sorted = [...widgets];
+    if (sortMode === 'platform') {
+      sorted.sort((a, b) => (a.platform ?? 'zzz').localeCompare(b.platform ?? 'zzz') || a.label.localeCompare(b.label));
+    } else if (sortMode === 'type') {
+      sorted.sort((a, b) => (CATEGORY_ORDER[a.category] ?? 9) - (CATEGORY_ORDER[b.category] ?? 9) || a.label.localeCompare(b.label));
+    } else if (sortMode === 'name') {
+      sorted.sort((a, b) => a.label.localeCompare(b.label));
+    }
+    // Recalculate positions based on sort order
+    let y = 0;
+    let x = 0;
+    return sorted.map((w) => {
+      if (x + w.position.w > 12) { x = 0; y += 2; }
+      const newW = { ...w, position: { ...w.position, x, y } };
+      x += w.position.w;
+      if (x >= 12) { x = 0; y += w.position.h; }
+      return newW;
+    });
+  }, [widgets, sortMode]);
+
   const widgetDataMap = useMemo(() => buildWidgetDataMap(
     kpis, sparklineMap, currSymbol, spendByPlatform, totalSpend,
     engagementStackedData as unknown as Array<Record<string, unknown>>,
