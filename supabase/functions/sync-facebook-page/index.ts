@@ -64,22 +64,20 @@ Deno.serve(async (req) => {
     const metadata = conn.metadata as any;
     const allPages = metadata?.pages || [];
 
-    // Filter to the selected page (account_id) only
     let pages: any[];
     if (conn.account_id) {
       const selectedPage = allPages.find((p: any) => String(p.id) === String(conn.account_id));
       if (!selectedPage) {
-        throw new Error(`Selected page ${conn.account_id} not found in metadata. Available: ${allPages.map((p: any) => p.id).join(", ")}`);
+        throw new Error(`Selected page ${conn.account_id} not found in metadata.`);
       }
       pages = [selectedPage];
       console.log(`Syncing ONLY selected page: ${selectedPage.name} (${selectedPage.id})`);
     } else {
       pages = allPages;
-      console.log(`No account_id set — syncing all ${pages.length} pages (legacy mode)`);
     }
 
     if (pages.length === 0) {
-      throw new Error("No Facebook Pages discovered. Please reconnect Facebook to grant page permissions.");
+      throw new Error("No Facebook Pages discovered. Please reconnect Facebook.");
     }
 
     const { data: clientData } = await supabaseClient.from("clients").select("org_id").eq("id", clientId).single();
@@ -91,7 +89,6 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    // Build date range
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
@@ -108,26 +105,23 @@ Deno.serve(async (req) => {
     for (const page of pages) {
       const pageToken = page.access_token;
       if (!pageToken) {
-        console.error(`No Page Access Token for page ${page.id}. Reconnect Facebook.`);
-        await supabaseClient
-          .from("platform_connections")
+        console.error(`No Page Access Token for page ${page.id}.`);
+        await supabaseClient.from("platform_connections")
           .update({ last_error: `No token for page ${page.id}`, last_sync_status: "failed" })
           .eq("id", connectionId);
         continue;
       }
       const pageId = page.id;
 
-      // 1. Fetch core insights: page_post_engagements + page_follows
+      // 1. Core insights: page_post_engagements + page_follows
       try {
         const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_post_engagements,page_follows&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        console.log(`Fetching insights for page ${pageId} (${page.name})`);
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
           throw new Error(`Insights API error (${insightsRes.status}): ${errorBody}`);
         }
         const insightsData = await insightsRes.json();
-
         if (insightsData.data) {
           for (const metric of insightsData.data) {
             const values = metric.values || [];
@@ -143,14 +137,13 @@ Deno.serve(async (req) => {
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Insights sync error for page ${pageId}:`, errorMsg);
-        await supabaseClient
-          .from("platform_connections")
+        console.error(`Insights error page ${pageId}:`, errorMsg);
+        await supabaseClient.from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
 
-      // 2. Fetch page_media_view (replaces deprecated page_impressions)
+      // 2. page_media_view
       try {
         const mediaViewUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const mediaViewRes = await fetch(mediaViewUrl);
@@ -164,7 +157,7 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // 3. Fetch page_media_view with is_from_ads breakdown for paid vs organic
+      // 3. page_media_view with is_from_ads breakdown
       try {
         const breakdownUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&period=day&since=${startDate}&until=${endDate}&breakdowns=is_from_ads&access_token=${pageToken}`;
         const breakdownRes = await fetch(breakdownUrl);
@@ -183,7 +176,7 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // 4. Fetch page_views_total (Page Visits)
+      // 4. page_views_total
       try {
         const pageViewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_views_total&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const pageViewsRes = await fetch(pageViewsUrl);
@@ -197,7 +190,7 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // 5. Fetch page_consumptions (Link Clicks / Content Clicks)
+      // 5. page_consumptions (link clicks)
       try {
         const consumptionsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_consumptions&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const consumptionsRes = await fetch(consumptionsUrl);
@@ -211,25 +204,9 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // 6. Fetch video stats
+      // 6. Fetch ALL posts with basic fields, then fetch per-post insights individually
       try {
-        const videoUrl = `${GRAPH_BASE}/${pageId}/video_posts?fields=length,description,created_time,video_insights{name,values}&since=${startDate}&until=${endDate}&limit=25&access_token=${pageToken}`;
-        const videoRes = await fetch(videoUrl);
-        if (videoRes.ok) {
-          const videoData = await videoRes.json();
-          for (const video of videoData.data || []) {
-            for (const insight of video.video_insights?.data || []) {
-              if (insight.name === "total_video_views") {
-                metricsAccum.video_views = (metricsAccum.video_views || 0) + (insight.values?.[0]?.value || 0);
-              }
-            }
-          }
-        }
-      } catch {} // non-blocking
-
-      // 7. Fetch ALL posts with full content, images, and per-post insights
-      try {
-        let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,full_picture,permalink_url,likes.summary(true),comments.summary(true),shares,reactions.summary(true),insights.metric(post_impressions_unique,post_clicks){values}&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
+        let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,full_picture,permalink_url,likes.summary(true),comments.summary(true),shares,type&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
 
         while (postsUrl) {
           const postsRes = await fetch(postsUrl);
@@ -244,35 +221,32 @@ Deno.serve(async (req) => {
               const likes = post.likes?.summary?.total_count || 0;
               const comments = post.comments?.summary?.total_count || 0;
               const shares = post.shares?.count || 0;
+              const isVideo = post.type === 'video' || post.type === 'reel';
 
-              // Extract per-post reach and clicks from inline insights
+              // Fetch per-post insights individually for reliable reach and video views
               let postReach = 0;
               let postClicks = 0;
-              if (post.insights?.data) {
-                for (const insight of post.insights.data) {
-                  if (insight.name === "post_impressions_unique") {
-                    postReach = insight.values?.[0]?.value || 0;
-                  } else if (insight.name === "post_clicks") {
-                    postClicks = insight.values?.[0]?.value || 0;
-                  }
-                }
-              }
+              let postVideoViews = 0;
 
-              // Fetch video views for video posts
-              let postVideoViews: number | undefined;
               try {
-                const postId = post.id;
-                if (postId && post.full_picture) {
-                  const videoInsightsUrl = `${GRAPH_BASE}/${postId}/insights?metric=post_video_views&access_token=${pageToken}`;
-                  const videoInsightsRes = await fetch(videoInsightsUrl);
-                  if (videoInsightsRes.ok) {
-                    const videoInsightsData = await videoInsightsRes.json();
-                    if (videoInsightsData.data?.[0]?.values?.[0]?.value) {
-                      postVideoViews = videoInsightsData.data[0].values[0].value;
-                    }
+                // Build metrics list based on post type
+                const insightMetrics = isVideo
+                  ? 'post_impressions_unique,post_clicks,post_video_views'
+                  : 'post_impressions_unique,post_clicks';
+
+                const postInsightsUrl = `${GRAPH_BASE}/${post.id}/insights?metric=${insightMetrics}&access_token=${pageToken}`;
+                const postInsightsRes = await fetch(postInsightsUrl);
+
+                if (postInsightsRes.ok) {
+                  const postInsightsData = await postInsightsRes.json();
+                  for (const insight of postInsightsData.data || []) {
+                    const val = insight.values?.[0]?.value || 0;
+                    if (insight.name === 'post_impressions_unique') postReach = val;
+                    if (insight.name === 'post_clicks') postClicks = val;
+                    if (insight.name === 'post_video_views') postVideoViews = val;
                   }
                 }
-              } catch {} // non-blocking — not all posts are videos
+              } catch {} // non-blocking per-post
 
               allTopPosts.push({
                 page_name: page.name,
@@ -285,29 +259,30 @@ Deno.serve(async (req) => {
                 shares,
                 reach: postReach,
                 clicks: postClicks,
-                video_views: postVideoViews,
+                video_views: postVideoViews > 0 ? postVideoViews : undefined,
+                media_type: post.type || 'status',
                 total_engagement: likes + comments + shares,
               });
             }
           }
 
-          // Paginate if more posts exist
           postsUrl = postsData.paging?.next || null;
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Posts sync error for page ${pageId}:`, errorMsg);
-        await supabaseClient
-          .from("platform_connections")
+        console.error(`Posts sync error page ${pageId}:`, errorMsg);
+        await supabaseClient.from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
     }
 
-    // Sort all posts by engagement, keep all of them
+    // Sort by engagement, keep all
     const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement);
 
-    // Use organic-only values for primary metrics to avoid duplication with Meta Ads
+    // Aggregate video views from posts (month-specific, not lifetime)
+    const monthlyVideoViews = allTopPosts.reduce((sum, p) => sum + (p.video_views || 0), 0);
+
     const organicImpressions = totalMediaViewsOrganic || Math.max(totalMediaViews - totalMediaViewsPaid, 0);
 
     const metricsData = {
@@ -321,7 +296,7 @@ Deno.serve(async (req) => {
       link_clicks: totalLinkClicks,
       follower_growth: metricsAccum.follower_growth || 0,
       total_followers: metricsAccum.total_fans || 0,
-      video_views: metricsAccum.video_views || 0,
+      video_views: monthlyVideoViews,
       likes: allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
       comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
@@ -340,41 +315,28 @@ Deno.serve(async (req) => {
       .eq("report_year", year)
       .single();
 
-    if (existing?.snapshot_locked) {
-      throw new Error("Snapshot for this period is locked.");
-    }
+    if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
 
     if (existing) {
-      await supabaseClient
-        .from("monthly_snapshots")
+      await supabaseClient.from("monthly_snapshots")
         .update({ metrics_data: metricsData, top_content: topContent })
         .eq("id", existing.id);
     } else {
-      await supabaseClient
-        .from("monthly_snapshots")
-        .insert({
-          client_id: clientId,
-          platform: "facebook",
-          report_month: month,
-          report_year: year,
-          metrics_data: metricsData,
-          top_content: topContent,
-        });
+      await supabaseClient.from("monthly_snapshots")
+        .insert({ client_id: clientId, platform: "facebook", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent });
     }
 
-    await supabaseClient
-      .from("platform_connections")
+    await supabaseClient.from("platform_connections")
       .update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null })
       .eq("id", connectionId);
 
     if (syncLog?.id) {
-      await supabaseClient
-        .from("sync_logs")
+      await supabaseClient.from("sync_logs")
         .update({ status: "success", completed_at: new Date().toISOString() })
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete. Pages synced: ${pages.length}, Metrics:`, JSON.stringify(metricsData));
+    console.log(`Facebook sync complete. video_views=${monthlyVideoViews}, posts=${allTopPosts.length}, reach(page)=${organicImpressions}`);
 
     return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -382,8 +344,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error("Facebook Page sync error:", e);
     if (connectionId) {
-      await supabaseClient
-        .from("platform_connections")
+      await supabaseClient.from("platform_connections")
         .update({ last_sync_status: "failed", last_error: e instanceof Error ? e.message : "Unknown error" })
         .eq("id", connectionId);
     }

@@ -130,6 +130,9 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
+      // Always set video_views from monthly analytics (not lifetime channel stats)
+      metricsData.video_views = metricsData.views;
+
       try {
         const channelRes = await fetch(
           `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}`,
@@ -138,8 +141,6 @@ Deno.serve(async (req) => {
         const channelData = await channelRes.json();
         if (channelData.items?.[0]?.statistics) {
           metricsData.total_followers = parseInt(channelData.items[0].statistics.subscriberCount || "0", 10);
-        // Use monthly analytics views, not all-time channel viewCount
-        metricsData.video_views = metricsData.views;
           metricsData.videos_published = parseInt(channelData.items[0].statistics.videoCount || "0", 10);
         }
       } catch (e) {
