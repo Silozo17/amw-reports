@@ -119,7 +119,8 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
     }).eq('id', client.id);
 
     if (error) {
-      toast.error('Failed to update client');
+      console.error('Client update error:', error);
+      toast.error(error.message || 'Failed to update client');
     } else {
       toast.success('Client updated');
       setOpen(false);

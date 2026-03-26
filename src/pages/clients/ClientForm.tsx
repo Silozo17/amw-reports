@@ -124,16 +124,23 @@ const ClientForm = () => {
       logoUrl = urlData.publicUrl;
     }
 
+    if (!orgId) {
+      toast.error('Organisation not found — please reload the page');
+      setIsSubmitting(false);
+      return;
+    }
+
     const { error } = await supabase.from('clients').insert({
       ...form,
       phone: formatPhone(form.phone),
       logo_url: logoUrl,
       created_by: user?.id,
-      org_id: orgId!,
+      org_id: orgId,
     });
 
     if (error) {
-      toast.error('Failed to create client');
+      console.error('Client creation error:', error);
+      toast.error(error.message || 'Failed to create client');
     } else {
       toast.success('Client created');
       navigate('/clients');
