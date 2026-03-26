@@ -15,25 +15,111 @@ const COLS = 12;
 const GAP = 16;
 const ROW_H = 72;
 
-interface DragState {
+interface DragInfo {
   widgetId: string;
+  /** Mouse position at drag start */
   startMouseX: number;
   startMouseY: number;
+  /** Widget pixel position at drag start */
   startLeft: number;
   startTop: number;
-  offsetX: number;
-  offsetY: number;
+  /** Current ghost grid cell */
+  ghostX: number;
+  ghostY: number;
+  /** Current pixel offset from start */
+  currentX: number;
+  currentY: number;
+}
+
+/* ────────────────────────────────────────────
+ * Layout algorithm – compact widgets vertically
+ * with an optional ghost override for one widget
+ * ──────────────────────────────────────────── */
+function compactLayout(
+  widgets: DashboardWidget[],
+  ghostId?: string,
+  ghostX?: number,
+  ghostY?: number,
+) {
+  const items = widgets.map((w) => ({
+    ...w,
+    pos: {
+      x: w.id === ghostId && ghostX !== undefined ? ghostX : w.position.x,
+      y: w.id === ghostId && ghostY !== undefined ? ghostY : w.position.y,
+      w: w.position.w,
+      h: w.position.h,
+    },
+  }));
+
+  // Sort: the ghost widget gets priority (placed first) so others reflow around it
+  items.sort((a, b) => {
+    if (a.id === ghostId) return -1;
+    if (b.id === ghostId) return 1;
+    return a.pos.y - b.pos.y || a.pos.x - b.pos.x;
+  });
+
+  const occupied: boolean[][] = [];
+  const ensureRows = (maxY: number) => {
+    while (occupied.length <= maxY + 10) occupied.push(new Array(COLS).fill(false));
+  };
+  ensureRows(100);
+
+  for (const item of items) {
+    const w = item.pos.w;
+    const h = item.pos.h;
+    const targetX = Math.min(Math.max(item.pos.x, 0), COLS - w);
+
+    if (item.id === ghostId) {
+      // Place ghost at its exact target position, mark cells
+      const y = Math.max(item.pos.y, 0);
+      ensureRows(y + h);
+      item.pos.x = targetX;
+      item.pos.y = y;
+      for (let dy = 0; dy < h; dy++) {
+        for (let dx = 0; dx < w; dx++) {
+          occupied[y + dy][targetX + dx] = true;
+        }
+      }
+      continue;
+    }
+
+    // For non-ghost widgets, find the first row where they fit
+    let placed = false;
+    for (let tryY = 0; tryY < 300 && !placed; tryY++) {
+      ensureRows(tryY + h);
+      let fits = true;
+      for (let dy = 0; dy < h && fits; dy++) {
+        for (let dx = 0; dx < w && fits; dx++) {
+          if (occupied[tryY + dy]?.[targetX + dx]) fits = false;
+        }
+      }
+      if (fits) {
+        item.pos.y = tryY;
+        item.pos.x = targetX;
+        for (let dy = 0; dy < h; dy++) {
+          for (let dx = 0; dx < w; dx++) {
+            occupied[tryY + dy][targetX + dx] = true;
+          }
+        }
+        placed = true;
+      }
+    }
+  }
+
+  return items;
 }
 
 const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditMode }: DashboardGridProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
-  const [dragState, setDragState] = useState<DragState | null>(null);
-  const dragRef = useRef<DragState | null>(null);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<DragInfo | null>(null);
+  const dragRef = useRef<DragInfo | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const [isSnapping, setIsSnapping] = useState(false);
 
   const visibleWidgets = useMemo(() => widgets.filter((w) => w.visible), [widgets]);
 
+  // Observe container width
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
@@ -45,49 +131,27 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
 
   const colW = (containerWidth - GAP * (COLS + 1)) / COLS;
 
-  // Compact layout vertically
-  const compactedLayout = useMemo(() => {
-    const items = visibleWidgets.map((w) => ({
-      ...w,
-      pos: { ...w.position },
-    }));
-
-    items.sort((a, b) => a.pos.y - b.pos.y || a.pos.x - b.pos.x);
-
-    const occupied: boolean[][] = [];
-    const ensureRows = (maxY: number) => {
-      while (occupied.length <= maxY + 10) occupied.push(new Array(COLS).fill(false));
-    };
-    ensureRows(100);
-
-    for (const item of items) {
-      let placed = false;
-      for (let tryY = 0; tryY < 200 && !placed; tryY++) {
-        ensureRows(tryY + item.pos.h);
-        const x = Math.min(item.pos.x, COLS - item.pos.w);
-        let fits = true;
-        for (let dy = 0; dy < item.pos.h && fits; dy++) {
-          for (let dx = 0; dx < item.pos.w && fits; dx++) {
-            if (occupied[tryY + dy]?.[x + dx]) fits = false;
-          }
-        }
-        if (fits) {
-          item.pos.y = tryY;
-          item.pos.x = x;
-          for (let dy = 0; dy < item.pos.h; dy++) {
-            for (let dx = 0; dx < item.pos.w; dx++) {
-              occupied[tryY + dy][x + dx] = true;
-            }
-          }
-          placed = true;
-        }
-      }
+  // Compute layout – reflows live when dragging
+  const layout = useMemo(() => {
+    if (drag) {
+      return compactLayout(visibleWidgets, drag.widgetId, drag.ghostX, drag.ghostY);
     }
+    return compactLayout(visibleWidgets);
+  }, [visibleWidgets, drag]);
 
-    return items;
-  }, [visibleWidgets]);
+  // ─── Pixel helpers ─────────────────────────────────────────
+  const gridToPixelX = useCallback((gx: number) => GAP + gx * (colW + GAP), [colW]);
+  const gridToPixelY = useCallback((gy: number) => GAP + gy * (ROW_H + GAP), []);
+  const pixelToGridX = useCallback(
+    (px: number) => Math.round((px - GAP) / (colW + GAP)),
+    [colW],
+  );
+  const pixelToGridY = useCallback(
+    (py: number) => Math.round((py - GAP) / (ROW_H + GAP)),
+    [],
+  );
 
-  // ─── Pointer-based drag ──────────────────────────────────────
+  // ─── Pointer handlers ─────────────────────────────────────
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, widgetId: string, left: number, top: number) => {
       if (!isEditMode) return;
@@ -95,69 +159,99 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
       e.stopPropagation();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-      const state: DragState = {
+      const widget = visibleWidgets.find((w) => w.id === widgetId);
+      if (!widget) return;
+
+      const info: DragInfo = {
         widgetId,
         startMouseX: e.clientX,
         startMouseY: e.clientY,
         startLeft: left,
         startTop: top,
-        offsetX: 0,
-        offsetY: 0,
+        ghostX: widget.position.x,
+        ghostY: widget.position.y,
+        currentX: 0,
+        currentY: 0,
       };
-      dragRef.current = state;
-      setDragState(state);
-      setDragOffset({ x: 0, y: 0 });
+      dragRef.current = info;
+      setDrag(info);
+      setIsSnapping(false);
     },
-    [isEditMode],
+    [isEditMode, visibleWidgets],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!dragRef.current) return;
+      const d = dragRef.current;
+      if (!d) return;
       e.preventDefault();
-      const dx = e.clientX - dragRef.current.startMouseX;
-      const dy = e.clientY - dragRef.current.startMouseY;
-      dragRef.current.offsetX = dx;
-      dragRef.current.offsetY = dy;
-      setDragOffset({ x: dx, y: dy });
+
+      const dx = e.clientX - d.startMouseX;
+      const dy = e.clientY - d.startMouseY;
+
+      const newLeft = d.startLeft + dx;
+      const newTop = d.startTop + dy;
+
+      const widget = visibleWidgets.find((w) => w.id === d.widgetId);
+      if (!widget) return;
+
+      const gx = Math.max(0, Math.min(pixelToGridX(newLeft), COLS - widget.position.w));
+      const gy = Math.max(0, pixelToGridY(newTop));
+
+      // Update ref immediately for smooth rendering
+      d.currentX = dx;
+      d.currentY = dy;
+      d.ghostX = gx;
+      d.ghostY = gy;
+
+      // Throttle state updates via rAF
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        setDrag({ ...d });
+        rafRef.current = null;
+      });
     },
-    [],
+    [visibleWidgets, pixelToGridX, pixelToGridY],
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
-      const state = dragRef.current;
-      if (!state) return;
+      const d = dragRef.current;
+      if (!d) return;
       e.preventDefault();
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
 
-      const finalLeft = state.startLeft + state.offsetX;
-      const finalTop = state.startTop + state.offsetY;
-
-      // Snap to grid
-      const gridX = Math.round((finalLeft - GAP) / (colW + GAP));
-      const gridY = Math.round((finalTop - GAP) / (ROW_H + GAP));
-
-      const widget = widgets.find((w) => w.id === state.widgetId);
-      if (widget) {
-        const clampedX = Math.max(0, Math.min(gridX, COLS - widget.position.w));
-        const clampedY = Math.max(0, gridY);
-
-        const updated = widgets.map((w) =>
-          w.id === state.widgetId
-            ? { ...w, position: { ...w.position, x: clampedX, y: clampedY } }
-            : w,
-        );
-        onLayoutChange(updated);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
 
+      // Snap animation
+      setIsSnapping(true);
+
+      // Commit the ghost position
+      const finalLayout = compactLayout(visibleWidgets, d.widgetId, d.ghostX, d.ghostY);
+      const updated = widgets.map((w) => {
+        const found = finalLayout.find((l) => l.id === w.id);
+        if (found) {
+          return { ...w, position: { ...w.position, x: found.pos.x, y: found.pos.y } };
+        }
+        return w;
+      });
+
       dragRef.current = null;
-      setDragState(null);
-      setDragOffset(null);
+      setDrag(null);
+
+      // Brief delay so snap transition plays, then commit
+      setTimeout(() => {
+        setIsSnapping(false);
+        onLayoutChange(updated);
+      }, 180);
     },
-    [widgets, onLayoutChange, colW],
+    [widgets, visibleWidgets, onLayoutChange],
   );
 
+  // ─── Empty state ───────────────────────────────────────────
   if (visibleWidgets.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
@@ -166,7 +260,7 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
     );
   }
 
-  const maxY = Math.max(...compactedLayout.map((item) => item.pos.y + item.pos.h), 0);
+  const maxY = Math.max(...layout.map((item) => item.pos.y + item.pos.h), 0);
 
   return (
     <div
@@ -190,39 +284,52 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
         />
       )}
 
-      {compactedLayout.map((item) => {
-        const left = GAP + item.pos.x * (colW + GAP);
-        const top = GAP + item.pos.y * (ROW_H + GAP);
+      {layout.map((item) => {
+        const left = gridToPixelX(item.pos.x);
+        const top = gridToPixelY(item.pos.y);
         const width = item.pos.w * colW + (item.pos.w - 1) * GAP;
         const height = item.pos.h * ROW_H + (item.pos.h - 1) * GAP;
 
-        const isDragging = dragState?.widgetId === item.id;
-        const dragX = isDragging && dragOffset ? dragOffset.x : 0;
-        const dragY = isDragging && dragOffset ? dragOffset.y : 0;
+        const isDragging = drag?.widgetId === item.id;
+
+        // Dragged widget follows cursor directly
+        const renderLeft = isDragging ? drag.startLeft + drag.currentX : left;
+        const renderTop = isDragging ? drag.startTop + drag.currentY : top;
 
         return (
-          <div
-            key={item.id}
-            className={cn(
-              'absolute touch-none',
-              !isDragging && 'transition-all duration-200',
-              isEditMode && 'cursor-grab',
-              isDragging && 'cursor-grabbing z-50 shadow-2xl ring-2 ring-primary/40 scale-[1.02]',
+          <div key={item.id}>
+            {/* Ghost placeholder – shown at target grid position while dragging */}
+            {isDragging && (
+              <div
+                className="absolute rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 transition-all duration-300 ease-in-out"
+                style={{ left, top, width, height }}
+              />
             )}
-            style={{
-              left: left + dragX,
-              top: top + dragY,
-              width,
-              height,
-            }}
-            onPointerDown={(e) => handlePointerDown(e, item.id, left, top)}
-          >
-            <WidgetRenderer
-              widget={item}
-              data={dataMap[item.dataSource] ?? {}}
-              onTypeChange={onTypeChange}
-              isEditMode={isEditMode}
-            />
+
+            {/* Actual widget */}
+            <div
+              className={cn(
+                'absolute touch-none',
+                isEditMode && 'cursor-grab',
+                isDragging && 'cursor-grabbing z-50 shadow-2xl ring-2 ring-primary/40 scale-[1.02] opacity-90',
+                !isDragging && !isSnapping && 'transition-all duration-300 ease-in-out',
+                !isDragging && isSnapping && 'transition-all duration-150 ease-out',
+              )}
+              style={{
+                left: renderLeft,
+                top: renderTop,
+                width,
+                height,
+              }}
+              onPointerDown={(e) => handlePointerDown(e, item.id, left, top)}
+            >
+              <WidgetRenderer
+                widget={item}
+                data={dataMap[item.dataSource] ?? {}}
+                onTypeChange={onTypeChange}
+                isEditMode={isEditMode}
+              />
+            </div>
           </div>
         );
       })}
