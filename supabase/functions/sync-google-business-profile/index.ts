@@ -140,7 +140,11 @@ Deno.serve(async (req) => {
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
-        if (!metricRes.ok) continue;
+        if (!metricRes.ok) {
+          const errBody = await metricRes.text();
+          console.warn(`GBP metric ${metric} failed (${metricRes.status}):`, errBody);
+          continue;
+        }
 
         const metricData = await metricRes.json();
         const dataPoints = metricData.timeSeries?.datedValues || [];
@@ -160,22 +164,11 @@ Deno.serve(async (req) => {
     // Total views = maps + search views
     const gbpViews = totalViews + totalSearches;
 
-    // Fetch reviews
-    let reviewsCount = 0;
-    let avgRating = 0;
-    try {
-      const reviewsRes = await fetch(
-        `https://mybusiness.googleapis.com/v4/${locationId}/reviews?pageSize=1`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (reviewsRes.ok) {
-        const reviewsData = await reviewsRes.json();
-        reviewsCount = reviewsData.totalReviewCount || 0;
-        avgRating = reviewsData.averageRating || 0;
-      }
-    } catch (e) {
-      console.warn("Could not fetch reviews:", e);
-    }
+    // TODO: Reviews API — the v4 mybusiness.googleapis.com endpoint was deprecated (sunset March 2023).
+    // Google has not yet released a public v1 replacement for reviews.
+    // Setting to null so the dashboard can distinguish "no data" from "zero reviews."
+    const reviewsCount: number | null = null;
+    const avgRating: number | null = null;
 
     const metricsData = {
       gbp_views: gbpViews,
