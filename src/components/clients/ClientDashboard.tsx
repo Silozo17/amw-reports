@@ -66,6 +66,7 @@ interface SnapshotData {
 }
 
 interface ConnectionData {
+  id: string;
   platform: PlatformType;
   last_sync_at: string | null;
   last_sync_status: JobStatus | null;
@@ -209,7 +210,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", clientId)
         .or(`report_year.gt.${startYr},and(report_year.eq.${startYr},report_month.gte.${startMonth})`)
         .order("report_year", { ascending: true }).order("report_month", { ascending: true }),
-      supabase.from("platform_connections").select("platform, last_sync_at, last_sync_status, last_error").eq("client_id", clientId).eq("is_connected", true),
+      supabase.from("platform_connections").select("id, platform, last_sync_at, last_sync_status, last_error").eq("client_id", clientId).eq("is_connected", true),
       supabase.from("client_platform_config").select("platform, is_enabled, enabled_metrics").eq("client_id", clientId),
     ]);
 
