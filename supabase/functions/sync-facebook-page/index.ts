@@ -122,14 +122,11 @@ Deno.serve(async (req) => {
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
     // ── Accumulators ──
-    let totalViews = 0;
+    let totalViews = 0;       // organic only
+    let totalViewsAll = 0;    // organic + paid
     let totalUniqueViewers = 0;
-    let totalCTAClicks = 0;
-    let totalPageViews = 0;
-    let totalLinkClicks = 0;
-    let totalNewFollowers = 0;
-    let totalUnfollows = 0;
-    let currentFollowers = 0;
+    let followerStart = 0;
+    let followerEnd = 0;
     let coreInsightsFetched = false;
     const allTopPosts: any[] = [];
 
@@ -144,7 +141,9 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Batch 1a: Organic views only via is_from_ads breakdown ──
+      // ── Batch 1a: Organic views via is_from_ads breakdown ──
+      // Meta v25 returns FLAT entries: each day has TWO rows with is_from_ads as a sibling field
+      // { "value": 25, "is_from_ads": "0" } = organic,  { "value": 3, "is_from_ads": "1" } = paid
       try {
         const viewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&breakdown=is_from_ads&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const viewsRes = await fetch(viewsUrl);
@@ -156,18 +155,21 @@ Deno.serve(async (req) => {
           for (const metric of viewsBody.data) {
             if (metric.name === 'page_media_view') {
               for (const dayEntry of (metric.values || [])) {
-                const val = dayEntry.value;
-                if (typeof val === 'object' && val !== null) {
-                  // Meta returns breakdown as object: { "false": organicViews, "true": adViews }
-                  // "false" = is_from_ads is false = organic only
-                  const organicDay = Number(val['false'] || val['False'] || 0);
-                  totalViews += organicDay;
+                const dayVal = Number(dayEntry.value || 0);
+                const fromAds = String(dayEntry.is_from_ads ?? '');
+                if (fromAds === '0' || fromAds === 'false' || fromAds === 'False') {
+                  totalViews += dayVal;    // organic
+                } else if (fromAds === '1' || fromAds === 'true' || fromAds === 'True') {
+                  totalViewsAll += dayVal; // paid (add to total later)
+                } else {
+                  // No breakdown field — treat as organic (safe fallback)
+                  totalViews += dayVal;
                 }
-                // DO NOT fall back to total — if no breakdown, log and skip
               }
-              console.log(`Organic views accumulated for ${pageId}: ${totalViews}`);
             }
           }
+          totalViewsAll += totalViews; // totalViewsAll = organic + paid
+          console.log(`Views for ${pageId}: organic=${totalViews}, total=${totalViewsAll}`);
           coreInsightsFetched = true;
         } else {
           console.error(`page_media_view breakdown failed for ${pageId}:`, JSON.stringify(viewsBody));
@@ -176,41 +178,19 @@ Deno.serve(async (req) => {
         console.error(`Organic views exception ${pageId}:`, err instanceof Error ? err.message : err);
       }
 
-      // ── Batch 1b: Unique viewers, CTA ──
+      // ── Batch 1b: Unique viewers (reach) ──
       try {
         const batch1b = await fetchPageInsights(pageId, pageToken, [
           "page_total_media_view_unique",
-          "page_total_actions",
         ], startDate, endDate);
 
         totalUniqueViewers += sumDailyValues(batch1b, "page_total_media_view_unique");
-        totalCTAClicks     += sumDailyValues(batch1b, "page_total_actions");
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         console.error(`Batch 1b failed page ${pageId}:`, msg);
-        await supabaseClient.from("platform_connections")
-          .update({ last_error: `Batch 1b failed: ${msg}`, last_sync_status: "partial" })
-          .eq("id", connectionId);
       }
 
-      // ── Batch 2: Page views, link clicks, follows ──
-      try {
-        const batch2 = await fetchPageInsights(pageId, pageToken, [
-          "page_views_total",
-          "page_consumptions",
-          "page_daily_follows_unique",
-          "page_daily_unfollows_unique",
-        ], startDate, endDate);
-
-        totalPageViews    += sumDailyValues(batch2, "page_views_total");
-        totalLinkClicks   += sumDailyValues(batch2, "page_consumptions");
-        totalNewFollowers += sumDailyValues(batch2, "page_daily_follows_unique");
-        totalUnfollows    += sumDailyValues(batch2, "page_daily_unfollows_unique");
-      } catch (err) {
-        console.warn(`Batch 2 failed page ${pageId}:`, err instanceof Error ? err.message : err);
-      }
-
-      // ── Call B: Total followers (last daily value) ──
+      // ── Followers: first and last daily value for growth calculation ──
       try {
         const followerUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_follows&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const followerRes = await fetch(followerUrl);
@@ -218,7 +198,8 @@ Deno.serve(async (req) => {
           const followerData = await followerRes.json();
           const values = followerData.data?.[0]?.values || [];
           if (values.length > 0) {
-            currentFollowers += Number(values[values.length - 1]?.value || 0);
+            followerStart += Number(values[0]?.value || 0);
+            followerEnd   += Number(values[values.length - 1]?.value || 0);
           }
         }
       } catch (err) {
@@ -250,31 +231,26 @@ Deno.serve(async (req) => {
             let postClicksByType: Record<string, number> = {};
             let reactionBreakdown: Record<string, number> = {};
 
-            // Call 1: Numeric post metrics
+            // Call 1: post_total_media_view_unique (replaces deprecated post_media_view)
             try {
-              const numericUrl = `${GRAPH_BASE}/${post.id}/insights?metric=post_media_view,post_clicks,post_engaged_users&access_token=${pageToken}`;
-              const numericRes = await fetch(numericUrl);
-              const numericBody = await numericRes.json();
-
-              if (numericRes.ok && numericBody.data) {
-                for (const insight of numericBody.data) {
-                  const val = insight.values?.[0]?.value;
-                  if (insight.name === 'post_media_view')   postViews = Number(val || 0);
-                  if (insight.name === 'post_clicks')        postClicks = Number(val || 0);
-                  if (insight.name === 'post_engaged_users') postEngagedUsers = Number(val || 0);
-                }
-                if (postViews === 0) {
-                  console.warn(`post_media_view returned 0 for post ${post.id} — raw:`, JSON.stringify(numericBody).slice(0, 300));
+              const viewsRes = await fetch(
+                `${GRAPH_BASE}/${post.id}/insights?metric=post_total_media_view_unique&access_token=${pageToken}`
+              );
+              const viewsBody = await viewsRes.json();
+              if (viewsRes.ok && viewsBody.data) {
+                for (const insight of viewsBody.data) {
+                  if (insight.name === 'post_total_media_view_unique') {
+                    postViews = Number(insight.values?.[0]?.value || 0);
+                  }
                 }
               } else {
-                // Log full error so we can see exactly why Meta rejected this
-                console.error(`Post insights FAILED for ${post.id} (${numericRes.status}):`, JSON.stringify(numericBody).slice(0, 500));
+                console.warn(`post_total_media_view_unique failed for ${post.id}:`, JSON.stringify(viewsBody).slice(0, 300));
               }
             } catch (err) {
-              console.error(`Post insights EXCEPTION for ${post.id}:`, err instanceof Error ? err.message : err);
+              console.error(`Post views exception ${post.id}:`, err instanceof Error ? err.message : err);
             }
 
-            // Call 2: Object metrics (separate call so failure doesn't kill Call 1)
+            // Call 2: Object metrics (post_clicks_by_type, post_reactions_by_type_total)
             try {
               const objectRes = await fetch(
                 `${GRAPH_BASE}/${post.id}/insights?metric=post_clicks_by_type,post_reactions_by_type_total&access_token=${pageToken}`
@@ -283,8 +259,11 @@ Deno.serve(async (req) => {
                 const objectData = await objectRes.json();
                 for (const insight of (objectData.data || [])) {
                   const val = insight.values?.[0]?.value;
-                  if (insight.name === 'post_clicks_by_type')
+                  if (insight.name === 'post_clicks_by_type') {
                     postClicksByType = (typeof val === 'object' && val !== null) ? val : {};
+                    // Sum all click types for total clicks
+                    postClicks = Object.values(postClicksByType).reduce((s: number, v: any) => s + Number(v || 0), 0);
+                  }
                   if (insight.name === 'post_reactions_by_type_total')
                     reactionBreakdown = (typeof val === 'object' && val !== null) ? val : {};
                 }
@@ -334,26 +313,21 @@ Deno.serve(async (req) => {
 
     const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement);
 
+    const followerGrowth = followerEnd - followerStart;
+
     const metricsData = {
-      views:           totalViews,
-      impressions:     totalViews,
-      reach:           totalUniqueViewers,
+      views:           totalViews,           // organic only
+      views_total:     totalViewsAll,        // organic + paid
+      reach:           totalUniqueViewers,    // unique viewers (total incl paid)
       engagement:      totalEngagement,
       engagement_rate: totalViews > 0 ? parseFloat(((totalEngagement / totalViews) * 100).toFixed(2)) : 0,
-      page_views:      totalPageViews,
-      link_clicks:     totalLinkClicks,
-      cta_clicks:      totalCTAClicks,
-      total_followers: currentFollowers,
-      new_followers:   totalNewFollowers,
-      unfollows:       totalUnfollows,
-      follower_growth: Math.max(totalNewFollowers - totalUnfollows, 0),
+      total_followers: followerEnd,
+      follower_growth: followerGrowth,
       reactions:       allTopPosts.reduce((s, p) => s + (p.reactions || 0), 0),
       likes:           allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
       comments:        allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares:          allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
       posts_published: allTopPosts.length,
-      post_views:      allTopPosts.reduce((s, p) => s + (p.views || 0), 0),
-      post_clicks:     allTopPosts.reduce((s, p) => s + (p.clicks || 0), 0),
       pages_count:     pages.length,
     };
 
@@ -409,7 +383,7 @@ Deno.serve(async (req) => {
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete. organic_views=${totalViews}, unique_viewers=${totalUniqueViewers}, engagement=${totalEngagement}, followers=${currentFollowers}, posts=${allTopPosts.length}`);
+    console.log(`Facebook sync complete. organic_views=${totalViews}, total_views=${totalViewsAll}, reach=${totalUniqueViewers}, engagement=${totalEngagement}, followers=${followerEnd}, growth=${followerGrowth}, posts=${allTopPosts.length}`);
 
     return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
