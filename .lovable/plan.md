@@ -1,32 +1,18 @@
 
 
-# Fix "Organisation Not Found" and Client Creation Errors
+# Add Platform Logos to Hero KPI Cards
 
-## Root Cause
+## Problem
+Users can't tell which platforms contribute to each aggregated KPI (e.g. "Reach" combines Facebook reach, Instagram reach, GA views, etc.). The screenshot confirms the cards show only a generic icon and label.
 
-The `ClientForm` component destructures `orgId` from `useOrg()` but **does not check `isLoading`**. If the user submits the form before the org membership query completes, `orgId` is still `null` and the guard at line 127 fires the "Organisation not found" toast.
+## Solution
+Add small platform logo icons to each Hero KPI card, showing which platforms contributed data to that metric. The logos appear as a row of tiny avatars (16x16px) beneath the metric label.
 
-This is a **race condition**, not a data issue — the org and membership exist in the database, but the async fetch hasn't resolved yet at the time of submission.
+## How it works
 
-## Fix
+Each KPI already aggregates from `filtered` snapshots. We need to track **which platforms** contributed a non-zero value for each metric, then pass that list to the card.
 
-### 1. `src/pages/clients/ClientForm.tsx`
-- Destructure `isLoading: isOrgLoading` from `useOrg()` alongside `orgId`
-- Disable the submit button while `isOrgLoading` is true (same as `isSubmitting`)
-- Move the `!orgId` guard **after** confirming org has finished loading, so it only fires for genuinely missing orgs
-
-### 2. `src/hooks/useOrg.ts`
-- Add error logging when the `org_members` or `organisations` queries fail, so future issues surface in the console instead of silently returning null
-- Ensure `isLoading` is only set to `false` after both queries complete (currently correct, but add a `finally` to guard against thrown errors leaving `isLoading` stuck at `true`)
-
-### 3. No database or RLS changes needed
-The existing RLS policies are correct:
-- `org_members` SELECT uses `user_org_id(auth.uid())` via SECURITY DEFINER — no recursion
-- `clients` INSERT uses `org_id = user_org_id(auth.uid())` — correct
-- `organisations` SELECT uses `id = user_org_id(auth.uid())` — correct
-
-| File | Change |
-|------|--------|
-| `src/pages/clients/ClientForm.tsx` | Use `isLoading` from `useOrg`, disable submit while loading |
-| `src/hooks/useOrg.ts` | Add error logging and `finally` block for robustness |
-
+### 1. `src/components/clients/ClientDashboard.tsx`
+- Extend the `KpiItem` interface to include `platforms: PlatformType[]`
+- In the `kpis` useMemo (lines 316-351), for each KPI, compute which platforms from `filtered` snapshots contributed non-zero values to that metric
+- Example: for "Reach", loop `filtered` and collect platforms where `reach
