@@ -29,6 +29,8 @@ interface DragInfo {
   /** Current pixel offset from start */
   currentX: number;
   currentY: number;
+  /** When true, widget is animating to ghost position after release */
+  snapping: boolean;
 }
 
 /* ────────────────────────────────────────────
