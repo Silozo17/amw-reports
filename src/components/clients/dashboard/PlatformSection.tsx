@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -7,7 +8,9 @@ import { PLATFORM_LOGOS, PLATFORM_LABELS, HIDDEN_METRICS, AD_METRICS, ORGANIC_PL
 import { METRIC_EXPLANATIONS } from '@/types/metrics';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import type { PlatformType, JobStatus } from '@/types/database';
-import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff, RefreshCw, Loader2 } from 'lucide-react';
+import { triggerSync } from '@/lib/triggerSync';
+import { toast } from 'sonner';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, Legend,
@@ -59,10 +62,14 @@ interface PlatformSectionProps {
   metricsData: Record<string, number>;
   prevMetricsData?: Record<string, number>;
   connection?: ConnectionInfo;
+  connectionId?: string;
   topContent?: TopContentItem[];
   trendData?: Array<{ name: string; [key: string]: number | string }>;
   currSymbol: string;
   enabledMetrics?: string[];
+  reportMonth: number;
+  reportYear: number;
+  onSyncComplete?: () => void;
 }
 
 /** Priority metrics per platform category */
