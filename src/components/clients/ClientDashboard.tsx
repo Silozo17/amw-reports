@@ -245,7 +245,7 @@ function generateDefaultWidgets(
     let pIdx = 0;
 
     for (const [key, val] of Object.entries(snapshot.metrics_data)) {
-      if (typeof val !== 'number' || val === 0) continue;
+      if (typeof val !== 'number') continue;
       if (HIDDEN_METRICS.has(key)) continue;
       if (isOrganic && AD_METRICS.has(key)) continue;
       if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
