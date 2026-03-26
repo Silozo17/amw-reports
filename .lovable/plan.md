@@ -1,34 +1,33 @@
 
 
-# Add Missing Currencies
+# Fix: Client Creation Errors
 
-## Current State
-`CURRENCY_OPTIONS` in `src/types/database.ts` has 7 currencies: GBP, EUR, USD, PLN, CAD, AUD, NZD. Missing Danish Krone and many others.
+## Root Cause Analysis
 
-## Where Currencies Appear (all already use `CURRENCY_OPTIONS` — single source of truth)
-1. **`src/types/database.ts`** — definition + `getCurrencySymbol()`
-2. **`src/pages/clients/ClientForm.tsx`** — dropdown on client creation
-3. **`src/pages/clients/ClientDetail.tsx`** — inline currency picker
-4. **`src/components/clients/ClientEditDialog.tsx`** — edit dialog dropdown
-5. **`src/components/clients/ClientDashboard.tsx`** — display via `getCurrencySymbol()`
-6. **`src/components/clients/PlatformMetricsCard.tsx`** — display via `getCurrencySymbol()`
-7. **`src/components/clients/dashboard/PlatformSection.tsx`** — display via `getCurrencySymbol()`
-8. **`src/pages/ClientPortal.tsx`** — portal display via `getCurrencySymbol()`
+After investigating triggers, schema, RLS policies, and the client creation code, I found two issues:
 
-## Change — Single File Edit
-**`src/types/database.ts`** — expand `CURRENCY_OPTIONS` to include all major world currencies, sorted alphabetically:
+### Issue 1: Error details are completely swallowed
+In `ClientForm.tsx` line 136, the error from the database is caught but only a generic "Failed to create client" toast is shown. The actual error message is never logged or displayed, making it impossible to diagnose what went wrong.
 
-```
-AED (د.إ), ARS (AR$), AUD (A$), BGN (лв), BRL (R$), CAD (C$),
-CHF (CHF), CLP (CL$), CNY (¥), COP (CO$), CZK (Kč), DKK (kr),
-EGP (E£), EUR (€), GBP (£), GEL (₾), HKD (HK$), HRK (kn),
-HUF (Ft), IDR (Rp), ILS (₪), INR (₹), ISK (kr), JPY (¥),
-KRW (₩), MAD (MAD), MXN (MX$), MYR (RM), NGN (₦), NOK (kr),
-NZD (NZ$), PEN (S/.), PHP (₱), PKR (₨), PLN (zł), QAR (QR),
-RON (lei), RUB (₽), SAR (SAR), SEK (kr), SGD (S$), THB (฿),
-TRY (₺), TWD (NT$), UAH (₴), USD ($), UYU (UY$), VND (₫),
-ZAR (R)
-```
+### Issue 2: No guard against missing org membership
+The insert uses `org_id: orgId!` (line 132) with a TypeScript non-null assertion. If `orgId` is null (user hasn't been assigned to an organisation, or the org fetch hasn't completed yet), it inserts `null` into a NOT NULL column, or fails the RLS policy (`org_id = user_org_id(auth.uid())` — null = null is false in SQL). Either way, silent failure.
 
-No other files need changing — they all import from this single source.
+No trigger issues were found — the only trigger on `clients` is `update_updated_at_column` which only fires on UPDATE, not INSERT.
+
+## Fix — Single File Change
+
+**`src/pages/clients/ClientForm.tsx`**
+
+1. Add a guard before the insert: if `orgId` is falsy, show "Organisation not found — please reload" and return early
+2. Show the actual database error message in the toast: `toast.error(error.message || 'Failed to create client')`
+3. Add `console.error('Client creation error:', error)` so the error is visible in logs for future debugging
+
+Same treatment for the `ClientEditDialog.tsx` — show the actual error message instead of generic "Failed to update client".
+
+## Files
+
+| File | Change |
+|------|--------|
+| `src/pages/clients/ClientForm.tsx` | Add orgId guard, show real error message, add console.error |
+| `src/components/clients/ClientEditDialog.tsx` | Show real error message in toast |
 
