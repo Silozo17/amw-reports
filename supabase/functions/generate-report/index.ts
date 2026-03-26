@@ -14,20 +14,6 @@ interface ReportRequest {
 
 const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-// AMW Brand Colors
-const C = {
-  offWhite: [244, 237, 227] as [number, number, number],
-  black: [36, 31, 33] as [number, number, number],
-  purple: [179, 47, 191] as [number, number, number],
-  blue: [83, 155, 219] as [number, number, number],
-  green: [78, 214, 142] as [number, number, number],
-  orange: [238, 135, 51] as [number, number, number],
-  white: [255, 255, 255] as [number, number, number],
-  grey: [120, 120, 120] as [number, number, number],
-  lightGrey: [200, 200, 200] as [number, number, number],
-  darkPurple: [120, 30, 130] as [number, number, number],
-};
-
 const PLATFORM_LABELS: Record<string, string> = {
   google_ads: "Google Ads", meta_ads: "Meta Ads", facebook: "Facebook",
   instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn",
@@ -48,6 +34,57 @@ const METRIC_LABELS: Record<string, string> = {
   audience_growth_rate: "Audience Growth",
 };
 
+/** Convert hex (#RRGGBB) to [r, g, b] tuple */
+const hexToRgb = (hex: string): [number, number, number] => {
+  const h = hex.replace("#", "");
+  return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)];
+};
+
+/** Convert HSL string "210 40% 98%" to hex */
+const hslToHex = (hsl: string): string => {
+  const parts = hsl.trim().split(/[\s,]+/);
+  const h = parseFloat(parts[0]) / 360;
+  const s = parseFloat(parts[1]) / 100;
+  const l = parseFloat(parts[2]) / 100;
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  let r, g, b;
+  if (s === 0) { r = g = b = l; } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  const toHex = (x: number) => Math.round(x * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
+/** Parse a color value (hex or HSL) to RGB tuple */
+const parseColorToRgb = (color: string | null, fallback: [number, number, number]): [number, number, number] => {
+  if (!color) return fallback;
+  if (color.startsWith("#")) return hexToRgb(color);
+  // Try HSL format "H S% L%"
+  try { return hexToRgb(hslToHex(color)); } catch { return fallback; }
+};
+
+// Default fallback colors
+const DEFAULTS = {
+  offWhite: [244, 237, 227] as [number, number, number],
+  black: [36, 31, 33] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+  grey: [120, 120, 120] as [number, number, number],
+  lightGrey: [200, 200, 200] as [number, number, number],
+  green: [78, 214, 142] as [number, number, number],
+  orange: [238, 135, 51] as [number, number, number],
+  blue: [83, 155, 219] as [number, number, number],
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -66,7 +103,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch all required data
+    // Fetch all required data including organisation
     const [clientRes, snapshotsRes, configRes, prevSnapshotsRes, yoySnapshotsRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year),
@@ -85,12 +122,38 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Fetch organisation branding
+    const { data: org } = await supabase.from("organisations").select("*").eq("id", client.org_id).single();
+    const orgName = org?.name ?? "Your Agency";
+    const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
+    const showLogo = reportSettings.show_logo !== false;
+    const showAiInsights = reportSettings.show_ai_insights !== false;
+    const reportAccentColor = (reportSettings.report_accent_color as string) || null;
+
+    // Resolve brand colors from org settings
+    const primaryColor = parseColorToRgb(reportAccentColor || org?.primary_color, [179, 47, 191]);
+    const secondaryColor = parseColorToRgb(org?.secondary_color, DEFAULTS.blue);
+    const accentColor = parseColorToRgb(org?.accent_color, DEFAULTS.green);
+
+    // Build color palette using org branding
+    const C = {
+      offWhite: DEFAULTS.offWhite,
+      black: DEFAULTS.black,
+      primary: primaryColor,
+      secondary: secondaryColor,
+      accent: accentColor,
+      green: DEFAULTS.green,
+      orange: DEFAULTS.orange,
+      white: DEFAULTS.white,
+      grey: DEFAULTS.grey,
+      lightGrey: DEFAULTS.lightGrey,
+    };
+
     const snapshots = snapshotsRes.data ?? [];
     const prevSnapshots = prevSnapshotsRes.data ?? [];
     const yoySnapshots = yoySnapshotsRes.data ?? [];
     const configs = configRes.data ?? [];
 
-    // Currency symbol from client preference
     const CURRENCY_SYMBOLS: Record<string, string> = {
       GBP: "£", EUR: "€", USD: "$", PLN: "zł", CAD: "C$", AUD: "A$", NZD: "NZ$",
     };
@@ -135,14 +198,16 @@ Deno.serve(async (req) => {
           500
         );
 
-        aiInsights = await aiCall(
-          `Write platform-by-platform insights for ${client.company_name}'s marketing report for ${MONTH_NAMES[report_month]} ${report_year}. For each platform, 2-3 sentences explaining what happened. Simple language. Data: ${dataContext}. If no data, note it will be included once platforms are active.`,
-          800
-        );
+        if (showAiInsights) {
+          aiInsights = await aiCall(
+            `Write platform-by-platform insights for ${client.company_name}'s marketing report for ${MONTH_NAMES[report_month]} ${report_year}. For each platform, 2-3 sentences explaining what happened. Simple language. Data: ${dataContext}. If no data, note it will be included once platforms are active.`,
+            800
+          );
+        }
 
         if (client.enable_upsell) {
           aiUpsell = await aiCall(
-            `Based on marketing data for ${client.company_name}, suggest 2-3 AMW Media services that could help. AMW offers: SEO, content production, web dev, CRM/automations, social media management, paid campaigns, email marketing, branding. Currently subscribed: ${(client.services_subscribed ?? []).join(", ") || "unknown"}. Helpful, not pushy. 1-2 sentences each. Data: ${dataContext}`,
+            `Based on marketing data for ${client.company_name}, suggest 2-3 ${orgName} services that could help. ${orgName} offers: SEO, content production, web dev, CRM/automations, social media management, paid campaigns, email marketing, branding. Currently subscribed: ${(client.services_subscribed ?? []).join(", ") || "unknown"}. Helpful, not pushy. 1-2 sentences each. Data: ${dataContext}`,
             400
           );
         }
@@ -165,11 +230,11 @@ Deno.serve(async (req) => {
 
     const stripMarkdown = (text: string): string =>
       text
-        .replace(/#{1,6}\s+/g, '')      // headings
-        .replace(/\*\*(.+?)\*\*/g, '$1') // bold
-        .replace(/\*(.+?)\*/g, '$1')     // italic
-        .replace(/`(.+?)`/g, '$1')       // inline code
-        .replace(/^[-*]\s+/gm, '• ');    // bullet lists
+        .replace(/#{1,6}\s+/g, '')
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/\*(.+?)\*/g, '$1')
+        .replace(/`(.+?)`/g, '$1')
+        .replace(/^[-*]\s+/gm, '• ');
 
     const wrapText = (text: string, x: number, y: number, maxW: number, lh: number): number => {
       const clean = stripMarkdown(text);
@@ -184,10 +249,10 @@ Deno.serve(async (req) => {
 
     const newPageHeader = (): number => {
       setF(C.offWhite); doc.rect(0, 0, W, H, "F");
-      setF(C.purple); doc.rect(0, 0, W, 8, "F");
+      setF(C.primary); doc.rect(0, 0, W, 8, "F");
       // Footer
       doc.setFontSize(7); setC(C.grey);
-      doc.text("AMW Media | Confidential", W / 2, H - 8, { align: "center" });
+      doc.text(`${orgName} | Confidential`, W / 2, H - 8, { align: "center" });
       doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, H - 4, { align: "center" });
       return M + 8;
     };
@@ -195,7 +260,7 @@ Deno.serve(async (req) => {
     const sectionTitle = (title: string, y: number): number => {
       if (y > H - 60) { doc.addPage(); y = newPageHeader(); }
       doc.setFontSize(20); setC(C.black); doc.text(title, M, y);
-      setF(C.purple); doc.rect(M, y + 4, 50, 2, "F");
+      setF(C.primary); doc.rect(M, y + 4, 50, 2, "F");
       return y + 16;
     };
 
@@ -211,24 +276,52 @@ Deno.serve(async (req) => {
     setF(C.black); doc.rect(0, 0, W, H, "F");
 
     // Decorative elements
-    setF(C.purple); doc.rect(0, 0, 6, H, "F");
-    doc.setGlobalAlpha?.(0.1); // subtle accent strip
+    setF(C.primary); doc.rect(0, 0, 6, H, "F");
 
-    doc.setFontSize(72); setC(C.purple); doc.text("AMW", W / 2, 80, { align: "center" });
-    doc.setFontSize(16); setC(C.offWhite); doc.text("M E D I A", W / 2, 95, { align: "center" });
+    // Org logo or name
+    if (showLogo && org?.logo_url) {
+      try {
+        const logoRes = await fetch(org.logo_url);
+        if (logoRes.ok) {
+          const logoBlob = await logoRes.arrayBuffer();
+          const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBlob)));
+          const ext = org.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
+          doc.addImage(`data:image/${ext.toLowerCase()};base64,${logoBase64}`, ext, W / 2 - 25, 55, 50, 50);
+        } else {
+          doc.setFontSize(72); setC(C.primary); doc.text(orgName, W / 2, 80, { align: "center" });
+        }
+      } catch {
+        doc.setFontSize(72); setC(C.primary); doc.text(orgName, W / 2, 80, { align: "center" });
+      }
+    } else {
+      doc.setFontSize(72); setC(C.primary); doc.text(orgName, W / 2, 80, { align: "center" });
+    }
 
-    setF(C.purple); doc.rect(W / 2 - 30, 105, 60, 1.5, "F");
+    setF(C.primary); doc.rect(W / 2 - 30, 115, 60, 1.5, "F");
 
-    doc.setFontSize(28); setC(C.white); doc.text("Monthly Marketing", W / 2, 135, { align: "center" });
-    doc.text("Performance Report", W / 2, 148, { align: "center" });
+    doc.setFontSize(28); setC(C.white); doc.text("Monthly Marketing", W / 2, 145, { align: "center" });
+    doc.text("Performance Report", W / 2, 158, { align: "center" });
 
-    doc.setFontSize(20); setC(C.purple); doc.text(client.company_name, W / 2, 178, { align: "center" });
-    doc.setFontSize(14); setC(C.grey); doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, W / 2, 193, { align: "center" });
+    doc.setFontSize(20); setC(C.primary); doc.text(client.company_name, W / 2, 188, { align: "center" });
+    doc.setFontSize(14); setC(C.grey); doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, W / 2, 203, { align: "center" });
+
+    // Client logo if available
+    if (client.logo_url) {
+      try {
+        const clientLogoRes = await fetch(client.logo_url);
+        if (clientLogoRes.ok) {
+          const clientLogoBlob = await clientLogoRes.arrayBuffer();
+          const clientLogoBase64 = btoa(String.fromCharCode(...new Uint8Array(clientLogoBlob)));
+          const cExt = client.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
+          doc.addImage(`data:image/${cExt.toLowerCase()};base64,${clientLogoBase64}`, cExt, W / 2 - 15, 215, 30, 30);
+        }
+      } catch { /* skip client logo on error */ }
+    }
 
     // Decorative bottom bar
-    setF(C.purple); doc.rect(M, H - 40, CW, 0.5, "F");
+    setF(C.primary); doc.rect(M, H - 40, CW, 0.5, "F");
     doc.setFontSize(9); setC(C.grey);
-    doc.text("Prepared by AMW Media", W / 2, H - 28, { align: "center" });
+    doc.text(`Prepared by ${orgName}`, W / 2, H - 28, { align: "center" });
     doc.text("Confidential", W / 2, H - 22, { align: "center" });
 
     // ═══════ PAGE 2: EXECUTIVE SUMMARY ═══════
@@ -243,7 +336,6 @@ Deno.serve(async (req) => {
     y += 8;
     y = sectionTitle("Key Performance Indicators", y);
 
-    // Compute KPIs
     const totalSpend = snapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.spend || 0), 0);
     const totalImpressions = snapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.impressions || 0), 0);
     const totalClicks = snapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.clicks || 0), 0);
@@ -268,20 +360,15 @@ Deno.serve(async (req) => {
     if (y + kpiH > H - 30) { doc.addPage(); y = newPageHeader(); }
 
     for (const kpi of kpiCards) {
-      // Card bg
       setF(C.white); doc.roundedRect(kpiX, y, kpiW, kpiH, 3, 3, "F");
-      // Purple accent top
-      setF(C.purple); doc.rect(kpiX, y, kpiW, 2, "F");
+      setF(C.primary); doc.rect(kpiX, y, kpiW, 2, "F");
 
-      // Label
       doc.setFontSize(6.5); setC(C.grey);
       doc.text(kpi.label, kpiX + 5, y + 9);
 
-      // Value
       doc.setFontSize(16); setC(C.black);
       doc.text(kpi.value, kpiX + 5, y + 20);
 
-      // MoM change
       if (kpi.prev > 0) {
         const change = ((kpi.curr - kpi.prev) / kpi.prev) * 100;
         const isGood = kpi.isCost ? change < 0 : change > 0;
@@ -305,16 +392,14 @@ Deno.serve(async (req) => {
       const prevSnapshot = prevSnapshots.find((s: any) => s.platform === snapshot.platform);
       const yoySnapshot = yoySnapshots.find((s: any) => s.platform === snapshot.platform);
 
-      // Platform header
-      doc.setFontSize(22); setC(C.purple); doc.text(platformName, M, y);
-      setF(C.purple); doc.rect(M, y + 5, 40, 1.5, "F");
+      doc.setFontSize(22); setC(C.primary); doc.text(platformName, M, y);
+      setF(C.primary); doc.rect(M, y + 5, 40, 1.5, "F");
       y += 18;
 
       const metrics = snapshot.metrics_data as Record<string, number>;
       const prevMetrics = (prevSnapshot?.metrics_data ?? {}) as Record<string, number>;
       const yoyMetrics = (yoySnapshot?.metrics_data ?? {}) as Record<string, number>;
 
-      // Metric cards in a 3-column grid with more spacing
       const cardW = (CW - 16) / 3;
       const cardH = 30;
       let cardX = M;
@@ -328,22 +413,17 @@ Deno.serve(async (req) => {
           cardX = M; cardsInRow = 0;
         }
 
-        // Card with rounded corners
         setF(C.white); doc.roundedRect(cardX, y, cardW, cardH, 2, 2, "F");
-        // Left accent
-        setF(C.purple); doc.rect(cardX, y + 3, 1.5, cardH - 6, "F");
+        setF(C.primary); doc.rect(cardX, y + 3, 1.5, cardH - 6, "F");
 
-        // Label
         doc.setFontSize(7); setC(C.grey);
         const label = METRIC_LABELS[metricKey] ?? metricKey;
         doc.text(label.toUpperCase(), cardX + 6, y + 8);
 
-        // Value
         doc.setFontSize(15); setC(C.black);
         const fmtVal = formatMetricValue(metricKey, metrics[metricKey]);
         doc.text(fmtVal, cardX + 6, y + 18);
 
-        // MoM change
         if (client.enable_mom_comparison && prevMetrics[metricKey] !== undefined && prevMetrics[metricKey] !== 0) {
           const change = ((metrics[metricKey] - prevMetrics[metricKey]) / prevMetrics[metricKey]) * 100;
           const isCost = metricKey === "spend" || metricKey === "cpc" || metricKey === "cost_per_conversion";
@@ -353,10 +433,9 @@ Deno.serve(async (req) => {
           doc.text(`${arrow} ${Math.abs(change).toFixed(1)}% MoM`, cardX + 6, y + 24);
         }
 
-        // YoY
         if (client.enable_yoy_comparison && yoyMetrics[metricKey] !== undefined && yoyMetrics[metricKey] !== 0) {
           const yoyChange = ((metrics[metricKey] - yoyMetrics[metricKey]) / yoyMetrics[metricKey]) * 100;
-          doc.setFontSize(5.5); setC(C.blue);
+          doc.setFontSize(5.5); setC(C.secondary);
           doc.text(`YoY: ${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(1)}%`, cardX + 6, y + 28);
         }
 
@@ -368,7 +447,7 @@ Deno.serve(async (req) => {
       }
       if (cardsInRow > 0) y += cardH + 6;
 
-      // ── SIMULATED BAR CHART for this platform ──
+      // ── SIMULATED BAR CHART ──
       y += 6;
       if (y + 50 < H - 30) {
         doc.setFontSize(10); setC(C.black); doc.text("Performance Breakdown", M, y);
@@ -387,12 +466,9 @@ Deno.serve(async (req) => {
             doc.setFontSize(7); setC(C.grey);
             doc.text((METRIC_LABELS[key] || key).toUpperCase(), M, y);
 
-            // Bar background
             setF(C.lightGrey); doc.roundedRect(M, y + 2, barMaxW, 5, 2, 2, "F");
-            // Bar value
-            setF(C.purple); doc.roundedRect(M, y + 2, Math.max(barW, 4), 5, 2, 2, "F");
+            setF(C.primary); doc.roundedRect(M, y + 2, Math.max(barW, 4), 5, 2, 2, "F");
 
-            // Value label
             doc.setFontSize(7); setC(C.black);
             doc.text(formatMetricValue(key, val), M + barMaxW + 3, y + 6);
 
@@ -418,9 +494,7 @@ Deno.serve(async (req) => {
         return { name: PLATFORM_LABELS[sn.platform] || sn.platform, value: (m.engagement || 0) + (m.likes || 0) + (m.comments || 0) + (m.shares || 0) };
       }).filter(e => e.value > 0).sort((a, b) => b.value - a.value);
 
-      const pieColors = [C.purple, C.blue, C.green, C.orange, C.grey, [200, 60, 60] as [number, number, number]];
-
-      // Simulated horizontal bar chart
+      const pieColors = [C.primary, C.secondary, C.accent, C.orange, C.grey, [200, 60, 60] as [number, number, number]];
       const maxEng = Math.max(...engByPlatform.map(e => e.value));
       const barMaxW = CW * 0.6;
 
@@ -453,7 +527,7 @@ Deno.serve(async (req) => {
         const topContent = (snapshot as any).top_content;
         if (!topContent || !Array.isArray(topContent) || topContent.length === 0) continue;
 
-        doc.setFontSize(12); setC(C.purple);
+        doc.setFontSize(12); setC(C.primary);
         doc.text(PLATFORM_LABELS[snapshot.platform] || snapshot.platform, M, y);
         y += 8;
 
@@ -466,7 +540,7 @@ Deno.serve(async (req) => {
           if (item.spend !== undefined || item.clicks !== undefined || item.impressions !== undefined) {
             doc.setFontSize(7); setC(C.grey);
             const details = [];
-            if (item.spend !== undefined) details.push(`Spend: $${Number(item.spend).toFixed(2)}`);
+            if (item.spend !== undefined) details.push(`Spend: ${currSymbol}${Number(item.spend).toFixed(2)}`);
             if (item.impressions !== undefined) details.push(`Imp: ${Number(item.impressions).toLocaleString()}`);
             if (item.clicks !== undefined) details.push(`Clicks: ${Number(item.clicks).toLocaleString()}`);
             doc.text(details.join("  |  "), M + 8, y);
@@ -483,7 +557,6 @@ Deno.serve(async (req) => {
     y = newPageHeader();
     y = sectionTitle("Audience & Demographics", y);
 
-    // Placeholder boxes
     const placeholders = [
       { title: "Age Distribution", desc: "Age group breakdown will appear here once demographic data is synced." },
       { title: "Gender Split", desc: "Male/female audience split will be displayed in future reports." },
@@ -499,7 +572,6 @@ Deno.serve(async (req) => {
       const py = y + Math.floor(i / 2) * (phH + 8);
 
       setF(C.white); doc.roundedRect(px, py, phW, phH, 3, 3, "F");
-      // Dashed border effect
       setF(C.lightGrey); doc.rect(px + 2, py + 2, phW - 4, 1, "F");
 
       doc.setFontSize(9); setC(C.black); doc.text(placeholders[i].title, px + 6, py + 12);
@@ -513,7 +585,7 @@ Deno.serve(async (req) => {
     doc.text("Demographic insights will be available in future reports as platforms provide this data.", M, y);
 
     // ═══════ AI INSIGHTS PAGE ═══════
-    if (aiInsights) {
+    if (showAiInsights && aiInsights) {
       doc.addPage();
       y = newPageHeader();
       y = sectionTitle("Insights & Analysis", y);
@@ -536,19 +608,37 @@ Deno.serve(async (req) => {
     // ═══════ CLOSING PAGE ═══════
     doc.addPage();
     setF(C.black); doc.rect(0, 0, W, H, "F");
-    setF(C.purple); doc.rect(0, 0, 6, H, "F");
+    setF(C.primary); doc.rect(0, 0, 6, H, "F");
 
-    doc.setFontSize(48); setC(C.purple); doc.text("AMW", W / 2, 100, { align: "center" });
-    doc.setFontSize(14); setC(C.offWhite); doc.text("M E D I A", W / 2, 112, { align: "center" });
-    setF(C.purple); doc.rect(W / 2 - 25, 120, 50, 1, "F");
+    if (showLogo && org?.logo_url) {
+      try {
+        const closingLogoRes = await fetch(org.logo_url);
+        if (closingLogoRes.ok) {
+          const closingLogoBlob = await closingLogoRes.arrayBuffer();
+          const closingLogoBase64 = btoa(String.fromCharCode(...new Uint8Array(closingLogoBlob)));
+          const ext = org.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
+          doc.addImage(`data:image/${ext.toLowerCase()};base64,${closingLogoBase64}`, ext, W / 2 - 20, 75, 40, 40);
+        } else {
+          doc.setFontSize(48); setC(C.primary); doc.text(orgName, W / 2, 100, { align: "center" });
+        }
+      } catch {
+        doc.setFontSize(48); setC(C.primary); doc.text(orgName, W / 2, 100, { align: "center" });
+      }
+    } else {
+      doc.setFontSize(48); setC(C.primary); doc.text(orgName, W / 2, 100, { align: "center" });
+    }
+
+    setF(C.primary); doc.rect(W / 2 - 25, 125, 50, 1, "F");
 
     doc.setFontSize(18); setC(C.white); doc.text("Thank you", W / 2, 148, { align: "center" });
 
     doc.setFontSize(11); setC(C.grey);
     doc.text("For questions about this report, please contact", W / 2, 170, { align: "center" });
-    doc.text("your AMW Media account manager.", W / 2, 178, { align: "center" });
+    doc.text(`your ${orgName} account manager.`, W / 2, 178, { align: "center" });
 
-    doc.setFontSize(10); setC(C.purple); doc.text("amwmedia.co.uk", W / 2, 200, { align: "center" });
+    if (org?.slug) {
+      doc.setFontSize(10); setC(C.primary); doc.text(org.slug, W / 2, 200, { align: "center" });
+    }
 
     // ───────── UPLOAD & SAVE ─────────
     const pdfBuffer = doc.output("arraybuffer");
