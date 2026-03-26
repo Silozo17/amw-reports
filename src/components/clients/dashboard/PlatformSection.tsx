@@ -124,9 +124,12 @@ const MetricCard = ({
 
   return (
     <div className="rounded-lg border bg-card p-3 space-y-1">
-      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider font-body truncate">
-        {label}
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider font-body truncate">
+          {label}
+        </p>
+        <MetricTooltip metricKey={metricKey} />
+      </div>
       <p className="text-xl font-bold font-body tabular-nums leading-none">
         {formatMetricValue(metricKey, value, currSymbol)}
       </p>
