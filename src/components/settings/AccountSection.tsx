@@ -105,6 +105,7 @@ const AccountSection = () => {
         full_name: fullName.trim(),
         phone: phone.trim() || null,
         position: position.trim() || null,
+        account_type: accountType,
       })
       .eq('user_id', user.id);
 
