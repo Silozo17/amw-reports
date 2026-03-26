@@ -36,7 +36,7 @@ const PLATFORM_ACCENT_COLORS: Record<string, string> = {
 };
 
 const formatValue = (key: string, value: number, currencySymbol: string): string => {
-  if (key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm') {
+  if (key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cost_per_lead' || key === 'cpm') {
     return `${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (key === 'ctr' || key === 'engagement_rate' || key === 'conversion_rate' || key === 'audience_growth_rate') {
@@ -114,7 +114,7 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
                   ? ((value - prevValue) / prevValue) * 100
                   : undefined;
 
-                const isCostMetric = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
+                const isCostMetric = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cost_per_lead' || key === 'cpm';
                 const isPositive = change !== undefined
                   ? isCostMetric ? change < 0 : change > 0
                   : undefined;

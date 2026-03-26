@@ -14,6 +14,7 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   cpc: 'Average cost for each click on your ads',
   cpm: 'Cost per 1,000 times your ad was shown',
   cost_per_conversion: 'Average cost to achieve one conversion',
+  cost_per_lead: 'Average cost to acquire one lead',
   roas: 'Revenue generated for every pound spent on ads',
   reach: 'Number of unique people who saw your content',
   frequency: 'Average number of times each person saw your ad',
