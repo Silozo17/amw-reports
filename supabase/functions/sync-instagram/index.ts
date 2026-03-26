@@ -87,9 +87,14 @@ Deno.serve(async (req) => {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-    // Convert to unix timestamps for IG insights
-    const sinceTs = Math.floor(new Date(startDate).getTime() / 1000);
-    const untilTs = Math.floor(new Date(endDate + "T23:59:59Z").getTime() / 1000);
+    // Build date ranges for IG insights (API limit: ≤30 days per request)
+    // Split month into two halves to stay within the limit
+    const midDay = Math.min(15, lastDay);
+    const midDate = `${year}-${String(month).padStart(2, "0")}-${String(midDay).padStart(2, "0")}`;
+    const dateRanges = [
+      { since: Math.floor(new Date(startDate + "T00:00:00Z").getTime() / 1000), until: Math.floor(new Date(midDate + "T23:59:59Z").getTime() / 1000) },
+      { since: Math.floor(new Date(midDate + "T00:00:00Z").getTime() / 1000) + 86400, until: Math.floor(new Date(endDate + "T23:59:59Z").getTime() / 1000) },
+    ].filter(r => r.since <= r.until);
 
     let totalImpressions = 0;
     let totalReach = 0;
@@ -102,26 +107,26 @@ Deno.serve(async (req) => {
     for (const ig of filteredAccounts) {
       const { ig_id, page_token } = ig;
 
-      // Fetch IG User Insights (only non-deprecated metrics)
+      // Fetch IG User Insights (only non-deprecated metrics) — split by date ranges
       const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
-        const insightsRes = await fetch(insightsUrl);
-        if (!insightsRes.ok) {
-          const errorBody = await insightsRes.text();
-          throw new Error(`API error (${insightsRes.status}): ${errorBody}`);
-        }
-        const insightsData = await insightsRes.json();
-
-        if (insightsData.data) {
-          for (const metric of insightsData.data) {
-            const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-            metricsMap[metric.name] = (metricsMap[metric.name] || 0) + total;
+        for (const range of dateRanges) {
+          const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach&period=day&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const insightsRes = await fetch(insightsUrl);
+          if (!insightsRes.ok) {
+            const errorBody = await insightsRes.text();
+            throw new Error(`API error (${insightsRes.status}): ${errorBody}`);
+          }
+          const insightsData = await insightsRes.json();
+          if (insightsData.data) {
+            for (const metric of insightsData.data) {
+              const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
+              metricsMap[metric.name] = (metricsMap[metric.name] || 0) + total;
+            }
           }
         }
         totalReach += metricsMap.reach || 0;
-        totalImpressions = totalReach; // impressions deprecated at account level; use reach
-        // Accumulate per-account metrics into global map
+        totalImpressions = totalReach;
         for (const [k, v] of Object.entries(metricsMap)) {
           globalMetricsMap[k] = (globalMetricsMap[k] || 0) + v;
         }
@@ -135,24 +140,28 @@ Deno.serve(async (req) => {
 
       // Fetch profile_views separately (requires metric_type=total_value)
       try {
-        const profileViewsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=profile_views&period=day&metric_type=total_value&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
-        const pvRes = await fetch(profileViewsUrl);
-        if (pvRes.ok) {
-          const pvData = await pvRes.json();
-          const pvValue = pvData?.data?.[0]?.total_value?.value || 0;
-          totalProfileViews += pvValue;
-          globalMetricsMap['profile_views'] = (globalMetricsMap['profile_views'] || 0) + pvValue;
+        for (const range of dateRanges) {
+          const profileViewsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=profile_views&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const pvRes = await fetch(profileViewsUrl);
+          if (pvRes.ok) {
+            const pvData = await pvRes.json();
+            const pvValue = pvData?.data?.[0]?.total_value?.value || 0;
+            totalProfileViews += pvValue;
+            globalMetricsMap['profile_views'] = (globalMetricsMap['profile_views'] || 0) + pvValue;
+          }
         }
       } catch {} // non-blocking
 
       // Fetch website_clicks separately (different metric_type)
       try {
-        const websiteClicksUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=website_clicks&period=day&metric_type=total_value&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
-        const wcRes = await fetch(websiteClicksUrl);
-        if (wcRes.ok) {
-          const wcData = await wcRes.json();
-          const wcValue = wcData?.data?.[0]?.total_value?.value || 0;
-          globalMetricsMap['website_clicks'] = (globalMetricsMap['website_clicks'] || 0) + wcValue;
+        for (const range of dateRanges) {
+          const websiteClicksUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=website_clicks&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const wcRes = await fetch(websiteClicksUrl);
+          if (wcRes.ok) {
+            const wcData = await wcRes.json();
+            const wcValue = wcData?.data?.[0]?.total_value?.value || 0;
+            globalMetricsMap['website_clicks'] = (globalMetricsMap['website_clicks'] || 0) + wcValue;
+          }
         }
       } catch {} // non-blocking
 
@@ -180,7 +189,7 @@ Deno.serve(async (req) => {
 
       // Fetch top media with expanded fields
       try {
-        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,video_views,thumbnail_url&since=${sinceTs}&until=${untilTs}&limit=50&access_token=${page_token}`;
+        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,video_views,thumbnail_url&since=${dateRanges[0].since}&until=${dateRanges[dateRanges.length - 1].until}&limit=50&access_token=${page_token}`;
         const mediaRes = await fetch(mediaUrl);
         if (!mediaRes.ok) {
           const errorBody = await mediaRes.text();
