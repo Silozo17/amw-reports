@@ -549,7 +549,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                   metricsData={snapshot.metrics_data}
                   prevMetricsData={prevSnapshot?.metrics_data}
                   connection={connection}
-                  connectionId={(connection as any)?.id}
+                  connectionId={connection?.id}
                   topContent={platformPosts}
                   trendData={platformTrend}
                   currSymbol={currSymbol}
