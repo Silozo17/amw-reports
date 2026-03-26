@@ -486,6 +486,36 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     return map;
   }, [trendData]);
 
+  // GSC trend data for Search Performance Trend chart
+  const gscTrendData = useMemo(() => {
+    const gscSnapshots = trendData.filter(s => s.platform === 'google_search_console');
+    if (gscSnapshots.length === 0) return [];
+    const monthMap = new Map<string, { search_impressions: number; search_clicks: number; search_ctr: number; search_position: number; count: number }>();
+    for (const s of gscSnapshots) {
+      const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
+      const existing = monthMap.get(key) || { search_impressions: 0, search_clicks: 0, search_ctr: 0, search_position: 0, count: 0 };
+      existing.search_impressions += s.metrics_data.search_impressions || 0;
+      existing.search_clicks += s.metrics_data.search_clicks || 0;
+      existing.search_ctr += s.metrics_data.search_ctr || 0;
+      existing.search_position += s.metrics_data.search_position || 0;
+      existing.count += 1;
+      monthMap.set(key, existing);
+    }
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([key, data]) => {
+        const [y, m] = key.split("-");
+        return {
+          name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`,
+          search_impressions: data.search_impressions,
+          search_clicks: data.search_clicks,
+          search_ctr: data.count > 0 ? data.search_ctr / data.count : 0,
+          search_position: data.count > 0 ? data.search_position / data.count : 0,
+        };
+      });
+  }, [trendData]);
+
   const lastSyncedAt = useMemo(() => {
     const syncDates = connections.filter(c => c.last_sync_at).map(c => new Date(c.last_sync_at!).getTime());
     return syncDates.length === 0 ? null : new Date(Math.max(...syncDates));
