@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
               // For VIDEO: use views, reach, saved
               // For IMAGE/CAROUSEL: use reach, saved
               const metricsToFetch = isVideo
-                ? 'plays,reach,saved'
+                ? 'views,reach,saved'
                 : 'reach,saved';
 
               const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=${metricsToFetch}&access_token=${page_token}`;
@@ -201,19 +201,7 @@ Deno.serve(async (req) => {
                   const val = insight.values?.[0]?.value || 0;
                   if (insight.name === 'reach') postReach = val;
                   if (insight.name === 'saved') postSaves = val;
-                  if (insight.name === 'plays') postViews = val;
-                }
-              } else {
-                // Fallback: try older metric names
-                const fallbackUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=reach,saved&access_token=${page_token}`;
-                const fallbackRes = await fetch(fallbackUrl);
-                if (fallbackRes.ok) {
-                  const fallbackData = await fallbackRes.json();
-                  for (const insight of fallbackData.data || []) {
-                    const val = insight.values?.[0]?.value || 0;
-                    if (insight.name === 'reach') postReach = val;
-                    if (insight.name === 'saved') postSaves = val;
-                  }
+                  if (insight.name === 'views') postViews = val;
                 }
               }
             } catch {} // non-blocking per-post
