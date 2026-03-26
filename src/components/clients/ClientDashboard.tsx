@@ -921,6 +921,18 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+            <SelectTrigger className="w-[140px] h-8 text-xs">
+              <ArrowUpDown className="h-3 w-3 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              <SelectItem value="platform">By Platform</SelectItem>
+              <SelectItem value="type">By Type</SelectItem>
+              <SelectItem value="name">By Name</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             size="sm"
             variant={isEditMode ? "default" : "outline"}
