@@ -234,7 +234,7 @@ export const getCurrencySymbol = (code: string): string => {
 };
 
 /** Metrics that are internal/derived and should never show as individual cards */
-export const HIDDEN_METRICS = new Set(['campaign_count', 'pages_count', 'roas']);
+export const HIDDEN_METRICS = new Set(['campaign_count', 'pages_count', 'roas', 'total_impressions', 'total_video_views', 'paid_impressions', 'paid_reach', 'paid_video_views']);
 
 /** Ad-specific metrics that should NOT appear on organic-only platforms */
 export const AD_METRICS = new Set([
