@@ -137,7 +137,7 @@ const LandingPage = () => {
     }
 
     toast.success('Account verified! Welcome aboard.');
-    navigate('/dashboard');
+    navigate('/onboarding');
     setIsLoading(false);
   };
 

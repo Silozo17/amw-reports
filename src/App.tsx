@@ -20,6 +20,7 @@ import Logs from "./pages/Logs";
 import DebugConsole from "./pages/DebugConsole";
 import SettingsPage from "./pages/SettingsPage";
 import ClientPortal from "./pages/ClientPortal";
+import OnboardingPage from "./pages/OnboardingPage";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrgList from "./pages/admin/AdminOrgList";
@@ -88,6 +89,7 @@ const AppRoutes = () => (
     <Route path="/features" element={<PublicPageRoute><FeaturesPage /></PublicPageRoute>} />
     <Route path="/pricing" element={<PublicPageRoute><PricingPage /></PublicPageRoute>} />
     <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
+    <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/clients" element={<ProtectedRoute><ClientList /></ProtectedRoute>} />
     <Route path="/clients/new" element={<ProtectedRoute><ClientForm /></ProtectedRoute>} />
