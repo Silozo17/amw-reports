@@ -418,7 +418,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
       monthMap.set(key, existing);
     }
-    const sorted = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+    // Also aggregate GSC sparkline metrics (re-iterate to add to existing monthMap)
     // Also aggregate GSC sparkline metrics
     for (const s of relevantTrend) {
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
