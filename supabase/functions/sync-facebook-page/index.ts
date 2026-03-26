@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
     let totalViews = 0;       // organic only
     let totalViewsAll = 0;    // organic + paid
     let totalUniqueViewers = 0;
+    let totalUniqueViewersOrganic = 0;
     let followerStart = 0;
     let followerEnd = 0;
     let coreInsightsFetched = false;
@@ -178,13 +179,40 @@ Deno.serve(async (req) => {
         console.error(`Organic views exception ${pageId}:`, err instanceof Error ? err.message : err);
       }
 
-      // ── Batch 1b: Unique viewers (reach) ──
+      // ── Batch 1b: Unique viewers (reach) with organic breakdown ──
       try {
-        const batch1b = await fetchPageInsights(pageId, pageToken, [
-          "page_total_media_view_unique",
-        ], startDate, endDate);
+        const reachUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_total_media_view_unique&breakdown=is_from_ads&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const reachRes = await fetch(reachUrl);
+        const reachBody = await reachRes.json();
 
-        totalUniqueViewers += sumDailyValues(batch1b, "page_total_media_view_unique");
+        console.log(`page_total_media_view_unique breakdown response for ${pageId}:`, JSON.stringify(reachBody).slice(0, 500));
+
+        if (reachRes.ok && reachBody.data) {
+          for (const metric of reachBody.data) {
+            if (metric.name === 'page_total_media_view_unique') {
+              for (const dayEntry of (metric.values || [])) {
+                const dayVal = Number(dayEntry.value || 0);
+                const fromAds = String(dayEntry.is_from_ads ?? '');
+                if (fromAds === '0' || fromAds === 'false' || fromAds === 'False') {
+                  totalUniqueViewersOrganic += dayVal;
+                } else if (fromAds === '1' || fromAds === 'true' || fromAds === 'True') {
+                  totalUniqueViewers += dayVal; // paid only (add organic later)
+                } else {
+                  totalUniqueViewersOrganic += dayVal; // fallback: treat as organic
+                }
+              }
+            }
+          }
+          totalUniqueViewers += totalUniqueViewersOrganic; // total = organic + paid
+          console.log(`Reach for ${pageId}: organic=${totalUniqueViewersOrganic}, total=${totalUniqueViewers}`);
+        } else {
+          // Fallback: use non-breakdown call
+          console.warn(`Reach breakdown failed for ${pageId}, falling back to total`);
+          const batch1b = await fetchPageInsights(pageId, pageToken, ["page_total_media_view_unique"], startDate, endDate);
+          const totalReach = sumDailyValues(batch1b, "page_total_media_view_unique");
+          totalUniqueViewers += totalReach;
+          totalUniqueViewersOrganic += totalReach; // best effort
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         console.error(`Batch 1b failed page ${pageId}:`, msg);
@@ -231,20 +259,24 @@ Deno.serve(async (req) => {
             let postClicksByType: Record<string, number> = {};
             let reactionBreakdown: Record<string, number> = {};
 
-            // Call 1: post_total_media_view_unique (replaces deprecated post_media_view)
+            // Call 1: post views — try post_impressions_unique first, fallback to post_total_media_view_unique
             try {
               const viewsRes = await fetch(
-                `${GRAPH_BASE}/${post.id}/insights?metric=post_total_media_view_unique&access_token=${pageToken}`
+                `${GRAPH_BASE}/${post.id}/insights?metric=post_impressions_unique,post_total_media_view_unique&access_token=${pageToken}`
               );
               const viewsBody = await viewsRes.json();
               if (viewsRes.ok && viewsBody.data) {
                 for (const insight of viewsBody.data) {
-                  if (insight.name === 'post_total_media_view_unique') {
-                    postViews = Number(insight.values?.[0]?.value || 0);
+                  const val = Number(insight.values?.[0]?.value || 0);
+                  if (insight.name === 'post_impressions_unique' && val > 0) {
+                    postViews = val;
+                  }
+                  if (insight.name === 'post_total_media_view_unique' && val > 0 && postViews === 0) {
+                    postViews = val;
                   }
                 }
               } else {
-                console.warn(`post_total_media_view_unique failed for ${post.id}:`, JSON.stringify(viewsBody).slice(0, 300));
+                console.warn(`Post views failed for ${post.id}:`, JSON.stringify(viewsBody).slice(0, 300));
               }
             } catch (err) {
               console.error(`Post views exception ${post.id}:`, err instanceof Error ? err.message : err);
@@ -316,9 +348,10 @@ Deno.serve(async (req) => {
     const followerGrowth = followerEnd - followerStart;
 
     const metricsData = {
-      views:           totalViews,           // organic only
-      views_total:     totalViewsAll,        // organic + paid
-      reach:           totalUniqueViewers,    // unique viewers (total incl paid)
+      views:           totalViews,                // organic only
+      views_total:     totalViewsAll,             // organic + paid
+      reach:           totalUniqueViewersOrganic,  // organic only
+      reach_total:     totalUniqueViewers,         // organic + paid
       engagement:      totalEngagement,
       engagement_rate: totalViews > 0 ? parseFloat(((totalEngagement / totalViews) * 100).toFixed(2)) : 0,
       total_followers: followerEnd,
@@ -327,6 +360,7 @@ Deno.serve(async (req) => {
       likes:           allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
       comments:        allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares:          allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
+      post_clicks:     allTopPosts.reduce((s, p) => s + (p.clicks || 0), 0),
       posts_published: allTopPosts.length,
       pages_count:     pages.length,
     };
