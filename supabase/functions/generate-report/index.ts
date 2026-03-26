@@ -163,8 +163,17 @@ Deno.serve(async (req) => {
     const setC = (c: number[]) => doc.setTextColor(c[0], c[1], c[2]);
     const setF = (c: number[]) => doc.setFillColor(c[0], c[1], c[2]);
 
+    const stripMarkdown = (text: string): string =>
+      text
+        .replace(/#{1,6}\s+/g, '')      // headings
+        .replace(/\*\*(.+?)\*\*/g, '$1') // bold
+        .replace(/\*(.+?)\*/g, '$1')     // italic
+        .replace(/`(.+?)`/g, '$1')       // inline code
+        .replace(/^[-*]\s+/gm, '• ');    // bullet lists
+
     const wrapText = (text: string, x: number, y: number, maxW: number, lh: number): number => {
-      const lines = doc.splitTextToSize(text, maxW);
+      const clean = stripMarkdown(text);
+      const lines = doc.splitTextToSize(clean, maxW);
       for (const line of lines) {
         if (y > H - 30) { doc.addPage(); y = newPageHeader(); }
         doc.text(line, x, y);
