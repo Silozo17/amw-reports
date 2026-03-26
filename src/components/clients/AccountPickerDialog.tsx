@@ -247,7 +247,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-sm truncate">{acct.name}</p>
-                        <p className="text-xs text-muted-foreground">ID: {acct.id}</p>
+                        
                       </div>
                     </button>
                   ))}
@@ -393,7 +393,6 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                 </p>
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {accounts.map(acct => {
-                    const isGenericName = acct.name.startsWith('Google Ads (');
                     return (
                       <button
                         key={acct.id}
@@ -415,12 +414,6 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm truncate">{acct.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {platform === 'google_ads' ? `Account ID: ${acct.id.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3')}` : `ID: ${acct.id}`}
-                          </p>
-                          {platform === 'google_ads' && isGenericName && (
-                            <p className="text-[10px] text-warning mt-0.5">Name will update after reconnecting</p>
-                          )}
                         </div>
                       </button>
                     );
