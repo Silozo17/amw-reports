@@ -18,7 +18,12 @@ import {
 import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
 import { PLATFORM_LOGOS, PLATFORM_LABELS } from '@/types/database';
 import ChartTypeSelector from './ChartTypeSelector';
-import { ExternalLink, ImageOff } from 'lucide-react';
+import { ExternalLink, ImageOff, Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   ResponsiveContainer,
   PieChart,
