@@ -372,6 +372,7 @@ const PlatformSection = ({
                         <TableHead className="w-10 px-2" />
                         <TableHead>Post</TableHead>
                         <TableHead className="text-right">Reach</TableHead>
+                        <TableHead className="text-right">Views</TableHead>
                         <TableHead className="text-right">Likes</TableHead>
                         <TableHead className="text-right">Comments</TableHead>
                         <TableHead className="w-10 px-2" />
@@ -389,6 +390,7 @@ const PlatformSection = ({
                           </TableCell>
                           <TableCell className="text-sm max-w-[200px] truncate">{(p.message || p.caption || 'No caption').slice(0, 80)}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums">{(p.reach ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{p.video_views ? p.video_views.toLocaleString() : '—'}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums">{(p.likes ?? 0).toLocaleString()}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums">{(p.comments ?? 0).toLocaleString()}</TableCell>
                           <TableCell className="w-10 px-2">

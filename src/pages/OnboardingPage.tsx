@@ -20,9 +20,9 @@ import { PLATFORM_LOGOS, PLATFORM_LABELS, type PlatformType } from '@/types/data
 const TOTAL_STEPS = 6;
 
 const PLATFORM_IDS: PlatformType[] = [
-  'google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok',
-  'linkedin', 'google_search_console', 'google_analytics',
-  'google_business_profile', 'youtube',
+  'facebook', 'instagram', 'tiktok', 'linkedin', 'youtube',
+  'meta_ads', 'google_ads', 'google_search_console', 'google_analytics',
+  'google_business_profile',
 ];
 
 const ACCOUNT_TYPES = [
