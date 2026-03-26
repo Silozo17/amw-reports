@@ -347,8 +347,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
     const spendPlatforms = platformsFor(m => m.spend || 0);
     const reachPlatforms = platformsFor(m => m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
-    const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0));
-    const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.comments || 0) + (m.shares || 0));
+    const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0));
+    const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0));
     const followerPlatforms = platformsFor(m => m.total_followers || 0);
     const sessionsPlatforms = platformsFor(m => m.sessions || 0);
     const videoViewsPlatforms = platformsFor(m => m.video_views || 0);
