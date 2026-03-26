@@ -22,6 +22,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, ExternalLink, ImageOff } from 'lucide-react';
 import { useState } from 'react';
 import MetricTooltip from '@/components/clients/MetricTooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
 
@@ -465,28 +466,70 @@ const PlatformSection = ({
                       <TableRow>
                         <TableHead className="w-10 px-2" />
                         <TableHead>Post</TableHead>
-                        <TableHead className="text-right">Reach</TableHead>
                         <TableHead className="text-right">Views</TableHead>
-                        <TableHead className="text-right">Likes</TableHead>
+                        <TableHead className="text-right">Reactions</TableHead>
                         <TableHead className="text-right">Comments</TableHead>
+                        <TableHead className="text-right">Shares</TableHead>
+                        {platform === 'facebook' && <TableHead className="text-right">Clicks</TableHead>}
                         <TableHead className="w-10 px-2" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {socialPosts.slice(0, 5).map((p, i) => (
+                      {socialPosts.slice(0, 10).map((p, i) => (
                         <TableRow key={i}>
                           <TableCell className="w-10 px-2">
-                            {p.full_picture ? (
-                              <img src={p.full_picture} alt="" className="h-8 w-8 rounded object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            ) : (
-                              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center"><ImageOff className="h-3 w-3 text-muted-foreground" /></div>
+                            <div className="flex items-center gap-2">
+                              {p.full_picture ? (
+                                <img src={p.full_picture} alt="" className="h-8 w-8 rounded object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              ) : (
+                                <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                                  <ImageOff className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm max-w-[200px]">
+                            <span className="truncate block">{(p.message || p.caption || 'No caption').slice(0, 80)}</span>
+                            {(p as any).is_promoted && (
+                              <span className="inline-block text-[9px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded mt-0.5 font-medium">Ad</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm max-w-[200px] truncate">{(p.message || p.caption || 'No caption').slice(0, 80)}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">{(p.reach ?? 0).toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">{p.video_views ? p.video_views.toLocaleString() : '—'}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">{(p.likes ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">
+                            {(p as any).views > 0 ? (p as any).views.toLocaleString() : (p.reach ?? 0) > 0 ? (p.reach ?? 0).toLocaleString() : '—'}
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">
+                            {platform === 'facebook' ? (
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help underline decoration-dotted underline-offset-2">
+                                      {((p as any).reactions ?? p.likes ?? 0).toLocaleString()}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs space-y-0.5 max-w-[180px]">
+                                    {(p as any).reaction_like > 0 && <p>👍 Like: {(p as any).reaction_like.toLocaleString()}</p>}
+                                    {(p as any).reaction_love > 0 && <p>❤️ Love: {(p as any).reaction_love.toLocaleString()}</p>}
+                                    {(p as any).reaction_wow > 0 && <p>😮 Wow: {(p as any).reaction_wow.toLocaleString()}</p>}
+                                    {(p as any).reaction_haha > 0 && <p>😂 Haha: {(p as any).reaction_haha.toLocaleString()}</p>}
+                                    {(p as any).reaction_sorry > 0 && <p>😢 Sorry: {(p as any).reaction_sorry.toLocaleString()}</p>}
+                                    {(p as any).reaction_anger > 0 && <p>😡 Angry: {(p as any).reaction_anger.toLocaleString()}</p>}
+                                    {!((p as any).reaction_like || (p as any).reaction_love || (p as any).reaction_wow || (p as any).reaction_haha || (p as any).reaction_sorry || (p as any).reaction_anger) && (
+                                      <p className="text-muted-foreground">No breakdown available</p>
+                                    )}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              (p.likes ?? 0).toLocaleString()
+                            )}
+                          </TableCell>
                           <TableCell className="text-right text-sm tabular-nums">{(p.comments ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{(p.shares ?? 0) > 0 ? (p.shares ?? 0).toLocaleString() : '—'}</TableCell>
+                          {platform === 'facebook' && (
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {(p as any).clicks > 0 ? (p as any).clicks.toLocaleString() : '—'}
+                            </TableCell>
+                          )}
                           <TableCell className="w-10 px-2">
                             {p.permalink_url && (
                               <a href={p.permalink_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground">
