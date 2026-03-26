@@ -112,6 +112,21 @@ const LandingPage = () => {
         .from('profiles')
         .update({ org_id: orgData.id })
         .eq('user_id', data.user.id);
+
+      // Auto-assign Starter plan
+      const { data: starterPlan } = await supabase
+        .from('subscription_plans')
+        .select('id')
+        .eq('slug', 'starter')
+        .single();
+
+      if (starterPlan) {
+        await supabase.from('org_subscriptions').insert({
+          org_id: orgData.id,
+          plan_id: starterPlan.id,
+          status: 'active',
+        });
+      }
     }
 
     toast.success('Account verified! Welcome aboard.');

@@ -7,10 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Plug, RefreshCw, AlertCircle, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformConnection } from '@/types/database';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import UsageBadge from '@/components/entitlements/UsageBadge';
 
 const META_PERMISSIONS_UPDATE_DATE = '2026-03-24';
 
 const Connections = () => {
+  const { currentConnections, maxConnections } = useEntitlements();
   const [connections, setConnections] = useState<(PlatformConnection & { clients?: { company_name: string } | null })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
@@ -44,7 +47,10 @@ const Connections = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-display">Connections</h1>
-          <p className="text-muted-foreground font-body mt-1">Platform integrations across all clients</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-muted-foreground font-body">Platform integrations across all clients</p>
+            <UsageBadge current={currentConnections} max={maxConnections} label="connections" />
+          </div>
         </div>
 
         {/* FIX 8: Meta reconnect banner */}

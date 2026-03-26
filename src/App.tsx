@@ -17,6 +17,10 @@ import DebugConsole from "./pages/DebugConsole";
 import SettingsPage from "./pages/SettingsPage";
 import ClientPortal from "./pages/ClientPortal";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminOrgList from "./pages/admin/AdminOrgList";
+import AdminOrgDetail from "./pages/admin/AdminOrgDetail";
+import { usePlatformAdmin } from "./hooks/usePlatformAdmin";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +40,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading: authLoading } = useAuth();
+  const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
+
+  if (authLoading || adminLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user || !isPlatformAdmin) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -63,6 +86,9 @@ const AppRoutes = () => (
     <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
     <Route path="/debug" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
+    <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+    <Route path="/admin/organisations" element={<AdminRoute><AdminOrgList /></AdminRoute>} />
+    <Route path="/admin/organisations/:id" element={<AdminRoute><AdminOrgDetail /></AdminRoute>} />
     <Route path="/portal/:token" element={<ClientPortal />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
