@@ -39,7 +39,7 @@ export interface WidgetData {
     stacked?: boolean;
     innerRadius?: number;
   };
-  tableColumns?: Array<{ key: string; label: string; align?: 'left' | 'right' }>;
+  tableColumns?: Array<{ key: string; label: string; align?: 'left' | 'right'; type?: 'text' | 'image' | 'platform' | 'link' }>;
   tableData?: Array<Record<string, unknown>>;
   totalLabel?: string;
   totalValue?: string;

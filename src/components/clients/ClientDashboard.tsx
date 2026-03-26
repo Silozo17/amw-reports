@@ -346,19 +346,32 @@ function buildWidgetDataMap(
   if (socialPosts.length > 0) {
     map['table-posts'] = {
       tableColumns: [
+        { key: 'image', label: '', type: 'image' },
+        { key: 'platform', label: '', type: 'platform' },
         { key: 'content', label: 'Post' },
         { key: 'reach', label: 'Reach', align: 'right' },
         { key: 'likes', label: 'Likes', align: 'right' },
         { key: 'comments', label: 'Comments', align: 'right' },
         { key: 'shares', label: 'Shares', align: 'right' },
+        { key: 'engagement_rate', label: 'Eng. Rate', align: 'right' },
+        { key: 'link', label: '', type: 'link' },
       ],
-      tableData: socialPosts.map(p => ({
-        content: p.message || p.caption || 'No caption',
-        reach: p.reach ?? 0,
-        likes: p.likes ?? 0,
-        comments: p.comments ?? 0,
-        shares: p.shares ?? 0,
-      })) as unknown as Array<Record<string, unknown>>,
+      tableData: socialPosts.map(p => {
+        const totalEngagement = (p.likes ?? 0) + (p.comments ?? 0) + (p.shares ?? 0);
+        const reachVal = p.reach ?? 0;
+        const engRate = reachVal > 0 ? ((totalEngagement / reachVal) * 100).toFixed(1) + '%' : '—';
+        return {
+          image: p.full_picture ?? null,
+          platform: p.platform ?? '',
+          content: p.message || p.caption || 'No caption',
+          reach: reachVal,
+          likes: p.likes ?? 0,
+          comments: p.comments ?? 0,
+          shares: p.shares ?? 0,
+          engagement_rate: engRate,
+          link: p.permalink_url ?? null,
+        };
+      }) as unknown as Array<Record<string, unknown>>,
     };
   }
 
