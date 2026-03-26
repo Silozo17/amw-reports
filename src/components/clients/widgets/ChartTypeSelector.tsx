@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { BarChart3, TrendingUp, Activity, PieChart, Hash, Table2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, PieChart, Hash, Table2, Circle, Gauge } from 'lucide-react';
 import type { WidgetType } from '@/types/widget';
 
 const CHART_TYPE_ICONS: Partial<Record<WidgetType, React.ElementType>> = {
@@ -17,6 +17,8 @@ const CHART_TYPE_ICONS: Partial<Record<WidgetType, React.ElementType>> = {
   donut: PieChart,
   radar: Activity,
   table: Table2,
+  progress: Circle,
+  gauge: Gauge,
 };
 
 const CHART_TYPE_LABELS: Record<WidgetType, string> = {
@@ -28,6 +30,8 @@ const CHART_TYPE_LABELS: Record<WidgetType, string> = {
   donut: 'Donut Chart',
   radar: 'Radar Chart',
   table: 'Table',
+  progress: 'Progress Ring',
+  gauge: 'Gauge',
 };
 
 interface ChartTypeSelectorProps {

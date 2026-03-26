@@ -79,13 +79,25 @@ const formatKpiValue = (val: number, isCurrency: boolean, currSymbol: string): s
   return Math.round(val).toLocaleString();
 };
 
+// ─── Empty State ───────────────────────────────────────────────
+const EmptyState = () => (
+  <div className="flex items-center justify-center h-full min-h-[60px]">
+    <p className="text-xs text-muted-foreground italic">No data to display</p>
+  </div>
+);
+
 // ─── Number Widget ─────────────────────────────────────────────
 const NumberWidget = ({ data }: { data: WidgetData }) => {
+  const hasData = data.value !== undefined && data.value !== 0;
   const animatedValue = useAnimatedCounter(data.value ?? 0);
   const isCost = data.isCost ?? false;
   const change = data.change;
   const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
   const currSymbol = data.currSymbol ?? '';
+
+  if (!hasData && (!data.sparklineData || data.sparklineData.length < 2)) {
+    return <EmptyState />;
+  }
 
   return (
     <div className="space-y-1.5">
@@ -108,25 +120,24 @@ const NumberWidget = ({ data }: { data: WidgetData }) => {
           </span>
         </div>
       )}
-      {/* Sparkline */}
       {data.sparklineData && data.sparklineData.length > 1 && (
         <div className="mt-1 -mx-1">
           <ResponsiveContainer width="100%" height={44}>
             <AreaChart data={data.sparklineData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id={`spark-${data.value}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#b32fbf" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#b32fbf" stopOpacity={0} />
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Area
                 type="monotone"
                 dataKey="v"
-                stroke="#b32fbf"
+                stroke="hsl(var(--primary))"
                 strokeWidth={1.5}
                 fill={`url(#spark-${data.value})`}
                 dot={false}
-                activeDot={{ r: 3, fill: '#b32fbf', stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: 3, fill: 'hsl(var(--primary))', stroke: '#fff', strokeWidth: 2 }}
               />
               <RechartsTooltip
                 content={({ active, payload }) => {
@@ -149,6 +160,111 @@ const NumberWidget = ({ data }: { data: WidgetData }) => {
           </ResponsiveContainer>
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── Progress Ring (Apple Watch style) ─────────────────────────
+const ProgressRingWidget = ({ data }: { data: WidgetData }) => {
+  const value = data.value ?? 0;
+  const hasData = value !== 0;
+  const change = data.change;
+  const isCost = data.isCost ?? false;
+  const currSymbol = data.currSymbol ?? '';
+  const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
+
+  if (!hasData) return <EmptyState />;
+
+  // Clamp percentage for the ring (use value directly if it's already a %)
+  const pct = Math.min(Math.max(value, 0), 100);
+  const radius = 52;
+  const stroke = 10;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct / 100) * circumference;
+
+  // Color based on performance
+  const ringColor = pct >= 70 ? 'hsl(var(--accent))' : pct >= 40 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))';
+
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="relative">
+        <svg width={140} height={140} viewBox="0 0 140 140">
+          {/* Background ring */}
+          <circle cx="70" cy="70" r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} />
+          {/* Progress ring */}
+          <circle
+            cx="70" cy="70" r={radius}
+            fill="none"
+            stroke={ringColor}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            transform="rotate(-90 70 70)"
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-lg font-display font-bold leading-none">
+            {isCost ? `${currSymbol}${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}` : `${pct.toFixed(0)}%`}
+          </span>
+          {change !== undefined && (
+            <span className={cn('text-[10px] font-medium mt-0.5', isPositive ? 'text-accent' : 'text-destructive')}>
+              {change > 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Gauge (semi-circle) ───────────────────────────────────────
+const GaugeWidget = ({ data }: { data: WidgetData }) => {
+  const value = data.value ?? 0;
+  const hasData = value !== 0;
+  const change = data.change;
+  const isCost = data.isCost ?? false;
+  const currSymbol = data.currSymbol ?? '';
+  const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
+
+  if (!hasData) return <EmptyState />;
+
+  const pct = Math.min(Math.max(value, 0), 100);
+  const radius = 60;
+  const stroke = 12;
+  // Semi-circle: half circumference
+  const halfCirc = Math.PI * radius;
+  const offset = halfCirc - (pct / 100) * halfCirc;
+
+  const gaugeColor = pct >= 70 ? 'hsl(var(--accent))' : pct >= 40 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))';
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full">
+      <svg width={160} height={90} viewBox="0 0 160 90" className="overflow-visible">
+        {/* Background arc */}
+        <path
+          d={`M ${80 - radius} 80 A ${radius} ${radius} 0 0 1 ${80 + radius} 80`}
+          fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} strokeLinecap="round"
+        />
+        {/* Value arc */}
+        <path
+          d={`M ${80 - radius} 80 A ${radius} ${radius} 0 0 1 ${80 + radius} 80`}
+          fill="none" stroke={gaugeColor} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={halfCirc} strokeDashoffset={offset}
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <div className="flex flex-col items-center -mt-10">
+        <span className="text-lg font-display font-bold leading-none">
+          {isCost ? `${currSymbol}${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}` : `${pct.toFixed(0)}%`}
+        </span>
+        {change !== undefined && (
+          <span className={cn('text-[10px] font-medium mt-0.5', isPositive ? 'text-accent' : 'text-destructive')}>
+            {change > 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
+          </span>
+        )}
+      </div>
     </div>
   );
 };
@@ -448,15 +564,15 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
   const { type, category } = widget;
 
   // KPI widgets shown as chart use sparkline data
-  const isKpiAsChart = category === 'kpi' && type !== 'number';
-  const isPlatformAsChart = category === 'platform' && type !== 'number';
+  const isKpiAsChart = category === 'kpi' && type !== 'number' && type !== 'progress' && type !== 'gauge';
+  const isPlatformAsChart = category === 'platform' && type !== 'number' && type !== 'progress' && type !== 'gauge';
 
   return (
     <Card className={cn('h-full overflow-hidden flex flex-col', isEditMode && 'ring-2 ring-primary/20 ring-dashed')}>
       <CardHeader className="pb-1 flex flex-row items-start justify-between space-y-0 px-4 pt-3">
         <div className="space-y-0 min-w-0 flex-1">
-          <CardTitle className="text-xs font-display leading-tight truncate">{widget.label}</CardTitle>
-          <p className="text-[10px] text-muted-foreground leading-tight line-clamp-1">{widget.description}</p>
+          <CardTitle className="text-sm font-display leading-tight tracking-wide truncate">{widget.label}</CardTitle>
+          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{widget.description}</p>
         </div>
         <ChartTypeSelector
           currentType={widget.type}
@@ -466,6 +582,8 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
       </CardHeader>
       <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0">
         {type === 'number' && <NumberWidget data={data} />}
+        {type === 'progress' && <ProgressRingWidget data={data} />}
+        {type === 'gauge' && <GaugeWidget data={data} />}
         {type === 'table' && <TableWidget data={data} widgetId={widget.id} />}
         {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
           <SparklineChart data={data} type={type} />

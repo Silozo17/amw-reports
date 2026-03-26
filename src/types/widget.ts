@@ -1,4 +1,4 @@
-export type WidgetType = 'number' | 'line' | 'area' | 'bar' | 'pie' | 'donut' | 'radar' | 'table';
+export type WidgetType = 'number' | 'line' | 'area' | 'bar' | 'pie' | 'donut' | 'radar' | 'table' | 'progress' | 'gauge';
 
 export type WidgetCategory = 'kpi' | 'chart' | 'table' | 'platform';
 
@@ -46,8 +46,8 @@ export interface WidgetData {
 }
 
 export const COMPATIBLE_TYPES: Record<WidgetCategory, WidgetType[]> = {
-  kpi: ['number', 'line', 'area', 'bar'],
+  kpi: ['number', 'line', 'area', 'bar', 'progress', 'gauge'],
   chart: ['pie', 'donut', 'bar', 'area', 'line', 'radar'],
   table: ['table'],
-  platform: ['number', 'bar', 'line', 'area'],
+  platform: ['number', 'bar', 'line', 'area', 'progress', 'gauge'],
 };
