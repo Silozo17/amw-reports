@@ -12,7 +12,7 @@ import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff, RefreshCw, Loader2 }
 import { triggerSync } from '@/lib/triggerSync';
 import { toast } from 'sonner';
 import {
-  ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, Legend,
 } from 'recharts';
 import {
