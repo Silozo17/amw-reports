@@ -444,6 +444,69 @@ export type Database = {
           },
         ]
       }
+      org_subscriptions: {
+        Row: {
+          additional_clients: number
+          additional_connections: number
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          is_custom: boolean
+          org_id: string
+          override_max_clients: number | null
+          override_max_connections: number | null
+          plan_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          additional_clients?: number
+          additional_connections?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          is_custom?: boolean
+          org_id: string
+          override_max_clients?: number | null
+          override_max_connections?: number | null
+          plan_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          additional_clients?: number
+          additional_connections?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          is_custom?: boolean
+          org_id?: string
+          override_max_clients?: number | null
+          override_max_connections?: number | null
+          plan_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organisations: {
         Row: {
           accent_color: string | null
@@ -489,6 +552,24 @@ export type Database = {
           secondary_color?: string | null
           slug?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      platform_admins: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -719,6 +800,45 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          additional_client_price: number
+          additional_connection_price: number
+          base_price: number
+          created_at: string
+          id: string
+          included_clients: number
+          included_connections: number
+          is_active: boolean
+          name: string
+          slug: string
+        }
+        Insert: {
+          additional_client_price?: number
+          additional_connection_price?: number
+          base_price?: number
+          created_at?: string
+          id?: string
+          included_clients?: number
+          included_connections?: number
+          is_active?: boolean
+          name: string
+          slug: string
+        }
+        Update: {
+          additional_client_price?: number
+          additional_connection_price?: number
+          base_price?: number
+          created_at?: string
+          id?: string
+          included_clients?: number
+          included_connections?: number
+          is_active?: boolean
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       sync_logs: {
         Row: {
           client_id: string
@@ -814,6 +934,7 @@ export type Database = {
         Returns: boolean
       }
       is_org_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       user_org_id: { Args: { _user_id: string }; Returns: string }
       validate_share_token: {
         Args: { _token: string }
