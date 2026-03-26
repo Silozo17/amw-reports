@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
       const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
       // Query YouTube Analytics API
-      const metricsParam = "views,estimatedMinutesWatched,likes,comments,shares,subscribersGained,subscribersLost,impressions,impressionClickThroughRate,averageViewDuration";
+      const metricsParam = "views,estimatedMinutesWatched,likes,comments,shares,subscribersGained,subscribersLost,averageViewDuration";
       const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${channelId}&startDate=${startDate}&endDate=${endDate}&metrics=${metricsParam}&dimensions=&sort=`;
 
       const analyticsRes = await fetch(analyticsUrl, {
