@@ -4,14 +4,18 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import {
   ArrowRight, ArrowLeft, Loader2, Sparkles,
   Palette, Building2, Users, BarChart3, Clock,
   Heart, Search, Share2, Calendar, MessageSquare,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PLATFORM_LOGOS, PLATFORM_LABELS, type PlatformType } from '@/types/database';
+
+/* ─── Constants ──────────────────────────────────────────── */
 
 const TOTAL_STEPS = 6;
 
@@ -43,6 +47,16 @@ const REFERRAL_SOURCES = [
 ];
 
 const CLIENT_COUNTS = ['1–5', '6–20', '21–50', '50+'];
+
+/* ─── Shared style helpers ───────────────────────────────── */
+
+const CARD_BASE =
+  'rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-300 cursor-pointer hover:shadow-md hover:border-border';
+
+const CARD_SELECTED =
+  'bg-primary/8 border-primary/30 shadow-lg shadow-primary/10 scale-[1.02] ring-1 ring-primary/20';
+
+/* ─── Page ───────────────────────────────────────────────── */
 
 const OnboardingPage = () => {
   const { user } = useAuth();
@@ -80,6 +94,15 @@ const OnboardingPage = () => {
   }, [step]);
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] ?? 'there';
+
+  /* Visible step count (skip step 3 for non-agency) */
+  const visibleSteps = accountType === 'agency' ? TOTAL_STEPS : TOTAL_STEPS - 1;
+  const currentVisibleStep = (() => {
+    if (accountType === 'agency') return step;
+    if (step <= 2) return step;
+    // steps 4,5,6 map to 3,4,5 for non-agency
+    return step - 1;
+  })();
 
   const goNext = () => {
     setDirection('forward');
@@ -154,30 +177,32 @@ const OnboardingPage = () => {
     navigate(guided ? '/dashboard?guided=true' : '/dashboard');
   };
 
-  const progressPercent = Math.min(((step) / TOTAL_STEPS) * 100, 100);
+  const progressPercent = Math.min((step / TOTAL_STEPS) * 100, 100);
 
   return (
-    <div className="min-h-screen bg-sidebar-background text-sidebar-foreground relative overflow-hidden">
-      {/* Progress bar */}
-      {step < TOTAL_STEPS && (
-        <div className="fixed top-0 left-0 right-0 z-50 h-1.5 bg-sidebar-border/50 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all duration-700 ease-out"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      )}
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+      {/* Ambient glow — subtle, behind content */}
+      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/6 blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-[-120px] right-[-80px] w-[350px] h-[350px] rounded-full bg-secondary/5 blur-[120px] pointer-events-none" />
 
-      {/* Ambient glow */}
-      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-150px] right-[-100px] w-[400px] h-[400px] rounded-full bg-secondary/8 blur-[100px] pointer-events-none" />
+      {/* Centered shell */}
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
+        {/* Progress header — inside shell, not fixed */}
+        {step < TOTAL_STEPS && (
+          <div className="w-full max-w-xl mb-10 space-y-3">
+            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+              <span>Step {currentVisibleStep} of {visibleSteps - 1}</span>
+              <span>{Math.round(progressPercent)}%</span>
+            </div>
+            <Progress value={progressPercent} className="h-1.5 bg-muted" />
+          </div>
+        )}
 
-      {/* Main content */}
-      <div className="relative z-10 flex min-h-screen items-center justify-center p-6">
+        {/* Step content */}
         <div
           key={step}
           className={cn(
-            'w-full max-w-2xl',
+            'w-full max-w-xl',
             direction === 'forward' ? 'animate-fade-in' : 'animate-fade-in'
           )}
         >
@@ -196,23 +221,22 @@ const OnboardingPage = () => {
                       key={type.id}
                       onClick={() => setAccountType(type.id)}
                       className={cn(
-                        'group relative flex flex-col items-center gap-4 rounded-2xl p-6 transition-all duration-300 cursor-pointer',
-                        selected
-                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.02]'
-                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
+                        CARD_BASE,
+                        'flex flex-col items-center gap-4 p-6',
+                        selected && CARD_SELECTED
                       )}
                     >
                       <div className={cn(
-                        'flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-300',
+                        'flex h-14 w-14 items-center justify-center rounded-xl transition-colors duration-300',
                         selected
-                          ? 'bg-primary/20 text-primary'
-                          : 'bg-sidebar-accent/60 text-sidebar-foreground/70'
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-muted-foreground'
                       )}>
                         <Icon className="h-6 w-6" />
                       </div>
                       <div className="text-center">
-                        <p className="font-semibold text-lg text-sidebar-foreground">{type.label}</p>
-                        <p className="mt-1 text-xs text-sidebar-foreground/50 leading-relaxed">{type.description}</p>
+                        <p className="font-semibold text-base text-foreground">{type.label}</p>
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{type.description}</p>
                       </div>
                     </button>
                   );
@@ -236,10 +260,9 @@ const OnboardingPage = () => {
                       key={platformId}
                       onClick={() => togglePlatform(platformId)}
                       className={cn(
-                        'flex flex-col items-center gap-3 rounded-2xl p-4 transition-all duration-300 cursor-pointer',
-                        selected
-                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.03]'
-                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
+                        CARD_BASE,
+                        'flex flex-col items-center gap-3 p-4',
+                        selected && CARD_SELECTED
                       )}
                     >
                       <img
@@ -247,7 +270,7 @@ const OnboardingPage = () => {
                         alt={PLATFORM_LABELS[platformId]}
                         className="h-8 w-8 object-contain"
                       />
-                      <span className="text-xs font-medium text-center leading-tight text-sidebar-foreground/80">
+                      <span className="text-xs font-medium text-center leading-tight text-muted-foreground">
                         {PLATFORM_LABELS[platformId]}
                       </span>
                     </button>
@@ -270,10 +293,10 @@ const OnboardingPage = () => {
                     key={count}
                     onClick={() => setClientCount(count)}
                     className={cn(
-                      'rounded-full px-8 py-3.5 text-sm font-semibold transition-all duration-300 cursor-pointer',
+                      'rounded-full px-8 py-3.5 text-sm font-semibold border border-border/60 bg-card shadow-sm transition-all duration-300 cursor-pointer hover:shadow-md',
                       clientCount === count
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 scale-[1.05]'
-                        : 'bg-sidebar-accent/40 text-sidebar-foreground/80 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 border-primary/30 scale-[1.05]'
+                        : 'text-foreground hover:border-border'
                     )}
                   >
                     {count}
@@ -299,21 +322,20 @@ const OnboardingPage = () => {
                       key={reason.id}
                       onClick={() => setPrimaryReason(reason.id)}
                       className={cn(
-                        'flex items-center gap-4 rounded-2xl p-5 text-left transition-all duration-300 cursor-pointer',
-                        selected
-                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.02]'
-                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
+                        CARD_BASE,
+                        'flex items-center gap-4 p-5 text-left',
+                        selected && CARD_SELECTED
                       )}
                     >
                       <div className={cn(
-                        'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-300',
+                        'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors duration-300',
                         selected
-                          ? 'bg-primary/20 text-primary'
-                          : 'bg-sidebar-accent/60 text-sidebar-foreground/70'
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-muted-foreground'
                       )}>
                         <Icon className="h-5 w-5" />
                       </div>
-                      <span className="text-sm font-medium text-sidebar-foreground">{reason.label}</span>
+                      <span className="text-sm font-medium text-foreground">{reason.label}</span>
                     </button>
                   );
                 })}
@@ -337,17 +359,16 @@ const OnboardingPage = () => {
                       key={source.id}
                       onClick={() => setReferralSource(source.id)}
                       className={cn(
-                        'flex flex-col items-center gap-3 rounded-2xl p-5 transition-all duration-300 cursor-pointer',
-                        selected
-                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.02]'
-                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
+                        CARD_BASE,
+                        'flex flex-col items-center gap-3 p-5',
+                        selected && CARD_SELECTED
                       )}
                     >
                       <Icon className={cn(
                         'h-5 w-5 transition-colors duration-300',
-                        selected ? 'text-primary' : 'text-sidebar-foreground/50'
+                        selected ? 'text-primary' : 'text-muted-foreground'
                       )} />
-                      <span className="text-sm font-medium text-sidebar-foreground">{source.label}</span>
+                      <span className="text-sm font-medium text-foreground">{source.label}</span>
                     </button>
                   );
                 })}
@@ -358,7 +379,7 @@ const OnboardingPage = () => {
                     value={otherReferral}
                     onChange={(e) => setOtherReferral(e.target.value)}
                     placeholder="Tell us more..."
-                    className="bg-sidebar-accent/40 border-none text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-1 focus-visible:ring-primary/30"
+                    className="bg-card border-border text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-primary/30"
                   />
                 </div>
               )}
@@ -371,7 +392,7 @@ const OnboardingPage = () => {
             </StepContainer>
           )}
 
-          {/* Step 6: Welcome Screen */}
+          {/* Step 6: Welcome / Completion */}
           {step === TOTAL_STEPS && (
             <div className="flex flex-col items-center text-center space-y-8">
               {particles.map((p) => (
@@ -391,29 +412,51 @@ const OnboardingPage = () => {
                 />
               ))}
 
-              <div className="animate-scale-in">
-                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-primary/15 mb-6">
-                  <Sparkles className="h-12 w-12 text-primary animate-pulse" />
+              <div className="animate-scale-in space-y-6">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
+                  <CheckCircle2 className="h-10 w-10 text-primary" />
                 </div>
-                <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl text-sidebar-foreground">
-                  Welcome, {firstName}!
-                </h1>
-                <p className="mt-4 text-lg text-sidebar-foreground/60 max-w-md mx-auto leading-relaxed">
-                  Your workspace is ready. Let's get you set up with your first client and connections.
-                </p>
+
+                <div className="space-y-3">
+                  <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground" style={{ fontFamily: 'var(--font-body, Montserrat), sans-serif', textTransform: 'none', letterSpacing: '0' }}>
+                    Welcome, {firstName}!
+                  </h1>
+                  <p className="text-base text-muted-foreground max-w-md mx-auto leading-relaxed">
+                    Your workspace is ready. Let's get you set up with your first client and connections.
+                  </p>
+                </div>
+
+                {/* What happens next */}
+                <div className="w-full max-w-sm mx-auto rounded-xl border border-border/60 bg-card p-5 text-left space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What happens next</p>
+                  <ul className="space-y-2 text-sm text-foreground">
+                    <li className="flex items-start gap-2">
+                      <Sparkles className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                      <span>Add your first client</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Sparkles className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                      <span>Connect their marketing platforms</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Sparkles className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                      <span>Generate your first branded report</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md animate-fade-in" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
+              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm animate-fade-in" style={{ animationDelay: '0.4s', animationFillMode: 'both' }}>
                 <Button
                   onClick={() => handleComplete(true)}
                   disabled={isSubmitting}
-                  className="flex-1 h-14 text-base gap-2 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                  className="flex-1 h-12 text-sm gap-2 shadow-md shadow-primary/15"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
-                      <Sparkles className="h-5 w-5" />
+                      <Sparkles className="h-4 w-4" />
                       Guide me through setup
                     </>
                   )}
@@ -422,10 +465,10 @@ const OnboardingPage = () => {
                   variant="outline"
                   onClick={() => handleComplete(false)}
                   disabled={isSubmitting}
-                  className="flex-1 h-14 text-base border-sidebar-accent/60 text-sidebar-foreground hover:bg-sidebar-accent/40"
+                  className="flex-1 h-12 text-sm border-border text-foreground hover:bg-muted"
                 >
                   I'll explore on my own
-                  <ArrowRight className="h-5 w-5 ml-2" />
+                  <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>
@@ -443,6 +486,8 @@ const OnboardingPage = () => {
   );
 };
 
+/* ─── Sub-components ─────────────────────────────────────── */
+
 function StepContainer({
   title,
   subtitle,
@@ -454,11 +499,14 @@ function StepContainer({
 }) {
   return (
     <div className="space-y-8">
-      <div className="text-center space-y-3">
-        <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl text-sidebar-foreground">
+      <div className="text-center space-y-2">
+        <h2
+          className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground"
+          style={{ fontFamily: 'var(--font-body, Montserrat), sans-serif' }}
+        >
           {title}
         </h2>
-        <p className="text-sidebar-foreground/50 text-base">{subtitle}</p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
       {children}
     </div>
@@ -482,7 +530,7 @@ function StepActions({
         <Button
           variant="ghost"
           onClick={onBack}
-          className="text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -493,7 +541,7 @@ function StepActions({
       <Button
         onClick={onNext}
         disabled={!canContinue}
-        className="gap-2 px-8 shadow-lg shadow-primary/20"
+        className="gap-2 px-8 shadow-md shadow-primary/15"
       >
         {nextLabel}
         <ArrowRight className="h-4 w-4" />
