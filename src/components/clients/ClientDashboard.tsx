@@ -10,7 +10,7 @@ import {
   Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users,
   BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, TrendingUp,
   ExternalLink, FileText, Image as ImageIcon, Globe, Search, PlayCircle, Activity, Pencil, Lock,
-  ArrowUpDown,
+  ArrowUpDown, Layers, LayoutList,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -157,6 +157,7 @@ function generateDefaultWidgets(
   hasYtVideos: boolean,
   filtered: SnapshotData[],
   platformConfigs: Map<string, PlatformConfigData>,
+  viewMode: 'compact' | 'extended',
 ): DashboardWidget[] {
   const widgets: DashboardWidget[] = [];
   let y = 0;
@@ -241,34 +242,81 @@ function generateDefaultWidgets(
   }
 
   // Platform metric widgets
-  for (const snapshot of filtered) {
-    const platform = snapshot.platform;
-    const isOrganic = ORGANIC_PLATFORMS.has(platform);
-    const config = platformConfigs.get(platform);
-    const enabledMetrics = config?.enabled_metrics;
+  if (viewMode === 'compact') {
+    // Group metrics by key across all platforms
+    const metricMap = new Map<string, { platforms: PlatformType[]; label: string }>();
+    for (const snapshot of filtered) {
+      const platform = snapshot.platform;
+      const isOrganic = ORGANIC_PLATFORMS.has(platform);
+      const config = platformConfigs.get(platform);
+      const enabledMetrics = config?.enabled_metrics;
+
+      for (const [key, val] of Object.entries(snapshot.metrics_data)) {
+        if (typeof val !== 'number') continue;
+        if (HIDDEN_METRICS.has(key)) continue;
+        if (isOrganic && AD_METRICS.has(key)) continue;
+        if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
+
+        const existing = metricMap.get(key);
+        if (existing) {
+          if (!existing.platforms.includes(platform)) existing.platforms.push(platform);
+        } else {
+          metricMap.set(key, {
+            platforms: [platform],
+            label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          });
+        }
+      }
+    }
+
     let pIdx = 0;
-
-    for (const [key, val] of Object.entries(snapshot.metrics_data)) {
-      if (typeof val !== 'number') continue;
-      if (HIDDEN_METRICS.has(key)) continue;
-      if (isOrganic && AD_METRICS.has(key)) continue;
-      if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
-
+    for (const [key, info] of metricMap) {
       widgets.push({
-        id: `platform-${platform}-${key}`,
-        dataSource: `platform-${platform}-${key}`,
-        label: `${PLATFORM_LABELS[platform]} — ${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
+        id: `compact-${key}`,
+        dataSource: `compact-${key}`,
+        label: info.label,
         description: METRIC_EXPLANATIONS[key] || '',
         type: 'number',
         category: 'platform',
         visible: true,
         position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
         compatibleTypes: COMPATIBLE_TYPES.platform,
-        platform,
+        platformSources: info.platforms,
       });
       pIdx++;
     }
     y += Math.ceil(pIdx / 4) * 3;
+  } else {
+    // Extended mode — individual platform widgets (existing behavior)
+    for (const snapshot of filtered) {
+      const platform = snapshot.platform;
+      const isOrganic = ORGANIC_PLATFORMS.has(platform);
+      const config = platformConfigs.get(platform);
+      const enabledMetrics = config?.enabled_metrics;
+      let pIdx = 0;
+
+      for (const [key, val] of Object.entries(snapshot.metrics_data)) {
+        if (typeof val !== 'number') continue;
+        if (HIDDEN_METRICS.has(key)) continue;
+        if (isOrganic && AD_METRICS.has(key)) continue;
+        if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
+
+        widgets.push({
+          id: `platform-${platform}-${key}`,
+          dataSource: `platform-${platform}-${key}`,
+          label: `${PLATFORM_LABELS[platform]} — ${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
+          description: METRIC_EXPLANATIONS[key] || '',
+          type: 'number',
+          category: 'platform',
+          visible: true,
+          position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
+          compatibleTypes: COMPATIBLE_TYPES.platform,
+          platform,
+        });
+        pIdx++;
+      }
+      y += Math.ceil(pIdx / 4) * 3;
+    }
   }
 
   return widgets;
@@ -481,6 +529,37 @@ function buildWidgetDataMap(
     }
   }
 
+  // Compact mode: merged metric widgets
+  const compactMetrics = new Map<string, { value: number; breakdown: Record<string, number>; breakdownChange: Record<string, number>; isCost: boolean }>();
+  for (const snapshot of filtered) {
+    const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
+    for (const [key, val] of Object.entries(snapshot.metrics_data)) {
+      if (typeof val !== 'number') continue;
+      const prevVal = prevSnapshot?.metrics_data[key];
+      const change = prevVal && prevVal !== 0 ? ((val - prevVal) / prevVal) * 100 : undefined;
+      const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
+
+      const existing = compactMetrics.get(key) || { value: 0, breakdown: {}, breakdownChange: {}, isCost };
+      existing.value += val;
+      existing.breakdown[snapshot.platform] = val;
+      if (change !== undefined) existing.breakdownChange[snapshot.platform] = change;
+      compactMetrics.set(key, existing);
+    }
+  }
+
+  for (const [key, info] of compactMetrics) {
+    const totalPrev = filteredPrev.reduce((sum, s) => sum + (s.metrics_data[key] ?? 0), 0);
+    const totalChange = totalPrev !== 0 ? ((info.value - totalPrev) / totalPrev) * 100 : undefined;
+    map[`compact-${key}`] = {
+      value: info.value,
+      change: totalChange,
+      isCost: info.isCost,
+      currSymbol,
+      platformBreakdown: info.breakdown,
+      platformBreakdownChange: info.breakdownChange,
+    };
+  }
+
   return map;
 }
 
@@ -513,8 +592,14 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   // Widget state
   type SortMode = 'default' | 'platform' | 'type' | 'name';
+  type ViewMode = 'compact' | 'extended';
   const [isEditMode, setIsEditMode] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('default');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      return (localStorage.getItem(`dashboard-viewmode-${clientId}`) as ViewMode) || 'compact';
+    } catch { return 'compact'; }
+  });
   const [savedWidgetState, setSavedWidgetState] = useState<Record<string, { visible: boolean; type: WidgetType; position: { x: number; y: number; w: number; h: number } }>>({});
 
   // Load saved widget state
@@ -813,7 +898,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     ytPosts.length > 0,
     filtered,
     platformConfigs,
-  ), [kpis, spendByPlatform, engagementStackedData, impressionsByPlatform, trendChartData, filteredPosts, gscPosts, gaPosts, ytPosts, filtered, platformConfigs]);
+    viewMode,
+  ), [kpis, spendByPlatform, engagementStackedData, impressionsByPlatform, trendChartData, filteredPosts, gscPosts, gaPosts, ytPosts, filtered, platformConfigs, viewMode]);
 
   // Merge saved state with defaults
   const widgets = useMemo(() => {
@@ -921,6 +1007,27 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-md border border-border bg-muted/30 p-0.5">
+            <Button
+              size="sm"
+              variant={viewMode === 'compact' ? 'default' : 'ghost'}
+              onClick={() => { setViewMode('compact'); localStorage.setItem(`dashboard-viewmode-${clientId}`, 'compact'); }}
+              className="h-7 px-2.5 text-xs gap-1.5 rounded-sm"
+            >
+              <Layers className="h-3 w-3" />
+              Compact
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'extended' ? 'default' : 'ghost'}
+              onClick={() => { setViewMode('extended'); localStorage.setItem(`dashboard-viewmode-${clientId}`, 'extended'); }}
+              className="h-7 px-2.5 text-xs gap-1.5 rounded-sm"
+            >
+              <LayoutList className="h-3 w-3" />
+              Extended
+            </Button>
+          </div>
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
             <SelectTrigger className="w-[140px] h-8 text-xs">
               <ArrowUpDown className="h-3 w-3 mr-1" />
