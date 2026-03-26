@@ -90,6 +90,54 @@ export type Database = {
           },
         ]
       }
+      client_share_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          org_id: string
+          token: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          org_id: string
+          token?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_share_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_share_tokens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           account_manager: string | null
@@ -713,6 +761,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_portal_client: { Args: { _client_id: string }; Returns: Json }
+      get_portal_org: { Args: { _org_id: string }; Returns: Json }
+      get_portal_snapshots: {
+        Args: { _client_id: string; _month: number; _year: number }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -722,6 +776,13 @@ export type Database = {
       }
       is_org_owner: { Args: { _user_id: string }; Returns: boolean }
       user_org_id: { Args: { _user_id: string }; Returns: string }
+      validate_share_token: {
+        Args: { _token: string }
+        Returns: {
+          client_id: string
+          org_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "owner" | "manager"
