@@ -119,7 +119,17 @@ Deno.serve(async (req) => {
         avg_view_duration: row[7] || 0,
       };
 
-      // Fetch channel stats for total subscriber count
+      // Optionally fetch impressions/CTR (not available for all channels)
+      try {
+        const impUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${channelId}&startDate=${startDate}&endDate=${endDate}&metrics=impressions,impressionClickThroughRate`;
+        const impRes = await fetch(impUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const impData = await impRes.json();
+        if (!impData.error && impData.rows?.[0]) {
+          metricsData.impressions = impData.rows[0][0] || 0;
+          metricsData.ctr = (impData.rows[0][1] || 0) * 100;
+        }
+      } catch {} // non-blocking
+
       try {
         const channelRes = await fetch(
           `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}`,
