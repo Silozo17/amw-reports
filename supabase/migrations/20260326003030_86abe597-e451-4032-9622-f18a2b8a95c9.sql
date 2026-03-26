@@ -1,0 +1,1 @@
+ALTER TABLE public.organisations ADD COLUMN IF NOT EXISTS report_settings jsonb DEFAULT '{"show_logo": true, "show_ai_insights": true, "report_accent_color": null}'::jsonb;
