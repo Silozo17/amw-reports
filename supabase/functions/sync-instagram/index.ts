@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       // Fetch IG User Insights (only non-deprecated metrics)
       const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach,profile_views&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
         const insightsRes = await fetch(insightsUrl);
         if (!insightsRes.ok) {
           const errorBody = await insightsRes.text();
@@ -121,7 +121,6 @@ Deno.serve(async (req) => {
         }
         totalReach += metricsMap.reach || 0;
         totalImpressions = totalReach; // impressions deprecated at account level; use reach
-        totalProfileViews += metricsMap.profile_views || 0;
         // Accumulate per-account metrics into global map
         for (const [k, v] of Object.entries(metricsMap)) {
           globalMetricsMap[k] = (globalMetricsMap[k] || 0) + v;
@@ -133,6 +132,18 @@ Deno.serve(async (req) => {
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
+
+      // Fetch profile_views separately (requires metric_type=total_value)
+      try {
+        const profileViewsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=profile_views&period=day&metric_type=total_value&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
+        const pvRes = await fetch(profileViewsUrl);
+        if (pvRes.ok) {
+          const pvData = await pvRes.json();
+          const pvValue = pvData?.data?.[0]?.total_value?.value || 0;
+          totalProfileViews += pvValue;
+          globalMetricsMap['profile_views'] = (globalMetricsMap['profile_views'] || 0) + pvValue;
+        }
+      } catch {} // non-blocking
 
       // Fetch website_clicks separately (different metric_type)
       try {
