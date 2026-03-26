@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { subMonths, formatDistanceToNow, format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,35 +8,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ReactMarkdown from "react-markdown";
 import {
   Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users,
-  BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, TrendingUp,
-  ExternalLink, FileText, Image as ImageIcon, Globe, Search, PlayCircle, Activity, Pencil, Lock,
-  ArrowUpDown, Layers, LayoutList,
+  BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, Activity,
 } from "lucide-react";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from "@/components/ui/table";
-import { PLATFORM_LOGOS } from "@/types/database";
-import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area,
-} from "recharts";
-import SectionHeader from "./SectionHeader";
-import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from "./DashboardHeader";
-import AudienceMap from "./AudienceMap";
-import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
+import { PLATFORM_LOGOS, PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
 import { METRIC_EXPLANATIONS } from "@/types/metrics";
 import type { PlatformType, JobStatus } from "@/types/database";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import type { DashboardWidget, WidgetData, WidgetType } from "@/types/widget";
-import { COMPATIBLE_TYPES } from "@/types/widget";
-import DashboardGrid from "./widgets/DashboardGrid";
-import WidgetPanel from "./widgets/WidgetPanel";
+import DashboardHeader, { type SelectedPeriod, type PlatformFilter } from "./DashboardHeader";
+import HeroKPIs from "./dashboard/HeroKPIs";
+import PlatformSection from "./dashboard/PlatformSection";
+import PerformanceOverview from "./dashboard/PerformanceOverview";
 
-const CHART_COLORS = ["#b32fbf", "#539BDB", "#4ED68E", "#EE8733", "#241f21", "#8b5cf6"];
+const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 interface ClientDashboardProps {
   clientId: string;
@@ -95,46 +78,6 @@ interface PlatformConfigData {
   enabled_metrics: string[];
 }
 
-const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** Check whether a platform passes the current filter */
-const matchesPlatformFilter = (filter: PlatformFilter, platform: PlatformType): boolean =>
-  filter === 'all' || filter.includes(platform);
-
-/** Check whether the filter includes a specific platform (for table sections) */
-const filterIncludesPlatform = (filter: PlatformFilter, platform: PlatformType): boolean =>
-  filter === 'all' || filter.includes(platform);
-
-// ─── Dashboard Skeleton ────────────────────────────────────────
-const DashboardSkeleton = () => (
-  <div className="space-y-8">
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <Card key={i}>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-7 w-7 rounded-lg" />
-              <Skeleton className="h-3 w-16" />
-            </div>
-            <Skeleton className="h-6 w-24" />
-            <Skeleton className="h-3 w-14" />
-            <Skeleton className="h-[50px] w-full rounded" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-    <div className="grid gap-6 md:grid-cols-2">
-      {Array.from({ length: 2 }).map((_, i) => (
-        <Card key={i}>
-          <CardHeader className="pb-2"><Skeleton className="h-4 w-32" /></CardHeader>
-          <CardContent><Skeleton className="h-[260px] w-full rounded" /></CardContent>
-        </Card>
-      ))}
-    </div>
-  </div>
-);
-
-// ─── Widget Generation ─────────────────────────────────────────
 interface KpiItem {
   label: string;
   value: number;
@@ -144,432 +87,48 @@ interface KpiItem {
   metricKey: string;
 }
 
-function generateDefaultWidgets(
-  kpis: KpiItem[],
-  hasSpendDistribution: boolean,
-  hasEngagementBreakdown: boolean,
-  hasImpressions: boolean,
-  hasTrend: boolean,
-  hasPosts: boolean,
-  hasGscData: boolean,
-  hasGaPages: boolean,
-  hasGaSources: boolean,
-  hasYtVideos: boolean,
-  filtered: SnapshotData[],
-  platformConfigs: Map<string, PlatformConfigData>,
-  viewMode: 'compact' | 'extended',
-): DashboardWidget[] {
-  const widgets: DashboardWidget[] = [];
-  let y = 0;
+const matchesPlatformFilter = (filter: PlatformFilter, platform: PlatformType): boolean =>
+  filter === 'all' || filter.includes(platform);
 
-  // KPI widgets
-  kpis.forEach((kpi, i) => {
-    widgets.push({
-      id: `kpi-${kpi.metricKey}`,
-      dataSource: `kpi-${kpi.metricKey}`,
-      label: kpi.label,
-      description: METRIC_EXPLANATIONS[kpi.metricKey] || 'Key performance metric',
-      type: 'number',
-      category: 'kpi',
-      visible: true,
-      position: { x: (i % 4) * 3, y: Math.floor(i / 4) * 4, w: 3, h: 4, minW: 2, minH: 3 },
-      compatibleTypes: COMPATIBLE_TYPES.kpi,
-    });
-  });
-  y = Math.ceil(kpis.length / 4) * 4;
+const filterIncludesPlatform = (filter: PlatformFilter, platform: PlatformType): boolean =>
+  filter === 'all' || filter.includes(platform);
 
-  // Chart widgets
-  if (hasSpendDistribution) {
-    widgets.push({
-      id: 'chart-spend-distribution', dataSource: 'chart-spend-distribution',
-      label: 'Spend Distribution', description: 'How your ad budget is split across platforms',
-      type: 'donut', category: 'chart', visible: true,
-      position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 },
-      compatibleTypes: ['pie', 'donut', 'bar'],
-    });
-  }
-  if (hasEngagementBreakdown) {
-    widgets.push({
-      id: 'chart-engagement-breakdown', dataSource: 'chart-engagement-breakdown',
-      label: 'Engagement Breakdown', description: 'How people interact with your content',
-      type: 'bar', category: 'chart', visible: true,
-      position: { x: 6, y, w: 6, h: 4, minW: 4, minH: 3 },
-      compatibleTypes: ['bar', 'radar', 'pie', 'donut'],
-    });
-  }
-  if (hasSpendDistribution || hasEngagementBreakdown) y += 4;
-
-  if (hasImpressions) {
-    widgets.push({
-      id: 'chart-impressions-clicks', dataSource: 'chart-impressions-clicks',
-      label: 'Impressions & Clicks', description: 'How many people saw your content vs took action',
-      type: 'bar', category: 'chart', visible: true,
-      position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 },
-      compatibleTypes: ['bar', 'line', 'area'],
-    });
-  }
-  if (hasTrend) {
-    widgets.push({
-      id: 'chart-performance-trend', dataSource: 'chart-performance-trend',
-      label: 'Performance Trend', description: 'Key metrics over the last 6 months',
-      type: 'area', category: 'chart', visible: true,
-      position: { x: hasImpressions ? 6 : 0, y, w: 6, h: 4, minW: 4, minH: 3 },
-      compatibleTypes: ['area', 'line', 'bar'],
-    });
-  }
-  if (hasImpressions || hasTrend) y += 4;
-
-  // Table widgets
-  if (hasPosts) {
-    widgets.push({ id: 'table-posts', dataSource: 'table-posts', label: 'Performance by Post', description: 'How each piece of content performed', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 12, h: 5, minW: 6, minH: 3 }, compatibleTypes: ['table'] });
-    y += 5;
-  }
-  if (hasGscData) {
-    widgets.push({ id: 'table-gsc-queries', dataSource: 'table-gsc-queries', label: 'Top Search Queries', description: 'Search terms people used to find your website', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_search_console' });
-    widgets.push({ id: 'table-gsc-pages', dataSource: 'table-gsc-pages', label: 'Top Pages (Search)', description: 'Pages that received the most search traffic', type: 'table', category: 'table', visible: true, position: { x: 6, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_search_console' });
-    y += 4;
-  }
-  if (hasGaPages) {
-    widgets.push({ id: 'table-ga-pages', dataSource: 'table-ga-pages', label: 'Top Pages (Analytics)', description: 'Pages that received the most traffic', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_analytics' });
-  }
-  if (hasGaSources) {
-    widgets.push({ id: 'table-ga-sources', dataSource: 'table-ga-sources', label: 'Traffic Sources', description: 'Where your website visitors come from', type: 'table', category: 'table', visible: true, position: { x: hasGaPages ? 6 : 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_analytics' });
-  }
-  if (hasGaPages || hasGaSources) y += 4;
-  if (hasYtVideos) {
-    widgets.push({ id: 'table-yt-videos', dataSource: 'table-yt-videos', label: 'Top Videos', description: 'Your best-performing YouTube videos', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 12, h: 4, minW: 6, minH: 3 }, compatibleTypes: ['table'], platform: 'youtube' });
-    y += 4;
-  }
-
-  // Platform metric widgets
-  if (viewMode === 'compact') {
-    // Group metrics by key across all platforms
-    const metricMap = new Map<string, { platforms: PlatformType[]; label: string }>();
-    for (const snapshot of filtered) {
-      const platform = snapshot.platform;
-      const isOrganic = ORGANIC_PLATFORMS.has(platform);
-      const config = platformConfigs.get(platform);
-      const enabledMetrics = config?.enabled_metrics;
-
-      for (const [key, val] of Object.entries(snapshot.metrics_data)) {
-        if (typeof val !== 'number') continue;
-        if (HIDDEN_METRICS.has(key)) continue;
-        if (isOrganic && AD_METRICS.has(key)) continue;
-        if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
-
-        const existing = metricMap.get(key);
-        if (existing) {
-          if (!existing.platforms.includes(platform)) existing.platforms.push(platform);
-        } else {
-          metricMap.set(key, {
-            platforms: [platform],
-            label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-          });
-        }
-      }
-    }
-
-    let pIdx = 0;
-    for (const [key, info] of metricMap) {
-      const platformCount = info.platforms.length;
-      const widgetH = Math.max(4, Math.min(8, 2 + platformCount));
-      widgets.push({
-        id: `compact-${key}`,
-        dataSource: `compact-${key}`,
-        label: info.label,
-        description: METRIC_EXPLANATIONS[key] || '',
-        type: 'number',
-        category: 'platform',
-        visible: true,
-        position: { x: (pIdx % 3) * 4, y: y + Math.floor(pIdx / 3) * widgetH, w: 4, h: widgetH, minW: 3, minH: 3 },
-        compatibleTypes: COMPATIBLE_TYPES.platform,
-        platformSources: info.platforms,
-      });
-      pIdx++;
-    }
-    y += Math.ceil(pIdx / 3) * 5;
-  } else {
-    // Extended mode — individual platform widgets (existing behavior)
-    for (const snapshot of filtered) {
-      const platform = snapshot.platform;
-      const isOrganic = ORGANIC_PLATFORMS.has(platform);
-      const config = platformConfigs.get(platform);
-      const enabledMetrics = config?.enabled_metrics;
-      let pIdx = 0;
-
-      for (const [key, val] of Object.entries(snapshot.metrics_data)) {
-        if (typeof val !== 'number') continue;
-        if (HIDDEN_METRICS.has(key)) continue;
-        if (isOrganic && AD_METRICS.has(key)) continue;
-        if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
-
-        widgets.push({
-          id: `platform-${platform}-${key}`,
-          dataSource: `platform-${platform}-${key}`,
-          label: `${PLATFORM_LABELS[platform]} — ${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
-          description: METRIC_EXPLANATIONS[key] || '',
-          type: 'number',
-          category: 'platform',
-          visible: true,
-          position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 4, w: 3, h: 4, minW: 2, minH: 3 },
-          compatibleTypes: COMPATIBLE_TYPES.platform,
-          platform,
-        });
-        pIdx++;
-      }
-      y += Math.ceil(pIdx / 4) * 4;
-    }
-  }
-
-  return widgets;
-}
-
-// ─── Widget Data Map ───────────────────────────────────────────
-function buildWidgetDataMap(
-  kpis: KpiItem[],
-  sparklineMap: Record<string, Array<{ v: number; name: string }>>,
-  currSymbol: string,
-  spendByPlatform: Array<{ name: string; value: number }>,
-  totalSpend: number,
-  engagementStackedData: Array<Record<string, unknown>>,
-  impressionsByPlatform: Array<Record<string, unknown>>,
-  trendChartData: Array<Record<string, unknown>>,
-  filteredPosts: Array<TopContentItem & { platform: PlatformType }>,
-  allPosts: Array<TopContentItem & { platform: PlatformType }>,
-  selectedPlatform: PlatformFilter,
-  filtered: SnapshotData[],
-  filteredPrev: SnapshotData[],
-): Record<string, WidgetData> {
-  const map: Record<string, WidgetData> = {};
-
-  // KPI data
-  for (const kpi of kpis) {
-    map[`kpi-${kpi.metricKey}`] = {
-      value: kpi.value,
-      change: kpi.change,
-      isCost: kpi.isCost,
-      currSymbol,
-      sparklineData: sparklineMap[kpi.metricKey] ?? [],
-    };
-  }
-
-  // Chart data
-  if (spendByPlatform.length > 1) {
-    map['chart-spend-distribution'] = {
-      chartData: spendByPlatform as unknown as Array<Record<string, unknown>>,
-      chartConfig: { dataKeys: ['value'], colors: CHART_COLORS, xAxisKey: 'name' },
-      totalValue: `${currSymbol}${totalSpend >= 1000 ? `${(totalSpend / 1000).toFixed(1)}K` : totalSpend.toFixed(0)}`,
-      totalLabel: 'Total',
-    };
-  }
-
-  if (engagementStackedData.length > 0) {
-    map['chart-engagement-breakdown'] = {
-      chartData: engagementStackedData,
-      chartConfig: {
-        dataKeys: ['likes', 'comments', 'shares', 'saves'],
-        names: ['Likes', 'Comments', 'Shares', 'Saves'],
-        colors: CHART_COLORS,
-        xAxisKey: 'name',
-        stacked: true,
-      },
-    };
-  }
-
-  if (impressionsByPlatform.length > 0) {
-    map['chart-impressions-clicks'] = {
-      chartData: impressionsByPlatform,
-      chartConfig: {
-        dataKeys: ['impressions', 'clicks'],
-        names: ['Impressions', 'Clicks'],
-        colors: ['#539BDB', '#4ED68E'],
-        xAxisKey: 'name',
-      },
-    };
-  }
-
-  if (trendChartData.length > 0) {
-    const dataKeys: string[] = [];
-    const names: string[] = [];
-    const colors: string[] = [];
-    const sample = trendChartData[0] as Record<string, number>;
-    if (trendChartData.some(d => (d as Record<string, number>).impressions > 0)) { dataKeys.push('impressions'); names.push('Impressions'); colors.push('#b32fbf'); }
-    if (trendChartData.some(d => (d as Record<string, number>).clicks > 0)) { dataKeys.push('clicks'); names.push('Clicks'); colors.push('#539BDB'); }
-    if (trendChartData.some(d => (d as Record<string, number>).engagement > 0)) { dataKeys.push('engagement'); names.push('Engagement'); colors.push('#4ED68E'); }
-    if (trendChartData.some(d => (d as Record<string, number>).reach > 0)) { dataKeys.push('reach'); names.push('Reach'); colors.push('#EE8733'); }
-
-    map['chart-performance-trend'] = {
-      chartData: trendChartData,
-      chartConfig: { dataKeys, names, colors, xAxisKey: 'name' },
-    };
-  }
-
-  // Table data
-  const socialPosts = filteredPosts.filter(p => p.message || p.caption);
-  if (socialPosts.length > 0) {
-    map['table-posts'] = {
-      tableColumns: [
-        { key: 'image', label: '', type: 'image' },
-        { key: 'platform', label: '', type: 'platform' },
-        { key: 'content', label: 'Post' },
-        { key: 'reach', label: 'Reach', align: 'right' },
-        { key: 'likes', label: 'Likes', align: 'right' },
-        { key: 'comments', label: 'Comments', align: 'right' },
-        { key: 'shares', label: 'Shares', align: 'right' },
-        { key: 'engagement_rate', label: 'Eng. Rate', align: 'right' },
-        { key: 'link', label: '', type: 'link' },
-      ],
-      tableData: socialPosts.map(p => {
-        const totalEngagement = (p.likes ?? 0) + (p.comments ?? 0) + (p.shares ?? 0);
-        const reachVal = p.reach ?? 0;
-        const engRate = reachVal > 0 ? ((totalEngagement / reachVal) * 100).toFixed(1) + '%' : '—';
-        return {
-          image: p.full_picture ?? null,
-          platform: p.platform ?? '',
-          content: p.message || p.caption || 'No caption',
-          reach: reachVal,
-          likes: p.likes ?? 0,
-          comments: p.comments ?? 0,
-          shares: p.shares ?? 0,
-          engagement_rate: engRate,
-          link: p.permalink_url ?? null,
-        };
-      }) as unknown as Array<Record<string, unknown>>,
-    };
-  }
-
-  // GSC data
-  const gscPosts = filterIncludesPlatform(selectedPlatform, 'google_search_console')
-    ? allPosts.filter(p => p.platform === 'google_search_console') : [];
-  const gscQueries = gscPosts.filter(p => p.query);
-  const gscPages = gscPosts.filter(p => p.page && !p.query);
-  if (gscQueries.length > 0) {
-    map['table-gsc-queries'] = {
-      tableColumns: [
-        { key: 'query', label: 'Query' },
-        { key: 'clicks', label: 'Clicks', align: 'right' },
-        { key: 'impressions', label: 'Impressions', align: 'right' },
-        { key: 'ctr', label: 'CTR', align: 'right' },
-      ],
-      tableData: gscQueries.slice(0, 10).map(q => ({
-        query: q.query,
-        clicks: q.clicks ?? 0,
-        impressions: q.impressions ?? 0,
-        ctr: q.ctr != null ? `${(q.ctr * 100).toFixed(1)}%` : '—',
-      })) as unknown as Array<Record<string, unknown>>,
-    };
-  }
-  if (gscPages.length > 0) {
-    map['table-gsc-pages'] = {
-      tableColumns: [
-        { key: 'page', label: 'Page' },
-        { key: 'clicks', label: 'Clicks', align: 'right' },
-        { key: 'impressions', label: 'Impressions', align: 'right' },
-      ],
-      tableData: gscPages.slice(0, 10).map(p => ({
-        page: p.page, clicks: p.clicks ?? 0, impressions: p.impressions ?? 0,
-      })) as unknown as Array<Record<string, unknown>>,
-    };
-  }
-
-  // GA data
-  const gaPosts = filterIncludesPlatform(selectedPlatform, 'google_analytics')
-    ? allPosts.filter(p => p.platform === 'google_analytics' && (p.page || p.source)) : [];
-  const gaPages = gaPosts.filter(p => p.page);
-  const gaSources = gaPosts.filter(p => p.source && !p.page);
-  if (gaPages.length > 0) {
-    map['table-ga-pages'] = {
-      tableColumns: [
-        { key: 'page', label: 'Page Path' },
-        { key: 'views', label: 'Views', align: 'right' },
-        { key: 'sessions', label: 'Sessions', align: 'right' },
-      ],
-      tableData: gaPages.slice(0, 10).map(p => ({
-        page: p.page, views: p.views ?? 0, sessions: p.sessions ?? 0,
-      })) as unknown as Array<Record<string, unknown>>,
-    };
-  }
-  if (gaSources.length > 0) {
-    map['table-ga-sources'] = {
-      tableColumns: [
-        { key: 'source', label: 'Source' },
-        { key: 'sessions', label: 'Sessions', align: 'right' },
-        { key: 'users', label: 'Users', align: 'right' },
-      ],
-      tableData: gaSources.slice(0, 10).map(s => ({
-        source: s.source, sessions: s.sessions ?? 0, users: s.users ?? 0,
-      })) as unknown as Array<Record<string, unknown>>,
-    };
-  }
-
-  // YT data
-  const ytPosts = filterIncludesPlatform(selectedPlatform, 'youtube')
-    ? allPosts.filter(p => p.platform === 'youtube' && p.title) : [];
-  if (ytPosts.length > 0) {
-    map['table-yt-videos'] = {
-      tableColumns: [
-        { key: 'title', label: 'Video' },
-        { key: 'views', label: 'Views', align: 'right' },
-        { key: 'likes', label: 'Likes', align: 'right' },
-        { key: 'comments', label: 'Comments', align: 'right' },
-      ],
-      tableData: ytPosts.slice(0, 10).map(v => ({
-        title: v.title, views: v.views ?? v.video_views ?? 0, likes: v.likes ?? 0, comments: v.comments ?? 0,
-      })) as unknown as Array<Record<string, unknown>>,
-    };
-  }
-
-  // Platform metric widgets
-  for (const snapshot of filtered) {
-    const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
-    for (const [key, val] of Object.entries(snapshot.metrics_data)) {
-      if (typeof val !== 'number') continue;
-      const prevVal = prevSnapshot?.metrics_data[key];
-      const change = prevVal && prevVal !== 0 ? ((val - prevVal) / prevVal) * 100 : undefined;
-      const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
-      map[`platform-${snapshot.platform}-${key}`] = { value: val, change, isCost, currSymbol };
-    }
-  }
-
-  // Compact mode: merged metric widgets
-  const compactMetrics = new Map<string, { value: number; breakdown: Record<string, number>; breakdownChange: Record<string, number>; isCost: boolean }>();
-  for (const snapshot of filtered) {
-    const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
-    for (const [key, val] of Object.entries(snapshot.metrics_data)) {
-      if (typeof val !== 'number') continue;
-      const prevVal = prevSnapshot?.metrics_data[key];
-      const change = prevVal && prevVal !== 0 ? ((val - prevVal) / prevVal) * 100 : undefined;
-      const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
-
-      const existing = compactMetrics.get(key) || { value: 0, breakdown: {}, breakdownChange: {}, isCost };
-      existing.value += val;
-      existing.breakdown[snapshot.platform] = val;
-      if (change !== undefined) existing.breakdownChange[snapshot.platform] = change;
-      compactMetrics.set(key, existing);
-    }
-  }
-
-  for (const [key, info] of compactMetrics) {
-    const totalPrev = filteredPrev.reduce((sum, s) => sum + (s.metrics_data[key] ?? 0), 0);
-    const totalChange = totalPrev !== 0 ? ((info.value - totalPrev) / totalPrev) * 100 : undefined;
-    const platformRows = Object.entries(info.breakdown).map(([platform, value]) => ({
-      platform,
-      value,
-      change: info.breakdownChange[platform],
-    }));
-    map[`compact-${key}`] = {
-      value: info.value,
-      change: totalChange,
-      isCost: info.isCost,
-      currSymbol,
-      platformBreakdown: info.breakdown,
-      platformBreakdownChange: info.breakdownChange,
-      platformRows,
-    };
-  }
-
-  return map;
-}
+// ─── Dashboard Skeleton ────────────────────────────────────────
+const DashboardSkeleton = () => (
+  <div className="space-y-8">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded-lg" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+            <Skeleton className="h-8 w-28" />
+            <Skeleton className="h-4 w-20" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    <div className="grid gap-4 md:grid-cols-2">
+      {Array.from({ length: 2 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-5"><Skeleton className="h-[220px] w-full rounded" /></CardContent>
+        </Card>
+      ))}
+    </div>
+    {Array.from({ length: 2 }).map((_, i) => (
+      <Card key={i}>
+        <CardContent className="p-5 space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <div className="grid grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, j) => <Skeleton key={j} className="h-16 rounded" />)}
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
 
 // ─── Main Dashboard ────────────────────────────────────────────
 const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientDashboardProps) => {
@@ -598,45 +157,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [allPosts, setAllPosts] = useState<(TopContentItem & { platform: PlatformType })[]>([]);
 
-  // Widget state
-  type SortMode = 'default' | 'platform' | 'type' | 'name';
-  type ViewMode = 'compact' | 'extended';
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>('default');
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    try {
-      return (localStorage.getItem(`dashboard-viewmode-${clientId}`) as ViewMode) || 'compact';
-    } catch { return 'compact'; }
-  });
-  const [savedWidgetState, setSavedWidgetState] = useState<Record<string, { visible: boolean; type: WidgetType; position: { x: number; y: number; w: number; h: number } }>>({});
-
-  // Load saved widget state
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`dashboard-widgets-${clientId}`);
-      if (!saved) return;
-
-      const parsed = JSON.parse(saved) as Record<string, { visible?: boolean; type?: WidgetType; position?: { x?: number; y?: number; w?: number; h?: number } }>;
-      const sanitized = Object.fromEntries(
-        Object.entries(parsed || {}).map(([widgetId, config]) => [
-          widgetId,
-          {
-            ...(typeof config?.visible === 'boolean' ? { visible: config.visible } : {}),
-            ...(typeof config?.type === 'string' ? { type: config.type as WidgetType } : {}),
-            ...(config?.position ? { position: config.position } : {}),
-          },
-        ]),
-      ) as Record<string, { visible: boolean; type: WidgetType; position: { x: number; y: number; w: number; h: number } }>;
-
-      setSavedWidgetState(sanitized);
-    } catch {
-      setSavedWidgetState({});
-    }
-  }, [clientId]);
-
   useEffect(() => { setHasAutoDetected(false); }, [clientId]);
 
-  // ─── Data Fetching (unchanged) ───────────────────────────────
+  // ─── Data Fetching ───────────────────────────────────────────
   const fetchSnapshots = useCallback(async () => {
     setIsLoading(true);
     const { month, year, type, startDate, endDate } = selectedPeriod;
@@ -787,7 +310,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   // ─── Computed Data ───────────────────────────────────────────
   const filtered = useMemo(() => (selectedPlatform === "all" ? snapshots : snapshots.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))), [snapshots, selectedPlatform]);
   const filteredPrev = useMemo(() => (selectedPlatform === "all" ? prevSnapshots : prevSnapshots.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))), [prevSnapshots, selectedPlatform]);
-  const filteredPosts = useMemo(() => (selectedPlatform === "all" ? allPosts : allPosts.filter(p => matchesPlatformFilter(selectedPlatform, p.platform))), [allPosts, selectedPlatform]);
 
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
@@ -795,8 +317,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0); }, 0);
     const totalEngagement = filtered.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
     const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
-    const totalLinkClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
-    const totalPageViews = filtered.reduce((sum, s) => sum + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0), 0);
     const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
     const totalVideoViews = filtered.reduce((sum, s) => sum + (s.metrics_data.video_views || 0), 0);
 
@@ -804,23 +324,19 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
     const prevClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0); }, 0);
     const prevEngagement = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
-    const prevLinkClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.link_clicks || 0), 0);
-    const prevPageViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0), 0);
     const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
     const prevVideoViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.video_views || 0), 0);
 
     const cc = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
     return [
-      ...((selectedPlatform === 'all' || filterIncludesPlatform(selectedPlatform, 'meta_ads') || filterIncludesPlatform(selectedPlatform, 'google_ads')) ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend" }] : []),
-      ...(filterIncludesPlatform(selectedPlatform, 'tiktok') ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views" }] : []),
-      { label: "Reach", value: totalReach, change: cc(totalReach, prevReach), icon: Eye, metricKey: "reach" },
-      { label: "Clicks", value: totalClicks, change: cc(totalClicks, prevClicks), icon: MousePointerClick, metricKey: "clicks" },
-      { label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement" },
+      ...((selectedPlatform === 'all' || filterIncludesPlatform(selectedPlatform, 'meta_ads') || filterIncludesPlatform(selectedPlatform, 'google_ads')) && totalSpend > 0 ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend" }] : []),
+      ...(totalVideoViews > 0 ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views" }] : []),
+      ...(totalReach > 0 ? [{ label: "Reach", value: totalReach, change: cc(totalReach, prevReach), icon: Eye, metricKey: "reach" }] : []),
+      ...(totalClicks > 0 ? [{ label: "Clicks", value: totalClicks, change: cc(totalClicks, prevClicks), icon: MousePointerClick, metricKey: "clicks" }] : []),
+      ...(totalEngagement > 0 ? [{ label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement" }] : []),
       ...(totalFollowers > 0 ? [{ label: "Followers", value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: "total_followers" }] : []),
       ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions" }] : []),
-      ...(totalLinkClicks > 0 ? [{ label: "Link Clicks", value: totalLinkClicks, change: cc(totalLinkClicks, prevLinkClicks), icon: MousePointerClick, metricKey: "link_clicks" }] : []),
-      ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: Eye, metricKey: "page_views" }] : []),
     ] as KpiItem[];
   }, [filtered, filteredPrev, selectedPlatform]);
 
@@ -836,14 +352,12 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0) + (s.metrics_data.search_clicks || 0) + (s.metrics_data.gbp_website_clicks || 0);
       existing.engagement = (existing.engagement || 0) + (s.metrics_data.engagement ? s.metrics_data.engagement : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0));
       existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
-      existing.link_clicks = (existing.link_clicks || 0) + (s.metrics_data.link_clicks || 0);
-      existing.page_views = (existing.page_views || 0) + (s.metrics_data.page_views || s.metrics_data.ga_page_views || 0);
       existing.video_views = (existing.video_views || 0) + (s.metrics_data.video_views || 0);
       existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
       monthMap.set(key, existing);
     }
     const sorted = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
-    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "link_clicks", "page_views", "video_views", "sessions"]) {
+    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions"]) {
       map[metricKey] = sorted.map(([key, data]) => { const [y, m] = key.split("-"); return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` }; });
     }
     return map;
@@ -873,11 +387,32 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     return Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, data]) => { const [y, m] = key.split("-"); return { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, ...data }; });
   }, [trendData, selectedPlatform]);
 
-  const geoData = useMemo(() => {
-    const all: Array<{ lat: number; lng: number; value: number; label: string }> = [];
-    for (const s of filtered) { const geo = (s.metrics_data as any)?.geo_data; if (Array.isArray(geo)) all.push(...geo); }
-    return all;
-  }, [filtered]);
+  // Per-platform trend data
+  const platformTrendMap = useMemo(() => {
+    const map = new Map<PlatformType, Array<{ name: string; [key: string]: number | string }>>();
+    for (const s of trendData) {
+      const existing = map.get(s.platform) || [];
+      const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
+      // Find or create entry for this month
+      let entry = existing.find(e => (e as any)._key === key);
+      if (!entry) {
+        const [y, m] = key.split("-");
+        entry = { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, _key: key } as any;
+        existing.push(entry);
+      }
+      // Add all metric values
+      for (const [mk, mv] of Object.entries(s.metrics_data)) {
+        if (typeof mv === 'number') (entry as any)[mk] = ((entry as any)[mk] || 0) + mv;
+      }
+      map.set(s.platform, existing);
+    }
+    // Sort each platform's trend data
+    for (const [platform, data] of map) {
+      data.sort((a, b) => ((a as any)._key as string).localeCompare((b as any)._key as string));
+      map.set(platform, data.slice(-6));
+    }
+    return map;
+  }, [trendData]);
 
   const lastSyncedAt = useMemo(() => {
     const syncDates = connections.filter(c => c.last_sync_at).map(c => new Date(c.last_sync_at!).getTime());
@@ -888,176 +423,25 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const hasFilteredData = filtered.length > 0;
   const allZeros = hasFilteredData && kpis.every(k => k.value === 0);
 
-  // ─── Widget System ───────────────────────────────────────────
-  const gscPosts = useMemo(() => filterIncludesPlatform(selectedPlatform, 'google_search_console') ? allPosts.filter(p => p.platform === 'google_search_console' && (p.query || p.page)) : [], [allPosts, selectedPlatform]);
-  const gaPosts = useMemo(() => filterIncludesPlatform(selectedPlatform, 'google_analytics') ? allPosts.filter(p => p.platform === 'google_analytics' && (p.page || p.source)) : [], [allPosts, selectedPlatform]);
-  const ytPosts = useMemo(() => filterIncludesPlatform(selectedPlatform, 'youtube') ? allPosts.filter(p => p.platform === 'youtube' && p.title) : [], [allPosts, selectedPlatform]);
-
-  const defaultWidgets = useMemo(() => generateDefaultWidgets(
-    kpis,
-    spendByPlatform.length > 1,
-    engagementStackedData.length > 0,
-    impressionsByPlatform.length > 0,
-    trendChartData.length > 0,
-    filteredPosts.filter(p => p.message || p.caption).length > 0,
-    gscPosts.length > 0,
-    gaPosts.filter(p => p.page).length > 0,
-    gaPosts.filter(p => p.source && !p.page).length > 0,
-    ytPosts.length > 0,
-    filtered,
-    platformConfigs,
-    viewMode,
-  ), [kpis, spendByPlatform, engagementStackedData, impressionsByPlatform, trendChartData, filteredPosts, gscPosts, gaPosts, ytPosts, filtered, platformConfigs, viewMode]);
-
-  // Merge saved state with defaults
-  const widgets = useMemo(() => {
-    return defaultWidgets.map((w) => {
-      const saved = savedWidgetState[w.id];
-      if (!saved) return w;
-
-      const safeType = saved.type && w.compatibleTypes.includes(saved.type) ? saved.type : w.type;
-      return {
-        ...w,
-        visible: typeof saved.visible === 'boolean' ? saved.visible : w.visible,
-        type: safeType,
-        position: saved.position ? { ...w.position, ...saved.position } : w.position,
-      };
-    });
-  }, [defaultWidgets, savedWidgetState]);
-
-  // Sort widgets
-  const CATEGORY_ORDER: Record<string, number> = { kpi: 0, chart: 1, table: 2, platform: 3 };
-  const sortedWidgets = useMemo(() => {
-    if (sortMode === 'default') return widgets;
-    const sorted = [...widgets];
-    if (sortMode === 'platform') {
-      sorted.sort((a, b) => (a.platform ?? 'zzz').localeCompare(b.platform ?? 'zzz') || a.label.localeCompare(b.label));
-    } else if (sortMode === 'type') {
-      sorted.sort((a, b) => (CATEGORY_ORDER[a.category] ?? 9) - (CATEGORY_ORDER[b.category] ?? 9) || a.label.localeCompare(b.label));
-    } else if (sortMode === 'name') {
-      sorted.sort((a, b) => a.label.localeCompare(b.label));
-    }
-    // Recalculate positions based on sort order
-    let y = 0;
-    let x = 0;
-    return sorted.map((w) => {
-      if (x + w.position.w > 12) { x = 0; y += 2; }
-      const newW = { ...w, position: { ...w.position, x, y } };
-      x += w.position.w;
-      if (x >= 12) { x = 0; y += w.position.h; }
-      return newW;
-    });
-  }, [widgets, sortMode]);
-
-  const widgetDataMap = useMemo(() => buildWidgetDataMap(
-    kpis, sparklineMap, currSymbol, spendByPlatform, totalSpend,
-    engagementStackedData as unknown as Array<Record<string, unknown>>,
-    impressionsByPlatform as unknown as Array<Record<string, unknown>>,
-    trendChartData as unknown as Array<Record<string, unknown>>,
-    filteredPosts, allPosts, selectedPlatform, filtered, filteredPrev,
-  ), [kpis, sparklineMap, currSymbol, spendByPlatform, totalSpend, engagementStackedData, impressionsByPlatform, trendChartData, filteredPosts, allPosts, selectedPlatform, filtered, filteredPrev]);
-
-  const handleWidgetToggle = useCallback((widgetId: string, visible: boolean) => {
-    setSavedWidgetState(prev => {
-      const existing = prev[widgetId] || {};
-      const next = { ...prev, [widgetId]: { ...existing, visible } as any };
-      localStorage.setItem(`dashboard-widgets-${clientId}`, JSON.stringify(next));
-      return next;
-    });
-  }, [clientId]);
-
-  const handleWidgetTypeChange = useCallback((widgetId: string, newType: WidgetType) => {
-    setSavedWidgetState(prev => {
-      const existing = prev[widgetId] || {};
-      const next = { ...prev, [widgetId]: { ...existing, type: newType } as any };
-      localStorage.setItem(`dashboard-widgets-${clientId}`, JSON.stringify(next));
-      return next;
-    });
-  }, [clientId]);
-
-  const handleLayoutChange = useCallback((updatedWidgets: DashboardWidget[]) => {
-    setSavedWidgetState(prev => {
-      const next = { ...prev };
-      for (const w of updatedWidgets) {
-        next[w.id] = { ...(next[w.id] || {}), position: w.position } as any;
-      }
-      localStorage.setItem(`dashboard-widgets-${clientId}`, JSON.stringify(next));
-      return next;
-    });
-  }, [clientId]);
-
-  const handleResetLayout = useCallback(() => {
-    localStorage.removeItem(`dashboard-widgets-${clientId}`);
-    setSavedWidgetState({});
-    setIsEditMode(false);
-    toast.success("Dashboard layout reset to default");
-  }, [clientId]);
-
   // ─── Render ──────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      <DashboardHeader
-        selectedPlatform={selectedPlatform}
-        onPlatformChange={setSelectedPlatform}
-        selectedPeriod={selectedPeriod}
-        onPeriodChange={setSelectedPeriod}
-        availablePlatforms={availablePlatforms}
-      />
-
-      {/* Controls bar */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3">
+    <div className="space-y-8">
+      {/* Header Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DashboardHeader
+          selectedPlatform={selectedPlatform}
+          onPlatformChange={setSelectedPlatform}
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={setSelectedPeriod}
+          availablePlatforms={availablePlatforms}
+        />
+        <div className="flex items-center gap-2">
           {lastSyncedAt && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />
-              <span>Last synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
+              <span>Synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* View mode toggle */}
-          <div className="flex items-center rounded-md border border-border bg-muted/30 p-0.5">
-            <Button
-              size="sm"
-              variant={viewMode === 'compact' ? 'default' : 'ghost'}
-              onClick={() => { setViewMode('compact'); localStorage.setItem(`dashboard-viewmode-${clientId}`, 'compact'); }}
-              className="h-7 px-2.5 text-xs gap-1.5 rounded-sm"
-            >
-              <Layers className="h-3 w-3" />
-              Compact
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === 'extended' ? 'default' : 'ghost'}
-              onClick={() => { setViewMode('extended'); localStorage.setItem(`dashboard-viewmode-${clientId}`, 'extended'); }}
-              className="h-7 px-2.5 text-xs gap-1.5 rounded-sm"
-            >
-              <LayoutList className="h-3 w-3" />
-              Extended
-            </Button>
-          </div>
-          <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-            <SelectTrigger className="w-[140px] h-8 text-xs">
-              <ArrowUpDown className="h-3 w-3 mr-1" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default</SelectItem>
-              <SelectItem value="platform">By Platform</SelectItem>
-              <SelectItem value="type">By Type</SelectItem>
-              <SelectItem value="name">By Name</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            variant={isEditMode ? "default" : "outline"}
-            onClick={() => setIsEditMode(!isEditMode)}
-            className="gap-2"
-          >
-            {isEditMode ? <Lock className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-            {isEditMode ? "Lock Layout" : "Edit Dashboard"}
-          </Button>
-          <WidgetPanel widgets={widgets} onToggle={handleWidgetToggle} onResetLayout={handleResetLayout} />
           <Button
             size="sm"
             variant={aiAnalysis ? "outline" : "default"}
@@ -1073,11 +457,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
       {/* AI Analysis Card */}
       {aiAnalysis && aiAnalysisDate && (
-        <Card>
+        <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-display">AI Analysis</CardTitle>
+              <CardTitle className="text-sm font-semibold font-body">AI Analysis</CardTitle>
               <span className="text-[10px] text-muted-foreground">{format(aiAnalysisDate, "dd MMM yyyy, HH:mm")}</span>
             </div>
             <Button size="sm" variant="ghost" onClick={() => setAnalysisDialogOpen(true)}>View Full Analysis</Button>
@@ -1090,7 +474,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
         </Card>
       )}
 
-      {/* AI Analysis Dialog with Markdown */}
+      {/* AI Analysis Dialog */}
       <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -1133,39 +517,46 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           </CardContent>
         </Card>
       ) : (
-        <>
-          {isEditMode && (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2 text-sm text-primary flex items-center gap-2">
-              <Pencil className="h-4 w-4" />
-              <span>Edit mode — drag widgets to rearrange, use the Widgets panel to show/hide, click chart icons to change visualisation type</span>
-            </div>
-          )}
+        <div className="space-y-8">
+          {/* 1. Hero KPIs */}
+          <HeroKPIs kpis={kpis} currSymbol={currSymbol} sparklineMap={sparklineMap} />
 
-          <DashboardGrid
-            widgets={sortedWidgets}
-            dataMap={widgetDataMap}
-            onLayoutChange={handleLayoutChange}
-            onTypeChange={handleWidgetTypeChange}
-            isEditMode={isEditMode}
+          {/* 2. Performance Overview Charts */}
+          <PerformanceOverview
+            spendByPlatform={spendByPlatform}
+            totalSpend={totalSpend}
+            currSymbol={currSymbol}
+            engagementStackedData={engagementStackedData as unknown as Array<Record<string, unknown>>}
+            impressionsByPlatform={impressionsByPlatform as unknown as Array<Record<string, unknown>>}
+            trendChartData={trendChartData as unknown as Array<Record<string, unknown>>}
           />
 
-          {/* Audience Map */}
-          <AudienceMap geoData={geoData} />
+          {/* 3. Platform Sections */}
+          <div className="space-y-6">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider font-body">Platform Breakdown</h2>
+            {filtered.map(snapshot => {
+              const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
+              const connection = connections.find(c => c.platform === snapshot.platform);
+              const config = platformConfigs.get(snapshot.platform);
+              const platformPosts = allPosts.filter(p => p.platform === snapshot.platform);
+              const platformTrend = platformTrendMap.get(snapshot.platform);
 
-          {/* Demographics Placeholder */}
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-display flex items-center gap-1.5">
-                <Users className="h-4 w-4" /> Audience & Demographics
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">Understanding who your audience is — age, location, and interests</p>
-            </CardHeader>
-            <CardContent className="py-8 text-center space-y-2">
-              <Users className="h-10 w-10 mx-auto text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">Audience insights coming soon</p>
-            </CardContent>
-          </Card>
-        </>
+              return (
+                <PlatformSection
+                  key={snapshot.platform}
+                  platform={snapshot.platform}
+                  metricsData={snapshot.metrics_data}
+                  prevMetricsData={prevSnapshot?.metrics_data}
+                  connection={connection}
+                  topContent={platformPosts}
+                  trendData={platformTrend}
+                  currSymbol={currSymbol}
+                  enabledMetrics={config?.enabled_metrics}
+                />
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
