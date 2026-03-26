@@ -286,7 +286,7 @@ const PlatformSection = ({
       <CardContent className="p-5 space-y-5">
         {/* Metric Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {allMetricKeys.filter(k => !k.startsWith('paid_') && !k.startsWith('total_impressions') && !k.startsWith('total_video_views')).slice(0, 10).map(key => (
+          {allMetricKeys.slice(0, 10).map(key => (
             <MetricCard
               key={key}
               metricKey={key}
