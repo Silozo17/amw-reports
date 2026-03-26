@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
+import type { DashboardWidget, WidgetData, WidgetType, PlatformRow } from '@/types/widget';
 import { PLATFORM_LOGOS, PLATFORM_LABELS } from '@/types/database';
 import ChartTypeSelector from './ChartTypeSelector';
 import { ExternalLink, ImageOff, Info } from 'lucide-react';
@@ -47,6 +47,7 @@ import {
   PolarRadiusAxis,
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
 
@@ -84,12 +85,89 @@ const formatKpiValue = (val: number, isCurrency: boolean, currSymbol: string): s
   return Math.round(val).toLocaleString();
 };
 
+const formatCompactValue = (val: number, isCurrency: boolean, currSymbol: string): string => {
+  if (isCurrency)
+    return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 10_000) return `${(val / 1_000).toFixed(1)}K`;
+  return val.toLocaleString();
+};
+
+// ─── Change Badge ─────────────────────────────────────────────
+const ChangeBadge = ({ change, isCost }: { change: number; isCost?: boolean }) => {
+  const isPositive = isCost ? change < 0 : change > 0;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center text-[10px] font-medium whitespace-nowrap',
+        isPositive ? 'text-accent' : 'text-destructive',
+      )}
+    >
+      {change > 0 ? '↑' : change < 0 ? '↓' : '→'} {Math.abs(change).toFixed(1)}%
+    </span>
+  );
+};
+
 // ─── Empty State ───────────────────────────────────────────────
 const EmptyState = () => (
   <div className="flex items-center justify-center h-full min-h-[60px]">
     <p className="text-xs text-muted-foreground italic">No data to display</p>
   </div>
 );
+
+// ─── Compact Metric Widget (per-platform breakdown rows) ──────
+const CompactMetricWidget = ({ data }: { data: WidgetData }) => {
+  const rows = data.platformRows ?? [];
+  const isCost = data.isCost ?? false;
+  const currSymbol = data.currSymbol ?? '';
+
+  if (!rows.length) return <EmptyState />;
+
+  const total = rows.reduce((s, r) => s + r.value, 0);
+  const prevTotal = rows.reduce((s, r) => {
+    if (r.change === undefined || r.change === 0) return s + r.value;
+    const prevVal = r.value / (1 + r.change / 100);
+    return s + prevVal;
+  }, 0);
+  const totalChange = prevTotal !== 0 ? ((total - prevTotal) / prevTotal) * 100 : undefined;
+
+  return (
+    <div className="flex flex-col h-full justify-between gap-1">
+      <div className="space-y-0.5">
+        {rows.map((row) => (
+          <div key={row.platform} className="flex items-center justify-between py-1 px-1 rounded hover:bg-muted/40 transition-colors">
+            <div className="flex items-center gap-2 min-w-0">
+              {PLATFORM_LOGOS[row.platform] ? (
+                <img src={PLATFORM_LOGOS[row.platform]} alt="" className="h-4 w-4 object-contain flex-shrink-0" />
+              ) : (
+                <div className="h-4 w-4 rounded bg-muted flex-shrink-0" />
+              )}
+              <span className="text-xs text-muted-foreground truncate">{PLATFORM_LABELS[row.platform] ?? row.platform}</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-sm font-semibold tabular-nums">
+                {formatCompactValue(row.value, isCost, currSymbol)}
+              </span>
+              {row.change !== undefined && <ChangeBadge change={row.change} isCost={isCost} />}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div>
+        <Separator className="my-1" />
+        <div className="flex items-center justify-between px-1 py-0.5">
+          <span className="text-xs font-semibold text-muted-foreground">Total</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold tabular-nums">
+              {formatCompactValue(total, isCost, currSymbol)}
+            </span>
+            {totalChange !== undefined && <ChangeBadge change={totalChange} isCost={isCost} />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ─── Number Widget ─────────────────────────────────────────────
 const NumberWidget = ({ data }: { data: WidgetData }) => {
@@ -105,28 +183,30 @@ const NumberWidget = ({ data }: { data: WidgetData }) => {
   }
 
   return (
-    <div className="space-y-1.5">
-      <p className="text-2xl font-display font-bold leading-none">
-        {formatKpiValue(animatedValue, isCost, currSymbol)}
-      </p>
-      {change !== undefined && (
-        <div
-          className={cn(
-            'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full',
-            isPositive === true
-              ? 'bg-accent/10 text-accent'
-              : isPositive === false
-                ? 'bg-destructive/10 text-destructive'
-                : 'bg-muted text-muted-foreground',
-          )}
-        >
-          <span>
-            {change > 0 ? '↑' : change < 0 ? '↓' : '→'} {Math.abs(change).toFixed(1)}%
-          </span>
-        </div>
-      )}
+    <div className="flex flex-col h-full justify-between">
+      <div className="space-y-1.5">
+        <p className="text-2xl font-display font-bold leading-none">
+          {formatKpiValue(animatedValue, isCost, currSymbol)}
+        </p>
+        {change !== undefined && (
+          <div
+            className={cn(
+              'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full',
+              isPositive === true
+                ? 'bg-accent/10 text-accent'
+                : isPositive === false
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-muted text-muted-foreground',
+            )}
+          >
+            <span>
+              {change > 0 ? '↑' : change < 0 ? '↓' : '→'} {Math.abs(change).toFixed(1)}%
+            </span>
+          </div>
+        )}
+      </div>
       {data.sparklineData && data.sparklineData.length > 1 && (
-        <div className="mt-1 -mx-1">
+        <div className="-mx-1 mt-auto">
           <ResponsiveContainer width="100%" height={44}>
             <AreaChart data={data.sparklineData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <defs>
@@ -180,23 +260,19 @@ const ProgressRingWidget = ({ data }: { data: WidgetData }) => {
 
   if (!hasData) return <EmptyState />;
 
-  // Clamp percentage for the ring (use value directly if it's already a %)
   const pct = Math.min(Math.max(value, 0), 100);
   const radius = 52;
   const stroke = 10;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (pct / 100) * circumference;
 
-  // Color based on performance
   const ringColor = pct >= 70 ? 'hsl(var(--accent))' : pct >= 40 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))';
 
   return (
     <div className="flex items-center justify-center h-full">
       <div className="relative">
         <svg width={140} height={140} viewBox="0 0 140 140">
-          {/* Background ring */}
           <circle cx="70" cy="70" r={radius} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} />
-          {/* Progress ring */}
           <circle
             cx="70" cy="70" r={radius}
             fill="none"
@@ -238,7 +314,6 @@ const GaugeWidget = ({ data }: { data: WidgetData }) => {
   const pct = Math.min(Math.max(value, 0), 100);
   const radius = 60;
   const stroke = 12;
-  // Semi-circle: half circumference
   const halfCirc = Math.PI * radius;
   const offset = halfCirc - (pct / 100) * halfCirc;
 
@@ -247,12 +322,10 @@ const GaugeWidget = ({ data }: { data: WidgetData }) => {
   return (
     <div className="flex flex-col items-center justify-center h-full">
       <svg width={160} height={90} viewBox="0 0 160 90" className="overflow-visible">
-        {/* Background arc */}
         <path
           d={`M ${80 - radius} 80 A ${radius} ${radius} 0 0 1 ${80 + radius} 80`}
           fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} strokeLinecap="round"
         />
-        {/* Value arc */}
         <path
           d={`M ${80 - radius} 80 A ${radius} ${radius} 0 0 1 ${80 + radius} 80`}
           fill="none" stroke={gaugeColor} strokeWidth={stroke} strokeLinecap="round"
@@ -500,7 +573,6 @@ const TableWidget = ({ data, widgetId }: { data: WidgetData; widgetId?: string }
       ) : null;
     }
 
-    // Text column — truncate long content
     if (col.key === 'content' && typeof value === 'string' && value.length > 120) {
       return <span title={value}>{value.slice(0, 120)}…</span>;
     }
@@ -567,16 +639,9 @@ interface WidgetRendererProps {
 
 const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRendererProps) => {
   const { type, category } = widget;
-  const [platformFilter, setPlatformFilter] = useState('all');
 
-  // For compact widgets with platform sources, derive filtered data
-  const hasMultiplePlatforms = (widget.platformSources?.length ?? 0) > 1;
-  const effectiveData = useMemo(() => {
-    if (!hasMultiplePlatforms || platformFilter === 'all' || !data.platformBreakdown) return data;
-    const filteredValue = data.platformBreakdown[platformFilter] ?? 0;
-    const filteredChange = data.platformBreakdownChange?.[platformFilter];
-    return { ...data, value: filteredValue, change: filteredChange };
-  }, [data, platformFilter, hasMultiplePlatforms]);
+  // Check if this is a compact widget with platform rows
+  const isCompactWidget = (widget.platformSources?.length ?? 0) > 0 && data.platformRows && data.platformRows.length > 0;
 
   // KPI widgets shown as chart use sparkline data
   const isKpiAsChart = category === 'kpi' && type !== 'number' && type !== 'progress' && type !== 'gauge';
@@ -587,13 +652,13 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
 
   return (
     <Card className={cn('h-full overflow-hidden flex flex-col', isEditMode && 'ring-2 ring-primary/20 ring-dashed')}>
-      <CardHeader className="pb-1 flex flex-row items-start justify-between space-y-0 px-4 pt-3">
+      <CardHeader className="pb-1 flex flex-row items-start justify-between space-y-0 px-4 pt-3 gap-1">
         <div className="space-y-0 min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {platformLogo && (
               <img src={platformLogo} alt={platformLabel ?? ''} className="h-4 w-4 object-contain flex-shrink-0" />
             )}
-            <CardTitle className="text-sm font-display leading-tight tracking-wide truncate">{widget.label}</CardTitle>
+            <CardTitle className="text-sm font-display leading-tight tracking-wide line-clamp-2">{widget.label}</CardTitle>
             {widget.description && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -605,44 +670,31 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
               </Tooltip>
             )}
           </div>
-          {/* Compact mode platform filter */}
-          {hasMultiplePlatforms && widget.platformSources && (
-            <div className="mt-1">
-              <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                <SelectTrigger className="w-full h-6 text-[10px] border-none bg-muted/40 px-2 py-0">
-                  <SelectValue placeholder="All Platforms" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Platforms</SelectItem>
-                  {widget.platformSources.map(p => (
-                    <SelectItem key={p} value={p}>
-                      <span className="flex items-center gap-1.5">
-                        {PLATFORM_LOGOS[p] && <img src={PLATFORM_LOGOS[p]} alt="" className="h-3.5 w-3.5 object-contain" />}
-                        {PLATFORM_LABELS[p] ?? p}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
-        <ChartTypeSelector
-          currentType={widget.type}
-          compatibleTypes={widget.compatibleTypes}
-          onChange={(newType) => onTypeChange(widget.id, newType)}
-        />
-      </CardHeader>
-      <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0">
-        {type === 'number' && <NumberWidget data={effectiveData} />}
-        {type === 'progress' && <ProgressRingWidget data={effectiveData} />}
-        {type === 'gauge' && <GaugeWidget data={effectiveData} />}
-        {type === 'table' && <TableWidget data={effectiveData} widgetId={widget.id} />}
-        {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
-          <SparklineChart data={effectiveData} type={type} />
+        {!isCompactWidget && (
+          <ChartTypeSelector
+            currentType={widget.type}
+            compatibleTypes={widget.compatibleTypes}
+            onChange={(newType) => onTypeChange(widget.id, newType)}
+          />
         )}
-        {category === 'chart' && type !== 'table' && (
-          <ChartWidget data={effectiveData} type={type} />
+      </CardHeader>
+      <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0 overflow-auto">
+        {isCompactWidget ? (
+          <CompactMetricWidget data={data} />
+        ) : (
+          <>
+            {type === 'number' && <NumberWidget data={data} />}
+            {type === 'progress' && <ProgressRingWidget data={data} />}
+            {type === 'gauge' && <GaugeWidget data={data} />}
+            {type === 'table' && <TableWidget data={data} widgetId={widget.id} />}
+            {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
+              <SparklineChart data={data} type={type} />
+            )}
+            {category === 'chart' && type !== 'table' && (
+              <ChartWidget data={data} type={type} />
+            )}
+          </>
         )}
       </CardContent>
     </Card>

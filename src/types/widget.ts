@@ -26,6 +26,12 @@ export interface DashboardWidget {
   platformSources?: string[];
 }
 
+export interface PlatformRow {
+  platform: string;
+  value: number;
+  change?: number;
+}
+
 export interface WidgetData {
   value?: number;
   change?: number;
@@ -50,6 +56,8 @@ export interface WidgetData {
   platformBreakdown?: Record<string, number>;
   /** Compact mode: per-platform change breakdown */
   platformBreakdownChange?: Record<string, number>;
+  /** Compact mode: per-platform rows for inline display */
+  platformRows?: PlatformRow[];
 }
 
 export const COMPATIBLE_TYPES: Record<WidgetCategory, WidgetType[]> = {

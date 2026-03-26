@@ -172,11 +172,11 @@ function generateDefaultWidgets(
       type: 'number',
       category: 'kpi',
       visible: true,
-      position: { x: (i % 4) * 3, y: Math.floor(i / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
+      position: { x: (i % 4) * 3, y: Math.floor(i / 4) * 4, w: 3, h: 4, minW: 2, minH: 3 },
       compatibleTypes: COMPATIBLE_TYPES.kpi,
     });
   });
-  y = Math.ceil(kpis.length / 4) * 3;
+  y = Math.ceil(kpis.length / 4) * 4;
 
   // Chart widgets
   if (hasSpendDistribution) {
@@ -271,6 +271,8 @@ function generateDefaultWidgets(
 
     let pIdx = 0;
     for (const [key, info] of metricMap) {
+      const platformCount = info.platforms.length;
+      const widgetH = Math.max(4, Math.min(8, 2 + platformCount));
       widgets.push({
         id: `compact-${key}`,
         dataSource: `compact-${key}`,
@@ -279,13 +281,13 @@ function generateDefaultWidgets(
         type: 'number',
         category: 'platform',
         visible: true,
-        position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
+        position: { x: (pIdx % 3) * 4, y: y + Math.floor(pIdx / 3) * widgetH, w: 4, h: widgetH, minW: 3, minH: 3 },
         compatibleTypes: COMPATIBLE_TYPES.platform,
         platformSources: info.platforms,
       });
       pIdx++;
     }
-    y += Math.ceil(pIdx / 4) * 3;
+    y += Math.ceil(pIdx / 3) * 5;
   } else {
     // Extended mode — individual platform widgets (existing behavior)
     for (const snapshot of filtered) {
@@ -309,13 +311,13 @@ function generateDefaultWidgets(
           type: 'number',
           category: 'platform',
           visible: true,
-          position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
+          position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 4, w: 3, h: 4, minW: 2, minH: 3 },
           compatibleTypes: COMPATIBLE_TYPES.platform,
           platform,
         });
         pIdx++;
       }
-      y += Math.ceil(pIdx / 4) * 3;
+      y += Math.ceil(pIdx / 4) * 4;
     }
   }
 
@@ -550,6 +552,11 @@ function buildWidgetDataMap(
   for (const [key, info] of compactMetrics) {
     const totalPrev = filteredPrev.reduce((sum, s) => sum + (s.metrics_data[key] ?? 0), 0);
     const totalChange = totalPrev !== 0 ? ((info.value - totalPrev) / totalPrev) * 100 : undefined;
+    const platformRows = Object.entries(info.breakdown).map(([platform, value]) => ({
+      platform,
+      value,
+      change: info.breakdownChange[platform],
+    }));
     map[`compact-${key}`] = {
       value: info.value,
       change: totalChange,
@@ -557,6 +564,7 @@ function buildWidgetDataMap(
       currSymbol,
       platformBreakdown: info.breakdown,
       platformBreakdownChange: info.breakdownChange,
+      platformRows,
     };
   }
 
