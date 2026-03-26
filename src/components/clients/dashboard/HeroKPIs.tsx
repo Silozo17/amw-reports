@@ -6,6 +6,9 @@ import {
   ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
 import MetricTooltip from '@/components/clients/MetricTooltip';
+import { PLATFORM_LOGOS, PLATFORM_LABELS } from '@/types/database';
+import type { PlatformType } from '@/types/database';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface HeroKPI {
   label: string;
@@ -14,6 +17,7 @@ interface HeroKPI {
   isCost?: boolean;
   metricKey: string;
   icon: React.ElementType;
+  platforms?: PlatformType[];
 }
 
 interface HeroKPIsProps {
@@ -92,6 +96,26 @@ const HeroKPICard = ({
             {kpi.label}
           </span>
           <MetricTooltip metricKey={kpi.metricKey} />
+          {kpi.platforms && kpi.platforms.length > 0 && (
+            <div className="flex items-center gap-0.5 ml-auto">
+              <TooltipProvider delayDuration={200}>
+                {kpi.platforms.slice(0, 5).map((p) => (
+                  <Tooltip key={p}>
+                    <TooltipTrigger asChild>
+                      <img
+                        src={PLATFORM_LOGOS[p]}
+                        alt={PLATFORM_LABELS[p]}
+                        className="h-4 w-4 rounded-sm object-contain"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      {PLATFORM_LABELS[p]}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </TooltipProvider>
+            </div>
+          )}
         </div>
 
         <p className="text-3xl font-bold font-body tabular-nums leading-none mb-2">
