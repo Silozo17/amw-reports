@@ -552,6 +552,11 @@ function buildWidgetDataMap(
   for (const [key, info] of compactMetrics) {
     const totalPrev = filteredPrev.reduce((sum, s) => sum + (s.metrics_data[key] ?? 0), 0);
     const totalChange = totalPrev !== 0 ? ((info.value - totalPrev) / totalPrev) * 100 : undefined;
+    const platformRows = Object.entries(info.breakdown).map(([platform, value]) => ({
+      platform,
+      value,
+      change: info.breakdownChange[platform],
+    }));
     map[`compact-${key}`] = {
       value: info.value,
       change: totalChange,
@@ -559,6 +564,7 @@ function buildWidgetDataMap(
       currSymbol,
       platformBreakdown: info.breakdown,
       platformBreakdownChange: info.breakdownChange,
+      platformRows,
     };
   }
 
