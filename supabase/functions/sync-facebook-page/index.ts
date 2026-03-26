@@ -145,25 +145,50 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Batch 1: Views, unique viewers, engagement, CTA clicks ──
+      // ── Batch 1a: Organic views only (using is_from_ads breakdown) ──
       try {
-        const batch1 = await fetchPageInsights(pageId, pageToken, [
-          "page_media_view",
+        const viewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&breakdown=is_from_ads&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const viewsRes = await fetch(viewsUrl);
+        if (viewsRes.ok) {
+          const viewsData = await viewsRes.json();
+          for (const metric of (viewsData.data || [])) {
+            if (metric.name === 'page_media_view') {
+              for (const dayEntry of (metric.values || [])) {
+                // value is an object: { "true": adViews, "false": organicViews }
+                const val = dayEntry.value;
+                if (typeof val === 'object' && val !== null) {
+                  // "false" = not from ads = organic
+                  totalViews += Number(val['false'] || 0);
+                } else {
+                  // fallback: no breakdown available, use total
+                  totalViews += Number(val || 0);
+                }
+              }
+            }
+          }
+        }
+        coreInsightsFetched = true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`Views (organic) failed page ${pageId}:`, msg);
+      }
+
+      // ── Batch 1b: Unique viewers, engagement, CTA ──
+      try {
+        const batch1b = await fetchPageInsights(pageId, pageToken, [
           "page_total_media_view_unique",
           "page_post_engagements",
           "page_total_actions",
         ], startDate, endDate);
 
-        totalViews         += sumDailyValues(batch1, "page_media_view");
-        totalUniqueViewers += sumDailyValues(batch1, "page_total_media_view_unique");
-        totalEngagement    += sumDailyValues(batch1, "page_post_engagements");
-        totalCTAClicks     += sumDailyValues(batch1, "page_total_actions");
-        coreInsightsFetched = true;
+        totalUniqueViewers += sumDailyValues(batch1b, "page_total_media_view_unique");
+        totalEngagement    += sumDailyValues(batch1b, "page_post_engagements");
+        totalCTAClicks     += sumDailyValues(batch1b, "page_total_actions");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Batch 1 failed page ${pageId}:`, msg);
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`Batch 1b failed page ${pageId}:`, msg);
         await supabaseClient.from("platform_connections")
-          .update({ last_error: `Batch 1 failed: ${msg}`, last_sync_status: "partial" })
+          .update({ last_error: `Batch 1b failed: ${msg}`, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
 
@@ -224,21 +249,38 @@ Deno.serve(async (req) => {
             let postClicksByType: Record<string, number> = {};
             let reactionBreakdown: Record<string, number> = {};
 
+            // Call 1: Numeric metrics (always reliable)
             try {
-              const insightMetrics = 'post_media_view,post_clicks,post_clicks_by_type,post_engaged_users,post_reactions_by_type_total';
-              const piRes = await fetch(`${GRAPH_BASE}/${post.id}/insights?metric=${insightMetrics}&access_token=${pageToken}`);
-              if (piRes.ok) {
-                const piData = await piRes.json();
-                for (const insight of (piData.data || [])) {
+              const numericRes = await fetch(
+                `${GRAPH_BASE}/${post.id}/insights?metric=post_media_view,post_clicks,post_engaged_users&access_token=${pageToken}`
+              );
+              if (numericRes.ok) {
+                const numericData = await numericRes.json();
+                for (const insight of (numericData.data || [])) {
                   const val = insight.values?.[0]?.value;
-                  if (insight.name === 'post_media_view')              postViews = Number(val || 0);
-                  if (insight.name === 'post_clicks')                  postClicks = Number(val || 0);
-                  if (insight.name === 'post_engaged_users')           postEngagedUsers = Number(val || 0);
-                  if (insight.name === 'post_clicks_by_type')          postClicksByType = (typeof val === 'object' && val !== null) ? val : {};
-                  if (insight.name === 'post_reactions_by_type_total') reactionBreakdown = (typeof val === 'object' && val !== null) ? val : {};
+                  if (insight.name === 'post_media_view')    postViews = Number(val || 0);
+                  if (insight.name === 'post_clicks')         postClicks = Number(val || 0);
+                  if (insight.name === 'post_engaged_users')  postEngagedUsers = Number(val || 0);
                 }
               }
-            } catch {} // non-blocking per-post
+            } catch {} // non-blocking
+
+            // Call 2: Object metrics (separate call so failure doesn't kill Call 1)
+            try {
+              const objectRes = await fetch(
+                `${GRAPH_BASE}/${post.id}/insights?metric=post_clicks_by_type,post_reactions_by_type_total&access_token=${pageToken}`
+              );
+              if (objectRes.ok) {
+                const objectData = await objectRes.json();
+                for (const insight of (objectData.data || [])) {
+                  const val = insight.values?.[0]?.value;
+                  if (insight.name === 'post_clicks_by_type')
+                    postClicksByType = (typeof val === 'object' && val !== null) ? val : {};
+                  if (insight.name === 'post_reactions_by_type_total')
+                    reactionBreakdown = (typeof val === 'object' && val !== null) ? val : {};
+                }
+              }
+            } catch {} // non-blocking
 
             allTopPosts.push({
               page_name:      page.name,
@@ -354,7 +396,7 @@ Deno.serve(async (req) => {
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete. views=${totalViews}, reach=${totalUniqueViewers}, engagement=${totalEngagement}, followers=${currentFollowers}, posts=${allTopPosts.length}`);
+    console.log(`Facebook sync complete. organic_views=${totalViews}, unique_viewers=${totalUniqueViewers}, engagement=${totalEngagement}, followers=${currentFollowers}, posts=${allTopPosts.length}`);
 
     return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
