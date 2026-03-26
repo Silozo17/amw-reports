@@ -1,63 +1,82 @@
 
-Root cause is confirmed: the Meta Ads widget is rendering exactly what is stored in the snapshot, and the latest snapshot for this client still contains the old metric shape.
 
-What I found:
-- Latest `monthly_snapshots` row for this client/platform still has:
-  - `conversions`
-  - `cost_per_conversion`
-  - `conversions_value`
-  - `roas`
-  - `ctr: 0.0135...`
-- It does not have:
-  - `leads`
-  - `cost_per_lead`
-- That means the sync data in the database was written by the old Meta Ads sync output, so the UI has nothing to display for leads/CPL.
-- This is not caused by client metric filtering for this client:
-  - there is no `client_platform_config` row for this client’s `meta_ads`
-- I also found stale global defaults in the database:
-  - `metric_defaults` for `meta_ads` still lists old available metrics like `conversions`, `cost_per_conversion`, `roas`
-- There are still some old frontend references to conversion-based metrics in a few files, so even after the backend is corrected, parts of the app can still show outdated language/formatting elsewhere.
+# Remove User Sync Buttons, Add Automated Scheduling & Admin Sync
 
-Plan:
-1. Fix the backend/data mismatch first
-   - Reconcile the running `sync-meta-ads` backend so it definitely writes:
-     - `leads`
-     - `cost_per_lead`
-     - `ctr` as a real percentage
-   - Then re-sync the affected Meta Ads months so existing snapshots are rewritten with the new keys.
-   - This is the main fix, because the current widget is reading old stored data.
+## Summary
 
-2. Clean up stale metric configuration data
-   - Update `metric_defaults` for `meta_ads` so available/default metrics match the new Meta Ads model.
-   - Remove old Meta Ads defaults like:
-     - `conversions`
-     - `cost_per_conversion`
-     - `conversions_value`
-     - `roas`
-   - Ensure `leads` and `cost_per_lead` are included by default.
-   - Also sweep existing `client_platform_config` rows for `meta_ads` so older saved configs do not keep hiding the new metrics for other clients.
+1. Remove all user-facing sync buttons (ClientDetail sync popover, PlatformSection per-platform sync, Connections page refresh, DebugConsole sync)
+2. Create a `scheduled-sync` edge function that runs daily at 5 AM — syncs current month for all connected platforms, and also syncs previous month during the first 7 days of a new month
+3. After account selection (AccountPickerDialog `onComplete`), automatically trigger a background 12-month initial sync
+4. Add a "Sync 12 Months" button per org in the admin panel (AdminOrgDetail) — platform admin only
 
-3. Finish the frontend cleanup
-   - Audit remaining conversion-specific references so Meta Ads is consistently lead-based everywhere it appears.
-   - Files to update:
-     - `src/components/clients/ClientDashboard.tsx`
-       - remove Meta-specific dependence on `conversions` / `cost_per_conversion` in aggregate logic where needed
-     - `src/components/clients/PlatformMetricsCard.tsx`
-       - treat `cost_per_lead` as a cost metric for formatting and change-color logic
-     - `src/pages/ClientPortal.tsx`
-       - replace remaining cost/conversion label handling so portal view stays consistent
-     - `src/types/metrics.ts`
-       - add/update explanation text for `cost_per_lead` and keep Meta terminology aligned
+## Technical Details
 
-4. Verify Meta Ads end-to-end
-   - Re-sync the current month for this client
-   - Confirm the Meta Ads section shows:
-     - Leads
-     - Cost Per Lead
-     - CTR as a percentage, not a near-zero decimal
-   - Confirm “Conversions” is no longer shown for Meta Ads
-   - Confirm Settings metric defaults for Meta Ads no longer expose old conversion metrics
+### 1. Remove sync buttons from user-facing UI
 
-Technical notes:
-- The strongest evidence is the stored row itself: if the new sync code had run successfully, the snapshot would already contain `leads` and `cost_per_lead`, and CTR would be around `1.35`, not `0.0135`.
-- So the immediate problem is not the widget component; it is stale backend-written snapshot data plus stale defaults/configuration.
+**`src/pages/clients/ClientDetail.tsx`**
+- Remove the entire Sync `<Popover>` block (lines 420–461) — the sync button, month/year selectors, manual sync, and bulk sync
+- Remove all related state: `isSyncing`, `syncMenuOpen`, `syncMonth`, `syncYear`, `isBulkSyncing`, `bulkProgress`
+- Remove functions: `runSyncForMonth`, `handleManualSync`, `handleBulkSync`
+- Remove `SYNC_FUNCTION_MAP` import
+- Keep `RefreshCw` icon only if used elsewhere; remove if not
+
+**`src/components/clients/dashboard/PlatformSection.tsx`**
+- Remove the `handleSyncNow` function and "Sync" button (lines 230–271)
+- Remove `triggerSync` import, `isSyncing` state, `Loader2`/`RefreshCw` icons if unused
+- Remove the `connectionId` and `onSyncComplete` props (update interface)
+- Keep the connection status badge and "Synced X ago" text
+
+**`src/components/clients/ClientDashboard.tsx`**
+- Remove `onSyncComplete={fetchSnapshots}` prop from `PlatformSection` calls
+
+**`src/pages/Connections.tsx`**
+- Remove the `<RefreshCw>` ghost button from each connection card (line 107–109)
+
+**`src/pages/DebugConsole.tsx`**
+- Remove the "Sync Now" button and `handleSyncTest` function
+
+### 2. Create `scheduled-sync` edge function
+
+**`supabase/functions/scheduled-sync/index.ts`**
+
+New edge function that:
+- Queries all `platform_connections` where `is_connected = true` and `account_id IS NOT NULL`
+- Determines months to sync:
+  - Always sync current month
+  - If today's date is <= 7th of the month, also sync previous month (to catch late-reporting data)
+- For each connection, invokes the appropriate sync function (using the same `SYNC_FUNCTION_MAP` logic)
+- Processes connections sequentially or in small batches to avoid rate limits
+- Returns a summary of results
+
+### 3. Set up pg_cron job for daily 5 AM sync
+
+- Use `supabase--read_query` to enable `pg_cron` and `pg_net` extensions
+- Create a cron job: `0 5 * * *` (5:00 AM UTC daily) that calls the `scheduled-sync` edge function
+
+### 4. Auto-sync 12 months on first connection
+
+**`src/components/clients/AccountPickerDialog.tsx`**
+- After `onComplete()` is called (account selection saved), trigger a background 12-month sync for the newly connected platform(s)
+- Use `triggerInitialSync` from `triggerSync.ts` but updated to 12 months
+- Run in background (fire-and-forget with toast notifications for progress/completion)
+- For Meta Ads multi-step: after all connections (meta_ads, facebook, instagram) are created, sync all of them
+
+### 5. Admin bulk sync button
+
+**`src/pages/admin/AdminOrgDetail.tsx`**
+- Add a "Sync All Platforms (12 months)" button to the Connection Health card header
+- When clicked: fetch all connected platform connections for this org, then sequentially sync each one for the last 12 months using `supabase.functions.invoke`
+- Show progress toast/badge during sync
+- This is the only place where manual sync remains in the entire app
+
+### Files to modify
+1. `src/pages/clients/ClientDetail.tsx` — remove sync UI
+2. `src/components/clients/dashboard/PlatformSection.tsx` — remove sync button
+3. `src/components/clients/ClientDashboard.tsx` — remove onSyncComplete prop
+4. `src/pages/Connections.tsx` — remove refresh button
+5. `src/pages/DebugConsole.tsx` — remove sync test button
+6. `src/components/clients/AccountPickerDialog.tsx` — add auto 12-month sync on connect
+7. `src/lib/triggerSync.ts` — update `triggerInitialSync` default to 12 months
+8. `supabase/functions/scheduled-sync/index.ts` — new edge function
+9. `src/pages/admin/AdminOrgDetail.tsx` — add admin sync button
+
