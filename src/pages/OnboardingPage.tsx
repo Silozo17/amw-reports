@@ -268,7 +268,7 @@ const OnboardingPage = () => {
 
     await supabase
       .from('profiles')
-      .update({ onboarding_completed: true })
+      .update({ onboarding_completed: true, account_type: accountType })
       .eq('user_id', user.id);
 
     navigate(guided ? '/dashboard?guided=true' : '/dashboard');
