@@ -37,8 +37,8 @@ const LandingHero = () => {
           <div className="animate-fade-up-in">
             {/* Branding */}
             <div className="mb-8">
-              <img src={amwLogo} alt="AMW Media" className="h-10 w-auto" />
-              <p className="text-xs tracking-[0.3em] text-amw-offwhite/60 uppercase font-body">Reports</p>
+              <img src={amwLogo} alt="AMW Reports" className="h-10 w-auto" />
+              <p className="text-sm tracking-[0.2em] text-amw-offwhite/70 uppercase font-body font-semibold">AMW Reports</p>
             </div>
 
             {/* Accent text */}

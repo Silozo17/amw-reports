@@ -52,8 +52,8 @@ const HomePage = () => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <div>
-              <img src={amwLogo} alt="AMW Media" className="h-10 w-auto mb-2" />
-              <p className="text-xs tracking-[0.3em] text-amw-offwhite/50 uppercase font-body">Reports</p>
+              <img src={amwLogo} alt="AMW Reports" className="h-10 w-auto mb-2" />
+              <p className="text-sm tracking-[0.2em] text-amw-offwhite/70 uppercase font-body font-semibold">AMW Reports</p>
             </div>
             <p className="font-accent text-2xl lg:text-3xl text-primary">
               We Are AMW Media
@@ -64,7 +64,7 @@ const HomePage = () => (
               <span className="text-gradient-purple">Elevate</span> Your Agency
             </h1>
             <p className="font-body text-lg max-w-md leading-relaxed text-amw-offwhite/70">
-              Connect your marketing platforms, generate stunning branded reports, and deliver insights to your clients — automatically.
+              AMW Reports connects 10+ marketing platforms, generates stunning branded PDF reports, and delivers insights to your clients — automatically.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <Button size="lg" asChild>
