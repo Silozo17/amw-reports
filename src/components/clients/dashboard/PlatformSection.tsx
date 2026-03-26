@@ -75,11 +75,11 @@ interface PlatformSectionProps {
 
 /** Priority metrics per platform category */
 const AD_PLATFORM_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'conversions', 'cost_per_conversion', 'reach'];
-const SOCIAL_KEY_METRICS = ['reach', 'impressions', 'engagement', 'likes', 'comments', 'shares', 'total_followers', 'follower_growth', 'profile_visits', 'website_clicks'];
+const SOCIAL_KEY_METRICS = ['reach', 'impressions', 'engagement', 'likes', 'comments', 'shares', 'total_followers', 'follower_growth', 'profile_visits', 'website_clicks', 'video_views', 'saves', 'reel_count'];
 const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session'];
 const GSC_KEY_METRICS = ['search_clicks', 'search_impressions', 'search_ctr', 'search_position'];
 const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating'];
-const YOUTUBE_KEY_METRICS = ['views', 'watch_time', 'subscribers', 'likes', 'comments', 'avg_view_duration'];
+const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers', 'likes', 'comments', 'avg_view_duration'];
 
 const PLATFORM_KEY_METRICS: Record<string, string[]> = {
   google_ads: AD_PLATFORM_KEY_METRICS,
@@ -314,7 +314,49 @@ const PlatformSection = ({
         )}
 
         {/* Trend Chart */}
-        {hasChartData && (
+        {platform === 'google_search_console' && trendData && trendData.length > 1 ? (
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">Search Performance — Last 6 Months</p>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                  <defs>
+                    {GSC_KEY_METRICS.map((key, i) => (
+                      <linearGradient key={key} id={`grad-gsc-${key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.15} />
+                        <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--popover))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  {GSC_KEY_METRICS.map((key, i) => (
+                    <Area
+                      key={key}
+                      type="monotone"
+                      dataKey={key}
+                      name={METRIC_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                      strokeWidth={2}
+                      fill={`url(#grad-gsc-${key})`}
+                      dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        ) : hasChartData && (
           <div className="rounded-lg border bg-card p-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">{chartLabel} — Last 6 Months</p>
             <div className="h-[180px]">
