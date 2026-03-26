@@ -17,6 +17,12 @@ interface ShareToken {
   created_at: string;
 }
 
+interface CustomDomain {
+  domain: string;
+  verified_at: string | null;
+  is_active: boolean;
+}
+
 interface ShareDialogProps {
   clientId: string;
   orgId: string;
