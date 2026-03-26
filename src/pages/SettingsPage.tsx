@@ -18,6 +18,7 @@ import AccountSection from '@/components/settings/AccountSection';
 import OrganisationSection from '@/components/settings/OrganisationSection';
 import BrandingSection from '@/components/settings/BrandingSection';
 import ReportSettingsSection from '@/components/settings/ReportSettingsSection';
+import CustomDomainSection from '@/components/settings/CustomDomainSection';
 
 interface TeamMember {
   id: string;
@@ -137,6 +138,7 @@ const SettingsPage = () => {
         <OrganisationSection />
         <BrandingSection />
         <ReportSettingsSection />
+        <CustomDomainSection />
 
         {/* Team Members */}
         <Card>

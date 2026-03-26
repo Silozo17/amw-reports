@@ -17,6 +17,12 @@ interface ShareToken {
   created_at: string;
 }
 
+interface CustomDomain {
+  domain: string;
+  verified_at: string | null;
+  is_active: boolean;
+}
+
 interface ShareDialogProps {
   clientId: string;
   orgId: string;
@@ -27,6 +33,7 @@ const ShareDialog = ({ clientId, orgId, clientName }: ShareDialogProps) => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [tokens, setTokens] = useState<ShareToken[]>([]);
+  const [customDomain, setCustomDomain] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -39,8 +46,24 @@ const ShareDialog = ({ clientId, orgId, clientName }: ShareDialogProps) => {
     setTokens((data as ShareToken[]) ?? []);
   };
 
+  const fetchCustomDomain = async () => {
+    const { data } = await supabase
+      .from('custom_domains')
+      .select('domain, verified_at, is_active')
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+    if (data && (data as CustomDomain).verified_at) {
+      setCustomDomain((data as CustomDomain).domain);
+    }
+  };
+
   useEffect(() => {
-    if (open) fetchTokens();
+    if (open) {
+      fetchTokens();
+      fetchCustomDomain();
+    }
   }, [open]);
 
   const createToken = async () => {
@@ -85,7 +108,10 @@ const ShareDialog = ({ clientId, orgId, clientName }: ShareDialogProps) => {
     }
   };
 
-  const getShareUrl = (token: string) => `${window.location.origin}/portal/${token}`;
+  const getShareUrl = (token: string) => {
+    if (customDomain) return `https://${customDomain}/portal/${token}`;
+    return `${window.location.origin}/portal/${token}`;
+  };
 
   const copyLink = async (token: ShareToken) => {
     await navigator.clipboard.writeText(getShareUrl(token.token));
