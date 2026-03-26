@@ -486,10 +486,7 @@ const ClientDetail = () => {
         <Tabs defaultValue="dashboard">
           <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
             <TabsTrigger value="dashboard" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5 hidden sm:inline" />Dashboard</TabsTrigger>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="connections">Connections</TabsTrigger>
-            <TabsTrigger value="recipients">Recipients</TabsTrigger>
-            <TabsTrigger value="metrics">Metrics</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
