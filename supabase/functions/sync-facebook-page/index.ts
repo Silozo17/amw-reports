@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
 
       // 6. Fetch ALL posts with basic fields, then fetch per-post insights individually
       try {
-        let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,full_picture,permalink_url,likes.summary(true),comments.summary(true),shares,type&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
+        let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,full_picture,permalink_url,likes.summary(true),comments.summary(true),shares,attachments{media_type,media,url,title}&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
 
         while (postsUrl) {
           const postsRes = await fetch(postsUrl);
@@ -221,7 +221,8 @@ Deno.serve(async (req) => {
               const likes = post.likes?.summary?.total_count || 0;
               const comments = post.comments?.summary?.total_count || 0;
               const shares = post.shares?.count || 0;
-              const isVideo = post.type === 'video' || post.type === 'reel';
+              const attachmentType = post.attachments?.data?.[0]?.media_type || '';
+              const isVideo = attachmentType === 'video' || attachmentType === 'video_inline';
 
               // Fetch per-post insights individually for reliable reach and video views
               let postReach = 0;
@@ -260,7 +261,7 @@ Deno.serve(async (req) => {
                 reach: postReach,
                 clicks: postClicks,
                 video_views: postVideoViews > 0 ? postVideoViews : undefined,
-                media_type: post.type || 'status',
+                media_type: attachmentType || 'status',
                 total_engagement: likes + comments + shares,
               });
             }
