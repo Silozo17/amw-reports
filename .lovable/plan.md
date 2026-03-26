@@ -1,84 +1,191 @@
 
+Fix only the data path for Facebook, Instagram, and YouTube video views and per-post reach, with a strict platform-by-platform audit and no unrelated changes.
 
-# Fix: Users Can't Create Clients & Architecture Cleanup
+## What I found
 
-## Root Problem
+### 1. YouTube is mostly fixed already
+The stored March/February YouTube snapshots for this client show:
+- `views: 307 / 316`
+- `video_views: 307 / 316`
 
-The org creation happens **client-side** during OTP verification (LandingPage.tsx lines 94-136). If anything fails (network, race condition, browser closes), the user ends up with no org and no subscription. This causes "Organisation not found" when creating clients.
+So the YouTube monthly total now matches the expected source data. The remaining work for YouTube is to verify the hero/widget pipeline and make sure top-video rows and hero aggregation keep using monthly snapshot values only.
 
-The current architecture requires every client to have an `org_id`. The subscription/plan is tied to the org. This is fine architecturally, but the org creation is fragile.
+### 2. Instagram is still wrong
+Current Instagram sync is using deprecated media metrics:
+- It requests `video_views` on `/media`
+- It requests `video_views` and `impressions` on `/{media-id}/insights`
 
-## Solution: Make Org Creation Bulletproof + Add Recovery
+The current Meta docs now say:
+- `video_views` is deprecated
+- `views` is the replacement metric
+- `impressions` is deprecated for newer media
+- `reach` is still valid for FEED/REELS/STORY
 
-### 1. Move org creation into the `handle_new_user` database trigger
+This explains why your stored Instagram snapshot shows:
+- `video_views: 0`
+- top reel rows also have `video_views: 0`
+- per-post reach is not even persisted into top content
 
-**Migration**: Update the `handle_new_user()` function to:
-- Create an organisation from `raw_user_meta_data->>'company_name'` (falls back to `full_name`)
-- Create an `org_members` entry (role: owner)
-- Set `profiles.org_id`
-- Auto-assign the Starter plan from `subscription_plans`
+### 3. Facebook is still wrong
+Current Facebook sync has two reliability problems:
+- page-level `video_views` is built from `/video_posts` + `total_video_views`, which is lifetime-oriented and not aligned to the report month
+- per-post reach is pulled from inline `published_posts ... insights.metric(post_impressions_unique,post_clicks)` but stored posts currently show `reach: 0` across the board
 
-This fires on `auth.users` INSERT, so even if the client crashes after signup, the org exists.
+That means both:
+- platform card video views are wrong/zero
+- top post reach is wrong/zero
+- hero “Video Views” misses Facebook contribution
 
-### 2. Simplify the OTP verification handler (LandingPage.tsx)
+## Implementation plan
 
-Remove all org/membership/subscription creation code from `handleVerifyOtp`. After verification, just navigate to `/onboarding`. The trigger already handled everything.
+### A. Rebuild Instagram sync to use current supported metrics
+File: `supabase/functions/sync-instagram/index.ts`
 
-### 3. Add org recovery in Index.tsx (dashboard entry point)
+Replace deprecated logic with current-compatible logic:
 
-Before the onboarding check, add a recovery step: if a user has no `org_id` on their profile and no `org_members` entry, auto-create an org using their `user_metadata.company_name` or `full_name`. This fixes existing broken users like ms@redigital.dk without manual intervention.
+1. For top media fetch:
+- include `media_product_type` if available
+- stop depending on `video_views`
+- use `views` for video/reel media
+- use `reach` for per-post reach
+- do not request deprecated `impressions` for media-level metrics where it can fail
 
-### 4. Add `account_type` column to `profiles` table
+2. For each media item:
+- request insights using supported metrics per media type
+- for REELS/VIDEO: fetch `views,reach,saved`
+- for FEED image/carousel posts: fetch `reach,saved`
+- gracefully skip unsupported metrics per media type instead of failing the whole sync
 
-**Migration**: `ALTER TABLE profiles ADD COLUMN account_type text DEFAULT 'business'`
+3. Persist per-post fields consistently into `top_content`:
+- `reach`
+- `video_views` (mapped from `views`)
+- `media_type`
+- `permalink_url`
+- thumbnail/image
 
-- Set during onboarding step 1 (already collected but not persisted to profiles)
-- Save it alongside `onboarding_completed` in `handleComplete`
-- For creators: the org is their personal workspace (UI hides "organisation" language)
-- For business/agency: org is their company workspace
+4. Aggregate monthly Instagram `metrics_data.video_views` from per-post `views`, not deprecated fields.
 
-### 5. Allow account type switching in Settings
+Expected outcome:
+- Instagram platform card shows real video views
+- Instagram top posts table shows reach and views
+- hero video widget can include Instagram
 
-Add an "Account Type" selector to the Account settings section. Changing from creator → agency (or vice versa) just updates `profiles.account_type`. No structural changes needed since everyone has an org regardless.
+### B. Rebuild Facebook per-post metrics for reliability
+File: `supabase/functions/sync-facebook-page/index.ts`
 
-### 6. Update `useOrg` hook with recovery
+1. Stop trusting the current inline `published_posts ... insights.metric(...)` result as the single source for reach.
+2. For each post returned from `published_posts`:
+- fetch post insights directly from `/{post-id}/insights`
+- read `post_impressions_unique` for post reach
+- read `post_clicks` for clicks
+- for video/reel posts, fetch video-related metrics only when supported
 
-If `org_members` query returns no rows, attempt to create an org for the user (recovery path). This catches any edge cases where the trigger didn't fire (e.g., users created before this change).
+3. Split Facebook video handling into:
+- per-post video views for post table rows
+- monthly aggregated video views built only from posts created in the selected month, not page lifetime video totals
 
-### 7. Fix the "Founder" plan for ms@redigital.dk
+4. If page/reel/video endpoints return different supported metrics, normalize all of them into:
+- `reach`
+- `video_views`
+for storage in `top_content`
 
-The admin panel already supports subscription overrides. The Founder plan should be created as a hidden `subscription_plans` row (slug: `founder`, `is_active: false` so it doesn't show in pricing), or simply use the existing override mechanism (`override_max_clients: -1, override_max_connections: -1`). The admin can assign it via the org detail page.
+5. Keep page-level impression/reach logic separate from post-level reach logic so the dashboard cards and the top-post table are both correct.
 
-## Files to Modify
+Expected outcome:
+- Facebook top posts get real per-post reach
+- Facebook video posts get real per-post views
+- monthly Facebook `metrics_data.video_views` becomes period-correct
+- hero video widget can include Facebook
 
-| File | Change |
-|---|---|
-| Migration (SQL) | Update `handle_new_user()` trigger to create org + membership + starter plan. Add `account_type` to profiles. |
-| `src/pages/LandingPage.tsx` | Remove org/membership/subscription creation from OTP handler. Just navigate to onboarding. |
-| `src/pages/Index.tsx` | Add org recovery check before onboarding check. |
-| `src/hooks/useOrg.ts` | Add recovery: if no membership found, create org for user. |
-| `src/pages/OnboardingPage.tsx` | Save `accountType` to `profiles.account_type` in `handleComplete`. |
-| `src/components/settings/AccountSection.tsx` | Add account type selector (Creator/Business/Agency). |
+### C. Verify YouTube pipeline and lock it down
+Files:
+- `supabase/functions/sync-youtube/index.ts`
+- `src/components/clients/ClientDashboard.tsx`
+- `src/components/clients/dashboard/PlatformSection.tsx`
 
-## Technical Flow After Changes
+1. Keep YouTube using monthly analytics `views` as `video_views`.
+2. Make the sync set `video_views` even if channel statistics fetch fails.
+3. Confirm hero aggregation only sums `metrics_data.video_views` from snapshots.
+4. Confirm top videos table prefers monthly row `views` and does not mix lifetime stats.
 
+Expected outcome:
+- no regression on YouTube
+- hero widget continues to show YouTube only when it genuinely has data
+- once IG/FB are fixed, their icons will appear too
+
+### D. Normalize social top-content shape across platforms
+Files:
+- `supabase/functions/sync-instagram/index.ts`
+- `supabase/functions/sync-facebook-page/index.ts`
+- possibly small UI-only adjustments in `PlatformSection.tsx`
+
+Standardize stored post objects so Facebook and Instagram both always provide:
 ```text
-Signup → auth.users INSERT → handle_new_user trigger:
-  1. Create profile
-  2. Create org (from company_name or full_name)
-  3. Create org_members (owner)
-  4. Set profile.org_id
-  5. Assign Starter plan
-  
-OTP Verify → navigate to /onboarding (no DB writes needed)
-
-Dashboard → recovery check → onboarding check → render
+message/caption
+created_time/timestamp
+full_picture
+permalink_url
+likes
+comments
+shares/saves
+reach
+video_views
+total_engagement
+media_type
 ```
 
-## What This Fixes
-- ms@redigital.dk and any other users with missing orgs get auto-recovered
-- New signups can never end up without an org
-- Creators don't need to think about "organisations" — they just have a personal workspace
-- Account type is switchable without data migration
-- Plans remain on orgs (which is correct for multi-user agencies) but feel user-level since each user owns one org
+This removes mismatch bugs in the shared top-post table.
 
+### E. Keep the UI minimal and correct
+Files:
+- `src/components/clients/dashboard/PlatformSection.tsx`
+- `src/components/clients/ClientDashboard.tsx`
+
+UI changes should be small:
+1. Keep the top-posts table using `reach` and `video_views`.
+2. Ensure zero is shown as `0` only when a post truly has a known zero, and show `—` when metric is unavailable.
+3. Do not change widget logic beyond what is needed for correct source aggregation.
+
+## Data repair / resync plan
+
+After code changes, I would re-sync these platforms for the affected client:
+1. Instagram
+2. Facebook
+3. YouTube verification pass
+
+Because old snapshots already contain bad stored values:
+- Instagram `video_views: 0`
+- Facebook post `reach: 0`
+- Facebook monthly `video_views: 0`
+
+So a resync is required to repair historical monthly snapshots.
+
+## Technical notes
+
+```text
+Current confirmed problems:
+- Instagram uses deprecated `video_views`
+- Instagram does not persist per-post reach
+- Facebook per-post reach currently stores as 0
+- Facebook monthly video views use the wrong source
+- YouTube monthly totals look correct in stored data
+```
+
+```text
+Primary files to update:
+- supabase/functions/sync-instagram/index.ts
+- supabase/functions/sync-facebook-page/index.ts
+- supabase/functions/sync-youtube/index.ts
+- src/components/clients/dashboard/PlatformSection.tsx
+- src/components/clients/ClientDashboard.tsx
+```
+
+## Scope for this iteration
+I will focus only on:
+- Facebook video views
+- Instagram video views
+- YouTube verification/no-regression
+- individual post reach for Facebook and Instagram
+- hero widget source correctness for video views
+
+I will not touch unrelated integrations in this pass.
