@@ -14,7 +14,7 @@ interface DashboardGridProps {
 
 const COLS = 12;
 const GAP = 16;
-const ROW_H = 72;
+const ROW_H = 80;
 const MIN_W = 2;
 const MIN_H = 2;
 const MAX_W = 12;
