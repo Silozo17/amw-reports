@@ -220,19 +220,19 @@ function generateDefaultWidgets(
     y += 5;
   }
   if (hasGscData) {
-    widgets.push({ id: 'table-gsc-queries', dataSource: 'table-gsc-queries', label: 'Top Search Queries', description: 'Search terms people used to find your website', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
-    widgets.push({ id: 'table-gsc-pages', dataSource: 'table-gsc-pages', label: 'Top Pages (Search)', description: 'Pages that received the most search traffic', type: 'table', category: 'table', visible: true, position: { x: 6, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-gsc-queries', dataSource: 'table-gsc-queries', label: 'Top Search Queries', description: 'Search terms people used to find your website', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_search_console' });
+    widgets.push({ id: 'table-gsc-pages', dataSource: 'table-gsc-pages', label: 'Top Pages (Search)', description: 'Pages that received the most search traffic', type: 'table', category: 'table', visible: true, position: { x: 6, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_search_console' });
     y += 4;
   }
   if (hasGaPages) {
-    widgets.push({ id: 'table-ga-pages', dataSource: 'table-ga-pages', label: 'Top Pages (Analytics)', description: 'Pages that received the most traffic', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-ga-pages', dataSource: 'table-ga-pages', label: 'Top Pages (Analytics)', description: 'Pages that received the most traffic', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_analytics' });
   }
   if (hasGaSources) {
-    widgets.push({ id: 'table-ga-sources', dataSource: 'table-ga-sources', label: 'Traffic Sources', description: 'Where your website visitors come from', type: 'table', category: 'table', visible: true, position: { x: hasGaPages ? 6 : 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-ga-sources', dataSource: 'table-ga-sources', label: 'Traffic Sources', description: 'Where your website visitors come from', type: 'table', category: 'table', visible: true, position: { x: hasGaPages ? 6 : 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_analytics' });
   }
   if (hasGaPages || hasGaSources) y += 4;
   if (hasYtVideos) {
-    widgets.push({ id: 'table-yt-videos', dataSource: 'table-yt-videos', label: 'Top Videos', description: 'Your best-performing YouTube videos', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 12, h: 4, minW: 6, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-yt-videos', dataSource: 'table-yt-videos', label: 'Top Videos', description: 'Your best-performing YouTube videos', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 12, h: 4, minW: 6, minH: 3 }, compatibleTypes: ['table'], platform: 'youtube' });
     y += 4;
   }
 
