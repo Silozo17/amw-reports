@@ -1027,7 +1027,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           )}
 
           <DashboardGrid
-            widgets={widgets}
+            widgets={sortedWidgets}
             dataMap={widgetDataMap}
             onLayoutChange={handleLayoutChange}
             onTypeChange={handleWidgetTypeChange}
