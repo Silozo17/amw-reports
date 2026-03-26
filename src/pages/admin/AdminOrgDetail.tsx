@@ -180,6 +180,7 @@ const AdminOrgDetail = () => {
             <TabsTrigger value="subscription">Subscription</TabsTrigger>
             <TabsTrigger value="clients">Clients ({clients.length})</TabsTrigger>
             <TabsTrigger value="members">Members ({members.length})</TabsTrigger>
+            <TabsTrigger value="onboarding">Onboarding Data</TabsTrigger>
           </TabsList>
 
           {/* SUBSCRIPTION TAB */}

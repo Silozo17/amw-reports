@@ -150,6 +150,17 @@ const Dashboard = () => {
     return <Mail className="h-3.5 w-3.5" />;
   };
 
+  if (!onboardingChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <h1 className="text-2xl font-display text-primary">AMW</h1>
+          <p className="text-sm text-muted-foreground mt-2">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-8">
