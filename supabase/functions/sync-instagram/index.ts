@@ -50,7 +50,6 @@ Deno.serve(async (req) => {
       throw new Error("Instagram connection is not authenticated. Please connect via OAuth first.");
     }
 
-    // Token expiry check
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
       await supabaseClient.from("platform_connections")
         .update({ last_error: "Token expired. Please reconnect.", last_sync_status: "failed" })
@@ -58,13 +57,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // IG accounts are stored directly on this instagram connection's metadata
     const metadata = conn.metadata as any;
     const igAccounts = (metadata?.ig_accounts || [])
       .filter((ig: any) => ig.id && ig.page_token)
       .map((ig: any) => ({ ig_id: ig.id, ig_username: ig.username, page_token: ig.page_token }));
 
-    const connMetadata = conn.metadata as any;
     const targetIgId = conn.account_id;
     const filteredAccounts = targetIgId ? igAccounts.filter((ig: any) => ig.ig_id === targetIgId) : igAccounts;
 
@@ -72,11 +69,9 @@ Deno.serve(async (req) => {
       throw new Error("No Instagram Business accounts found. Please reconnect Instagram and ensure your Facebook Pages have linked Instagram accounts.");
     }
 
-    // Get org_id from client
     const { data: clientData } = await supabaseClient.from("clients").select("org_id").eq("id", clientId).single();
     const orgId = clientData?.org_id;
 
-    // Create sync log
     const { data: syncLog } = await supabaseClient
       .from("sync_logs")
       .insert({ client_id: clientId, platform: "instagram", status: "running", report_month: month, report_year: year, org_id: orgId })
@@ -87,8 +82,7 @@ Deno.serve(async (req) => {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-    // Build date ranges for IG insights (API limit: ≤30 days per request)
-    // Split month into two halves to stay within the limit
+    // Split month into two halves for IG insights (API limit: ≤30 days)
     const midDay = Math.min(15, lastDay);
     const midDate = `${year}-${String(month).padStart(2, "0")}-${String(midDay).padStart(2, "0")}`;
     const dateRanges = [
@@ -96,7 +90,6 @@ Deno.serve(async (req) => {
       { since: Math.floor(new Date(midDate + "T00:00:00Z").getTime() / 1000) + 86400, until: Math.floor(new Date(endDate + "T23:59:59Z").getTime() / 1000) },
     ].filter(r => r.since <= r.until);
 
-    let totalImpressions = 0;
     let totalReach = 0;
     let totalProfileViews = 0;
     let totalFollowerCount = 0;
@@ -107,8 +100,7 @@ Deno.serve(async (req) => {
     for (const ig of filteredAccounts) {
       const { ig_id, page_token } = ig;
 
-      // Fetch IG User Insights (only non-deprecated metrics) — split by date ranges
-      const metricsMap: Record<string, number> = {};
+      // Fetch IG User Insights: reach (day period)
       try {
         for (const range of dateRanges) {
           const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach&period=day&since=${range.since}&until=${range.until}&access_token=${page_token}`;
@@ -121,28 +113,24 @@ Deno.serve(async (req) => {
           if (insightsData.data) {
             for (const metric of insightsData.data) {
               const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-              metricsMap[metric.name] = (metricsMap[metric.name] || 0) + total;
+              globalMetricsMap[metric.name] = (globalMetricsMap[metric.name] || 0) + total;
             }
           }
         }
-        totalReach += metricsMap.reach || 0;
-        totalImpressions = totalReach;
-        for (const [k, v] of Object.entries(metricsMap)) {
-          globalMetricsMap[k] = (globalMetricsMap[k] || 0) + v;
-        }
+        totalReach += globalMetricsMap.reach || 0;
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
-        console.error(`Sync error:`, errorMsg);
+        console.error(`IG insights sync error:`, errorMsg);
         await supabaseClient.from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
 
-      // Fetch profile_views separately (requires metric_type=total_value)
+      // Fetch profile_views (metric_type=total_value)
       try {
         for (const range of dateRanges) {
-          const profileViewsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=profile_views&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
-          const pvRes = await fetch(profileViewsUrl);
+          const pvUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=profile_views&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const pvRes = await fetch(pvUrl);
           if (pvRes.ok) {
             const pvData = await pvRes.json();
             const pvValue = pvData?.data?.[0]?.total_value?.value || 0;
@@ -152,11 +140,11 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // Fetch website_clicks separately (different metric_type)
+      // Fetch website_clicks (metric_type=total_value)
       try {
         for (const range of dateRanges) {
-          const websiteClicksUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=website_clicks&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
-          const wcRes = await fetch(websiteClicksUrl);
+          const wcUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=website_clicks&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const wcRes = await fetch(wcUrl);
           if (wcRes.ok) {
             const wcData = await wcRes.json();
             const wcValue = wcData?.data?.[0]?.total_value?.value || 0;
@@ -165,81 +153,96 @@ Deno.serve(async (req) => {
         }
       } catch {} // non-blocking
 
-      // Fetch follower count and media count from user profile
+      // Fetch follower count and media count
       try {
-        const userRes = await fetch(`${GRAPH_BASE}/${ig_id}?fields=followers_count,media_count,website&access_token=${page_token}`);
-        if (!userRes.ok) {
-          const errorBody = await userRes.text();
-          throw new Error(`API error (${userRes.status}): ${errorBody}`);
+        const userRes = await fetch(`${GRAPH_BASE}/${ig_id}?fields=followers_count,media_count&access_token=${page_token}`);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          if (userData.followers_count) totalFollowerCount += userData.followers_count;
+          if (userData.media_count) totalMediaCount += userData.media_count;
         }
-        const userData = await userRes.json();
-        if (userData.followers_count) {
-          totalFollowerCount += userData.followers_count;
-        }
-        if (userData.media_count) {
-          totalMediaCount += userData.media_count;
-        }
-      } catch (pageError) {
-        const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
-        console.error(`Sync error:`, errorMsg);
-        await supabaseClient.from("platform_connections")
-          .update({ last_error: errorMsg, last_sync_status: "partial" })
-          .eq("id", connectionId);
+      } catch (e) {
+        console.error("IG profile fetch error:", e instanceof Error ? e.message : e);
       }
 
-      // Fetch top media with expanded fields
+      // Fetch media posted in the month
       try {
-        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,media_url,thumbnail_url,permalink,video_views&since=${dateRanges[0].since}&until=${dateRanges[dateRanges.length - 1].until}&limit=50&access_token=${page_token}`;
+        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,media_url,thumbnail_url,permalink,media_product_type&since=${dateRanges[0].since}&until=${dateRanges[dateRanges.length - 1].until}&limit=50&access_token=${page_token}`;
         const mediaRes = await fetch(mediaUrl);
         if (!mediaRes.ok) {
           const errorBody = await mediaRes.text();
-          throw new Error(`API error (${mediaRes.status}): ${errorBody}`);
+          throw new Error(`Media API error (${mediaRes.status}): ${errorBody}`);
         }
         const mediaData = await mediaRes.json();
 
         if (mediaData.data) {
-          // Batch fetch saves, video_views, and profile_activity for top 20 posts
-          for (const mediaItem of mediaData.data.slice(0, 20)) {
+          for (const mediaItem of mediaData.data.slice(0, 25)) {
+            const isVideo = mediaItem.media_type === 'VIDEO' || mediaItem.media_product_type === 'REELS';
+
+            // Fetch per-media insights with correct metrics per type
+            let postReach = 0;
+            let postViews = 0;
+            let postSaves = 0;
+
             try {
-              const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=saved,video_views,reach,impressions&access_token=${page_token}`;
+              // For REELS: use plays (views), reach, saved
+              // For VIDEO: use views, reach, saved
+              // For IMAGE/CAROUSEL: use reach, saved
+              const metricsToFetch = isVideo
+                ? 'plays,reach,saved'
+                : 'reach,saved';
+
+              const mediaInsightsUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=${metricsToFetch}&access_token=${page_token}`;
               const mediaInsightsRes = await fetch(mediaInsightsUrl);
+
               if (mediaInsightsRes.ok) {
                 const mediaInsightsData = await mediaInsightsRes.json();
                 for (const insight of mediaInsightsData.data || []) {
-                  if (insight.name === 'saved') mediaItem.saves = insight.values?.[0]?.value || 0;
-                  if (insight.name === 'video_views') mediaItem.video_views_insight = insight.values?.[0]?.value || 0;
-                  if (insight.name === 'profile_activity') mediaItem.profile_activity = insight.values?.[0]?.value || 0;
+                  const val = insight.values?.[0]?.value || 0;
+                  if (insight.name === 'reach') postReach = val;
+                  if (insight.name === 'saved') postSaves = val;
+                  if (insight.name === 'plays') postViews = val;
+                }
+              } else {
+                // Fallback: try older metric names
+                const fallbackUrl = `${GRAPH_BASE}/${mediaItem.id}/insights?metric=reach,saved&access_token=${page_token}`;
+                const fallbackRes = await fetch(fallbackUrl);
+                if (fallbackRes.ok) {
+                  const fallbackData = await fallbackRes.json();
+                  for (const insight of fallbackData.data || []) {
+                    const val = insight.values?.[0]?.value || 0;
+                    if (insight.name === 'reach') postReach = val;
+                    if (insight.name === 'saved') postSaves = val;
+                  }
                 }
               }
-            } catch {} // non-blocking
-          }
+            } catch {} // non-blocking per-post
 
-          for (const m of mediaData.data) {
             allTopMedia.push({
-              caption: (m.caption || "").substring(0, 100),
-              timestamp: m.timestamp,
-              likes: m.like_count || 0,
-              comments: m.comments_count || 0,
-              saves: m.saves || 0,
-              video_views: m.video_views || m.video_views_insight || 0,
-              profile_activity: m.profile_activity || 0,
-              media_type: m.media_type,
-              full_picture: m.media_url || m.thumbnail_url || null,
-              permalink_url: m.permalink || null,
-              total_engagement: (m.like_count || 0) + (m.comments_count || 0) + (m.saves || 0),
+              caption: (mediaItem.caption || "").substring(0, 100),
+              timestamp: mediaItem.timestamp,
+              likes: mediaItem.like_count || 0,
+              comments: mediaItem.comments_count || 0,
+              saves: postSaves,
+              video_views: postViews,
+              reach: postReach,
+              media_type: mediaItem.media_type,
+              full_picture: mediaItem.media_url || mediaItem.thumbnail_url || null,
+              permalink_url: mediaItem.permalink || null,
+              total_engagement: (mediaItem.like_count || 0) + (mediaItem.comments_count || 0) + postSaves,
             });
           }
         }
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
-        console.error(`Sync error:`, errorMsg);
+        console.error(`IG media sync error:`, errorMsg);
         await supabaseClient.from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
     }
 
-    // Aggregate media metrics
+    // Aggregate metrics from posts
     const totalLikes = allTopMedia.reduce((sum, m) => sum + (m.likes || 0), 0);
     const totalComments = allTopMedia.reduce((sum, m) => sum + (m.comments || 0), 0);
     const totalSaves = allTopMedia.reduce((sum, m) => sum + (m.saves || 0), 0);
@@ -252,8 +255,13 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.total_engagement - a.total_engagement)
       .slice(0, 10);
 
+    const postsInMonth = allTopMedia.filter(m => {
+      const d = new Date(m.timestamp);
+      return d.getFullYear() === year && d.getMonth() + 1 === month;
+    }).length;
+
     const metricsData: Record<string, number> = {
-      impressions: totalImpressions,
+      impressions: totalReach, // IG reach ≈ impressions for organic
       reach: totalReach,
       profile_visits: totalProfileViews,
       website_clicks: globalMetricsMap['website_clicks'] || 0,
@@ -262,10 +270,7 @@ Deno.serve(async (req) => {
       comments: totalComments,
       saves: totalSaves,
       video_views: totalVideoViews,
-      posts_published: allTopMedia.filter(m => {
-        const d = new Date(m.timestamp);
-        return d.getFullYear() === year && d.getMonth() + 1 === month;
-      }).length,
+      posts_published: postsInMonth,
       reel_count: reelCount,
       image_count: imageCount,
       carousel_count: carouselCount,
@@ -299,8 +304,10 @@ Deno.serve(async (req) => {
       await supabaseClient.from("sync_logs").update({ status: "success", completed_at: new Date().toISOString() }).eq("id", syncLog.id);
     }
 
+    console.log(`Instagram sync complete. video_views=${totalVideoViews}, reach=${totalReach}, posts=${allTopMedia.length}`);
+
     return new Response(
-      JSON.stringify({ success: true, metrics: metricsData, accounts_synced: igAccounts.length }),
+      JSON.stringify({ success: true, metrics: metricsData, accounts_synced: filteredAccounts.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
