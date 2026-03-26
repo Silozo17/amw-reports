@@ -116,9 +116,7 @@ Deno.serve(async (req) => {
         comments: row[3] || 0,
         shares: row[4] || 0,
         subscribers: (row[5] || 0) - (row[6] || 0),
-        impressions: row[7] || 0,
-        ctr: (row[8] || 0) * 100,
-        avg_view_duration: row[9] || 0,
+        avg_view_duration: row[7] || 0,
       };
 
       // Fetch channel stats for total subscriber count
