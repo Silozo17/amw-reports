@@ -241,6 +241,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
         const a = { ...metrics };
         if (a.spend && a.clicks) a.cpc = a.spend / a.clicks;
         if (a.spend && a.conversions) a.cost_per_conversion = a.spend / a.conversions;
+        if (a.spend && a.leads) a.cost_per_lead = a.spend / a.leads;
         if (a.clicks && a.impressions) a.ctr = (a.clicks / a.impressions) * 100;
         if (a.engagement && a.impressions) a.engagement_rate = (a.engagement / a.impressions) * 100;
         return { platform, metrics_data: a, report_month: month, report_year: year };

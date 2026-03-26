@@ -83,7 +83,7 @@ const applyBranding = (org: PortalOrg) => {
 };
 
 const formatMetricValue = (key: string, val: number, currSymbol: string): string => {
-  if (key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm') {
+  if (key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cost_per_lead' || key === 'cpm') {
     return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (key === 'ctr' || key === 'engagement_rate' || key === 'conversion_rate' || key === 'audience_growth_rate' || key === 'bounce_rate' || key === 'search_ctr' || key === 'completion_rate') {
@@ -100,7 +100,7 @@ const METRIC_LABELS_MAP: Record<string, string> = {
   total_followers: 'Followers', follower_growth: 'Growth', engagement: 'Engagement',
   engagement_rate: 'Eng. Rate', likes: 'Likes', comments: 'Comments', shares: 'Shares',
   video_views: 'Video Views', posts_published: 'Posts', cost_per_conversion: 'Cost/Conv',
-  conversion_rate: 'Conv. Rate', leads: 'Leads', saves: 'Saves',
+  cost_per_lead: 'Cost/Lead', conversion_rate: 'Conv. Rate', leads: 'Leads', saves: 'Saves',
   profile_visits: 'Profile Visits', page_likes: 'Page Likes', page_views: 'Page Views',
   link_clicks: 'Link Clicks', audience_growth_rate: 'Audience Growth',
   sessions: 'Sessions', active_users: 'Active Users', new_users: 'New Users',
@@ -303,7 +303,7 @@ const ClientPortal = () => {
                     {metrics.map(([key, val]) => {
                       const prevVal = prevSnapshot?.metrics_data[key];
                       const change = prevVal && prevVal !== 0 ? ((val - prevVal) / prevVal) * 100 : undefined;
-                      const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
+                      const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cost_per_lead' || key === 'cpm';
                       const isGood = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
 
                       return (
