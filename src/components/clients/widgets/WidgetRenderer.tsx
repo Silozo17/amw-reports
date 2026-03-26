@@ -466,7 +466,7 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
       </CardHeader>
       <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0">
         {type === 'number' && <NumberWidget data={data} />}
-        {type === 'table' && <TableWidget data={data} />}
+        {type === 'table' && <TableWidget data={data} widgetId={widget.id} />}
         {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
           <SparklineChart data={data} type={type} />
         )}
