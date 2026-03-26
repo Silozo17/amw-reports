@@ -1,81 +1,76 @@
 
 
-## Two Major Gaps to Fix
+# Data Integrity Audit & Fixes
 
-### Issue 1: Onboarding Doesn't Set Up Organisation
+## Issues Found
 
-**Current flow:** Signup collects company name → OTP verifies → org is auto-created from `companyName` during OTP verification → onboarding wizard starts. The onboarding wizard only asks marketing questions (account type, platforms, client count, reason, referral). It never lets the user configure their organisation name, upload a logo, or set branding.
+### 1. YouTube `video_views` stores ALL-TIME channel views, not monthly
+**File:** `supabase/functions/sync-youtube/index.ts` line 141
+```typescript
+metricsData.video_views = parseInt(channelData.items[0].statistics.viewCount || "0", 10);
+```
+This fetches the **lifetime total view count** from the YouTube channel statistics API (e.g. 13,000+) and stores it as `video_views`. This is wrong — it should use the monthly `views` value from YouTube Analytics (line 113: `views: row[0] || 0`) which is the actual monthly view count (316).
 
-**Fix:** Add a new step between the current Step 1 (account type) and Step 2 (platforms) that lets users set up their organisation. This step will:
-- Pre-fill org name from what they entered at signup
-- Let them edit the org name
-- Upload an org logo (to `org-assets` bucket)
-- Optionally set brand colours (primary, secondary, accent)
-- Save to the `organisations` table on continue
+**Fix:** Change `video_views` to use the monthly analytics value instead of the all-time channel stat:
+```typescript
+// Remove: metricsData.video_views = parseInt(channelData.items[0].statistics.viewCount)
+// The monthly views from analytics (line 113) IS the correct video views for the period
+metricsData.video_views = metricsData.views; // already set on line 113
+```
 
-**File:** `src/pages/OnboardingPage.tsx`
-- Increase `TOTAL_STEPS` from 6 to 7
-- Insert new Step 2: "Set up your organisation" with fields for org name, logo upload, and optional brand colour pickers
-- Shift all subsequent steps by 1 (current step 2→3, 3→4, etc.)
-- On "Continue" from org step, update `organisations` table with name/logo/colours
-- Fetch current org data on mount to pre-fill
+### 2. Facebook platform section doesn't show `video_views` metric
+**File:** `src/components/clients/dashboard/PlatformSection.tsx` line 78
+`SOCIAL_KEY_METRICS` does not include `video_views`. Facebook sync DOES store `video_views` (line 307 of sync function), but the dashboard hides it because it's not in the key metrics list.
 
-### Issue 2: Admin User & Org Management Is Incomplete
+**Fix:** Add `video_views` to `SOCIAL_KEY_METRICS`:
+```typescript
+const SOCIAL_KEY_METRICS = ['reach', 'impressions', 'engagement', 'likes', 'comments', 'shares', 'total_followers', 'follower_growth', 'profile_visits', 'website_clicks', 'video_views', 'saves', 'reel_count'];
+```
 
-**Current state:**
-- `AdminUserList`: Only shows user table with deactivate and delete. No editing of name, email, password reset, or org reassignment.
-- `AdminOrgDetail`: Manages subscription, views clients, views members (remove only), views onboarding data. No editing of org name, no editing of member details.
-- No way to edit a user's profile (name, email, position, phone)
-- No way to reset a user's password
-- No way to edit an organisation's name or details from admin
+Also add `video_views` to `YOUTUBE_KEY_METRICS`:
+```typescript
+const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers', 'likes', 'comments', 'avg_view_duration'];
+```
 
-**Fix — AdminUserList enhancements:**
+### 3. GSC CTR stored as decimal but displayed as percentage
+**File:** `supabase/functions/sync-google-search-console/index.ts` line 152
+The GSC API returns CTR as a decimal (e.g. 0.008 = 0.8%). The sync stores it raw: `search_ctr: avgCtr`.
 
-Add an "Edit User" dialog (triggered by a pencil icon per row) with:
-- Edit full name, email, phone, position
-- Change organisation assignment (dropdown of all orgs)
-- Change role (owner/manager)
-- Save updates to `profiles` and `org_members` tables
+**File:** `src/components/clients/dashboard/PlatformSection.tsx` line 98/103
+The display code treats `search_ctr` as already a percentage and just appends `%`, showing `0.0%` instead of `0.8%`.
 
-Add a "Reset Password" action:
-- Create a new edge function `admin-reset-password` that uses the service role key to call `supabase.auth.admin.updateUser()` with a new generated password, or sends a password reset email
-- Button in the user row triggers this, shows the temporary password or confirms email sent
+**Fix:** Convert CTR to percentage during sync:
+```typescript
+search_ctr: avgCtr * 100, // API returns decimal, store as percentage
+```
 
-**Fix — AdminOrgDetail enhancements:**
+### 4. GSC Average Position shows wrong value (137 vs actual 45.7)
+The GSC API query uses `rowLimit: 1` with no dimensions, which should return the aggregate. The position value 137 suggests the data is from a different period or the API is returning weighted position differently. The 3-month view in the screenshot shows 45.7.
 
-Add org detail editing:
-- Editable org name field at the top of the page
-- Save changes to `organisations` table
+**Root cause:** The dashboard is showing a single month (February 2026), not 3 months. The position for that single month could legitimately be 137 if most impressions came from low-ranking queries. However, the user's GSC screenshot shows 3 months of data. This is a data period mismatch, not a code bug. The fix for CTR will resolve the most visible issue.
 
-Add member editing within the Members tab:
-- Edit member role (owner/manager dropdown)
-- Edit member profile (name, email) inline or via dialog
+### 5. GSC chart shows only `search_clicks` — should show all 4 metrics
+**File:** `src/components/clients/dashboard/PlatformSection.tsx` line 221
+```typescript
+const chartMetricKey = ... platform === 'google_search_console' ? 'search_clicks' : ...
+```
+Only one metric is charted. The user wants all 4 GSC metrics (impressions, clicks, CTR, position) on the trend chart, similar to Google's own Performance view.
 
-**Files to modify:**
-1. `src/pages/admin/AdminUserList.tsx` — Add Edit User dialog with profile fields, org assignment, role change. Add Reset Password button and flow.
-2. `src/pages/admin/AdminOrgDetail.tsx` — Add editable org name field. Add member role editing and profile editing in Members tab.
-3. `src/pages/OnboardingPage.tsx` — Insert org setup step (step 2) with name, logo, colours.
-4. `supabase/functions/admin-reset-password/index.ts` — New edge function for password reset via service role.
+**Fix:** For GSC, render a multi-line chart with all 4 metrics instead of a single metric area chart. Add special handling in the chart section to render multiple lines for GSC.
 
-### Technical Details
+### 6. Facebook posts show `video_views` in top_content but stored differently
+Facebook sync stores video views at the aggregate level (`metricsAccum.video_views`) but does NOT store `video_views` per post in the `allTopPosts` array. Each post only has likes, comments, shares, reach, clicks.
 
-**Org setup step (onboarding):**
-- Fetch org via `profiles.org_id` → `organisations` row
-- Logo upload uses existing `org-assets` public bucket
-- Colour pickers use simple hex input fields with preview swatches
-- On continue, `supabase.from('organisations').update(...)` with the edited values
+**Fix:** Add `video_views` per-post data. Facebook posts fetched via `published_posts` don't directly have video views. We need to fetch video insights for video posts separately, similar to how Instagram does it. For posts that are videos, fetch `post_video_views` from the post insights.
 
-**Admin user edit:**
-- Profile updates: `supabase.from('profiles').update({ full_name, email, phone, position }).eq('user_id', ...)`
-- Org reassignment: Delete old `org_members` row, insert new one, update `profiles.org_id`
-- Role change: `supabase.from('org_members').update({ role }).eq('id', ...)`
+### Summary of Changes
 
-**Admin password reset edge function:**
-- Uses `SUPABASE_SERVICE_ROLE_KEY` (already available)
-- Accepts `user_id` and generates a temporary password or triggers a reset email
-- Returns result to admin UI
-- Protected: verifies caller is a platform admin
+| File | Change |
+|---|---|
+| `supabase/functions/sync-youtube/index.ts` | Use monthly `views` for `video_views` instead of all-time channel stats |
+| `supabase/functions/sync-google-search-console/index.ts` | Multiply CTR by 100 before storing |
+| `supabase/functions/sync-facebook-page/index.ts` | Add per-post video view count from post insights |
+| `src/components/clients/dashboard/PlatformSection.tsx` | Add `video_views` to social key metrics; add multi-line GSC chart |
 
-**Admin org name edit:**
-- Simple input field bound to org name, save button calls `supabase.from('organisations').update({ name }).eq('id', ...)`
+After deploying these fixes, a re-sync of YouTube, GSC, and Facebook will be needed to correct the stored data.
 
