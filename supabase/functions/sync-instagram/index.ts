@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
 
       // Fetch top media with expanded fields
       try {
-        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,video_views,thumbnail_url&since=${dateRanges[0].since}&until=${dateRanges[dateRanges.length - 1].until}&limit=50&access_token=${page_token}`;
+        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,media_url,thumbnail_url,permalink,video_views&since=${dateRanges[0].since}&until=${dateRanges[dateRanges.length - 1].until}&limit=50&access_token=${page_token}`;
         const mediaRes = await fetch(mediaUrl);
         if (!mediaRes.ok) {
           const errorBody = await mediaRes.text();
