@@ -17,6 +17,7 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
   google_analytics: "sync-google-analytics",
   google_business_profile: "sync-google-business-profile",
   youtube: "sync-youtube",
+  pinterest: "sync-pinterest",
 };
 
 Deno.serve(async (req) => {

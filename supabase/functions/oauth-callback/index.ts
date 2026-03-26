@@ -74,6 +74,8 @@ Deno.serve(async (req) => {
       await handleGoogleBusinessProfile(supabase, authCode, connectionId, supabaseUrl);
     } else if (platform === "youtube") {
       await handleYouTube(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "pinterest") {
+      await handlePinterest(supabase, authCode, connectionId, supabaseUrl);
     } else {
       throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -853,6 +855,69 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
       account_name: autoName,
       account_id: autoId,
       metadata: { scope: tokenData.scope, token_type: tokenData.token_type, channels, discovery_error: discoveryError },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
+// ── Pinterest ──
+async function handlePinterest(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const appId = "1556588";
+  const appSecret = Deno.env.get("PINTEREST_APP_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+  const basicAuth = btoa(`${appId}:${appSecret}`);
+
+  const tokenRes = await fetch("https://api.pinterest.com/v5/oauth/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  const tokenData = await tokenRes.json();
+  console.log("Pinterest token response:", JSON.stringify(tokenData));
+  if (!tokenRes.ok || tokenData.code) {
+    throw new Error(tokenData.message || `Pinterest token exchange failed (${tokenRes.status})`);
+  }
+
+  const accessToken = tokenData.access_token;
+  const refreshToken = tokenData.refresh_token || null;
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in || 2592000) * 1000).toISOString();
+
+  // Fetch user account info
+  let username = "Pinterest User";
+  let accountId = "";
+  try {
+    const userRes = await fetch("https://api.pinterest.com/v5/user_account", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const userData = await userRes.json();
+    console.log("Pinterest user account:", JSON.stringify(userData));
+    username = userData.username || userData.business_name || "Pinterest User";
+    accountId = userData.username || "";
+  } catch (e) {
+    console.warn("Could not fetch Pinterest user info:", e);
+  }
+
+  // Pinterest returns a single user account — auto-select
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_id: accountId,
+      account_name: username,
+      metadata: { token_type: "bearer", accounts: [{ id: accountId, name: username }] },
     })
     .eq("id", connectionId);
 
