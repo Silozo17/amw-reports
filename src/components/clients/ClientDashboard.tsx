@@ -242,34 +242,81 @@ function generateDefaultWidgets(
   }
 
   // Platform metric widgets
-  for (const snapshot of filtered) {
-    const platform = snapshot.platform;
-    const isOrganic = ORGANIC_PLATFORMS.has(platform);
-    const config = platformConfigs.get(platform);
-    const enabledMetrics = config?.enabled_metrics;
+  if (viewMode === 'compact') {
+    // Group metrics by key across all platforms
+    const metricMap = new Map<string, { platforms: PlatformType[]; label: string }>();
+    for (const snapshot of filtered) {
+      const platform = snapshot.platform;
+      const isOrganic = ORGANIC_PLATFORMS.has(platform);
+      const config = platformConfigs.get(platform);
+      const enabledMetrics = config?.enabled_metrics;
+
+      for (const [key, val] of Object.entries(snapshot.metrics_data)) {
+        if (typeof val !== 'number') continue;
+        if (HIDDEN_METRICS.has(key)) continue;
+        if (isOrganic && AD_METRICS.has(key)) continue;
+        if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
+
+        const existing = metricMap.get(key);
+        if (existing) {
+          if (!existing.platforms.includes(platform)) existing.platforms.push(platform);
+        } else {
+          metricMap.set(key, {
+            platforms: [platform],
+            label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          });
+        }
+      }
+    }
+
     let pIdx = 0;
-
-    for (const [key, val] of Object.entries(snapshot.metrics_data)) {
-      if (typeof val !== 'number') continue;
-      if (HIDDEN_METRICS.has(key)) continue;
-      if (isOrganic && AD_METRICS.has(key)) continue;
-      if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
-
+    for (const [key, info] of metricMap) {
       widgets.push({
-        id: `platform-${platform}-${key}`,
-        dataSource: `platform-${platform}-${key}`,
-        label: `${PLATFORM_LABELS[platform]} — ${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
+        id: `compact-${key}`,
+        dataSource: `compact-${key}`,
+        label: info.label,
         description: METRIC_EXPLANATIONS[key] || '',
         type: 'number',
         category: 'platform',
         visible: true,
         position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
         compatibleTypes: COMPATIBLE_TYPES.platform,
-        platform,
+        platformSources: info.platforms,
       });
       pIdx++;
     }
     y += Math.ceil(pIdx / 4) * 3;
+  } else {
+    // Extended mode — individual platform widgets (existing behavior)
+    for (const snapshot of filtered) {
+      const platform = snapshot.platform;
+      const isOrganic = ORGANIC_PLATFORMS.has(platform);
+      const config = platformConfigs.get(platform);
+      const enabledMetrics = config?.enabled_metrics;
+      let pIdx = 0;
+
+      for (const [key, val] of Object.entries(snapshot.metrics_data)) {
+        if (typeof val !== 'number') continue;
+        if (HIDDEN_METRICS.has(key)) continue;
+        if (isOrganic && AD_METRICS.has(key)) continue;
+        if (enabledMetrics && enabledMetrics.length > 0 && !enabledMetrics.includes(key)) continue;
+
+        widgets.push({
+          id: `platform-${platform}-${key}`,
+          dataSource: `platform-${platform}-${key}`,
+          label: `${PLATFORM_LABELS[platform]} — ${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
+          description: METRIC_EXPLANATIONS[key] || '',
+          type: 'number',
+          category: 'platform',
+          visible: true,
+          position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
+          compatibleTypes: COMPATIBLE_TYPES.platform,
+          platform,
+        });
+        pIdx++;
+      }
+      y += Math.ceil(pIdx / 4) * 3;
+    }
   }
 
   return widgets;
