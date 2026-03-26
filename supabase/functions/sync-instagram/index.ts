@@ -224,6 +224,8 @@ Deno.serve(async (req) => {
               video_views: m.video_views || m.video_views_insight || 0,
               profile_activity: m.profile_activity || 0,
               media_type: m.media_type,
+              full_picture: m.media_url || m.thumbnail_url || null,
+              permalink_url: m.permalink || null,
               total_engagement: (m.like_count || 0) + (m.comments_count || 0) + (m.saves || 0),
             });
           }
