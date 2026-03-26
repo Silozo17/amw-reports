@@ -17,6 +17,7 @@ import type { PlatformType } from '@/types/database';
 import AccountSection from '@/components/settings/AccountSection';
 import OrganisationSection from '@/components/settings/OrganisationSection';
 import BrandingSection from '@/components/settings/BrandingSection';
+import ReportSettingsSection from '@/components/settings/ReportSettingsSection';
 
 interface TeamMember {
   id: string;
@@ -135,6 +136,7 @@ const SettingsPage = () => {
         <AccountSection />
         <OrganisationSection />
         <BrandingSection />
+        <ReportSettingsSection />
 
         {/* Team Members */}
         <Card>
