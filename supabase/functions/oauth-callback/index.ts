@@ -727,10 +727,12 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
     console.log("GBP accounts:", JSON.stringify(acctData));
 
     if (!acctRes.ok) {
-      if (acctData.error?.status === "PERMISSION_DENIED" || acctRes.status === 403) {
+      if (acctRes.status === 429) {
+        discoveryError = "My Business Account Management API has 0 quota. Please request GBP API access from Google (https://docs.google.com/forms/d/e/1FAIpQLSf6sFkVvMHASmDgJlCQ4LmCTODMJkLOmBNfCtKNDm_4CanCRg/viewform) before connecting.";
+      } else if (acctData.error?.status === "PERMISSION_DENIED" || acctRes.status === 403) {
         discoveryError = "My Business Account Management API is not enabled. Please enable it in your Google Cloud Console and retry.";
       } else {
-        discoveryError = `Google Business Profile API error: ${acctData.error?.message || acctRes.statusText}`;
+        discoveryError = `Google Business Profile API error (${acctRes.status}): ${acctData.error?.message || acctRes.statusText}`;
       }
       console.error("GBP discovery error:", discoveryError);
     } else if (acctData.accounts?.length > 0) {
@@ -740,6 +742,20 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
           { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
         );
         const locData = await locRes.json();
+        console.log(`GBP locations for ${acct.name}:`, JSON.stringify(locData));
+
+        if (!locRes.ok) {
+          if (locRes.status === 403 || locData.error?.status === "PERMISSION_DENIED") {
+            discoveryError = "My Business Business Information API is not enabled. Please enable it in your Google Cloud Console.";
+          } else if (locRes.status === 429) {
+            discoveryError = "Business Information API quota exceeded. Please request GBP API access from Google.";
+          } else {
+            discoveryError = `Failed to fetch locations (${locRes.status}): ${locData.error?.message || locRes.statusText}`;
+          }
+          console.error("GBP location discovery error:", discoveryError);
+          break;
+        }
+
         if (locData.locations?.length > 0) {
           for (const loc of locData.locations) {
             const locId = loc.name;
