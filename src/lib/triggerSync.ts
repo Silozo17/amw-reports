@@ -62,7 +62,7 @@ export async function triggerSync(
 export async function triggerInitialSync(
   connectionId: string,
   platform: PlatformType,
-  months: number = 3,
+  months: number = 12,
 ): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
   const now = new Date();
