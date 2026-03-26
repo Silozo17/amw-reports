@@ -410,6 +410,7 @@ const ClientDetail = () => {
             <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
+            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
             <AlertDialog>
               <AlertDialogTrigger asChild>
