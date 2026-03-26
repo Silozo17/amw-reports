@@ -62,7 +62,6 @@ const SettingsPage = () => {
           <TabsContent value="billing" className="space-y-6 mt-6">
             <BillingSection />
           </TabsContent>
-          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>
