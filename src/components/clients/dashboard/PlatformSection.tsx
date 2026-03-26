@@ -12,7 +12,7 @@ import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff, RefreshCw, Loader2 }
 import { triggerSync } from '@/lib/triggerSync';
 import { toast } from 'sonner';
 import {
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, Legend,
 } from 'recharts';
 import {
@@ -314,49 +314,89 @@ const PlatformSection = ({
         )}
 
         {/* Trend Chart */}
-        {platform === 'google_search_console' && trendData && trendData.length > 1 ? (
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">Search Performance — Last 6 Months</p>
-            <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                  <defs>
-                    {GSC_KEY_METRICS.map((key, i) => (
-                      <linearGradient key={key} id={`grad-gsc-${key}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.15} />
-                        <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0} />
-                      </linearGradient>
-                    ))}
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--popover))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px' }} />
-                  {GSC_KEY_METRICS.map((key, i) => (
-                    <Area
-                      key={key}
-                      type="monotone"
-                      dataKey={key}
-                      name={METRIC_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                      stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                      strokeWidth={2}
-                      fill={`url(#grad-gsc-${key})`}
-                      dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+        {platform === 'google_search_console' && trendData && trendData.length > 1 ? (() => {
+          // Normalize each GSC metric independently to 0–1 so every line fills the chart height
+          const activeGscMetrics = GSC_KEY_METRICS.filter(key =>
+            trendData.some(d => typeof d[key] === 'number' && (d[key] as number) > 0)
+          );
+
+          const metricRanges: Record<string, { min: number; max: number }> = {};
+          for (const key of activeGscMetrics) {
+            const values = trendData.map(d => (typeof d[key] === 'number' ? (d[key] as number) : 0));
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            metricRanges[key] = { min, max };
+          }
+
+          const normalizedData = trendData.map(d => {
+            const normalized: Record<string, number | string> = { name: d.name };
+            for (const key of activeGscMetrics) {
+              const val = typeof d[key] === 'number' ? (d[key] as number) : 0;
+              const { min, max } = metricRanges[key];
+              const range = max - min;
+              normalized[`_norm_${key}`] = range === 0 ? 0.5 : (val - min) / range;
+              normalized[`_orig_${key}`] = val; // keep original for tooltip
+            }
+            return normalized;
+          });
+
+          const GscTooltip = ({ active, payload, label }: any) => {
+            if (!active || !payload?.length) return null;
+            return (
+              <div className="rounded-lg border bg-popover px-3 py-2 shadow-xl text-xs space-y-1">
+                <p className="font-medium text-foreground">{label}</p>
+                {payload.map((entry: any) => {
+                  const normKey = entry.dataKey as string;
+                  const origKey = normKey.replace('_norm_', '');
+                  const origValue = entry.payload[`_orig_${origKey}`] as number;
+                  const metricLabel = METRIC_LABELS[origKey] ?? origKey.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                  return (
+                    <div key={origKey} className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                      <span className="text-muted-foreground">{metricLabel}:</span>
+                      <span className="font-medium text-foreground tabular-nums">{formatMetricValue(origKey, origValue, currSymbol)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+
+          return (
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">Search Performance — Last 6 Months</p>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={normalizedData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis hide domain={[0, 1]} />
+                    <RechartsTooltip content={<GscTooltip />} />
+                    <Legend
+                      wrapperStyle={{ fontSize: '11px' }}
+                      formatter={(value: string) => {
+                        const origKey = value.replace('_norm_', '');
+                        return METRIC_LABELS[origKey] ?? origKey.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                      }}
                     />
-                  ))}
-                </AreaChart>
-              </ResponsiveContainer>
+                    {activeGscMetrics.map((key, i) => (
+                      <Line
+                        key={key}
+                        type="monotone"
+                        dataKey={`_norm_${key}`}
+                        name={`_norm_${key}`}
+                        stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+                        activeDot={{ r: 5 }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
-        ) : hasChartData && (
+          );
+        })() : hasChartData && (
           <div className="rounded-lg border bg-card p-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">{chartLabel} — Last 6 Months</p>
             <div className="h-[180px]">
