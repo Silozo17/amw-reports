@@ -134,6 +134,7 @@ const SettingsPage = () => {
 
         <AccountSection />
         <OrganisationSection />
+        <BrandingSection />
 
         {/* Team Members */}
         <Card>
