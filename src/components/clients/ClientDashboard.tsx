@@ -10,7 +10,11 @@ import {
   Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users,
   BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, TrendingUp,
   ExternalLink, FileText, Image as ImageIcon, Globe, Search, PlayCircle, Activity, Pencil, Lock,
+  ArrowUpDown,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
@@ -220,19 +224,19 @@ function generateDefaultWidgets(
     y += 5;
   }
   if (hasGscData) {
-    widgets.push({ id: 'table-gsc-queries', dataSource: 'table-gsc-queries', label: 'Top Search Queries', description: 'Search terms people used to find your website', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
-    widgets.push({ id: 'table-gsc-pages', dataSource: 'table-gsc-pages', label: 'Top Pages (Search)', description: 'Pages that received the most search traffic', type: 'table', category: 'table', visible: true, position: { x: 6, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-gsc-queries', dataSource: 'table-gsc-queries', label: 'Top Search Queries', description: 'Search terms people used to find your website', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_search_console' });
+    widgets.push({ id: 'table-gsc-pages', dataSource: 'table-gsc-pages', label: 'Top Pages (Search)', description: 'Pages that received the most search traffic', type: 'table', category: 'table', visible: true, position: { x: 6, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_search_console' });
     y += 4;
   }
   if (hasGaPages) {
-    widgets.push({ id: 'table-ga-pages', dataSource: 'table-ga-pages', label: 'Top Pages (Analytics)', description: 'Pages that received the most traffic', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-ga-pages', dataSource: 'table-ga-pages', label: 'Top Pages (Analytics)', description: 'Pages that received the most traffic', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_analytics' });
   }
   if (hasGaSources) {
-    widgets.push({ id: 'table-ga-sources', dataSource: 'table-ga-sources', label: 'Traffic Sources', description: 'Where your website visitors come from', type: 'table', category: 'table', visible: true, position: { x: hasGaPages ? 6 : 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-ga-sources', dataSource: 'table-ga-sources', label: 'Traffic Sources', description: 'Where your website visitors come from', type: 'table', category: 'table', visible: true, position: { x: hasGaPages ? 6 : 0, y, w: 6, h: 4, minW: 4, minH: 3 }, compatibleTypes: ['table'], platform: 'google_analytics' });
   }
   if (hasGaPages || hasGaSources) y += 4;
   if (hasYtVideos) {
-    widgets.push({ id: 'table-yt-videos', dataSource: 'table-yt-videos', label: 'Top Videos', description: 'Your best-performing YouTube videos', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 12, h: 4, minW: 6, minH: 3 }, compatibleTypes: ['table'] });
+    widgets.push({ id: 'table-yt-videos', dataSource: 'table-yt-videos', label: 'Top Videos', description: 'Your best-performing YouTube videos', type: 'table', category: 'table', visible: true, position: { x: 0, y, w: 12, h: 4, minW: 6, minH: 3 }, compatibleTypes: ['table'], platform: 'youtube' });
     y += 4;
   }
 
@@ -260,6 +264,7 @@ function generateDefaultWidgets(
         visible: true,
         position: { x: (pIdx % 6) * 2, y: y + Math.floor(pIdx / 6) * 2, w: 2, h: 2, minW: 2, minH: 2 },
         compatibleTypes: COMPATIBLE_TYPES.platform,
+        platform,
       });
       pIdx++;
     }
@@ -507,7 +512,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const [allPosts, setAllPosts] = useState<(TopContentItem & { platform: PlatformType })[]>([]);
 
   // Widget state
+  type SortMode = 'default' | 'platform' | 'type' | 'name';
   const [isEditMode, setIsEditMode] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('default');
   const [savedWidgetState, setSavedWidgetState] = useState<Record<string, { visible: boolean; type: WidgetType; position: { x: number; y: number; w: number; h: number } }>>({});
 
   // Load saved widget state
@@ -824,6 +831,30 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     });
   }, [defaultWidgets, savedWidgetState]);
 
+  // Sort widgets
+  const CATEGORY_ORDER: Record<string, number> = { kpi: 0, chart: 1, table: 2, platform: 3 };
+  const sortedWidgets = useMemo(() => {
+    if (sortMode === 'default') return widgets;
+    const sorted = [...widgets];
+    if (sortMode === 'platform') {
+      sorted.sort((a, b) => (a.platform ?? 'zzz').localeCompare(b.platform ?? 'zzz') || a.label.localeCompare(b.label));
+    } else if (sortMode === 'type') {
+      sorted.sort((a, b) => (CATEGORY_ORDER[a.category] ?? 9) - (CATEGORY_ORDER[b.category] ?? 9) || a.label.localeCompare(b.label));
+    } else if (sortMode === 'name') {
+      sorted.sort((a, b) => a.label.localeCompare(b.label));
+    }
+    // Recalculate positions based on sort order
+    let y = 0;
+    let x = 0;
+    return sorted.map((w) => {
+      if (x + w.position.w > 12) { x = 0; y += 2; }
+      const newW = { ...w, position: { ...w.position, x, y } };
+      x += w.position.w;
+      if (x >= 12) { x = 0; y += w.position.h; }
+      return newW;
+    });
+  }, [widgets, sortMode]);
+
   const widgetDataMap = useMemo(() => buildWidgetDataMap(
     kpis, sparklineMap, currSymbol, spendByPlatform, totalSpend,
     engagementStackedData as unknown as Array<Record<string, unknown>>,
@@ -890,6 +921,18 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+            <SelectTrigger className="w-[140px] h-8 text-xs">
+              <ArrowUpDown className="h-3 w-3 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              <SelectItem value="platform">By Platform</SelectItem>
+              <SelectItem value="type">By Type</SelectItem>
+              <SelectItem value="name">By Name</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             size="sm"
             variant={isEditMode ? "default" : "outline"}
@@ -984,7 +1027,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           )}
 
           <DashboardGrid
-            widgets={widgets}
+            widgets={sortedWidgets}
             dataMap={widgetDataMap}
             onLayoutChange={handleLayoutChange}
             onTypeChange={handleWidgetTypeChange}

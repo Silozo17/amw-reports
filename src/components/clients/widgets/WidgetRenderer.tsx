@@ -567,11 +567,19 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
   const isKpiAsChart = category === 'kpi' && type !== 'number' && type !== 'progress' && type !== 'gauge';
   const isPlatformAsChart = category === 'platform' && type !== 'number' && type !== 'progress' && type !== 'gauge';
 
+  const platformLogo = widget.platform ? PLATFORM_LOGOS[widget.platform] : undefined;
+  const platformLabel = widget.platform ? PLATFORM_LABELS[widget.platform] : undefined;
+
   return (
     <Card className={cn('h-full overflow-hidden flex flex-col', isEditMode && 'ring-2 ring-primary/20 ring-dashed')}>
       <CardHeader className="pb-1 flex flex-row items-start justify-between space-y-0 px-4 pt-3">
         <div className="space-y-0 min-w-0 flex-1">
-          <CardTitle className="text-sm font-display leading-tight tracking-wide truncate">{widget.label}</CardTitle>
+          <div className="flex items-center gap-1.5">
+            {platformLogo && (
+              <img src={platformLogo} alt={platformLabel ?? ''} className="h-4 w-4 object-contain flex-shrink-0" />
+            )}
+            <CardTitle className="text-sm font-display leading-tight tracking-wide truncate">{widget.label}</CardTitle>
+          </div>
           <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{widget.description}</p>
         </div>
         <ChartTypeSelector

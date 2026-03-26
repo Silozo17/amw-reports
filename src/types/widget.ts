@@ -21,6 +21,7 @@ export interface DashboardWidget {
   visible: boolean;
   position: WidgetPosition;
   compatibleTypes: WidgetType[];
+  platform?: string;
 }
 
 export interface WidgetData {
