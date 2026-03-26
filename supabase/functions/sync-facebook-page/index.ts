@@ -124,7 +124,6 @@ Deno.serve(async (req) => {
     // ── Accumulators ──
     let totalViews = 0;
     let totalUniqueViewers = 0;
-    let totalEngagement = 0;
     let totalCTAClicks = 0;
     let totalPageViews = 0;
     let totalLinkClicks = 0;
@@ -145,44 +144,46 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Batch 1a: Organic views only (using is_from_ads breakdown) ──
+      // ── Batch 1a: Organic views only via is_from_ads breakdown ──
       try {
         const viewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&breakdown=is_from_ads&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const viewsRes = await fetch(viewsUrl);
-        if (viewsRes.ok) {
-          const viewsData = await viewsRes.json();
-          for (const metric of (viewsData.data || [])) {
+        const viewsBody = await viewsRes.json();
+
+        console.log(`page_media_view breakdown response for ${pageId}:`, JSON.stringify(viewsBody).slice(0, 500));
+
+        if (viewsRes.ok && viewsBody.data) {
+          for (const metric of viewsBody.data) {
             if (metric.name === 'page_media_view') {
               for (const dayEntry of (metric.values || [])) {
-                // value is an object: { "true": adViews, "false": organicViews }
                 const val = dayEntry.value;
                 if (typeof val === 'object' && val !== null) {
-                  // "false" = not from ads = organic
-                  totalViews += Number(val['false'] || 0);
-                } else {
-                  // fallback: no breakdown available, use total
-                  totalViews += Number(val || 0);
+                  // Meta returns breakdown as object: { "false": organicViews, "true": adViews }
+                  // "false" = is_from_ads is false = organic only
+                  const organicDay = Number(val['false'] || val['False'] || 0);
+                  totalViews += organicDay;
                 }
+                // DO NOT fall back to total — if no breakdown, log and skip
               }
+              console.log(`Organic views accumulated for ${pageId}: ${totalViews}`);
             }
           }
+          coreInsightsFetched = true;
+        } else {
+          console.error(`page_media_view breakdown failed for ${pageId}:`, JSON.stringify(viewsBody));
         }
-        coreInsightsFetched = true;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        console.error(`Views (organic) failed page ${pageId}:`, msg);
+        console.error(`Organic views exception ${pageId}:`, err instanceof Error ? err.message : err);
       }
 
-      // ── Batch 1b: Unique viewers, engagement, CTA ──
+      // ── Batch 1b: Unique viewers, CTA ──
       try {
         const batch1b = await fetchPageInsights(pageId, pageToken, [
           "page_total_media_view_unique",
-          "page_post_engagements",
           "page_total_actions",
         ], startDate, endDate);
 
         totalUniqueViewers += sumDailyValues(batch1b, "page_total_media_view_unique");
-        totalEngagement    += sumDailyValues(batch1b, "page_post_engagements");
         totalCTAClicks     += sumDailyValues(batch1b, "page_total_actions");
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -249,21 +250,29 @@ Deno.serve(async (req) => {
             let postClicksByType: Record<string, number> = {};
             let reactionBreakdown: Record<string, number> = {};
 
-            // Call 1: Numeric metrics (always reliable)
+            // Call 1: Numeric post metrics
             try {
-              const numericRes = await fetch(
-                `${GRAPH_BASE}/${post.id}/insights?metric=post_media_view,post_clicks,post_engaged_users&access_token=${pageToken}`
-              );
-              if (numericRes.ok) {
-                const numericData = await numericRes.json();
-                for (const insight of (numericData.data || [])) {
+              const numericUrl = `${GRAPH_BASE}/${post.id}/insights?metric=post_media_view,post_clicks,post_engaged_users&access_token=${pageToken}`;
+              const numericRes = await fetch(numericUrl);
+              const numericBody = await numericRes.json();
+
+              if (numericRes.ok && numericBody.data) {
+                for (const insight of numericBody.data) {
                   const val = insight.values?.[0]?.value;
-                  if (insight.name === 'post_media_view')    postViews = Number(val || 0);
-                  if (insight.name === 'post_clicks')         postClicks = Number(val || 0);
-                  if (insight.name === 'post_engaged_users')  postEngagedUsers = Number(val || 0);
+                  if (insight.name === 'post_media_view')   postViews = Number(val || 0);
+                  if (insight.name === 'post_clicks')        postClicks = Number(val || 0);
+                  if (insight.name === 'post_engaged_users') postEngagedUsers = Number(val || 0);
                 }
+                if (postViews === 0) {
+                  console.warn(`post_media_view returned 0 for post ${post.id} — raw:`, JSON.stringify(numericBody).slice(0, 300));
+                }
+              } else {
+                // Log full error so we can see exactly why Meta rejected this
+                console.error(`Post insights FAILED for ${post.id} (${numericRes.status}):`, JSON.stringify(numericBody).slice(0, 500));
               }
-            } catch {} // non-blocking
+            } catch (err) {
+              console.error(`Post insights EXCEPTION for ${post.id}:`, err instanceof Error ? err.message : err);
+            }
 
             // Call 2: Object metrics (separate call so failure doesn't kill Call 1)
             try {
@@ -318,6 +327,10 @@ Deno.serve(async (req) => {
           .eq("id", connectionId);
       }
     }
+
+    // Engagement = reactions + comments + shares only (matches Meta Business Suite "Content interactions")
+    const totalEngagement = allTopPosts.reduce((s, p) => s + (p.reactions || 0) + (p.comments || 0) + (p.shares || 0), 0);
+    console.log(`Computed engagement from posts: ${totalEngagement}`);
 
     const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement);
 
