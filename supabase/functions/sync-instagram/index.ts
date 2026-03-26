@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
 
       // Fetch top media with expanded fields
       try {
-        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,video_views,thumbnail_url&since=${dateRanges[0].since}&until=${dateRanges[dateRanges.length - 1].until}&limit=50&access_token=${page_token}`;
+        const mediaUrl = `${GRAPH_BASE}/${ig_id}/media?fields=caption,timestamp,like_count,comments_count,media_type,media_url,thumbnail_url,permalink,video_views&since=${dateRanges[0].since}&until=${dateRanges[dateRanges.length - 1].until}&limit=50&access_token=${page_token}`;
         const mediaRes = await fetch(mediaUrl);
         if (!mediaRes.ok) {
           const errorBody = await mediaRes.text();
@@ -224,6 +224,8 @@ Deno.serve(async (req) => {
               video_views: m.video_views || m.video_views_insight || 0,
               profile_activity: m.profile_activity || 0,
               media_type: m.media_type,
+              full_picture: m.media_url || m.thumbnail_url || null,
+              permalink_url: m.permalink || null,
               total_engagement: (m.like_count || 0) + (m.comments_count || 0) + (m.saves || 0),
             });
           }
