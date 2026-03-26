@@ -1,78 +1,126 @@
 
 
-# Fix Google Integrations — Plan
+# Settings Consolidation & Profile Dropdown Plan
 
-## Summary of Issues Found
+## What Changes
 
-| Platform | Status | Root Cause |
-|---|---|---|
-| Google Ads | Working | No active campaigns since Nov 2025 — zero data is correct |
-| Google Analytics | Connected but empty | Sync has never been triggered — no snapshots exist |
-| Google Search Console | Connected but empty | Sync has never been triggered — no snapshots exist |
-| Google Business Profile | Failed to connect | `mybusinessaccountmanagement.googleapis.com` quota is 0 req/min — discovery failed during OAuth |
+### 1. Profile Dropdown Menu (replaces sidebar items)
+Remove **Settings**, **Debug**, **Logs**, and **Sign Out** from the sidebar nav. Replace with a **popover/dropdown menu** that opens when clicking the profile name/avatar area at the bottom of the sidebar.
 
-## What Needs to Happen
+Menu items:
+- **Settings** → `/settings`
+- **Logs** → `/logs`
+- **Debug** → `/debug` (owner only)
+- **Sign Out**
 
-### A. Google Business Profile (requires YOUR action first)
-1. In Google Cloud Console → APIs & Services → `Business Profile Performance API` → Quotas → **"Requests per minute"** → click the 3-dot menu → Edit → increase to at least **60**
-2. Also check `My Business Account Management API` has the same quota increase
-3. After quota is increased, delete the current GBP connection in the app and re-add it (re-do OAuth) — this will re-run discovery and find the business location
+**Files:** `src/components/layout/AppSidebar.tsx`
+- Remove Settings, Debug, Logs from `NAV_ITEMS`
+- Replace the bottom profile section with a `DropdownMenu` (from shadcn) triggered by the avatar + name
+- Display `profile.avatar_url` in the sidebar avatar (currently only shows initials)
 
-### B. Code Fix: Auto-sync on connection (prevents GA4/GSC issue from recurring)
-The real bug is that GA4 and GSC were connected but **never synced**. The platform should automatically trigger a sync when a connection is established or when an account is selected.
+### 2. Settings Page — Tab-Based Layout
+Restructure `/settings` into 4 tabs:
 
-#### Files to modify:
+**Tab 1: Organisation**
+- Organisation name, slug (from existing `OrganisationSection`)
+- Team Members section (invite, remove — from existing inline code in `SettingsPage`)
 
-**`src/components/clients/AccountPickerDialog.tsx`** — After a user selects an account (or after auto-selection in oauth-callback), trigger the sync function for the current month and previous month automatically.
+**Tab 2: Account**
+- Existing `AccountSection` (profile fields, avatar, password)
+- **New: Avatar crop dialog** — when a non-square image is selected, show a crop modal before uploading
 
-**`src/pages/clients/ClientDetail.tsx`** — After detecting `oauth_connected` or `oauth_pending_selection` query params and the account is set, invoke the sync edge function for the last 3 months to populate initial data.
+**Tab 3: White Label**
+- `BrandingSection` (logo, colours, fonts)
+- `ReportSettingsSection` (PDF report layout options)
+- `CustomDomainSection` (custom domain management)
 
-#### New helper: `src/lib/triggerSync.ts`
-```typescript
-export async function triggerInitialSync(
-  connectionId: string, 
-  platform: PlatformType,
-  months: number = 3
-) {
-  const now = new Date();
-  const promises = [];
-  for (let i = 0; i < months; i++) {
-    const d = subMonths(now, i);
-    const month = d.getMonth() + 1;
-    const year = d.getFullYear();
-    const fnName = SYNC_FUNCTION_MAP[platform];
-    if (fnName) {
-      promises.push(
-        supabase.functions.invoke(fnName, {
-          body: { connection_id: connectionId, month, year }
-        })
-      );
-    }
-  }
-  return Promise.allSettled(promises);
-}
+**Tab 4: Metrics**
+- Current "Platform Metric Defaults" section
+- **Fix:** Instead of showing ALL_METRICS (284 entries) for every platform identically, filter available metrics per platform using `ORGANIC_PLATFORMS`, `AD_METRICS`, and platform-specific metric prefixes (e.g. `gbp_*` only for GBP, `search_*` only for GSC, `ga_*` only for GA4, `subscribers`/`watch_time` only for YouTube)
+
+**Files:**
+- `src/pages/SettingsPage.tsx` — restructure into `Tabs` component with 4 tabs
+- `src/components/settings/OrganisationSection.tsx` — expand to include team members
+- `src/components/settings/AccountSection.tsx` — add crop functionality
+- New: `src/components/settings/MetricsDefaultsSection.tsx` — extracted from SettingsPage with platform-aware metric filtering
+
+### 3. Avatar Crop Function
+When user selects a profile photo that isn't 1:1:
+- Show a crop dialog using a canvas-based approach (no heavy library)
+- Allow user to position a square crop area over the image
+- Upload the cropped result
+- The cropped avatar URL reflects in the sidebar immediately (requires `useAuth` to re-fetch profile or the AccountSection to update auth context)
+
+**Implementation:** Use `HTMLCanvasElement` to crop — read the file as an image, render a crop UI with a draggable square overlay, then `canvas.toBlob()` the cropped region before uploading.
+
+**Files:**
+- New: `src/components/settings/AvatarCropDialog.tsx`
+- `src/components/settings/AccountSection.tsx` — use crop dialog instead of direct upload
+- `src/hooks/useAuth.tsx` — expose a `refetchProfile` method so avatar updates reflect in sidebar
+
+### 4. Sidebar Avatar Sync
+Currently the sidebar shows `profile?.full_name?.charAt(0)` as a text initial. Change to use `Avatar` + `AvatarImage` with `profile.avatar_url`, falling back to initials.
+
+**Files:** `src/components/layout/AppSidebar.tsx`
+
+### 5. Platform-Specific Metric Filtering
+Define a `PLATFORM_AVAILABLE_METRICS` map that specifies which metrics each platform can actually have:
+
+```text
+google_ads:              spend, impressions, clicks, ctr, conversions, cpc, cpm, roas, ...
+meta_ads:                spend, impressions, reach, clicks, ctr, conversions, cpc, cpm, ...
+facebook:                total_followers, page_likes, page_views, engagement, ...
+instagram:               total_followers, profile_visits, reach, engagement, ...
+linkedin:                total_followers, impressions, engagement, ...
+tiktok:                  video_views, profile_views, total_likes_received, ...
+google_search_console:   search_clicks, search_impressions, search_ctr, search_position, ...
+google_analytics:        sessions, active_users, new_users, bounce_rate, ...
+google_business_profile: gbp_views, gbp_searches, gbp_calls, gbp_direction_requests, ...
+youtube:                 subscribers, views, watch_time, videos_published, ...
 ```
 
-**`src/components/clients/ConnectionDialog.tsx`** — After successful OAuth redirect back, call `triggerInitialSync` for the newly connected platform.
+This replaces the current approach where every platform shows all ~80 metrics.
 
-### C. One-time fix: Manually trigger syncs for existing GA4 and GSC connections
-Since GA4 and GSC are already connected but have no data, I will add a "Sync Now" action or trigger syncs programmatically for the last 6 months for both connections:
-- GA4 connection: `be098aa8-eb14-4304-9f91-047a2c6ea84c`
-- GSC connection: `1e3e34bb-c138-4221-8c4d-60db5b0d15d3`
+**Files:**
+- `src/types/database.ts` — add `PLATFORM_AVAILABLE_METRICS` constant
+- New `src/components/settings/MetricsDefaultsSection.tsx` — use the map
 
-This can be done by invoking the edge functions directly from the client dashboard or via a manual sync button.
+### 6. Route Updates
+- Remove `/settings`, `/debug`, `/logs` from sidebar `NAV_ITEMS` (they remain as routes in `App.tsx`)
+- Keep them accessible via the profile dropdown
 
-### D. Add sync trigger to the dashboard
-Add a "Sync" button per platform section on the client dashboard so users can manually trigger a sync for any connected platform. This already partially exists but should work for all platforms.
-
-## Implementation Order
-1. Create `triggerSync.ts` helper
-2. Wire auto-sync into `AccountPickerDialog` and connection flow
-3. Add per-platform "Sync Now" button to dashboard
-4. Manually trigger GA4 + GSC syncs for the AMW Media client
+**Files:** `src/components/layout/AppSidebar.tsx`, `src/App.tsx` (no route changes, just nav)
 
 ## Technical Details
-- Sync function names map: `google_analytics` → `sync-google-analytics`, `google_search_console` → `sync-google-search-console`, etc.
-- The existing `CONNECT_FUNCTION_MAP` in `ConnectionDialog.tsx` maps platforms to connect functions; a similar `SYNC_FUNCTION_MAP` is needed
-- Token refresh is handled inside each sync function, so calling them with expired tokens is fine
+
+### Crop Dialog Approach
+Canvas-based, no external library. Steps:
+1. `FileReader.readAsDataURL()` → load into `<img>`
+2. Check if image is square — if yes, skip crop, upload directly
+3. If not square, show dialog with image + draggable square overlay
+4. On confirm, draw cropped region to canvas at 256×256, export as blob
+5. Upload blob to storage
+
+### Auth Context Update
+Add `refetchProfile` to `AuthContextType`:
+```typescript
+const refetchProfile = async () => {
+  if (!user) return;
+  const { data } = await supabase.from('profiles').select('*').eq('user_id', user.id).single();
+  setProfile(data as Profile | null);
+};
+```
+
+## Files Summary
+
+| Action | File |
+|--------|------|
+| Modify | `src/components/layout/AppSidebar.tsx` — dropdown menu, avatar image |
+| Modify | `src/pages/SettingsPage.tsx` — 4-tab layout |
+| Modify | `src/components/settings/OrganisationSection.tsx` — add team members |
+| Modify | `src/components/settings/AccountSection.tsx` — integrate crop dialog |
+| Modify | `src/hooks/useAuth.tsx` — add `refetchProfile` |
+| Modify | `src/types/database.ts` — add `PLATFORM_AVAILABLE_METRICS` |
+| Create | `src/components/settings/AvatarCropDialog.tsx` |
+| Create | `src/components/settings/MetricsDefaultsSection.tsx` |
 
