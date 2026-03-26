@@ -1,14 +1,21 @@
 
 
-# Update Reach Metric Tooltip
+# Hide Account IDs in Account Picker — Show Names Only
 
-## What changes
+## Summary
+Remove all `ID: ...` subtitle lines from the account picker dialog. Only show account names. For Google Ads, if the name is a generic fallback (e.g. `Google Ads (123)`), still show it as-is (the ID is embedded in the name as a fallback already).
 
-Update the `reach` entry in `METRIC_EXPLANATIONS` (line 19 of `src/types/metrics.ts`) to mention it includes both organic and paid reach.
+## Changes
 
-**Current**: `'Number of unique people who saw your content'`
-**New**: `'Number of unique people who saw your content (includes both organic and paid reach)'`
+### File: `src/components/clients/AccountPickerDialog.tsx`
 
-## File to modify
-- `src/types/metrics.ts` — line 19, update the `reach` explanation string
+**1. Meta Ads Step 1 — Ad Account list (line 250)**
+- Remove `<p className="text-xs text-muted-foreground">ID: {acct.id}</p>` (line 250)
+
+**2. Non-meta single-step account list (lines 418-420)**
+- Remove the entire `<p>` that shows `Account ID: ...` or `ID: ...`
+- Remove the `isGenericName` variable (line 396) and associated warning text (lines 421-423) — the fallback name already contains the ID so no extra warning is needed
+
+### Files to modify
+1. `src/components/clients/AccountPickerDialog.tsx` — remove ID display lines at lines 250, 418-423
 
