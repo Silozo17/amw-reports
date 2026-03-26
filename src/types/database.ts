@@ -240,6 +240,7 @@ export const HIDDEN_METRICS = new Set(['campaign_count', 'pages_count', 'roas', 
 export const AD_METRICS = new Set([
   'spend', 'cpc', 'cpm', 'cost_per_conversion', 'conversions',
   'conversions_value', 'roas', 'campaign_count', 'conversion_rate', 'leads',
+  'cost_per_lead',
 ]);
 
 /** Platforms that are organic-only (no ad spend metrics) */
@@ -260,6 +261,7 @@ export const METRIC_LABELS: Record<string, string> = {
   cpc: 'Cost Per Click',
   cpm: 'CPM',
   cost_per_conversion: 'Cost Per Conversion',
+  cost_per_lead: 'Cost Per Lead',
   roas: 'ROAS',
   reach: 'Reach',
   frequency: 'Frequency',
@@ -344,8 +346,7 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
   ],
   meta_ads: [
     'spend', 'impressions', 'reach', 'clicks', 'link_clicks', 'ctr',
-    'conversions', 'conversions_value', 'conversion_rate', 'cpc', 'cpm',
-    'cost_per_conversion', 'roas', 'frequency', 'leads',
+    'leads', 'cpc', 'cpm', 'cost_per_lead', 'frequency',
   ],
   facebook: [
     'views', 'reach', 'engagement', 'engagement_rate',
