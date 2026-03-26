@@ -1,80 +1,35 @@
 
 
-# Enhance "Performance by Post" Table
+# Multi-Select Platform Dropdown
 
 ## Problem
-The posts table currently shows only text content, reach, likes, comments, and shares. It's missing:
-1. Post thumbnail images (`full_picture` is available in the data but not passed through)
-2. Platform logo per row (data has `platform` but it's stripped when building table data)
-3. Platform filter to show posts from specific platforms only
+Platform selection is currently a row of buttons allowing only a single selection. User wants a dropdown that supports multi-select (e.g., YouTube + Facebook together), with "All Platforms" acting as a select-all toggle.
 
 ## Approach
 
-### 1. Pass rich data to the table widget
-**File: `src/components/clients/ClientDashboard.tsx` (lines ~344-363)**
+### 1. Change `PlatformFilter` type from single to array
+**File: `src/components/clients/DashboardHeader.tsx`**
 
-- Add `image`, `platform`, and `permalink_url` fields to each row in `tableData`
-- Add `engagement_rate` column
-- Update `tableColumns` to include image, platform, and engagement rate columns
-- Mark special columns with a `type` field (e.g., `type: 'image'`, `type: 'platform'`)
+- Change `PlatformFilter` from `'all' | PlatformType` to `PlatformType[] | 'all'`
+- Replace the row of `<Button>` tabs with a multi-select `<Popover>` + checkbox list dropdown
+- Each platform option shows its logo + label with a checkbox
+- "All Platforms" is a special option at the top — selecting it clears individual selections; selecting any individual platform deselects "All"
+- The trigger shows selected platform logos/names (or "All Platforms" label)
 
-### 2. Extend `WidgetData` type to support a post platform filter
-**File: `src/types/widget.ts`**
+### 2. Update props and parent state
+**File: `src/components/clients/ClientDashboard.tsx`**
 
-- Add optional `columnType` to the table column definition: `'text' | 'image' | 'platform' | 'link'`
-- Add optional `filterOptions` and `onFilterChange` for the posts table filter
+- Change `selectedPlatform` state from `PlatformFilter` (single) to `PlatformType[] | 'all'`
+- Update all filtering logic: replace `selectedPlatform === 'all'` checks with array-based checks (e.g., `selectedPlatform === 'all' || selectedPlatform.includes(platform)`)
+- Update `useMemo` filters for `filtered`, `filteredPrev`, `filteredPosts`, `kpis`, `sparklineMap`, `trendChartData`, `geoData`, and the `buildWidgets` function
 
-### 3. Enhance `TableWidget` in WidgetRenderer to render rich columns
-**File: `src/components/clients/widgets/WidgetRenderer.tsx`**
-
-- When `columnType === 'image'`: render a small thumbnail (`<img>` with rounded corners, fallback placeholder)
-- When `columnType === 'platform'`: render the platform logo from `PLATFORM_LOGOS` map
-- When `columnType === 'link'`: render an external link icon
-- Truncate long post text to ~120 chars with ellipsis
-
-### 4. Add platform filter dropdown to the posts table header
-**File: `src/components/clients/widgets/WidgetRenderer.tsx`**
-
-- When the widget is `table-posts`, render a small `<Select>` dropdown in the card header allowing filtering by platform (All, Facebook, Instagram, etc.)
-- The filter state lives locally in the TableWidget component
-- Filter options are derived from the distinct platforms present in the table data
-
-## Technical Details
-
-### Column definition extension
-```typescript
-// in widget.ts
-tableColumns?: Array<{
-  key: string;
-  label: string;
-  align?: 'left' | 'right';
-  type?: 'text' | 'image' | 'platform' | 'link';
-}>;
-```
-
-### Post table data shape (each row)
-```typescript
-{
-  image: 'https://...jpg' | null,
-  platform: 'facebook',
-  content: 'Post caption text...',
-  reach: 4002,
-  likes: 9,
-  comments: 7,
-  shares: 0,
-  engagement_rate: '3.5%',
-  link: 'https://facebook.com/...',
-}
-```
-
-### Platform filter in TableWidget
-- Store `filterPlatform` state locally
-- Derive unique platforms from `tableData` rows
-- Filter displayed rows by selected platform
-- Render platform logos as filter chips or a Select dropdown above the table
+### 3. Dropdown UX details
+- Trigger button shows: "All Platforms" or logos of selected platforms + count
+- Clicking "All Platforms" selects all and disables individual checkboxes visually
+- Clicking any individual platform while "All" is active switches to just that platform
+- At least one option must always be selected (prevent empty state)
 
 ## Files Modified
-1. `src/types/widget.ts` -- add `type` to column definition
-2. `src/components/clients/ClientDashboard.tsx` -- enrich posts table data with image, platform, link
-3. `src/components/clients/widgets/WidgetRenderer.tsx` -- render images, platform logos, links; add platform filter dropdown
+1. `src/components/clients/DashboardHeader.tsx` — replace button row with multi-select dropdown, update types
+2. `src/components/clients/ClientDashboard.tsx` — update state type and all platform filtering logic
 
