@@ -564,15 +564,15 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
   const { type, category } = widget;
 
   // KPI widgets shown as chart use sparkline data
-  const isKpiAsChart = category === 'kpi' && type !== 'number';
-  const isPlatformAsChart = category === 'platform' && type !== 'number';
+  const isKpiAsChart = category === 'kpi' && type !== 'number' && type !== 'progress' && type !== 'gauge';
+  const isPlatformAsChart = category === 'platform' && type !== 'number' && type !== 'progress' && type !== 'gauge';
 
   return (
     <Card className={cn('h-full overflow-hidden flex flex-col', isEditMode && 'ring-2 ring-primary/20 ring-dashed')}>
       <CardHeader className="pb-1 flex flex-row items-start justify-between space-y-0 px-4 pt-3">
         <div className="space-y-0 min-w-0 flex-1">
-          <CardTitle className="text-xs font-display leading-tight truncate">{widget.label}</CardTitle>
-          <p className="text-[10px] text-muted-foreground leading-tight line-clamp-1">{widget.description}</p>
+          <CardTitle className="text-sm font-display leading-tight tracking-wide truncate">{widget.label}</CardTitle>
+          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{widget.description}</p>
         </div>
         <ChartTypeSelector
           currentType={widget.type}
@@ -582,6 +582,8 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
       </CardHeader>
       <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0">
         {type === 'number' && <NumberWidget data={data} />}
+        {type === 'progress' && <ProgressRingWidget data={data} />}
+        {type === 'gauge' && <GaugeWidget data={data} />}
         {type === 'table' && <TableWidget data={data} widgetId={widget.id} />}
         {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
           <SparklineChart data={data} type={type} />
