@@ -21,6 +21,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ExternalLink, ImageOff } from 'lucide-react';
 import { useState } from 'react';
+import MetricTooltip from '@/components/clients/MetricTooltip';
 
 const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
 
@@ -124,9 +125,12 @@ const MetricCard = ({
 
   return (
     <div className="rounded-lg border bg-card p-3 space-y-1">
-      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider font-body truncate">
-        {label}
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider font-body truncate">
+          {label}
+        </p>
+        <MetricTooltip metricKey={metricKey} />
+      </div>
       <p className="text-xl font-bold font-body tabular-nums leading-none">
         {formatMetricValue(metricKey, value, currSymbol)}
       </p>

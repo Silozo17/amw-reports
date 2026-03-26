@@ -5,6 +5,7 @@ import { METRIC_EXPLANATIONS } from '@/types/metrics';
 import {
   ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
+import MetricTooltip from '@/components/clients/MetricTooltip';
 
 interface HeroKPI {
   label: string;
@@ -90,6 +91,7 @@ const HeroKPICard = ({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">
             {kpi.label}
           </span>
+          <MetricTooltip metricKey={kpi.metricKey} />
         </div>
 
         <p className="text-3xl font-bold font-body tabular-nums leading-none mb-2">
