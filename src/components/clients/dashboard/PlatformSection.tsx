@@ -12,7 +12,7 @@ import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff, RefreshCw, Loader2 }
 import { triggerSync } from '@/lib/triggerSync';
 import { toast } from 'sonner';
 import {
-  ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, Legend,
 } from 'recharts';
 import {
@@ -367,7 +367,15 @@ const PlatformSection = ({
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">Search Performance — Last 6 Months</p>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={normalizedData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                  <AreaChart data={normalizedData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                    <defs>
+                      {activeGscMetrics.map((key, i) => (
+                        <linearGradient key={key} id={`grad-gsc-${key}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.2} />
+                          <stop offset="100%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0} />
+                        </linearGradient>
+                      ))}
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis hide domain={[0, 1]} />
@@ -380,18 +388,19 @@ const PlatformSection = ({
                       }}
                     />
                     {activeGscMetrics.map((key, i) => (
-                      <Line
+                      <Area
                         key={key}
                         type="monotone"
                         dataKey={`_norm_${key}`}
                         name={`_norm_${key}`}
                         stroke={CHART_COLORS[i % CHART_COLORS.length]}
                         strokeWidth={2}
+                        fill={`url(#grad-gsc-${key})`}
                         dot={{ r: 3, fill: CHART_COLORS[i % CHART_COLORS.length] }}
                         activeDot={{ r: 5 }}
                       />
                     ))}
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>

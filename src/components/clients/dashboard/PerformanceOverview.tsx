@@ -3,7 +3,7 @@ import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
+  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
 } from 'recharts';
 
@@ -222,24 +222,33 @@ const PerformanceOverview = ({
               </div>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={normalizedTrendData}>
+                  <AreaChart data={normalizedTrendData}>
+                    <defs>
+                      {trendKeys.map((tk) => (
+                        <linearGradient key={tk.key} id={`grad-trend-${tk.key}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={tk.color} stopOpacity={0.2} />
+                          <stop offset="100%" stopColor={tk.color} stopOpacity={0} />
+                        </linearGradient>
+                      ))}
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                     <YAxis hide domain={[0, 1]} />
                     <RechartsTooltip content={<TrendTooltip />} />
                     {trendKeys.map((tk) => (
-                      <Line
+                      <Area
                         key={tk.key}
                         type="monotone"
                         dataKey={`_norm_${tk.key}`}
                         name={tk.name}
                         stroke={tk.color}
                         strokeWidth={2}
+                        fill={`url(#grad-trend-${tk.key})`}
                         dot={{ r: 2, fill: tk.color }}
                       />
                     ))}
                     <Legend formatter={(value: string) => value.replace('_norm_', '').replace(/^\w/, (c: string) => c.toUpperCase())} />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
