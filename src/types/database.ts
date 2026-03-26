@@ -50,6 +50,7 @@ export interface Profile {
   org_id: string | null;
   phone: string | null;
   position: string | null;
+  onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
 }

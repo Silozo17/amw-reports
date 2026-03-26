@@ -45,6 +45,25 @@ const Dashboard = () => {
   const [clientHealth, setClientHealth] = useState<ClientHealth[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+
+  // Check if onboarding is completed
+  useEffect(() => {
+    if (!user) return;
+    const checkOnboarding = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('user_id', user.id)
+        .single();
+      if (profile && !profile.onboarding_completed) {
+        navigate('/onboarding', { replace: true });
+        return;
+      }
+      setOnboardingChecked(true);
+    };
+    checkOnboarding();
+  }, [user, navigate]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -130,6 +149,17 @@ const Dashboard = () => {
     if (type === 'report') return <FileText className="h-3.5 w-3.5" />;
     return <Mail className="h-3.5 w-3.5" />;
   };
+
+  if (!onboardingChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <h1 className="text-2xl font-display text-primary">AMW</h1>
+          <p className="text-sm text-muted-foreground mt-2">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AppLayout>

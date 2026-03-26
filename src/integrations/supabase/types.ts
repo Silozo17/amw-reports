@@ -403,6 +403,48 @@ export type Database = {
           },
         ]
       }
+      onboarding_responses: {
+        Row: {
+          account_type: string
+          biggest_challenge: string | null
+          client_count: string | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          org_id: string
+          platforms_used: string[] | null
+          primary_reason: string | null
+          referral_source: string | null
+          user_id: string
+        }
+        Insert: {
+          account_type: string
+          biggest_challenge?: string | null
+          client_count?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          org_id: string
+          platforms_used?: string[] | null
+          primary_reason?: string | null
+          referral_source?: string | null
+          user_id: string
+        }
+        Update: {
+          account_type?: string
+          biggest_challenge?: string | null
+          client_count?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          org_id?: string
+          platforms_used?: string[] | null
+          primary_reason?: string | null
+          referral_source?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       org_members: {
         Row: {
           accepted_at: string | null
@@ -642,6 +684,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          onboarding_completed: boolean | null
           org_id: string | null
           phone: string | null
           position: string | null
@@ -654,6 +697,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          onboarding_completed?: boolean | null
           org_id?: string | null
           phone?: string | null
           position?: string | null
@@ -666,6 +710,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          onboarding_completed?: boolean | null
           org_id?: string | null
           phone?: string | null
           position?: string | null
