@@ -120,6 +120,7 @@ const ClientPortal = () => {
   const [period, setPeriod] = useState<{ month: number; year: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedPlatform, setSelectedPlatform] = useState<'all' | PlatformType>('all');
 
   useEffect(() => {
     const load = async () => {
