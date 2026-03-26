@@ -320,7 +320,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
-    const totalReach = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
+    const totalReach = filtered.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
     const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0); }, 0);
     const totalEngagement = filtered.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
     const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
@@ -331,7 +331,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const totalWebsiteClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
-    const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
+    const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
     const prevClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0); }, 0);
     const prevEngagement = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
     const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
@@ -347,7 +347,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       [...new Set(filtered.filter(s => metricFn(s.metrics_data) > 0).map(s => s.platform))];
 
     const spendPlatforms = platformsFor(m => m.spend || 0);
-    const reachPlatforms = platformsFor(m => m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
+    const reachPlatforms = [...new Set(filtered.filter(s => { const m = s.metrics_data; if (s.platform === 'facebook') return (m.views || 0) > 0; return (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0) > 0; }).map(s => s.platform))];
     const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0));
     const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0));
     const followerPlatforms = platformsFor(m => m.total_followers || 0);
@@ -411,7 +411,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
       const existing = monthMap.get(key) || {};
       existing.spend = (existing.spend || 0) + (s.metrics_data.spend || 0);
-      existing.reach = (existing.reach || 0) + (s.metrics_data.reach || s.metrics_data.impressions || s.metrics_data.search_impressions || s.metrics_data.views || s.metrics_data.gbp_views || 0);
+      existing.reach = (existing.reach || 0) + (s.platform === 'facebook' ? (s.metrics_data.views || 0) : (s.metrics_data.reach || s.metrics_data.impressions || s.metrics_data.search_impressions || s.metrics_data.views || s.metrics_data.gbp_views || 0));
       existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0) + (s.metrics_data.search_clicks || 0) + (s.metrics_data.gbp_website_clicks || 0);
       existing.engagement = (existing.engagement || 0) + (s.metrics_data.engagement ? s.metrics_data.engagement : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0));
       existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
@@ -484,6 +484,36 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       map.set(platform, data.slice(-6));
     }
     return map;
+  }, [trendData]);
+
+  // GSC trend data for Search Performance Trend chart
+  const gscTrendData = useMemo(() => {
+    const gscSnapshots = trendData.filter(s => s.platform === 'google_search_console');
+    if (gscSnapshots.length === 0) return [];
+    const monthMap = new Map<string, { search_impressions: number; search_clicks: number; search_ctr: number; search_position: number; count: number }>();
+    for (const s of gscSnapshots) {
+      const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
+      const existing = monthMap.get(key) || { search_impressions: 0, search_clicks: 0, search_ctr: 0, search_position: 0, count: 0 };
+      existing.search_impressions += s.metrics_data.search_impressions || 0;
+      existing.search_clicks += s.metrics_data.search_clicks || 0;
+      existing.search_ctr += s.metrics_data.search_ctr || 0;
+      existing.search_position += s.metrics_data.search_position || 0;
+      existing.count += 1;
+      monthMap.set(key, existing);
+    }
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([key, data]) => {
+        const [y, m] = key.split("-");
+        return {
+          name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`,
+          search_impressions: data.search_impressions,
+          search_clicks: data.search_clicks,
+          search_ctr: data.count > 0 ? data.search_ctr / data.count : 0,
+          search_position: data.count > 0 ? data.search_position / data.count : 0,
+        };
+      });
   }, [trendData]);
 
   const lastSyncedAt = useMemo(() => {
@@ -602,6 +632,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             impressionsByPlatform={impressionsByPlatform as unknown as Array<Record<string, unknown>>}
             trendChartData={trendChartData as unknown as Array<Record<string, unknown>>}
             trendPlatforms={[...new Set((selectedPlatform === "all" ? trendData : trendData.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))).map(s => s.platform))] as PlatformType[]}
+            gscTrendData={gscTrendData as unknown as Array<Record<string, unknown>>}
           />
 
           {/* 3. Platform Sections */}
