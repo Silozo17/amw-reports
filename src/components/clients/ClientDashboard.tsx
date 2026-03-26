@@ -889,30 +889,28 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             </div>
           )}
         </div>
-        {!readOnly && (
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant={isEditMode ? "default" : "outline"}
-              onClick={() => setIsEditMode(!isEditMode)}
-              className="gap-2"
-            >
-              {isEditMode ? <Lock className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-              {isEditMode ? "Lock Layout" : "Edit Dashboard"}
-            </Button>
-            <WidgetPanel widgets={widgets} onToggle={handleWidgetToggle} onResetLayout={handleResetLayout} />
-            <Button
-              size="sm"
-              variant={aiAnalysis ? "outline" : "default"}
-              onClick={handleAnalyse}
-              disabled={isAnalysing || cooldownRemaining > 0}
-              className="gap-2"
-            >
-              {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {isAnalysing ? "Analysing..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? "Refresh Analysis" : "AI Analysis"}
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={isEditMode ? "default" : "outline"}
+            onClick={() => setIsEditMode(!isEditMode)}
+            className="gap-2"
+          >
+            {isEditMode ? <Lock className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+            {isEditMode ? "Lock Layout" : "Edit Dashboard"}
+          </Button>
+          <WidgetPanel widgets={widgets} onToggle={handleWidgetToggle} onResetLayout={handleResetLayout} />
+          <Button
+            size="sm"
+            variant={aiAnalysis ? "outline" : "default"}
+            onClick={handleAnalyse}
+            disabled={isAnalysing || cooldownRemaining > 0}
+            className="gap-2"
+          >
+            {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {isAnalysing ? "Analysing..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? "Refresh Analysis" : "AI Analysis"}
+          </Button>
+        </div>
       </div>
 
       {/* AI Analysis Card */}
