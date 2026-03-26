@@ -46,6 +46,10 @@ export interface WidgetData {
   tableData?: Array<Record<string, unknown>>;
   totalLabel?: string;
   totalValue?: string;
+  /** Compact mode: per-platform value breakdown */
+  platformBreakdown?: Record<string, number>;
+  /** Compact mode: per-platform change breakdown */
+  platformBreakdownChange?: Record<string, number>;
 }
 
 export const COMPATIBLE_TYPES: Record<WidgetCategory, WidgetType[]> = {
