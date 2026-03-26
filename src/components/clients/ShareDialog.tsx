@@ -33,6 +33,7 @@ const ShareDialog = ({ clientId, orgId, clientName }: ShareDialogProps) => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [tokens, setTokens] = useState<ShareToken[]>([]);
+  const [customDomain, setCustomDomain] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
