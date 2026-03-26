@@ -122,26 +122,15 @@ Deno.serve(async (req) => {
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
     // Accumulators
+    let totalImpressions = 0;
+    let totalVideoViews = 0;
     let totalEngagement = 0;
     let totalPageViews = 0;
     let totalLinkClicks = 0;
+    let paidImpressions = 0;
+    let paidVideoViews = 0;
 
-    // Organic metrics (native from FB API)
-    let organicReach = 0;          // page_impressions_organic_unique
-    let organicVideoViews = 0;     // page_video_views_organic
-
-    // Paid metrics
-    let paidImpressions = 0;       // page_impressions_paid
-    let paidVideoViews = 0;        // page_video_views_paid
-
-    // Totals (for reference & organic impressions calculation)
-    let totalImpressions = 0;      // page_impressions
-    let totalVideoViews = 0;       // page_video_views
-
-    // Media view breakdown (secondary signal)
-    let totalMediaViews = 0;
-    let totalMediaViewsPaid = 0;
-    let totalMediaViewsOrganic = 0;
+    let coreInsightsFetched = false;
 
     const metricsAccum: Record<string, number> = {};
     const allTopPosts: any[] = [];
@@ -157,29 +146,25 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // 1. Core organic/paid page-level metrics
+      // ── Call A: Totals (stable, always-supported metrics) ──
       try {
-        const coreMetrics = await fetchPageInsights(pageId, pageToken, [
+        const totalMetrics = await fetchPageInsights(pageId, pageToken, [
           "page_post_engagements",
           "page_follows",
           "page_impressions",
-          "page_impressions_paid",
-          "page_impressions_organic_unique",
+          "page_views_total",
+          "page_consumptions",
           "page_video_views",
-          "page_video_views_organic",
-          "page_video_views_paid",
         ], startDate, endDate);
 
-        totalEngagement += sumDailyValues(coreMetrics, "page_post_engagements");
-        totalImpressions += sumDailyValues(coreMetrics, "page_impressions");
-        paidImpressions += sumDailyValues(coreMetrics, "page_impressions_paid");
-        organicReach += sumDailyValues(coreMetrics, "page_impressions_organic_unique");
-        totalVideoViews += sumDailyValues(coreMetrics, "page_video_views");
-        organicVideoViews += sumDailyValues(coreMetrics, "page_video_views_organic");
-        paidVideoViews += sumDailyValues(coreMetrics, "page_video_views_paid");
+        totalEngagement += sumDailyValues(totalMetrics, "page_post_engagements");
+        totalImpressions += sumDailyValues(totalMetrics, "page_impressions");
+        totalVideoViews += sumDailyValues(totalMetrics, "page_video_views");
+        totalPageViews += sumDailyValues(totalMetrics, "page_views_total");
+        totalLinkClicks += sumDailyValues(totalMetrics, "page_consumptions");
 
         // page_follows: get growth from first to last day
-        for (const metric of coreMetrics) {
+        for (const metric of totalMetrics) {
           if (metric.name === "page_follows") {
             const values = metric.values || [];
             const lastValue = values.at(-1)?.value || 0;
@@ -188,52 +173,31 @@ Deno.serve(async (req) => {
             metricsAccum.follower_growth = (metricsAccum.follower_growth || 0) + (Number(lastValue) - Number(firstValue));
           }
         }
+
+        coreInsightsFetched = true;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Core insights error page ${pageId}:`, errorMsg);
+        console.error(`Core totals error page ${pageId}:`, errorMsg);
         await supabaseClient.from("platform_connections")
-          .update({ last_error: errorMsg, last_sync_status: "partial" })
+          .update({ last_error: `Core insights failed: ${errorMsg}`, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
 
-      // 2. page_media_view (total)
+      // ── Call B: Paid breakdown (separate, non-blocking) ──
       try {
-        const mediaViewData = await fetchPageInsights(pageId, pageToken, ["page_media_view"], startDate, endDate);
-        totalMediaViews += sumDailyValues(mediaViewData, "page_media_view");
-      } catch {} // non-blocking
+        const paidMetrics = await fetchPageInsights(pageId, pageToken, [
+          "page_impressions_paid",
+          "page_video_views_paid",
+        ], startDate, endDate);
 
-      // 3. page_media_view with is_from_ads breakdown (secondary signal)
-      try {
-        const breakdownUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&period=day&since=${startDate}&until=${endDate}&breakdowns=is_from_ads&access_token=${pageToken}`;
-        const breakdownRes = await fetch(breakdownUrl);
-        if (breakdownRes.ok) {
-          const breakdownData = await breakdownRes.json();
-          if (breakdownData.data) {
-            for (const metric of breakdownData.data) {
-              for (const val of metric.values || []) {
-                if (val.value && typeof val.value === "object") {
-                  totalMediaViewsPaid += Number(val.value["true"] || 0);
-                  totalMediaViewsOrganic += Number(val.value["false"] || 0);
-                }
-              }
-            }
-          }
-        }
-      } catch {} // non-blocking
+        paidImpressions += sumDailyValues(paidMetrics, "page_impressions_paid");
+        paidVideoViews += sumDailyValues(paidMetrics, "page_video_views_paid");
+      } catch (err) {
+        // Non-blocking: if paid metrics fail, paid = 0, so organic = total (safe)
+        console.warn(`Paid metrics unavailable for page ${pageId}:`, err instanceof Error ? err.message : err);
+      }
 
-      // 4. page_views_total
-      try {
-        const pageViewsData = await fetchPageInsights(pageId, pageToken, ["page_views_total"], startDate, endDate);
-        totalPageViews += sumDailyValues(pageViewsData, "page_views_total");
-      } catch {} // non-blocking
-
-      // 5. page_consumptions (link clicks)
-      try {
-        const consumptionsData = await fetchPageInsights(pageId, pageToken, ["page_consumptions"], startDate, endDate);
-        totalLinkClicks += sumDailyValues(consumptionsData, "page_consumptions");
-      } catch {} // non-blocking
-
-      // 6. Fetch ALL posts with basic fields, then fetch per-post insights individually
+      // ── Posts: fetch all with per-post insights ──
       try {
         let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,full_picture,permalink_url,likes.summary(true),comments.summary(true),shares,attachments{media_type,media,url,title}&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
 
@@ -253,7 +217,6 @@ Deno.serve(async (req) => {
               const attachmentType = post.attachments?.data?.[0]?.media_type || '';
               const isVideo = attachmentType === 'video' || attachmentType === 'video_inline';
 
-              // Fetch per-post insights: organic reach, paid reach, video views
               let postOrganicReach = 0;
               let postPaidReach = 0;
               let postClicks = 0;
@@ -316,37 +279,30 @@ Deno.serve(async (req) => {
     // Sort by engagement, keep all
     const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement);
 
-    // Aggregate video views from posts (month-specific, not lifetime)
-    const monthlyVideoViews = allTopPosts.reduce((sum, p) => sum + (p.video_views || 0), 0);
-
-    // Organic impressions: total - paid (no native organic-only impressions metric exists at non-unique level)
+    // ── Organic = Total - Paid ──
     const organicImpressions = Math.max(totalImpressions - paidImpressions, 0);
+    const organicVideoViews = Math.max(totalVideoViews - paidVideoViews, 0);
 
-    // Use native organic metrics as primary; fall back to media view breakdown if core metrics failed
-    const finalOrganicReach = organicReach > 0 ? organicReach : totalMediaViewsOrganic;
-    const finalOrganicVideoViews = organicVideoViews > 0 ? organicVideoViews : Math.max(monthlyVideoViews - paidVideoViews, 0);
-
-    // Paid reach: use page_impressions_paid as approximation (FB doesn't have page_impressions_paid_unique at page level)
-    // We already have paidImpressions from page_impressions_paid
-    const finalPaidReach = paidImpressions; // paid impressions serves as the paid reach proxy
+    // Fallback: if page-level video views are 0, aggregate from posts
+    const monthlyVideoViewsFromPosts = allTopPosts.reduce((sum, p) => sum + (p.video_views || 0), 0);
+    const finalOrganicVideoViews = organicVideoViews > 0 ? organicVideoViews : monthlyVideoViewsFromPosts;
 
     const metricsData = {
-      // Organic-only (primary display metrics)
+      // Organic (Total - Paid)
       impressions: organicImpressions,
-      organic_impressions: organicImpressions,
-      reach: finalOrganicReach,
+      reach: organicImpressions, // organic impressions = organic reach proxy
       video_views: finalOrganicVideoViews,
 
-      // Paid (stored for separate display — for boosted posts / ads run through FB)
+      // Paid (stored separately for boosted sub-section)
       paid_impressions: paidImpressions,
-      paid_reach: finalPaidReach,
+      paid_reach: paidImpressions, // paid impressions = paid reach proxy
       paid_video_views: paidVideoViews,
 
-      // Totals (for reference / validation)
+      // Totals (for reference, hidden from cards)
       total_impressions: totalImpressions,
-      total_video_views: totalVideoViews > 0 ? totalVideoViews : monthlyVideoViews,
+      total_video_views: totalVideoViews > 0 ? totalVideoViews : monthlyVideoViewsFromPosts,
 
-      // These are fine as-is (engagement includes all sources, which is acceptable)
+      // Engagement & other metrics (fine as totals)
       engagement: totalEngagement,
       page_views: totalPageViews,
       link_clicks: totalLinkClicks,
@@ -356,14 +312,18 @@ Deno.serve(async (req) => {
       comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
       posts_published: allTopPosts.length,
-      engagement_rate: finalOrganicReach > 0 ? (totalEngagement / finalOrganicReach) * 100 : 0,
+      engagement_rate: organicImpressions > 0 ? (totalEngagement / organicImpressions) * 100 : 0,
       pages_count: pages.length,
     };
 
-    // Upsert monthly snapshot
+    // ── Overwrite protection ──
+    // If core insights failed AND we have posts with likes, don't wipe existing data
+    const hasPostActivity = allTopPosts.some(p => (p.likes || 0) > 0);
+    const allCoreZero = metricsData.impressions === 0 && metricsData.engagement === 0 && metricsData.total_followers === 0;
+
     const { data: existing } = await supabaseClient
       .from("monthly_snapshots")
-      .select("id, snapshot_locked")
+      .select("id, snapshot_locked, metrics_data")
       .eq("client_id", clientId)
       .eq("platform", "facebook")
       .eq("report_month", month)
@@ -372,6 +332,28 @@ Deno.serve(async (req) => {
 
     if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
 
+    // If new data is all zeros but posts have activity AND existing snapshot has real data, skip overwrite
+    if (allCoreZero && hasPostActivity && existing) {
+      const existingMetrics = existing.metrics_data as Record<string, number>;
+      if ((existingMetrics?.impressions || 0) > 0 || (existingMetrics?.engagement || 0) > 0) {
+        console.warn("Skipping overwrite: new data is all zeros but existing snapshot has real values. Core insights likely failed.");
+        await supabaseClient.from("platform_connections")
+          .update({ last_sync_status: "partial", last_error: "Core page insights unavailable — existing data preserved." })
+          .eq("id", connectionId);
+
+        if (syncLog?.id) {
+          await supabaseClient.from("sync_logs")
+            .update({ status: "partial", completed_at: new Date().toISOString(), error_message: "Core insights failed, existing snapshot preserved" })
+            .eq("id", syncLog.id);
+        }
+
+        return new Response(JSON.stringify({ success: false, error: "Core insights unavailable, existing data preserved", posts_count: allTopPosts.length }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Save snapshot
     if (existing) {
       await supabaseClient.from("monthly_snapshots")
         .update({ metrics_data: metricsData, top_content: topContent })
@@ -391,7 +373,7 @@ Deno.serve(async (req) => {
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete. organic_reach=${finalOrganicReach}, organic_impressions=${organicImpressions}, paid_impressions=${paidImpressions}, organic_video_views=${finalOrganicVideoViews}, paid_video_views=${paidVideoViews}, posts=${allTopPosts.length}`);
+    console.log(`Facebook sync complete. organic_impressions=${organicImpressions}, paid_impressions=${paidImpressions}, organic_video_views=${finalOrganicVideoViews}, paid_video_views=${paidVideoViews}, posts=${allTopPosts.length}`);
 
     return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
