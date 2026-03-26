@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Building2, ScrollText, ArrowLeft, Menu } from 'lucide-react';
+import { LayoutDashboard, Building2, ScrollText, ArrowLeft, Menu, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const ADMIN_NAV = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { to: '/admin/organisations', label: 'Organisations', icon: Building2 },
+  { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/activity', label: 'Activity Log', icon: ScrollText },
 ];
 
