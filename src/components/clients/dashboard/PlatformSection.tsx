@@ -220,6 +220,22 @@ const PlatformSection = ({
 
   if (allMetricKeys.length === 0) return null;
 
+  const handleSyncNow = async () => {
+    if (!connectionId) {
+      toast.error('No connection ID available');
+      return;
+    }
+    setIsSyncing(true);
+    const result = await triggerSync(connectionId, platform, reportMonth, reportYear);
+    if (result.success) {
+      toast.success(`${label} synced for ${reportMonth}/${reportYear}`);
+      onSyncComplete?.();
+    } else {
+      toast.error(`Sync failed: ${result.error}`);
+    }
+    setIsSyncing(false);
+  };
+
   return (
     <Card className="overflow-hidden">
       {/* Platform Header */}
@@ -234,6 +250,18 @@ const PlatformSection = ({
               <Clock className="h-3 w-3" />
               Synced {formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}
             </span>
+          )}
+          {connectionId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-[10px] gap-1"
+              onClick={handleSyncNow}
+              disabled={isSyncing}
+            >
+              {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Sync
+            </Button>
           )}
           <Badge
             variant={syncStatus === 'success' ? 'default' : syncStatus === 'failed' ? 'destructive' : 'secondary'}
