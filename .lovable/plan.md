@@ -1,57 +1,72 @@
 
 
-# LinkedIn Connection Fix
+# Facebook & Instagram Sync Fix
 
-## Root Cause
+## Root Causes Found (from official Meta API documentation)
 
-The LinkedIn OAuth fails because of a **product mismatch** on the LinkedIn Developer Portal.
+### Issue 1: Facebook — `type` field deprecated since v3.3
 
-Your app currently has: **Pages Data Portability API** (scope: `r_dma_admin_pages_content`)
-Your code requests: `r_basicprofile r_organization_social rw_organization_admin`
+The FB sync (line 209) requests the `type` field on `published_posts`:
+```
+fields=message,created_time,full_picture,permalink_url,...,type
+```
 
-These scopes belong to the **Community Management API** product, which is NOT added to your app. LinkedIn rejects the authorization because the app isn't approved for those scopes.
+The `type` field was **deprecated in Graph API v3.3** (April 2019). On v25.0, this causes:
+```
+(#12) deprecate_post_aggregated_fields_for_attachement is deprecated for versions v3.3 and higher
+```
 
-Additionally, `r_organization_social` was **deprecated in June 2023** and replaced by `r_organization_social_feed`.
+This is the **exact error in the logs** — the entire posts request fails, meaning:
+- **Zero top posts** are returned (hence no post table)
+- **Zero video views** (aggregated from posts)
+- **Zero post-level metrics** (likes, comments, shares)
 
-## What Needs to Happen
+The official docs say to use `attachments` instead. To detect video vs photo, use `attachments{media_type}` or check if the post has video-related properties.
 
-### Step 1: Request the correct LinkedIn product (manual — you must do this)
+### Issue 2: Instagram — `plays` metric deprecated since April 21, 2025
 
-Go to your LinkedIn Developer Portal → Products tab → **Request access** to **Community Management API**.
+The IG sync (line 192) requests `plays` for video/reel media insights:
+```
+metric=plays,reach,saved
+```
 
-This is the product that grants the scopes needed for:
-- Discovering organization pages (`/organizationAcls`)
-- Fetching follower statistics (`/organizationalEntityFollowerStatistics`)
-- Reading posts (`/ugcPosts` or `/posts`)
-- Reading post analytics (`/organizationalEntityShareStatistics`)
+Per the official Instagram Media Insights documentation:
+> `plays` — **Deprecated for v22.0 and for all versions on April 21, 2025.**
 
-The Pages Data Portability API is a GDPR/DMA data export tool — it does NOT provide the analytics endpoints your sync function uses.
+The replacement is the `views` metric, which works for `FEED`, `STORY`, and `REELS` media product types. Since we're on v25.0 and the date is March 2026, `plays` returns an error (silently caught), resulting in **zero video views**.
 
-### Step 2: Code changes (after product approval)
+### Issue 3: Instagram — `video_views` metric also deprecated
 
-**File: `supabase/functions/linkedin-connect/index.ts`**
-- Update OAuth scopes from deprecated to current:
-  - `r_basicprofile` → `r_liteprofile` (or remove — profile scope may not be needed)
-  - `r_organization_social` → `r_organization_social_feed`
-  - `rw_organization_admin` stays (still valid under Community Management API)
-- Add `openid` scope if required by LinkedIn's current OAuth flow
+The docs explicitly state: "The `video_views` metric has been deprecated." The new universal metric is `views`.
 
-**File: `supabase/functions/oauth-callback/index.ts` (handleLinkedIn)**
-- Update LinkedIn API version header from `202401` to `202503` (current)
-- The org discovery endpoint `/rest/organizationAcls` is correct and will work once the Community Management API product is approved
+## Plan
 
-**File: `supabase/functions/sync-linkedin/index.ts`**
-- Update LinkedIn API version header from `202401` to `202503`
-- The sync endpoints are all correct (follower stats, ugcPosts, share statistics) — they just need the Community Management API product to be approved
+### File 1: `supabase/functions/sync-facebook-page/index.ts`
 
-### Summary
+**Fix the `type` field deprecation (line 209)**
+- Remove `type` from the fields list
+- Add `attachments{media_type,media,url,title}` to detect post type
+- Determine video posts from `attachments.data[0].media_type === 'video'` instead of `post.type === 'video'`
+- Keep `post_video_views` in per-post insights — this metric is still valid on v25.0 (confirmed in docs, line 599: "post_video_views ... lifetime, day")
+- Also add `page_video_views` as a page-level insight fetch (period=day) for aggregate video views as a fallback/supplement
 
-| What | Action |
-|---|---|
-| LinkedIn Developer Portal | Request **Community Management API** product (you do this manually) |
-| `linkedin-connect/index.ts` | Fix scopes: `r_organization_social` → `r_organization_social_feed`, remove `r_basicprofile` |
-| `oauth-callback/index.ts` | Update API version header to `202503` |
-| `sync-linkedin/index.ts` | Update API version header to `202503` |
+### File 2: `supabase/functions/sync-instagram/index.ts`
 
-The code changes are small. The blocker is LinkedIn product approval — without the Community Management API, no scope fix will make OAuth work because the analytics endpoints require that product.
+**Fix the `plays` deprecation (line 192)**
+- Replace `plays` with `views` for all media types (FEED, REELS, VIDEO)
+- The `views` metric works for ALL media product types (FEED, STORY, REELS), so use it universally instead of only for videos
+- For video/reel posts: fetch `views,reach,saved`
+- For image/carousel posts: fetch `reach,saved` (no change needed)
+- Map the `views` metric value to `video_views` in the post data for videos/reels
+- Remove the fallback block (lines 207-218) that tries deprecated metric names
+
+### Summary of Changes
+
+| File | Line | Current (broken) | Fix |
+|---|---|---|---|
+| `sync-facebook-page` | 209 | `type` field in published_posts | Replace with `attachments{media_type,media,url,title}` |
+| `sync-facebook-page` | 224 | `post.type === 'video'` | `attachments.data[0].media_type === 'video'` |
+| `sync-instagram` | 191-193 | `plays,reach,saved` | `views,reach,saved` |
+| `sync-instagram` | 204 | `insight.name === 'plays'` | `insight.name === 'views'` |
+| `sync-instagram` | 207-218 | Fallback to deprecated metrics | Remove fallback block |
 
