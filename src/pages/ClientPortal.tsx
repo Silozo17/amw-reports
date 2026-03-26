@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { PLATFORM_LABELS, PLATFORM_LOGOS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from '@/types/database';
 import { METRIC_EXPLANATIONS } from '@/types/metrics';
 import type { PlatformType } from '@/types/database';
@@ -118,6 +120,7 @@ const ClientPortal = () => {
   const [period, setPeriod] = useState<{ month: number; year: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedPlatform, setSelectedPlatform] = useState<'all' | PlatformType>('all');
 
   useEffect(() => {
     const load = async () => {
@@ -171,6 +174,10 @@ const ClientPortal = () => {
     return items;
   }, [snapshots, prevSnapshots, currSymbol]);
 
+  const filteredSnapshots = useMemo(() => {
+    if (selectedPlatform === 'all') return snapshots;
+    return snapshots.filter(s => s.platform === selectedPlatform);
+  }, [snapshots, selectedPlatform]);
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -244,8 +251,34 @@ const ClientPortal = () => {
           </div>
         )}
 
+        {/* Platform Filter */}
+        {snapshots.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            <Badge
+              variant={selectedPlatform === 'all' ? 'default' : 'outline'}
+              className="cursor-pointer select-none"
+              onClick={() => setSelectedPlatform('all')}
+            >
+              All Platforms
+            </Badge>
+            {snapshots.map(s => (
+              <Badge
+                key={s.platform}
+                variant={selectedPlatform === s.platform ? 'default' : 'outline'}
+                className="cursor-pointer select-none flex items-center gap-1.5"
+                onClick={() => setSelectedPlatform(s.platform)}
+              >
+                {PLATFORM_LOGOS[s.platform] && (
+                  <img src={PLATFORM_LOGOS[s.platform]} alt="" className="h-3.5 w-3.5 object-contain" />
+                )}
+                {PLATFORM_LABELS[s.platform]}
+              </Badge>
+            ))}
+          </div>
+        )}
+
         {/* Platform Sections */}
-        {snapshots.map(snapshot => {
+        {filteredSnapshots.map(snapshot => {
           const platform = snapshot.platform;
           const isOrganic = ORGANIC_PLATFORMS.has(platform);
           const prevSnapshot = prevSnapshots.find(s => s.platform === platform);
@@ -264,36 +297,38 @@ const ClientPortal = () => {
                   <CardTitle className="font-display text-lg">{PLATFORM_LABELS[platform]}</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {metrics.map(([key, val]) => {
-                    const prevVal = prevSnapshot?.metrics_data[key];
-                    const change = prevVal && prevVal !== 0 ? ((val - prevVal) / prevVal) * 100 : undefined;
-                    const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
-                    const isGood = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
+              <CardContent className="p-0">
+                <ScrollArea className="max-h-[280px] px-6 pb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {metrics.map(([key, val]) => {
+                      const prevVal = prevSnapshot?.metrics_data[key];
+                      const change = prevVal && prevVal !== 0 ? ((val - prevVal) / prevVal) * 100 : undefined;
+                      const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
+                      const isGood = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
 
-                    return (
-                      <div key={key} className="rounded-lg bg-muted/50 p-3 border">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide truncate">
-                          {METRIC_LABELS_MAP[key] ?? key.replace(/_/g, ' ')}
-                        </p>
-                        <p className="text-lg font-semibold mt-1">{formatMetricValue(key, val, currSymbol)}</p>
-                        {change !== undefined && (
-                          <div className={cn('flex items-center gap-1 mt-1 text-xs', isGood ? 'text-green-600' : 'text-orange-500')}>
-                            {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                            <span>{Math.abs(change).toFixed(1)}%</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      return (
+                        <div key={key} className="rounded-lg bg-muted/50 p-3 border">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide truncate">
+                            {METRIC_LABELS_MAP[key] ?? key.replace(/_/g, ' ')}
+                          </p>
+                          <p className="text-lg font-semibold mt-1">{formatMetricValue(key, val, currSymbol)}</p>
+                          {change !== undefined && (
+                            <div className={cn('flex items-center gap-1 mt-1 text-xs', isGood ? 'text-green-600' : 'text-orange-500')}>
+                              {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                              <span>{Math.abs(change).toFixed(1)}%</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
           );
         })}
 
-        {snapshots.length === 0 && (
+        {filteredSnapshots.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
               <Minus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
