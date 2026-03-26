@@ -410,7 +410,7 @@ const PlatformSection = ({
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => v.toLocaleString()} />
                   <RechartsTooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--popover))',
@@ -418,6 +418,7 @@ const PlatformSection = ({
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
+                    formatter={(value: number) => value.toLocaleString()}
                   />
                   <Area
                     type="monotone"

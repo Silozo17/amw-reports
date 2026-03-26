@@ -15,6 +15,8 @@ interface HeroKPI {
   value: number;
   change?: number;
   isCost?: boolean;
+  isPercentage?: boolean;
+  isDecimal?: boolean;
   metricKey: string;
   icon: React.ElementType;
   platforms?: PlatformType[];
@@ -36,9 +38,15 @@ const ACCENT_COLORS: Record<string, string> = {
   link_clicks: 'hsl(var(--amw-orange))',
   page_views: 'hsl(var(--amw-blue))',
   video_views: 'hsl(var(--amw-green))',
+  search_impressions: 'hsl(var(--amw-purple))',
+  search_clicks: 'hsl(var(--amw-orange))',
+  search_ctr: 'hsl(var(--amw-green))',
+  search_position: 'hsl(var(--amw-blue))',
 };
 
-const formatValue = (val: number, isCost: boolean, currSymbol: string): string => {
+const formatValue = (val: number, isCost: boolean, currSymbol: string, isPercentage?: boolean, isDecimal?: boolean): string => {
+  if (isPercentage) return `${val.toFixed(1)}%`;
+  if (isDecimal) return val.toFixed(1);
   if (isCost)
     return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
@@ -119,7 +127,7 @@ const HeroKPICard = ({
         </div>
 
         <p className="text-3xl font-bold font-body tabular-nums leading-none mb-2">
-          {formatValue(animatedValue, isCost, currSymbol)}
+          {formatValue(animatedValue, isCost, currSymbol, kpi.isPercentage, kpi.isDecimal)}
         </p>
 
         {change !== undefined && (
