@@ -47,10 +47,69 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
 
-  // Check if onboarding is completed
+  // Check org recovery + onboarding
   useEffect(() => {
     if (!user) return;
-    const checkOnboarding = async () => {
+    const checkSetup = async () => {
+      // 1. Check if user has an org — recover if missing
+      const { data: membership } = await supabase
+        .from('org_members')
+        .select('org_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+
+      if (!membership) {
+        // Recovery: create org for existing users who slipped through
+        const orgName =
+          user.user_metadata?.company_name ||
+          user.user_metadata?.full_name ||
+          user.email ||
+          'My Workspace';
+
+        const { data: newOrg, error: orgError } = await supabase
+          .from('organisations')
+          .insert({
+            name: orgName,
+            slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            created_by: user.id,
+          })
+          .select('id')
+          .single();
+
+        if (!orgError && newOrg) {
+          await supabase.from('org_members').insert({
+            org_id: newOrg.id,
+            user_id: user.id,
+            role: 'owner',
+            accepted_at: new Date().toISOString(),
+          });
+
+          await supabase
+            .from('profiles')
+            .update({ org_id: newOrg.id })
+            .eq('user_id', user.id);
+
+          // Assign starter plan
+          const { data: starterPlan } = await supabase
+            .from('subscription_plans')
+            .select('id')
+            .eq('slug', 'starter')
+            .single();
+
+          if (starterPlan) {
+            await supabase.from('org_subscriptions').insert({
+              org_id: newOrg.id,
+              plan_id: starterPlan.id,
+              status: 'active',
+            });
+          }
+
+          console.log('Recovered org for user', user.id);
+        }
+      }
+
+      // 2. Check onboarding
       const { data: profile } = await supabase
         .from('profiles')
         .select('onboarding_completed')
@@ -62,7 +121,7 @@ const Dashboard = () => {
       }
       setOnboardingChecked(true);
     };
-    checkOnboarding();
+    checkSetup();
   }, [user, navigate]);
 
   useEffect(() => {

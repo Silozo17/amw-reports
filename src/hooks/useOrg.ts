@@ -39,19 +39,66 @@ export function useOrg() {
     if (!user) return;
 
     try {
-      const { data: membership, error: membershipError } = await supabase
+      let { data: membership, error: membershipError } = await supabase
         .from('org_members')
         .select('org_id, role')
         .eq('user_id', user.id)
         .limit(1)
         .single();
 
-      if (membershipError) {
-        console.error('Failed to fetch org membership:', membershipError);
-        return;
-      }
+      if (membershipError || !membership) {
+        // Recovery: auto-create org for users who have none
+        const orgName =
+          user.user_metadata?.company_name ||
+          user.user_metadata?.full_name ||
+          user.email ||
+          'My Workspace';
 
-      if (!membership) return;
+        const { data: newOrg, error: orgError } = await supabase
+          .from('organisations')
+          .insert({
+            name: orgName,
+            slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            created_by: user.id,
+          })
+          .select('id')
+          .single();
+
+        if (orgError || !newOrg) {
+          console.error('Failed to recover org:', orgError);
+          return;
+        }
+
+        await supabase.from('org_members').insert({
+          org_id: newOrg.id,
+          user_id: user.id,
+          role: 'owner',
+          accepted_at: new Date().toISOString(),
+        });
+
+        await supabase
+          .from('profiles')
+          .update({ org_id: newOrg.id })
+          .eq('user_id', user.id);
+
+        // Assign starter plan
+        const { data: starterPlan } = await supabase
+          .from('subscription_plans')
+          .select('id')
+          .eq('slug', 'starter')
+          .single();
+
+        if (starterPlan) {
+          await supabase.from('org_subscriptions').insert({
+            org_id: newOrg.id,
+            plan_id: starterPlan.id,
+            status: 'active',
+          });
+        }
+
+        membership = { org_id: newOrg.id, role: 'owner' };
+        console.log('Recovered org for user', user.id);
+      }
 
       setOrgId(membership.org_id);
       setOrgRole(membership.role as 'owner' | 'manager');

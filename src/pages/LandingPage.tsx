@@ -82,7 +82,7 @@ const LandingPage = () => {
     if (otpCode.length !== 6) return;
     setIsLoading(true);
 
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       email: signupEmail,
       token: otpCode,
       type: 'signup',
@@ -90,51 +90,8 @@ const LandingPage = () => {
 
     if (error) { toast.error(error.message); setIsLoading(false); return; }
 
-    if (data.user) {
-      const { data: orgData, error: orgError } = await supabase
-        .from('organisations')
-        .insert({
-          name: companyName,
-          slug: companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-          created_by: data.user.id,
-        })
-        .select('id')
-        .single();
-
-      if (orgError) {
-        console.error('Failed to create org:', orgError);
-        toast.error('Account verified but failed to create organisation. Please contact support.');
-        setIsLoading(false);
-        return;
-      }
-
-      await supabase.from('org_members').insert({
-        org_id: orgData.id,
-        user_id: data.user.id,
-        role: 'owner',
-        accepted_at: new Date().toISOString(),
-      });
-
-      await supabase
-        .from('profiles')
-        .update({ org_id: orgData.id })
-        .eq('user_id', data.user.id);
-
-      // Auto-assign Starter plan
-      const { data: starterPlan } = await supabase
-        .from('subscription_plans')
-        .select('id')
-        .eq('slug', 'starter')
-        .single();
-
-      if (starterPlan) {
-        await supabase.from('org_subscriptions').insert({
-          org_id: orgData.id,
-          plan_id: starterPlan.id,
-          status: 'active',
-        });
-      }
-    }
+    // Org, membership, and starter plan are created automatically by the
+    // handle_new_user database trigger — no client-side writes needed.
 
     toast.success('Account verified! Welcome aboard.');
     navigate('/onboarding');
