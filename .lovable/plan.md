@@ -1,23 +1,24 @@
 
 
-# Fix: Add Facebook to Hero KPI Platform Badges
+# Fix: Facebook impressions & clicks aliases — organic only
 
 ## Problem
-Two `platformsFor` helpers on lines 350-351 don't check for Facebook's metric field names (`post_clicks` for clicks, `reactions`/`shares` for engagement), so the Facebook logo never appears on those hero cards.
+The previous plan proposed adding `impressions: totalViewsAll` (organic + paid) to Facebook's metricsData. But Meta Ads already contributes paid impressions to the hero KPI separately, so including paid views from Facebook would double-count.
 
-## Changes
+## Change
 
-**File: `src/components/clients/ClientDashboard.tsx`**
+**File: `supabase/functions/sync-facebook-page/index.ts`** (~line 350-366)
 
-**Line 350** — `clicksPlatforms`: Add `m.post_clicks || 0` to the sum so Facebook (which stores clicks as `post_clicks`) gets detected:
-```ts
-const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0));
+Add two alias fields to `metricsData`, using **organic-only** values:
+
+```typescript
+impressions: totalViews,          // organic only (not totalViewsAll) — avoids double-counting with Meta Ads
+clicks: allTopPosts.reduce((s, p) => s + (p.clicks || 0), 0),  // alias for post_clicks
 ```
 
-**Line 351** — `engagementPlatforms`: Add `(m.reactions || 0)` and `(m.shares || 0)` to the fallback branch so Facebook's engagement fields are detected:
-```ts
-const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0));
-```
+These are aliases of existing fields (`views` and `post_clicks`) so the hero KPI and bar chart logic that checks `m.impressions` and `m.clicks` will now pick up Facebook — but only organic impressions, since Meta Ads already provides the paid portion.
 
-Two lines changed, one file. No other modifications.
+**No frontend changes needed** — the existing `m.impressions` and `m.clicks` checks in `ClientDashboard.tsx` will automatically detect Facebook once these fields exist.
+
+One file, two lines added.
 
