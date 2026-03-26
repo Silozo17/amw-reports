@@ -1,23 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import {
   ArrowRight, ArrowLeft, Loader2, Sparkles,
   Palette, Building2, Users, BarChart3, Clock,
   Heart, Search, Share2, Calendar, MessageSquare,
-  CheckCircle2,
+  CheckCircle2, Upload, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PLATFORM_LOGOS, PLATFORM_LABELS, type PlatformType } from '@/types/database';
 
 /* ─── Constants ──────────────────────────────────────────── */
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 const PLATFORM_IDS: PlatformType[] = [
   'facebook', 'instagram', 'tiktok', 'linkedin', 'youtube',
@@ -72,7 +73,46 @@ const OnboardingPage = () => {
   const [referralSource, setReferralSource] = useState('');
   const [otherReferral, setOtherReferral] = useState('');
 
+  // Org setup state (Step 2)
+  const [orgName, setOrgName] = useState('');
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
+  const [orgLogoFile, setOrgLogoFile] = useState<File | null>(null);
+  const [orgLogoPreview, setOrgLogoPreview] = useState<string | null>(null);
+  const [primaryColor, setPrimaryColor] = useState('#7c3aed');
+  const [secondaryColor, setSecondaryColor] = useState('#06b6d4');
+  const [accentColor, setAccentColor] = useState('#f59e0b');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   const [particles, setParticles] = useState<Array<{ id: number; x: number; delay: number; color: string }>>([]);
+
+  // Fetch org data on mount
+  useEffect(() => {
+    if (!user) return;
+    const fetchOrg = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('user_id', user.id)
+        .single();
+      if (!profile?.org_id) return;
+      setOrgId(profile.org_id);
+      const { data: org } = await supabase
+        .from('organisations')
+        .select('name, logo_url, primary_color, secondary_color, accent_color')
+        .eq('id', profile.org_id)
+        .single();
+      if (org) {
+        setOrgName(org.name ?? '');
+        setOrgLogoUrl(org.logo_url);
+        if (org.primary_color) setPrimaryColor(org.primary_color);
+        if (org.secondary_color) setSecondaryColor(org.secondary_color);
+        if (org.accent_color) setAccentColor(org.accent_color);
+      }
+    };
+    fetchOrg();
+  }, [user]);
 
   useEffect(() => {
     if (step === TOTAL_STEPS) {
@@ -95,36 +135,100 @@ const OnboardingPage = () => {
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] ?? 'there';
 
-  /* Visible step count (skip step 3 for non-agency) */
+  /* Steps: 1=account type, 2=org setup, 3=platforms, 4=client count (agency), 5=reason, 6=referral, 7=complete */
+  /* Visible step count (skip step 4 for non-agency) */
   const visibleSteps = accountType === 'agency' ? TOTAL_STEPS : TOTAL_STEPS - 1;
   const currentVisibleStep = (() => {
     if (accountType === 'agency') return step;
-    if (step <= 2) return step;
-    // steps 4,5,6 map to 3,4,5 for non-agency
+    if (step <= 3) return step;
+    // steps 5,6,7 map to 4,5,6 for non-agency
     return step - 1;
   })();
 
-  const goNext = () => {
+  const goNext = async () => {
+    // If leaving step 2 (org setup), save org data
+    if (step === 2) {
+      await saveOrgData();
+    }
     setDirection('forward');
     let next = step + 1;
-    if (next === 3 && accountType !== 'agency') next = 4;
+    if (next === 4 && accountType !== 'agency') next = 5;
     setStep(next);
   };
 
   const goBack = () => {
     setDirection('back');
     let prev = step - 1;
-    if (prev === 3 && accountType !== 'agency') prev = 2;
+    if (prev === 4 && accountType !== 'agency') prev = 3;
     setStep(prev);
+  };
+
+  const saveOrgData = async () => {
+    if (!orgId) return;
+
+    let logoUrl = orgLogoUrl;
+
+    // Upload logo if a new file was selected
+    if (orgLogoFile) {
+      setIsUploadingLogo(true);
+      const ext = orgLogoFile.name.split('.').pop();
+      const path = `${orgId}/logo.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('org-assets')
+        .upload(path, orgLogoFile, { upsert: true });
+      if (uploadError) {
+        toast.error('Failed to upload logo');
+        setIsUploadingLogo(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
+      logoUrl = urlData.publicUrl;
+      setOrgLogoUrl(logoUrl);
+      setIsUploadingLogo(false);
+    }
+
+    const { error } = await supabase
+      .from('organisations')
+      .update({
+        name: orgName.trim(),
+        logo_url: logoUrl,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        accent_color: accentColor,
+      })
+      .eq('id', orgId);
+
+    if (error) {
+      console.error('Failed to save org:', error);
+      toast.error('Failed to save organisation details');
+    }
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo must be under 5MB');
+      return;
+    }
+    setOrgLogoFile(file);
+    setOrgLogoPreview(URL.createObjectURL(file));
+  };
+
+  const removeLogo = () => {
+    setOrgLogoFile(null);
+    setOrgLogoPreview(null);
+    setOrgLogoUrl(null);
   };
 
   const canContinue = () => {
     switch (step) {
       case 1: return !!accountType;
-      case 2: return platformsUsed.length > 0;
-      case 3: return !!clientCount;
-      case 4: return !!primaryReason;
-      case 5: return !!referralSource && (referralSource !== 'other' || otherReferral.trim().length > 0);
+      case 2: return orgName.trim().length > 0;
+      case 3: return platformsUsed.length > 0;
+      case 4: return !!clientCount;
+      case 5: return !!primaryReason;
+      case 6: return !!referralSource && (referralSource !== 'other' || otherReferral.trim().length > 0);
       default: return true;
     }
   };
@@ -139,13 +243,6 @@ const OnboardingPage = () => {
     if (!user) return;
     setIsSubmitting(true);
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('org_id')
-      .eq('user_id', user.id)
-      .single();
-
-    const orgId = profile?.org_id;
     if (!orgId) {
       toast.error('Organisation not found. Please contact support.');
       setIsSubmitting(false);
@@ -178,16 +275,17 @@ const OnboardingPage = () => {
   };
 
   const progressPercent = Math.min((step / TOTAL_STEPS) * 100, 100);
+  const logoDisplay = orgLogoPreview || orgLogoUrl;
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      {/* Ambient glow — subtle, behind content */}
+      {/* Ambient glow */}
       <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/6 blur-[140px] pointer-events-none" />
       <div className="absolute bottom-[-120px] right-[-80px] w-[350px] h-[350px] rounded-full bg-secondary/5 blur-[120px] pointer-events-none" />
 
       {/* Centered shell */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-12">
-        {/* Progress header — inside shell, not fixed */}
+        {/* Progress header */}
         {step < TOTAL_STEPS && (
           <div className="w-full max-w-xl mb-10 space-y-3">
             <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
@@ -246,8 +344,137 @@ const OnboardingPage = () => {
             </StepContainer>
           )}
 
-          {/* Step 2: Platforms */}
+          {/* Step 2: Organisation Setup */}
           {step === 2 && (
+            <StepContainer
+              title="Set up your organisation"
+              subtitle="Customise your brand — you can update this later in settings"
+            >
+              <div className="space-y-6">
+                {/* Org Name */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-foreground">Organisation Name</Label>
+                  <Input
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    placeholder="Your company or agency name"
+                    className="bg-card border-border text-foreground placeholder:text-muted-foreground/60"
+                  />
+                </div>
+
+                {/* Logo Upload */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-foreground">Logo</Label>
+                  <div className="flex items-center gap-4">
+                    {logoDisplay ? (
+                      <div className="relative">
+                        <img
+                          src={logoDisplay}
+                          alt="Organisation logo"
+                          className="h-16 w-16 rounded-xl object-contain border border-border bg-card p-1"
+                        />
+                        <button
+                          onClick={removeLogo}
+                          className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => logoInputRef.current?.click()}
+                        className={cn(CARD_BASE, 'flex items-center gap-3 px-5 py-3')}
+                      >
+                        <Upload className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Upload logo</span>
+                      </button>
+                    )}
+                    {logoDisplay && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        Change
+                      </Button>
+                    )}
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoSelect}
+                    />
+                  </div>
+                </div>
+
+                {/* Brand Colours */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-foreground">Brand Colours <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">Primary</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={primaryColor}
+                          onChange={(e) => setPrimaryColor(e.target.value)}
+                          className="h-9 w-9 rounded-lg border border-border cursor-pointer bg-transparent"
+                        />
+                        <Input
+                          value={primaryColor}
+                          onChange={(e) => setPrimaryColor(e.target.value)}
+                          className="h-9 text-xs bg-card border-border font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">Secondary</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={secondaryColor}
+                          onChange={(e) => setSecondaryColor(e.target.value)}
+                          className="h-9 w-9 rounded-lg border border-border cursor-pointer bg-transparent"
+                        />
+                        <Input
+                          value={secondaryColor}
+                          onChange={(e) => setSecondaryColor(e.target.value)}
+                          className="h-9 text-xs bg-card border-border font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">Accent</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={accentColor}
+                          onChange={(e) => setAccentColor(e.target.value)}
+                          className="h-9 w-9 rounded-lg border border-border cursor-pointer bg-transparent"
+                        />
+                        <Input
+                          value={accentColor}
+                          onChange={(e) => setAccentColor(e.target.value)}
+                          className="h-9 text-xs bg-card border-border font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Preview swatch */}
+                  <div className="flex gap-2 mt-2">
+                    <div className="h-8 flex-1 rounded-lg" style={{ backgroundColor: primaryColor }} />
+                    <div className="h-8 flex-1 rounded-lg" style={{ backgroundColor: secondaryColor }} />
+                    <div className="h-8 flex-1 rounded-lg" style={{ backgroundColor: accentColor }} />
+                  </div>
+                </div>
+              </div>
+              <StepActions onNext={goNext} onBack={goBack} canContinue={canContinue()} />
+            </StepContainer>
+          )}
+
+          {/* Step 3: Platforms */}
+          {step === 3 && (
             <StepContainer
               title="Which platforms do you use?"
               subtitle="Select all that apply — you can change these later"
@@ -281,8 +508,8 @@ const OnboardingPage = () => {
             </StepContainer>
           )}
 
-          {/* Step 3: Client Count (agency only) */}
-          {step === 3 && (
+          {/* Step 4: Client Count (agency only) */}
+          {step === 4 && (
             <StepContainer
               title="How many clients do you manage?"
               subtitle="This helps us recommend the right plan"
@@ -307,8 +534,8 @@ const OnboardingPage = () => {
             </StepContainer>
           )}
 
-          {/* Step 4: Primary Reason */}
-          {step === 4 && (
+          {/* Step 5: Primary Reason */}
+          {step === 5 && (
             <StepContainer
               title="What's your main reason for using AMW Reports?"
               subtitle="Choose the one that matters most"
@@ -344,8 +571,8 @@ const OnboardingPage = () => {
             </StepContainer>
           )}
 
-          {/* Step 5: Referral Source */}
-          {step === 5 && (
+          {/* Step 6: Referral Source */}
+          {step === 6 && (
             <StepContainer
               title="How did you find AMW Reports?"
               subtitle="We'd love to know what brought you here"
@@ -392,7 +619,7 @@ const OnboardingPage = () => {
             </StepContainer>
           )}
 
-          {/* Step 6: Welcome / Completion */}
+          {/* Step 7: Welcome / Completion */}
           {step === TOTAL_STEPS && (
             <div className="flex flex-col items-center text-center space-y-8">
               {particles.map((p) => (

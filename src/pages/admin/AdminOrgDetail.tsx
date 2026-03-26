@@ -12,7 +12,10 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Loader2, Users, Plug, Trash2 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { ArrowLeft, Loader2, Users, Plug, Trash2, Pencil, Save, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -22,12 +25,25 @@ const AdminOrgDetail = () => {
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
 
+  // Subscription state
   const [planId, setPlanId] = useState('');
   const [additionalClients, setAdditionalClients] = useState(0);
   const [additionalConnections, setAdditionalConnections] = useState(0);
   const [isCustom, setIsCustom] = useState(false);
   const [isUnlimited, setIsUnlimited] = useState(false);
   const [status, setStatus] = useState('active');
+
+  // Org name editing
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedOrgName, setEditedOrgName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  // Member edit dialog
+  const [editMember, setEditMember] = useState<any>(null);
+  const [editMemberName, setEditMemberName] = useState('');
+  const [editMemberEmail, setEditMemberEmail] = useState('');
+  const [editMemberRole, setEditMemberRole] = useState('');
+  const [isSavingMember, setIsSavingMember] = useState(false);
 
   const { data: org } = useQuery({
     queryKey: ['admin-org', id],
@@ -59,7 +75,6 @@ const AdminOrgDetail = () => {
     enabled: !!id,
   });
 
-  // Clients for this org
   const { data: clients = [] } = useQuery({
     queryKey: ['admin-org-clients', id],
     queryFn: async () => {
@@ -69,7 +84,6 @@ const AdminOrgDetail = () => {
     enabled: !!id,
   });
 
-  // Connections for this org's clients
   const { data: connections = [] } = useQuery({
     queryKey: ['admin-org-connections', id],
     queryFn: async () => {
@@ -84,7 +98,6 @@ const AdminOrgDetail = () => {
     enabled: clients.length > 0,
   });
 
-  // Members
   const { data: members = [] } = useQuery({
     queryKey: ['admin-org-members', id],
     queryFn: async () => {
@@ -94,7 +107,6 @@ const AdminOrgDetail = () => {
     enabled: !!id,
   });
 
-  // Profiles for members
   const { data: profiles = [] } = useQuery({
     queryKey: ['admin-org-profiles', id],
     queryFn: async () => {
@@ -125,6 +137,10 @@ const AdminOrgDetail = () => {
     }
   }, [subscription, plans]);
 
+  useEffect(() => {
+    if (org) setEditedOrgName(org.name);
+  }, [org]);
+
   const handleSave = async () => {
     setIsSaving(true);
     const payload = {
@@ -153,12 +169,77 @@ const AdminOrgDetail = () => {
     setIsSaving(false);
   };
 
+  const handleSaveOrgName = async () => {
+    if (!editedOrgName.trim()) return;
+    setIsSavingName(true);
+    const { error } = await supabase
+      .from('organisations')
+      .update({ name: editedOrgName.trim() })
+      .eq('id', id!);
+    if (error) {
+      toast.error('Failed to update organisation name');
+      console.error(error);
+    } else {
+      toast.success('Organisation name updated');
+      queryClient.invalidateQueries({ queryKey: ['admin-org', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin-orgs'] });
+      setIsEditingName(false);
+    }
+    setIsSavingName(false);
+  };
+
   const handleRemoveMember = async (memberId: string) => {
     const { error } = await supabase.from('org_members').delete().eq('id', memberId);
     if (error) { toast.error('Failed to remove member'); console.error(error); }
     else {
       toast.success('Member removed');
       queryClient.invalidateQueries({ queryKey: ['admin-org-members', id] });
+    }
+  };
+
+  const openEditMember = (member: any) => {
+    const profile = member.user_id ? profileMap[member.user_id] : null;
+    setEditMember(member);
+    setEditMemberName(profile?.full_name ?? '');
+    setEditMemberEmail(profile?.email ?? member.invited_email ?? '');
+    setEditMemberRole(member.role);
+  };
+
+  const handleSaveMember = async () => {
+    if (!editMember) return;
+    setIsSavingMember(true);
+
+    try {
+      // Update role on org_members
+      if (editMemberRole !== editMember.role) {
+        const { error } = await supabase
+          .from('org_members')
+          .update({ role: editMemberRole })
+          .eq('id', editMember.id);
+        if (error) throw error;
+      }
+
+      // Update profile if user exists
+      if (editMember.user_id) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            full_name: editMemberName.trim() || null,
+            email: editMemberEmail.trim() || null,
+          })
+          .eq('user_id', editMember.user_id);
+        if (error) throw error;
+      }
+
+      toast.success('Member updated');
+      queryClient.invalidateQueries({ queryKey: ['admin-org-members', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-profiles', id] });
+      setEditMember(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update member');
+    } finally {
+      setIsSavingMember(false);
     }
   };
 
@@ -169,8 +250,30 @@ const AdminOrgDetail = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/admin/organisations')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-display">{org?.name ?? 'Organisation'}</h1>
+          <div className="flex-1">
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editedOrgName}
+                  onChange={(e) => setEditedOrgName(e.target.value)}
+                  className="text-2xl font-display h-10 max-w-xs"
+                  autoFocus
+                />
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSaveOrgName} disabled={isSavingName}>
+                  {isSavingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-primary" />}
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setIsEditingName(false); setEditedOrgName(org?.name ?? ''); }}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-display">{org?.name ?? 'Organisation'}</h1>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsEditingName(true)}>
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            )}
             <p className="text-muted-foreground font-body mt-1">Manage subscription, clients & team</p>
           </div>
         </div>
@@ -292,7 +395,6 @@ const AdminOrgDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Connections detail */}
             {connections.length > 0 && (
               <Card className="mt-4">
                 <CardHeader><CardTitle className="font-display text-lg">Connection Health</CardTitle></CardHeader>
@@ -357,7 +459,7 @@ const AdminOrgDetail = () => {
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="w-12"></TableHead>
+                        <TableHead className="w-20">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -383,9 +485,14 @@ const AdminOrgDetail = () => {
                               )}
                             </TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveMember(member.id)}>
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditMember(member)}>
+                                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveMember(member.id)}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -396,12 +503,50 @@ const AdminOrgDetail = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
           {/* ONBOARDING DATA TAB */}
           <TabsContent value="onboarding">
             <OnboardingDataTab orgId={id!} members={members} profileMap={profileMap} />
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Member Dialog */}
+      <Dialog open={!!editMember} onOpenChange={() => setEditMember(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Member</DialogTitle>
+            <DialogDescription>Update member details and role</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input value={editMemberName} onChange={(e) => setEditMemberName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={editMemberEmail} onChange={(e) => setEditMemberEmail(e.target.value)} type="email" />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={editMemberRole} onValueChange={setEditMemberRole}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditMember(null)}>Cancel</Button>
+            <Button onClick={handleSaveMember} disabled={isSavingMember}>
+              {isSavingMember ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
