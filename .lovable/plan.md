@@ -1,34 +1,32 @@
 
 
-# Fix Instagram Reach/Impressions Not Displaying
+# Fix "Organisation Not Found" and Client Creation Errors
 
-## Root Cause (Confirmed)
+## Root Cause
 
-The previous version of `sync-instagram` bundled `profile_views` with `reach` in a **single API call**. The Instagram API rejected the entire request with a 400 error because `profile_views` requires `metric_type=total_value`. This meant **reach was never fetched**, so both `reach` and `impressions` (which mirrors reach) were stored as `0` in snapshots.
+The `ClientForm` component destructures `orgId` from `useOrg()` but **does not check `isLoading`**. If the user submits the form before the org membership query completes, `orgId` is still `null` and the guard at line 127 fires the "Organisation not found" toast.
 
-Edge function logs confirm this — every sync attempt logged:
-```
-Sync error: API error (400): profile_views should be specified with parameter metric_type=total_value
-```
+This is a **race condition**, not a data issue — the org and membership exist in the database, but the async fetch hasn't resolved yet at the time of submission.
 
-## Current Code Status
+## Fix
 
-The code fix from the previous message is **already correct**:
-- Line 108: fetches only `reach` with `period=day` ✅
-- Lines 136-146: fetches `profile_views` separately with `metric_type=total_value` ✅
-- Lines 148-157: fetches `website_clicks` separately ✅
+### 1. `src/pages/clients/ClientForm.tsx`
+- Destructure `isLoading: isOrgLoading` from `useOrg()` alongside `orgId`
+- Disable the submit button while `isOrgLoading` is true (same as `isSubmitting`)
+- Move the `!orgId` guard **after** confirming org has finished loading, so it only fires for genuinely missing orgs
 
-**No code changes needed.** The existing snapshots just contain stale zero-values from the failed syncs.
+### 2. `src/hooks/useOrg.ts`
+- Add error logging when the `org_members` or `organisations` queries fail, so future issues surface in the console instead of silently returning null
+- Ensure `isLoading` is only set to `false` after both queries complete (currently correct, but add a `finally` to guard against thrown errors leaving `isLoading` stuck at `true`)
 
-## Action Required
+### 3. No database or RLS changes needed
+The existing RLS policies are correct:
+- `org_members` SELECT uses `user_org_id(auth.uid())` via SECURITY DEFINER — no recursion
+- `clients` INSERT uses `org_id = user_org_id(auth.uid())` — correct
+- `organisations` SELECT uses `id = user_org_id(auth.uid())` — correct
 
-Re-trigger Instagram syncs for all connected clients to populate reach/impressions data. Also re-trigger YouTube syncs (parameter name fix was applied in the previous message but no syncs have run since — logs are empty).
-
-This will be done by invoking the edge functions directly for the current and recent months.
-
-## Steps
-
-1. Query `platform_connections` for all active Instagram and YouTube connections
-2. Invoke `sync-instagram` and `sync-youtube` for each connection for the last 3 months
-3. Verify the sync completes successfully by checking logs
+| File | Change |
+|------|--------|
+| `src/pages/clients/ClientForm.tsx` | Use `isLoading` from `useOrg`, disable submit while loading |
+| `src/hooks/useOrg.ts` | Add error logging and `finally` block for robustness |
 
