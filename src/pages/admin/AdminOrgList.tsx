@@ -43,7 +43,7 @@ const AdminOrgList = () => {
           return {
             ...org,
             clientCount: clientRes.count ?? 0,
-            connectionCount: connRes.count ?? 0,
+            connectionCount,
             subscription: subRes.data as any,
           };
         })
