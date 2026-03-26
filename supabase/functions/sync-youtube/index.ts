@@ -138,7 +138,8 @@ Deno.serve(async (req) => {
         const channelData = await channelRes.json();
         if (channelData.items?.[0]?.statistics) {
           metricsData.total_followers = parseInt(channelData.items[0].statistics.subscriberCount || "0", 10);
-          metricsData.video_views = parseInt(channelData.items[0].statistics.viewCount || "0", 10);
+        // Use monthly analytics views, not all-time channel viewCount
+        metricsData.video_views = metricsData.views;
           metricsData.videos_published = parseInt(channelData.items[0].statistics.videoCount || "0", 10);
         }
       } catch (e) {

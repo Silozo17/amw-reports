@@ -258,6 +258,22 @@ Deno.serve(async (req) => {
                 }
               }
 
+              // Fetch video views for video posts
+              let postVideoViews: number | undefined;
+              try {
+                const postId = post.id;
+                if (postId && post.full_picture) {
+                  const videoInsightsUrl = `${GRAPH_BASE}/${postId}/insights?metric=post_video_views&access_token=${pageToken}`;
+                  const videoInsightsRes = await fetch(videoInsightsUrl);
+                  if (videoInsightsRes.ok) {
+                    const videoInsightsData = await videoInsightsRes.json();
+                    if (videoInsightsData.data?.[0]?.values?.[0]?.value) {
+                      postVideoViews = videoInsightsData.data[0].values[0].value;
+                    }
+                  }
+                }
+              } catch {} // non-blocking — not all posts are videos
+
               allTopPosts.push({
                 page_name: page.name,
                 message: post.message || "",
@@ -269,6 +285,7 @@ Deno.serve(async (req) => {
                 shares,
                 reach: postReach,
                 clicks: postClicks,
+                video_views: postVideoViews,
                 total_engagement: likes + comments + shares,
               });
             }

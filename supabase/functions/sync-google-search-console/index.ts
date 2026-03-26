@@ -209,7 +209,7 @@ Deno.serve(async (req) => {
     const metricsData = {
       search_clicks: totalClicks,
       search_impressions: totalImpressions,
-      search_ctr: avgCtr,
+      search_ctr: avgCtr * 100, // API returns decimal (e.g. 0.008), store as percentage (0.8)
       search_position: avgPosition,
     };
 
