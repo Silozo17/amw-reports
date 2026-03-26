@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Play, RefreshCw, Loader2 } from 'lucide-react';
+import { Copy, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformType, PlatformConnection } from '@/types/database';
@@ -16,18 +16,6 @@ interface Client {
   company_name: string;
 }
 
-const SYNC_FUNCTION_MAP: Record<string, string> = {
-  facebook: 'sync-facebook-page',
-  instagram: 'sync-instagram',
-  meta_ads: 'sync-meta-ads',
-  google_ads: 'sync-google-ads',
-  google_analytics: 'sync-google-analytics',
-  google_search_console: 'sync-google-search-console',
-  google_business_profile: 'sync-google-business-profile',
-  youtube: 'sync-youtube',
-  linkedin: 'sync-linkedin',
-  tiktok: 'sync-tiktok-ads',
-};
 
 const maskToken = (token: string | null): string => {
   if (!token) return '—';
@@ -63,7 +51,6 @@ const DebugConsole = () => {
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [loading, setLoading] = useState({ connections: false, syncLogs: false, snapshots: false });
-  const [syncTestResult, setSyncTestResult] = useState<Record<string, { loading: boolean; response: any }>>({});
 
   // Fetch clients on mount
   useEffect(() => {
@@ -116,37 +103,6 @@ const DebugConsole = () => {
     setLoading(l => ({ ...l, snapshots: false }));
   };
 
-  const handleSyncTest = async (conn: PlatformConnection) => {
-    const funcName = SYNC_FUNCTION_MAP[conn.platform];
-    if (!funcName) {
-      toast.error(`No sync function mapped for ${conn.platform}`);
-      return;
-    }
-
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
-
-    setSyncTestResult(prev => ({ ...prev, [conn.id]: { loading: true, response: null } }));
-
-    const { data, error } = await supabase.functions.invoke(funcName, {
-      body: { connection_id: conn.id, month, year },
-    });
-
-    setSyncTestResult(prev => ({
-      ...prev,
-      [conn.id]: { loading: false, response: error ? { error: error.message } : data },
-    }));
-
-    if (error) {
-      toast.error(`Sync failed: ${error.message}`);
-    } else {
-      toast.success(`Sync complete for ${PLATFORM_LABELS[conn.platform]}`);
-      // Refresh data
-      fetchSyncLogs();
-      fetchSnapshots();
-    }
-  };
 
   return (
     <AppLayout>
@@ -198,18 +154,6 @@ const DebugConsole = () => {
                             {conn.is_connected ? 'Connected' : 'Disconnected'}
                           </Badge>
                         </CardTitle>
-                        <Button
-                          size="sm"
-                          onClick={() => handleSyncTest(conn)}
-                          disabled={syncTestResult[conn.id]?.loading}
-                        >
-                          {syncTestResult[conn.id]?.loading ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <Play className="h-4 w-4 mr-1" />
-                          )}
-                          Sync Now
-                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -229,9 +173,6 @@ const DebugConsole = () => {
                         </div>
                       )}
                       <JsonViewer data={conn.metadata} label="Metadata" />
-                      {syncTestResult[conn.id]?.response && (
-                        <JsonViewer data={syncTestResult[conn.id].response} label="Sync Response" />
-                      )}
                     </CardContent>
                   </Card>
                 ))
