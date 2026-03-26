@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrgList from "./pages/admin/AdminOrgList";
 import AdminOrgDetail from "./pages/admin/AdminOrgDetail";
+import AdminActivityLog from "./pages/admin/AdminActivityLog";
 import { usePlatformAdmin } from "./hooks/usePlatformAdmin";
 
 const queryClient = new QueryClient();
@@ -89,6 +90,7 @@ const AppRoutes = () => (
     <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
     <Route path="/admin/organisations" element={<AdminRoute><AdminOrgList /></AdminRoute>} />
     <Route path="/admin/organisations/:id" element={<AdminRoute><AdminOrgDetail /></AdminRoute>} />
+    <Route path="/admin/activity" element={<AdminRoute><AdminActivityLog /></AdminRoute>} />
     <Route path="/portal/:token" element={<ClientPortal />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
