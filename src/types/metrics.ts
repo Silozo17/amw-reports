@@ -68,7 +68,7 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   gbp_average_rating: 'Average star rating of your Google Business Profile reviews',
   // YouTube
   subscribers: 'Net new subscribers gained during this period',
-  views: 'Total number of times your content was played or displayed on screen',
+  views: 'Organic views — times your content was seen excluding paid/boosted delivery',
   watch_time: 'Total minutes people spent watching your videos',
   videos_published: 'Total number of videos on your channel',
   avg_view_duration: 'Average time in seconds viewers watched your videos',
