@@ -9,6 +9,7 @@ import ReactMarkdown from "react-markdown";
 import {
   Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users,
   BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, Activity,
+  Target, FileText, Link,
 } from "lucide-react";
 import { PLATFORM_LOGOS, PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
 import { METRIC_EXPLANATIONS } from "@/types/metrics";
@@ -320,6 +321,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
     const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
     const totalVideoViews = filtered.reduce((sum, s) => sum + (s.metrics_data.video_views || 0), 0);
+    const totalConversions = filtered.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
+    const totalPageViews = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
+    const totalWebsiteClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
 
     const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
     const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
@@ -327,6 +331,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const prevEngagement = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
     const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
     const prevVideoViews = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.video_views || 0), 0);
+    const prevConversions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
+    const prevPageViews = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
+    const prevWebsiteClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
 
     const cc = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
@@ -338,6 +345,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       ...(totalEngagement > 0 ? [{ label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement" }] : []),
       ...(totalFollowers > 0 ? [{ label: "Followers", value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: "total_followers" }] : []),
       ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions" }] : []),
+      ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions" }] : []),
+      ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views" }] : []),
+      ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks" }] : []),
     ] as KpiItem[];
   }, [filtered, filteredPrev, selectedPlatform]);
 
