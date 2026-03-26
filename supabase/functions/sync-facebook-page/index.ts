@@ -8,6 +8,34 @@ const corsHeaders = {
 
 const GRAPH_BASE = "https://graph.facebook.com/v25.0";
 
+/** Helper: sum daily values from a page insights metric array */
+const sumDailyValues = (metricData: any[], metricName: string): number => {
+  for (const metric of metricData) {
+    if (metric.name === metricName) {
+      return (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
+    }
+  }
+  return 0;
+};
+
+/** Helper: fetch page insights for a set of metrics (single API call) */
+const fetchPageInsights = async (
+  pageId: string,
+  pageToken: string,
+  metrics: string[],
+  startDate: string,
+  endDate: string,
+): Promise<any[]> => {
+  const url = `${GRAPH_BASE}/${pageId}/insights?metric=${metrics.join(",")}&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Insights API error (${res.status}): ${body}`);
+  }
+  const data = await res.json();
+  return data.data || [];
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -93,12 +121,28 @@ Deno.serve(async (req) => {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
+    // Accumulators
     let totalEngagement = 0;
+    let totalPageViews = 0;
+    let totalLinkClicks = 0;
+
+    // Organic metrics (native from FB API)
+    let organicReach = 0;          // page_impressions_organic_unique
+    let organicVideoViews = 0;     // page_video_views_organic
+
+    // Paid metrics
+    let paidImpressions = 0;       // page_impressions_paid
+    let paidVideoViews = 0;        // page_video_views_paid
+
+    // Totals (for reference & organic impressions calculation)
+    let totalImpressions = 0;      // page_impressions
+    let totalVideoViews = 0;       // page_video_views
+
+    // Media view breakdown (secondary signal)
     let totalMediaViews = 0;
     let totalMediaViewsPaid = 0;
     let totalMediaViewsOrganic = 0;
-    let totalPageViews = 0;
-    let totalLinkClicks = 0;
+
     const metricsAccum: Record<string, number> = {};
     const allTopPosts: any[] = [];
 
@@ -113,51 +157,52 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // 1. Core insights: page_post_engagements + page_follows
+      // 1. Core organic/paid page-level metrics
       try {
-        const insightsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_post_engagements,page_follows&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        const insightsRes = await fetch(insightsUrl);
-        if (!insightsRes.ok) {
-          const errorBody = await insightsRes.text();
-          throw new Error(`Insights API error (${insightsRes.status}): ${errorBody}`);
-        }
-        const insightsData = await insightsRes.json();
-        if (insightsData.data) {
-          for (const metric of insightsData.data) {
+        const coreMetrics = await fetchPageInsights(pageId, pageToken, [
+          "page_post_engagements",
+          "page_follows",
+          "page_impressions",
+          "page_impressions_paid",
+          "page_impressions_organic_unique",
+          "page_video_views",
+          "page_video_views_organic",
+          "page_video_views_paid",
+        ], startDate, endDate);
+
+        totalEngagement += sumDailyValues(coreMetrics, "page_post_engagements");
+        totalImpressions += sumDailyValues(coreMetrics, "page_impressions");
+        paidImpressions += sumDailyValues(coreMetrics, "page_impressions_paid");
+        organicReach += sumDailyValues(coreMetrics, "page_impressions_organic_unique");
+        totalVideoViews += sumDailyValues(coreMetrics, "page_video_views");
+        organicVideoViews += sumDailyValues(coreMetrics, "page_video_views_organic");
+        paidVideoViews += sumDailyValues(coreMetrics, "page_video_views_paid");
+
+        // page_follows: get growth from first to last day
+        for (const metric of coreMetrics) {
+          if (metric.name === "page_follows") {
             const values = metric.values || [];
-            if (metric.name === "page_post_engagements") {
-              totalEngagement += values.reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-            } else if (metric.name === "page_follows") {
-              const lastValue = values.at(-1)?.value || 0;
-              const firstValue = values.at(0)?.value || 0;
-              metricsAccum.total_fans = (metricsAccum.total_fans || 0) + Number(lastValue);
-              metricsAccum.follower_growth = (metricsAccum.follower_growth || 0) + (Number(lastValue) - Number(firstValue));
-            }
+            const lastValue = values.at(-1)?.value || 0;
+            const firstValue = values.at(0)?.value || 0;
+            metricsAccum.total_fans = (metricsAccum.total_fans || 0) + Number(lastValue);
+            metricsAccum.follower_growth = (metricsAccum.follower_growth || 0) + (Number(lastValue) - Number(firstValue));
           }
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Insights error page ${pageId}:`, errorMsg);
+        console.error(`Core insights error page ${pageId}:`, errorMsg);
         await supabaseClient.from("platform_connections")
           .update({ last_error: errorMsg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
 
-      // 2. page_media_view
+      // 2. page_media_view (total)
       try {
-        const mediaViewUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        const mediaViewRes = await fetch(mediaViewUrl);
-        if (mediaViewRes.ok) {
-          const mediaViewData = await mediaViewRes.json();
-          if (mediaViewData.data) {
-            for (const metric of mediaViewData.data) {
-              totalMediaViews += (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-            }
-          }
-        }
+        const mediaViewData = await fetchPageInsights(pageId, pageToken, ["page_media_view"], startDate, endDate);
+        totalMediaViews += sumDailyValues(mediaViewData, "page_media_view");
       } catch {} // non-blocking
 
-      // 3. page_media_view with is_from_ads breakdown
+      // 3. page_media_view with is_from_ads breakdown (secondary signal)
       try {
         const breakdownUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&period=day&since=${startDate}&until=${endDate}&breakdowns=is_from_ads&access_token=${pageToken}`;
         const breakdownRes = await fetch(breakdownUrl);
@@ -178,30 +223,14 @@ Deno.serve(async (req) => {
 
       // 4. page_views_total
       try {
-        const pageViewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_views_total&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        const pageViewsRes = await fetch(pageViewsUrl);
-        if (pageViewsRes.ok) {
-          const pageViewsData = await pageViewsRes.json();
-          if (pageViewsData.data) {
-            for (const metric of pageViewsData.data) {
-              totalPageViews += (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-            }
-          }
-        }
+        const pageViewsData = await fetchPageInsights(pageId, pageToken, ["page_views_total"], startDate, endDate);
+        totalPageViews += sumDailyValues(pageViewsData, "page_views_total");
       } catch {} // non-blocking
 
       // 5. page_consumptions (link clicks)
       try {
-        const consumptionsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_consumptions&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        const consumptionsRes = await fetch(consumptionsUrl);
-        if (consumptionsRes.ok) {
-          const consumptionsData = await consumptionsRes.json();
-          if (consumptionsData.data) {
-            for (const metric of consumptionsData.data) {
-              totalLinkClicks += (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-            }
-          }
-        }
+        const consumptionsData = await fetchPageInsights(pageId, pageToken, ["page_consumptions"], startDate, endDate);
+        totalLinkClicks += sumDailyValues(consumptionsData, "page_consumptions");
       } catch {} // non-blocking
 
       // 6. Fetch ALL posts with basic fields, then fetch per-post insights individually
@@ -224,16 +253,16 @@ Deno.serve(async (req) => {
               const attachmentType = post.attachments?.data?.[0]?.media_type || '';
               const isVideo = attachmentType === 'video' || attachmentType === 'video_inline';
 
-              // Fetch per-post insights individually for reliable reach and video views
-              let postReach = 0;
+              // Fetch per-post insights: organic reach, paid reach, video views
+              let postOrganicReach = 0;
+              let postPaidReach = 0;
               let postClicks = 0;
               let postVideoViews = 0;
 
               try {
-                // Build metrics list based on post type
                 const insightMetrics = isVideo
-                  ? 'post_impressions_unique,post_clicks,post_video_views'
-                  : 'post_impressions_unique,post_clicks';
+                  ? 'post_impressions_organic_unique,post_impressions_paid_unique,post_clicks,post_video_views'
+                  : 'post_impressions_organic_unique,post_impressions_paid_unique,post_clicks';
 
                 const postInsightsUrl = `${GRAPH_BASE}/${post.id}/insights?metric=${insightMetrics}&access_token=${pageToken}`;
                 const postInsightsRes = await fetch(postInsightsUrl);
@@ -242,12 +271,15 @@ Deno.serve(async (req) => {
                   const postInsightsData = await postInsightsRes.json();
                   for (const insight of postInsightsData.data || []) {
                     const val = insight.values?.[0]?.value || 0;
-                    if (insight.name === 'post_impressions_unique') postReach = val;
+                    if (insight.name === 'post_impressions_organic_unique') postOrganicReach = val;
+                    if (insight.name === 'post_impressions_paid_unique') postPaidReach = val;
                     if (insight.name === 'post_clicks') postClicks = val;
                     if (insight.name === 'post_video_views') postVideoViews = val;
                   }
                 }
               } catch {} // non-blocking per-post
+
+              const isBoosted = postPaidReach > 0;
 
               allTopPosts.push({
                 page_name: page.name,
@@ -258,11 +290,14 @@ Deno.serve(async (req) => {
                 likes,
                 comments,
                 shares,
-                reach: postReach,
+                reach: postOrganicReach,
+                organic_reach: postOrganicReach,
+                paid_reach: postPaidReach,
                 clicks: postClicks,
                 video_views: postVideoViews > 0 ? postVideoViews : undefined,
                 media_type: attachmentType || 'status',
                 total_engagement: likes + comments + shares,
+                is_boosted: isBoosted,
               });
             }
           }
@@ -284,25 +319,44 @@ Deno.serve(async (req) => {
     // Aggregate video views from posts (month-specific, not lifetime)
     const monthlyVideoViews = allTopPosts.reduce((sum, p) => sum + (p.video_views || 0), 0);
 
-    const organicImpressions = totalMediaViewsOrganic || Math.max(totalMediaViews - totalMediaViewsPaid, 0);
+    // Organic impressions: total - paid (no native organic-only impressions metric exists at non-unique level)
+    const organicImpressions = Math.max(totalImpressions - paidImpressions, 0);
+
+    // Use native organic metrics as primary; fall back to media view breakdown if core metrics failed
+    const finalOrganicReach = organicReach > 0 ? organicReach : totalMediaViewsOrganic;
+    const finalOrganicVideoViews = organicVideoViews > 0 ? organicVideoViews : Math.max(monthlyVideoViews - paidVideoViews, 0);
+
+    // Paid reach: use page_impressions_paid as approximation (FB doesn't have page_impressions_paid_unique at page level)
+    // We already have paidImpressions from page_impressions_paid
+    const finalPaidReach = paidImpressions; // paid impressions serves as the paid reach proxy
 
     const metricsData = {
+      // Organic-only (primary display metrics)
       impressions: organicImpressions,
       organic_impressions: organicImpressions,
-      paid_impressions: totalMediaViewsPaid,
-      total_impressions: totalMediaViews,
-      reach: organicImpressions,
+      reach: finalOrganicReach,
+      video_views: finalOrganicVideoViews,
+
+      // Paid (stored for separate display — for boosted posts / ads run through FB)
+      paid_impressions: paidImpressions,
+      paid_reach: finalPaidReach,
+      paid_video_views: paidVideoViews,
+
+      // Totals (for reference / validation)
+      total_impressions: totalImpressions,
+      total_video_views: totalVideoViews > 0 ? totalVideoViews : monthlyVideoViews,
+
+      // These are fine as-is (engagement includes all sources, which is acceptable)
       engagement: totalEngagement,
       page_views: totalPageViews,
       link_clicks: totalLinkClicks,
       follower_growth: metricsAccum.follower_growth || 0,
       total_followers: metricsAccum.total_fans || 0,
-      video_views: monthlyVideoViews,
       likes: allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
       comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
       shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
       posts_published: allTopPosts.length,
-      engagement_rate: organicImpressions > 0 ? (totalEngagement / organicImpressions) * 100 : 0,
+      engagement_rate: finalOrganicReach > 0 ? (totalEngagement / finalOrganicReach) * 100 : 0,
       pages_count: pages.length,
     };
 
@@ -337,7 +391,7 @@ Deno.serve(async (req) => {
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete. video_views=${monthlyVideoViews}, posts=${allTopPosts.length}, reach(page)=${organicImpressions}`);
+    console.log(`Facebook sync complete. organic_reach=${finalOrganicReach}, organic_impressions=${organicImpressions}, paid_impressions=${paidImpressions}, organic_video_views=${finalOrganicVideoViews}, paid_video_views=${paidVideoViews}, posts=${allTopPosts.length}`);
 
     return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
