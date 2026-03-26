@@ -157,6 +157,7 @@ function generateDefaultWidgets(
   hasYtVideos: boolean,
   filtered: SnapshotData[],
   platformConfigs: Map<string, PlatformConfigData>,
+  viewMode: 'compact' | 'extended',
 ): DashboardWidget[] {
   const widgets: DashboardWidget[] = [];
   let y = 0;
