@@ -22,6 +22,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, ExternalLink, ImageOff } from 'lucide-react';
 import { useState } from 'react';
 import MetricTooltip from '@/components/clients/MetricTooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
 
@@ -76,6 +77,7 @@ interface PlatformSectionProps {
 /** Priority metrics per platform category */
 const AD_PLATFORM_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'conversions', 'cost_per_conversion', 'reach'];
 const SOCIAL_KEY_METRICS = ['reach', 'impressions', 'engagement', 'likes', 'comments', 'shares', 'total_followers', 'follower_growth', 'profile_visits', 'website_clicks', 'video_views', 'saves', 'reel_count'];
+const FACEBOOK_KEY_METRICS = ['views', 'reach', 'engagement', 'reactions', 'comments', 'total_followers', 'new_followers', 'page_views', 'link_clicks', 'shares'];
 const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session'];
 const GSC_KEY_METRICS = ['search_clicks', 'search_impressions', 'search_ctr', 'search_position'];
 const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating'];
@@ -84,7 +86,7 @@ const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers'
 const PLATFORM_KEY_METRICS: Record<string, string[]> = {
   google_ads: AD_PLATFORM_KEY_METRICS,
   meta_ads: AD_PLATFORM_KEY_METRICS,
-  facebook: SOCIAL_KEY_METRICS,
+  facebook: FACEBOOK_KEY_METRICS,
   instagram: SOCIAL_KEY_METRICS,
   tiktok: SOCIAL_KEY_METRICS,
   linkedin: SOCIAL_KEY_METRICS,
@@ -285,7 +287,7 @@ const PlatformSection = ({
       <CardContent className="p-5 space-y-5">
         {/* Metric Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {allMetricKeys.filter(k => !k.startsWith('paid_') && !k.startsWith('total_impressions') && !k.startsWith('total_video_views')).slice(0, 10).map(key => (
+          {allMetricKeys.slice(0, 10).map(key => (
             <MetricCard
               key={key}
               metricKey={key}
@@ -296,31 +298,6 @@ const PlatformSection = ({
           ))}
         </div>
 
-        {/* Facebook Boosted / Paid Performance sub-section */}
-        {platform === 'facebook' && (metricsData.paid_impressions > 0 || metricsData.paid_reach > 0 || metricsData.paid_video_views > 0) && (
-          <Collapsible>
-            <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
-              <ChevronDown className="h-3.5 w-3.5 transition-transform" />
-              Boosted / Paid Performance
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {metricsData.paid_impressions > 0 && (
-                  <MetricCard metricKey="paid_impressions" value={metricsData.paid_impressions} change={computeChange('paid_impressions')} currSymbol={currSymbol} />
-                )}
-                {metricsData.paid_reach > 0 && (
-                  <MetricCard metricKey="paid_reach" value={metricsData.paid_reach} change={computeChange('paid_reach')} currSymbol={currSymbol} />
-                )}
-                {metricsData.paid_video_views > 0 && (
-                  <MetricCard metricKey="paid_video_views" value={metricsData.paid_video_views} change={computeChange('paid_video_views')} currSymbol={currSymbol} />
-                )}
-              </div>
-              <p className="text-[10px] text-muted-foreground/60 mt-2 italic">
-                Paid data from boosted posts or ads run directly through Facebook. If Meta Ads is also connected, campaign-level paid data is shown separately under Meta Ads.
-              </p>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
 
         {/* Platform-specific explanation */}
         {METRIC_EXPLANATIONS[allMetricKeys[0]] && (
@@ -489,28 +466,70 @@ const PlatformSection = ({
                       <TableRow>
                         <TableHead className="w-10 px-2" />
                         <TableHead>Post</TableHead>
-                        <TableHead className="text-right">Reach</TableHead>
                         <TableHead className="text-right">Views</TableHead>
-                        <TableHead className="text-right">Likes</TableHead>
+                        <TableHead className="text-right">Reactions</TableHead>
                         <TableHead className="text-right">Comments</TableHead>
+                        <TableHead className="text-right">Shares</TableHead>
+                        {platform === 'facebook' && <TableHead className="text-right">Clicks</TableHead>}
                         <TableHead className="w-10 px-2" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {socialPosts.slice(0, 5).map((p, i) => (
+                      {socialPosts.slice(0, 10).map((p, i) => (
                         <TableRow key={i}>
                           <TableCell className="w-10 px-2">
-                            {p.full_picture ? (
-                              <img src={p.full_picture} alt="" className="h-8 w-8 rounded object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            ) : (
-                              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center"><ImageOff className="h-3 w-3 text-muted-foreground" /></div>
+                            <div className="flex items-center gap-2">
+                              {p.full_picture ? (
+                                <img src={p.full_picture} alt="" className="h-8 w-8 rounded object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              ) : (
+                                <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                                  <ImageOff className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm max-w-[200px]">
+                            <span className="truncate block">{(p.message || p.caption || 'No caption').slice(0, 80)}</span>
+                            {(p as any).is_promoted && (
+                              <span className="inline-block text-[9px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded mt-0.5 font-medium">Ad</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm max-w-[200px] truncate">{(p.message || p.caption || 'No caption').slice(0, 80)}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">{(p.reach ?? 0).toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">{p.video_views ? p.video_views.toLocaleString() : '—'}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums">{(p.likes ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">
+                            {(p as any).views > 0 ? (p as any).views.toLocaleString() : (p.reach ?? 0) > 0 ? (p.reach ?? 0).toLocaleString() : '—'}
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">
+                            {platform === 'facebook' ? (
+                              <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help underline decoration-dotted underline-offset-2">
+                                      {((p as any).reactions ?? p.likes ?? 0).toLocaleString()}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs space-y-0.5 max-w-[180px]">
+                                    {(p as any).reaction_like > 0 && <p>👍 Like: {(p as any).reaction_like.toLocaleString()}</p>}
+                                    {(p as any).reaction_love > 0 && <p>❤️ Love: {(p as any).reaction_love.toLocaleString()}</p>}
+                                    {(p as any).reaction_wow > 0 && <p>😮 Wow: {(p as any).reaction_wow.toLocaleString()}</p>}
+                                    {(p as any).reaction_haha > 0 && <p>😂 Haha: {(p as any).reaction_haha.toLocaleString()}</p>}
+                                    {(p as any).reaction_sorry > 0 && <p>😢 Sorry: {(p as any).reaction_sorry.toLocaleString()}</p>}
+                                    {(p as any).reaction_anger > 0 && <p>😡 Angry: {(p as any).reaction_anger.toLocaleString()}</p>}
+                                    {!((p as any).reaction_like || (p as any).reaction_love || (p as any).reaction_wow || (p as any).reaction_haha || (p as any).reaction_sorry || (p as any).reaction_anger) && (
+                                      <p className="text-muted-foreground">No breakdown available</p>
+                                    )}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              (p.likes ?? 0).toLocaleString()
+                            )}
+                          </TableCell>
                           <TableCell className="text-right text-sm tabular-nums">{(p.comments ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{(p.shares ?? 0) > 0 ? (p.shares ?? 0).toLocaleString() : '—'}</TableCell>
+                          {platform === 'facebook' && (
+                            <TableCell className="text-right text-sm tabular-nums">
+                              {(p as any).clicks > 0 ? (p as any).clicks.toLocaleString() : '—'}
+                            </TableCell>
+                          )}
                           <TableCell className="w-10 px-2">
                             {p.permalink_url && (
                               <a href={p.permalink_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground">

@@ -68,11 +68,22 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   gbp_average_rating: 'Average star rating of your Google Business Profile reviews',
   // YouTube
   subscribers: 'Net new subscribers gained during this period',
-  views: 'Total number of times your videos were viewed',
+  views: 'Total number of times your content was played or displayed on screen',
   watch_time: 'Total minutes people spent watching your videos',
   videos_published: 'Total number of videos on your channel',
   avg_view_duration: 'Average time in seconds viewers watched your videos',
   top_videos: 'Your best-performing videos during this period',
+  new_followers:  'New accounts that followed your page this period',
+  cta_clicks:     'Clicks on your page contact info and call-to-action button',
+  post_views:     'Total views across all your posts this period',
+  post_clicks:    'Total clicks across all your posts this period',
+  engaged_users:  'Unique people who interacted with your post',
+  reaction_like:  'Number of Like reactions',
+  reaction_love:  'Number of Love reactions',
+  reaction_wow:   'Number of Wow reactions',
+  reaction_haha:  'Number of Haha reactions',
+  reaction_sorry: 'Number of Sorry reactions',
+  reaction_anger: 'Number of Angry reactions',
 };
 
 /** Timezone options for client configuration */
