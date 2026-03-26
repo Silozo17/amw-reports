@@ -8,8 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Building2, Mail, Phone } from 'lucide-react';
 import type { Client } from '@/types/database';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import UsageBadge from '@/components/entitlements/UsageBadge';
 
 const ClientList = () => {
+  const { currentClients, maxClients } = useEntitlements();
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
@@ -38,7 +41,10 @@ const ClientList = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-display">Clients</h1>
-            <p className="text-muted-foreground font-body mt-1">{clients.length} total clients</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-muted-foreground font-body">{clients.length} total clients</p>
+              <UsageBadge current={currentClients} max={maxClients} label="clients" />
+            </div>
           </div>
           <Button onClick={() => navigate('/clients/new')} className="gap-2">
             <Plus className="h-4 w-4" />

@@ -11,6 +11,8 @@ import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import ConnectionDisclaimer from './ConnectionDisclaimer';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import UpgradePrompt from '@/components/entitlements/UpgradePrompt';
 
 interface ConnectionDialogProps {
   clientId: string;
@@ -39,6 +41,8 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<PlatformType | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const { canAddConnection, currentConnections, maxConnections } = useEntitlements();
 
   // Filter out platforms that already have a connection
   const connectedPlatforms = new Set(connections.map(c => c.platform));
@@ -47,6 +51,10 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
   const handleAddAndConnect = async () => {
     if (!platform) {
       toast.error('Select a platform');
+      return;
+    }
+    if (!canAddConnection) {
+      setShowUpgrade(true);
       return;
     }
 
@@ -155,6 +163,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
 
         <ConnectionDisclaimer />
       </DialogContent>
+      <UpgradePrompt open={showUpgrade} onOpenChange={setShowUpgrade} type="connection" current={currentConnections} max={maxConnections} />
     </Dialog>
   );
 };

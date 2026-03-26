@@ -17,12 +17,16 @@ import { formatPhone } from '@/lib/utils';
 import { CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
 import { useOrg } from '@/hooks/useOrg';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import UpgradePrompt from '@/components/entitlements/UpgradePrompt';
 
 const ClientForm = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { orgId, isLoading: isOrgLoading } = useOrg();
+  const { canAddClient, currentClients, maxClients } = useEntitlements();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +106,10 @@ const ClientForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAddClient) {
+      setShowUpgrade(true);
+      return;
+    }
     if (!form.full_name || !form.company_name) {
       toast.error('Name and company are required');
       return;
@@ -351,6 +359,7 @@ const ClientForm = () => {
           </div>
         </form>
       </div>
+      <UpgradePrompt open={showUpgrade} onOpenChange={setShowUpgrade} type="client" current={currentClients} max={maxClients} />
     </AppLayout>
   );
 };
