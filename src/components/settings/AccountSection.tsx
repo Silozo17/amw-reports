@@ -16,8 +16,8 @@ const AccountSection = () => {
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [email, setEmail] = useState(profile?.email ?? user?.email ?? '');
-  const [phone, setPhone] = useState((profile as Record<string, unknown>)?.phone as string ?? '');
-  const [position, setPosition] = useState((profile as Record<string, unknown>)?.position as string ?? '');
+  const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [position, setPosition] = useState(profile?.position ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
 
   const [isSaving, setIsSaving] = useState(false);
