@@ -107,26 +107,26 @@ Deno.serve(async (req) => {
     for (const ig of filteredAccounts) {
       const { ig_id, page_token } = ig;
 
-      // Fetch IG User Insights (only non-deprecated metrics)
+      // Fetch IG User Insights (only non-deprecated metrics) — split by date ranges
       const metricsMap: Record<string, number> = {};
       try {
-        const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach&period=day&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
-        const insightsRes = await fetch(insightsUrl);
-        if (!insightsRes.ok) {
-          const errorBody = await insightsRes.text();
-          throw new Error(`API error (${insightsRes.status}): ${errorBody}`);
-        }
-        const insightsData = await insightsRes.json();
-
-        if (insightsData.data) {
-          for (const metric of insightsData.data) {
-            const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
-            metricsMap[metric.name] = (metricsMap[metric.name] || 0) + total;
+        for (const range of dateRanges) {
+          const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach&period=day&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const insightsRes = await fetch(insightsUrl);
+          if (!insightsRes.ok) {
+            const errorBody = await insightsRes.text();
+            throw new Error(`API error (${insightsRes.status}): ${errorBody}`);
+          }
+          const insightsData = await insightsRes.json();
+          if (insightsData.data) {
+            for (const metric of insightsData.data) {
+              const total = (metric.values || []).reduce((sum: number, v: any) => sum + (Number(v.value) || 0), 0);
+              metricsMap[metric.name] = (metricsMap[metric.name] || 0) + total;
+            }
           }
         }
         totalReach += metricsMap.reach || 0;
-        totalImpressions = totalReach; // impressions deprecated at account level; use reach
-        // Accumulate per-account metrics into global map
+        totalImpressions = totalReach;
         for (const [k, v] of Object.entries(metricsMap)) {
           globalMetricsMap[k] = (globalMetricsMap[k] || 0) + v;
         }
@@ -140,24 +140,28 @@ Deno.serve(async (req) => {
 
       // Fetch profile_views separately (requires metric_type=total_value)
       try {
-        const profileViewsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=profile_views&period=day&metric_type=total_value&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
-        const pvRes = await fetch(profileViewsUrl);
-        if (pvRes.ok) {
-          const pvData = await pvRes.json();
-          const pvValue = pvData?.data?.[0]?.total_value?.value || 0;
-          totalProfileViews += pvValue;
-          globalMetricsMap['profile_views'] = (globalMetricsMap['profile_views'] || 0) + pvValue;
+        for (const range of dateRanges) {
+          const profileViewsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=profile_views&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const pvRes = await fetch(profileViewsUrl);
+          if (pvRes.ok) {
+            const pvData = await pvRes.json();
+            const pvValue = pvData?.data?.[0]?.total_value?.value || 0;
+            totalProfileViews += pvValue;
+            globalMetricsMap['profile_views'] = (globalMetricsMap['profile_views'] || 0) + pvValue;
+          }
         }
       } catch {} // non-blocking
 
       // Fetch website_clicks separately (different metric_type)
       try {
-        const websiteClicksUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=website_clicks&period=day&metric_type=total_value&since=${sinceTs}&until=${untilTs}&access_token=${page_token}`;
-        const wcRes = await fetch(websiteClicksUrl);
-        if (wcRes.ok) {
-          const wcData = await wcRes.json();
-          const wcValue = wcData?.data?.[0]?.total_value?.value || 0;
-          globalMetricsMap['website_clicks'] = (globalMetricsMap['website_clicks'] || 0) + wcValue;
+        for (const range of dateRanges) {
+          const websiteClicksUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=website_clicks&period=day&metric_type=total_value&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const wcRes = await fetch(websiteClicksUrl);
+          if (wcRes.ok) {
+            const wcData = await wcRes.json();
+            const wcValue = wcData?.data?.[0]?.total_value?.value || 0;
+            globalMetricsMap['website_clicks'] = (globalMetricsMap['website_clicks'] || 0) + wcValue;
+          }
         }
       } catch {} // non-blocking
 
