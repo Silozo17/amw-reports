@@ -174,6 +174,10 @@ const ClientPortal = () => {
     return items;
   }, [snapshots, prevSnapshots, currSymbol]);
 
+  const filteredSnapshots = useMemo(() => {
+    if (selectedPlatform === 'all') return snapshots;
+    return snapshots.filter(s => s.platform === selectedPlatform);
+  }, [snapshots, selectedPlatform]);
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
