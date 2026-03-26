@@ -38,6 +38,7 @@ interface ClientDashboardProps {
   clientId: string;
   clientName: string;
   currencyCode?: string;
+  readOnly?: boolean;
 }
 
 interface TopContentItem {
@@ -480,7 +481,7 @@ function buildWidgetDataMap(
 }
 
 // ─── Main Dashboard ────────────────────────────────────────────
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", readOnly = false }: ClientDashboardProps) => {
   const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
   const defaultMonth = now.getMonth() === 0 ? 12 : now.getMonth();
