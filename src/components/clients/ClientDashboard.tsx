@@ -1007,6 +1007,27 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-md border border-border bg-muted/30 p-0.5">
+            <Button
+              size="sm"
+              variant={viewMode === 'compact' ? 'default' : 'ghost'}
+              onClick={() => { setViewMode('compact'); localStorage.setItem(`dashboard-viewmode-${clientId}`, 'compact'); }}
+              className="h-7 px-2.5 text-xs gap-1.5 rounded-sm"
+            >
+              <Layers className="h-3 w-3" />
+              Compact
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'extended' ? 'default' : 'ghost'}
+              onClick={() => { setViewMode('extended'); localStorage.setItem(`dashboard-viewmode-${clientId}`, 'extended'); }}
+              className="h-7 px-2.5 text-xs gap-1.5 rounded-sm"
+            >
+              <LayoutList className="h-3 w-3" />
+              Extended
+            </Button>
+          </div>
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
             <SelectTrigger className="w-[140px] h-8 text-xs">
               <ArrowUpDown className="h-3 w-3 mr-1" />
