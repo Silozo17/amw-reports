@@ -1,33 +1,29 @@
 
 
-# Fix: Client Creation Errors
+# Fix Instagram Sync & YouTube Data Issues
 
-## Root Cause Analysis
+## Issue 1: Instagram — `profile_views` metric error
 
-After investigating triggers, schema, RLS policies, and the client creation code, I found two issues:
+**Root cause:** Line 108 of `sync-instagram/index.ts` requests `profile_views` with `period=day`, but the Instagram API now requires `metric_type=total_value` for `profile_views` (same as `website_clicks`).
 
-### Issue 1: Error details are completely swallowed
-In `ClientForm.tsx` line 136, the error from the database is caught but only a generic "Failed to create client" toast is shown. The actual error message is never logged or displayed, making it impossible to diagnose what went wrong.
+The error from logs: `"(#100) The following metrics (profile_views) should be specified with parameter metric_type=total_value"`
 
-### Issue 2: No guard against missing org membership
-The insert uses `org_id: orgId!` (line 132) with a TypeScript non-null assertion. If `orgId` is null (user hasn't been assigned to an organisation, or the org fetch hasn't completed yet), it inserts `null` into a NOT NULL column, or fails the RLS policy (`org_id = user_org_id(auth.uid())` — null = null is false in SQL). Either way, silent failure.
+**Fix:** In `supabase/functions/sync-instagram/index.ts`:
+- Remove `profile_views` from the main insights call on line 108 (keep only `reach`)
+- Add a separate fetch for `profile_views` using `metric_type=total_value` (same pattern as `website_clicks` on lines 138-146)
 
-No trigger issues were found — the only trigger on `clients` is `update_updated_at_column` which only fires on UPDATE, not INSERT.
+## Issue 2: YouTube — parameter name mismatch
 
-## Fix — Single File Change
+**Root cause:** `sync-youtube/index.ts` expects `report_month` and `report_year` (line 15), but `triggerSync.ts` sends `month` and `year` (line 44). This means the YouTube sync function receives `undefined` for both parameters and returns a 400 error immediately.
 
-**`src/pages/clients/ClientForm.tsx`**
+**Fix:** In `supabase/functions/sync-youtube/index.ts`:
+- Change the destructuring on line 15 from `{ connection_id, report_month, report_year }` to `{ connection_id, month, year }`, matching every other sync function
+- Update all references to `report_month` → `month` and `report_year` → `year` throughout the function
 
-1. Add a guard before the insert: if `orgId` is falsy, show "Organisation not found — please reload" and return early
-2. Show the actual database error message in the toast: `toast.error(error.message || 'Failed to create client')`
-3. Add `console.error('Client creation error:', error)` so the error is visible in logs for future debugging
-
-Same treatment for the `ClientEditDialog.tsx` — show the actual error message instead of generic "Failed to update client".
-
-## Files
+## Files to modify
 
 | File | Change |
 |------|--------|
-| `src/pages/clients/ClientForm.tsx` | Add orgId guard, show real error message, add console.error |
-| `src/components/clients/ClientEditDialog.tsx` | Show real error message in toast |
+| `supabase/functions/sync-instagram/index.ts` | Move `profile_views` to its own `metric_type=total_value` fetch |
+| `supabase/functions/sync-youtube/index.ts` | Rename `report_month`/`report_year` to `month`/`year` |
 
