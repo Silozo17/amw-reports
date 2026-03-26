@@ -282,3 +282,59 @@ export const METRIC_LABELS: Record<string, string> = {
   total_likes_received: 'Total Likes Received',
   following: 'Following',
 };
+
+/** Platform-specific metrics — only these metrics are relevant per platform */
+export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
+  google_ads: [
+    'spend', 'impressions', 'clicks', 'ctr', 'conversions', 'conversions_value',
+    'conversion_rate', 'cpc', 'cpm', 'cost_per_conversion', 'roas', 'reach',
+    'search_impression_share', 'leads',
+  ],
+  meta_ads: [
+    'spend', 'impressions', 'reach', 'clicks', 'link_clicks', 'ctr',
+    'conversions', 'conversions_value', 'conversion_rate', 'cpc', 'cpm',
+    'cost_per_conversion', 'roas', 'frequency', 'leads',
+  ],
+  facebook: [
+    'total_followers', 'follower_growth', 'page_likes', 'page_views',
+    'engagement', 'engagement_rate', 'likes', 'comments', 'shares',
+    'reactions', 'posts_published', 'video_views', 'reach',
+    'organic_impressions',
+  ],
+  instagram: [
+    'total_followers', 'follower_growth', 'profile_visits', 'reach',
+    'engagement', 'engagement_rate', 'likes', 'comments', 'shares', 'saves',
+    'posts_published', 'reel_count', 'image_count', 'carousel_count',
+    'video_views', 'website_clicks', 'email_contacts', 'media_count',
+    'organic_impressions',
+  ],
+  tiktok: [
+    'total_followers', 'follower_growth', 'video_views', 'profile_views',
+    'likes', 'comments', 'shares', 'engagement_rate',
+    'total_likes_received', 'total_video_count', 'bio_link_clicks',
+    'completion_rate', 'average_time_watched', 'following',
+  ],
+  linkedin: [
+    'total_followers', 'follower_growth', 'follower_removes',
+    'impressions', 'engagement', 'engagement_rate', 'likes', 'comments',
+    'shares', 'clicks', 'posts_published', 'video_views',
+    'organic_impressions',
+  ],
+  google_search_console: [
+    'search_clicks', 'search_impressions', 'search_ctr', 'search_position',
+    'top_queries', 'gsc_top_pages',
+  ],
+  google_analytics: [
+    'sessions', 'active_users', 'new_users', 'ga_page_views',
+    'bounce_rate', 'avg_session_duration', 'pages_per_session',
+    'traffic_sources',
+  ],
+  google_business_profile: [
+    'gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests',
+    'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating',
+  ],
+  youtube: [
+    'subscribers', 'views', 'watch_time', 'videos_published',
+    'avg_view_duration', 'top_videos',
+  ],
+};
