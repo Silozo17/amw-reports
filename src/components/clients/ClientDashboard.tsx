@@ -10,7 +10,7 @@ import {
   Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users,
   BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, TrendingUp,
   ExternalLink, FileText, Image as ImageIcon, Globe, Search, PlayCircle, Activity, Pencil, Lock,
-  ArrowUpDown,
+  ArrowUpDown, Layers, LayoutList,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -513,8 +513,14 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   // Widget state
   type SortMode = 'default' | 'platform' | 'type' | 'name';
+  type ViewMode = 'compact' | 'extended';
   const [isEditMode, setIsEditMode] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('default');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      return (localStorage.getItem(`dashboard-viewmode-${clientId}`) as ViewMode) || 'compact';
+    } catch { return 'compact'; }
+  });
   const [savedWidgetState, setSavedWidgetState] = useState<Record<string, { visible: boolean; type: WidgetType; position: { x: number; y: number; w: number; h: number } }>>({});
 
   // Load saved widget state
