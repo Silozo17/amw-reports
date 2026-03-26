@@ -76,6 +76,7 @@ interface PlatformSectionProps {
 
 /** Priority metrics per platform category */
 const AD_PLATFORM_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'conversions', 'cost_per_conversion', 'reach'];
+const META_ADS_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'leads', 'cost_per_lead', 'reach'];
 const SOCIAL_KEY_METRICS = ['reach', 'impressions', 'engagement', 'likes', 'comments', 'shares', 'total_followers', 'follower_growth', 'profile_visits', 'website_clicks', 'video_views', 'saves', 'reel_count'];
 const FACEBOOK_KEY_METRICS = ['views', 'reach', 'engagement', 'reactions', 'comments', 'shares', 'total_followers', 'follower_growth', 'posts_published'];
 const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session'];
@@ -85,7 +86,7 @@ const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers'
 
 const PLATFORM_KEY_METRICS: Record<string, string[]> = {
   google_ads: AD_PLATFORM_KEY_METRICS,
-  meta_ads: AD_PLATFORM_KEY_METRICS,
+  meta_ads: META_ADS_KEY_METRICS,
   facebook: FACEBOOK_KEY_METRICS,
   instagram: SOCIAL_KEY_METRICS,
   tiktok: SOCIAL_KEY_METRICS,
@@ -96,7 +97,7 @@ const PLATFORM_KEY_METRICS: Record<string, string[]> = {
   youtube: YOUTUBE_KEY_METRICS,
 };
 
-const COST_METRICS = new Set(['spend', 'cpc', 'cpm', 'cost_per_conversion']);
+const COST_METRICS = new Set(['spend', 'cpc', 'cpm', 'cost_per_conversion', 'cost_per_lead']);
 const PERCENT_METRICS = new Set(['ctr', 'engagement_rate', 'bounce_rate', 'search_ctr', 'conversion_rate', 'audience_growth_rate']);
 const DECIMAL_METRICS = new Set(['search_position', 'gbp_average_rating', 'pages_per_session', 'avg_session_duration', 'avg_view_duration', 'frequency']);
 

@@ -132,8 +132,7 @@ Deno.serve(async (req) => {
     let totalImpressions = 0;
     let totalClicks = 0;
     let totalSpend = 0;
-    let totalConversions = 0;
-    let totalConversionsValue = 0;
+    let totalLeads = 0;
     let totalReach = 0;
     let totalLinkClicks = 0;
     let totalVideoPlays = 0;
@@ -146,24 +145,15 @@ Deno.serve(async (req) => {
       const spend = Number(row.spend || 0);
       const reach = Number(row.reach || 0);
 
-      // Extract conversions from actions array
-      let conversions = 0;
-      let conversionsValue = 0;
+      // Extract leads from actions array
+      let leads = 0;
       if (row.actions) {
         for (const action of row.actions) {
-          if (action.action_type === "offsite_conversion.fb_pixel_purchase" ||
-              action.action_type === "purchase" ||
-              action.action_type === "omni_purchase") {
-            conversions += Number(action.value || 0);
-          }
-        }
-      }
-      if (row.action_values) {
-        for (const av of row.action_values) {
-          if (av.action_type === "offsite_conversion.fb_pixel_purchase" ||
-              av.action_type === "purchase" ||
-              av.action_type === "omni_purchase") {
-            conversionsValue += Number(av.value || 0);
+          if (action.action_type === "lead" ||
+              action.action_type === "onsite_conversion.lead_grouped" ||
+              action.action_type === "offsite_conversion.fb_pixel_lead" ||
+              action.action_type === "onsite_web_lead") {
+            leads += Number(action.value || 0);
           }
         }
       }
@@ -171,8 +161,7 @@ Deno.serve(async (req) => {
       totalImpressions += impressions;
       totalClicks += clicks;
       totalSpend += spend;
-      totalConversions += conversions;
-      totalConversionsValue += conversionsValue;
+      totalLeads += leads;
       totalReach += reach;
       // Extract link_clicks from actions array
       const linkClickAction = row.actions?.find((a: any) => a.action_type === 'link_click');
@@ -192,8 +181,7 @@ Deno.serve(async (req) => {
         clicks,
         spend,
         reach,
-        conversions,
-        conversions_value: conversionsValue,
+        leads,
         ctr: Number(row.ctr || 0),
         cpc: Number(row.cpc || 0),
         cpm: Number(row.cpm || 0),
@@ -201,23 +189,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const overallCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+    const overallCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
     const overallCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
     const overallCpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
-    const costPerConversion = totalConversions > 0 ? totalSpend / totalConversions : 0;
     const totalFrequency = totalImpressions > 0 && totalReach > 0 ? totalImpressions / totalReach : 0;
 
     const metricsData = {
       impressions: totalImpressions,
       clicks: totalClicks,
       spend: totalSpend,
-      conversions: totalConversions,
-      conversions_value: totalConversionsValue,
+      leads: totalLeads,
       ctr: overallCtr,
       cpc: overallCpc,
       cpm: overallCpm,
-      cost_per_conversion: costPerConversion,
-      roas: totalSpend > 0 ? totalConversionsValue / totalSpend : 0,
+      cost_per_lead: totalLeads > 0 ? totalSpend / totalLeads : 0,
       reach: totalReach,
       link_clicks: totalLinkClicks,
       frequency: totalFrequency,
@@ -234,7 +219,7 @@ Deno.serve(async (req) => {
         spend: c.spend,
         clicks: c.clicks,
         impressions: c.impressions,
-        conversions: c.conversions,
+        leads: c.leads,
         ctr: c.ctr,
       }));
 
