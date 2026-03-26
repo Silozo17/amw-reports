@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -8,8 +8,17 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
+import { PLATFORM_LOGOS, PLATFORM_LABELS } from '@/types/database';
 import ChartTypeSelector from './ChartTypeSelector';
+import { ExternalLink, ImageOff } from 'lucide-react';
 import {
   ResponsiveContainer,
   PieChart,
@@ -315,31 +324,108 @@ const ChartWidget = ({ data, type }: { data: WidgetData; type: WidgetType }) => 
 };
 
 // ─── Table Widget ──────────────────────────────────────────────
-const TableWidget = ({ data }: { data: WidgetData }) => {
+const TableWidget = ({ data, widgetId }: { data: WidgetData; widgetId?: string }) => {
   const columns = data.tableColumns ?? [];
   const rows = (data.tableData ?? []) as Record<string, any>[];
+  const [platformFilter, setPlatformFilter] = useState('all');
+
+  const isPostsTable = widgetId === 'table-posts';
+
+  const uniquePlatforms = useMemo(() => {
+    if (!isPostsTable) return [];
+    const platforms = new Set<string>();
+    rows.forEach(r => { if (r.platform) platforms.add(r.platform as string); });
+    return Array.from(platforms);
+  }, [rows, isPostsTable]);
+
+  const filteredRows = useMemo(() => {
+    if (!isPostsTable || platformFilter === 'all') return rows;
+    return rows.filter(r => r.platform === platformFilter);
+  }, [rows, platformFilter, isPostsTable]);
+
   if (!rows.length) return <p className="text-xs text-muted-foreground italic">No data</p>;
 
+  const renderCell = (col: typeof columns[number], row: Record<string, any>) => {
+    const value = row[col.key];
+
+    if (col.type === 'image') {
+      return value ? (
+        <img
+          src={value as string}
+          alt=""
+          className="h-10 w-10 rounded-md object-cover flex-shrink-0"
+          loading="lazy"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      ) : (
+        <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+          <ImageOff className="h-4 w-4 text-muted-foreground" />
+        </div>
+      );
+    }
+
+    if (col.type === 'platform') {
+      const logo = PLATFORM_LOGOS[value as string];
+      return logo ? (
+        <img src={logo} alt={PLATFORM_LABELS[value as string] ?? ''} className="h-5 w-5 object-contain" />
+      ) : null;
+    }
+
+    if (col.type === 'link') {
+      return value ? (
+        <a href={value as string} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+          <ExternalLink className="h-4 w-4" />
+        </a>
+      ) : null;
+    }
+
+    // Text column — truncate long content
+    if (col.key === 'content' && typeof value === 'string' && value.length > 120) {
+      return <span title={value}>{value.slice(0, 120)}…</span>;
+    }
+
+    if (typeof value === 'number') return value.toLocaleString();
+    return (value as string) ?? '—';
+  };
+
   return (
-    <div className="relative w-full overflow-auto max-h-full">
+    <div className="relative w-full overflow-auto max-h-full space-y-2">
+      {isPostsTable && uniquePlatforms.length > 1 && (
+        <div className="flex justify-end">
+          <Select value={platformFilter} onValueChange={setPlatformFilter}>
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue placeholder="All Platforms" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Platforms</SelectItem>
+              {uniquePlatforms.map(p => (
+                <SelectItem key={p} value={p}>
+                  <span className="flex items-center gap-2">
+                    {PLATFORM_LOGOS[p] && <img src={PLATFORM_LOGOS[p]} alt="" className="h-4 w-4 object-contain" />}
+                    {PLATFORM_LABELS[p] ?? p}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
             {columns.map((col) => (
-              <TableHead key={col.key} className={col.align === 'right' ? 'text-right' : ''}>
+              <TableHead key={col.key} className={cn(col.align === 'right' ? 'text-right' : '', col.type === 'image' || col.type === 'platform' || col.type === 'link' ? 'w-10 px-2' : '')}>
                 {col.label}
               </TableHead>
             ))}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.slice(0, 10).map((row, idx) => (
+          {filteredRows.slice(0, 20).map((row, idx) => (
             <TableRow key={idx}>
               {columns.map((col) => (
-                <TableCell key={col.key} className={cn('text-sm', col.align === 'right' && 'text-right tabular-nums')}>
-                  {typeof row[col.key] === 'number'
-                    ? (row[col.key] as number).toLocaleString()
-                    : (row[col.key] as string) ?? '—'}
+                <TableCell key={col.key} className={cn('text-sm', col.align === 'right' && 'text-right tabular-nums', (col.type === 'image' || col.type === 'platform' || col.type === 'link') && 'w-10 px-2')}>
+                  {renderCell(col, row)}
                 </TableCell>
               ))}
             </TableRow>
@@ -380,7 +466,7 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
       </CardHeader>
       <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0">
         {type === 'number' && <NumberWidget data={data} />}
-        {type === 'table' && <TableWidget data={data} />}
+        {type === 'table' && <TableWidget data={data} widgetId={widget.id} />}
         {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
           <SparklineChart data={data} type={type} />
         )}
