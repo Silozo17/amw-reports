@@ -512,7 +512,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const [allPosts, setAllPosts] = useState<(TopContentItem & { platform: PlatformType })[]>([]);
 
   // Widget state
+  type SortMode = 'default' | 'platform' | 'type' | 'name';
   const [isEditMode, setIsEditMode] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('default');
   const [savedWidgetState, setSavedWidgetState] = useState<Record<string, { visible: boolean; type: WidgetType; position: { x: number; y: number; w: number; h: number } }>>({});
 
   // Load saved widget state
