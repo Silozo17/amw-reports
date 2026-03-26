@@ -121,7 +121,6 @@ Deno.serve(async (req) => {
         }
         totalReach += metricsMap.reach || 0;
         totalImpressions = totalReach; // impressions deprecated at account level; use reach
-        totalProfileViews += metricsMap.profile_views || 0;
         // Accumulate per-account metrics into global map
         for (const [k, v] of Object.entries(metricsMap)) {
           globalMetricsMap[k] = (globalMetricsMap[k] || 0) + v;
