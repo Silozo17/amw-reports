@@ -23,6 +23,7 @@ import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
+import { SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
 import ConnectionDisclaimer from '@/components/clients/ConnectionDisclaimer';
 import ShareDialog from '@/components/clients/ShareDialog';
 import { toast } from 'sonner';
@@ -170,21 +171,12 @@ const ClientDetail = () => {
       }
     };
 
-    const syncMap: Record<string, string> = {
-      google_ads: 'sync-google-ads',
-      meta_ads: 'sync-meta-ads',
-      facebook: 'sync-facebook-page',
-      instagram: 'sync-instagram',
-      tiktok: 'sync-tiktok-ads',
-      linkedin: 'sync-linkedin',
-    };
-
     const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
     if (connectedPlatformConns.length === 0) return { syncCount: 0, errors: ['No connected platforms'] };
 
     await Promise.all(
       connectedPlatformConns.map(conn => {
-        const fn = syncMap[conn.platform];
+        const fn = SYNC_FUNCTION_MAP[conn.platform];
         if (fn) return syncPlatform(conn, fn, PLATFORM_LABELS[conn.platform]);
         return Promise.resolve();
       })
@@ -311,15 +303,6 @@ const ClientDetail = () => {
     // Auto-sync historical data for new platforms
     toast.info('Syncing historical data for newly connected platform...');
     
-    const syncMap: Record<string, string> = {
-      google_ads: 'sync-google-ads',
-      meta_ads: 'sync-meta-ads',
-      facebook: 'sync-facebook-page',
-      instagram: 'sync-instagram',
-      tiktok: 'sync-tiktok-ads',
-      linkedin: 'sync-linkedin',
-    };
-
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -330,7 +313,7 @@ const ClientDetail = () => {
     for (let i = 0; i < 12; i++) {
       toast.info(`Syncing historical data... ${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/12)`);
       for (const conn of newPlatforms) {
-        const fn = syncMap[conn.platform];
+        const fn = SYNC_FUNCTION_MAP[conn.platform];
         if (!fn) continue;
         try {
           await supabase.functions.invoke(fn, {
