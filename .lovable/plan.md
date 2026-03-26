@@ -1,82 +1,51 @@
 
 
-# Remove User Sync Buttons, Add Automated Scheduling & Admin Sync
+# Facebook Organic Views in Reach KPI + GSC Trend Chart
 
-## Summary
+## What changes
 
-1. Remove all user-facing sync buttons (ClientDetail sync popover, PlatformSection per-platform sync, Connections page refresh, DebugConsole sync)
-2. Create a `scheduled-sync` edge function that runs daily at 5 AM — syncs current month for all connected platforms, and also syncs previous month during the first 7 days of a new month
-3. After account selection (AccountPickerDialog `onComplete`), automatically trigger a background 12-month initial sync
-4. Add a "Sync 12 Months" button per org in the admin panel (AdminOrgDetail) — platform admin only
+### 1. Reach KPI uses Facebook organic views (not reach)
 
-## Technical Details
+Currently, the Reach hero KPI aggregation (line 323) uses `m.reach || m.impressions || ...` — for Facebook, this picks up `reach` (organic unique viewers). The user wants Facebook to contribute its `views` metric (organic page views) instead.
 
-### 1. Remove sync buttons from user-facing UI
+**File: `src/components/clients/ClientDashboard.tsx`**
 
-**`src/pages/clients/ClientDetail.tsx`**
-- Remove the entire Sync `<Popover>` block (lines 420–461) — the sync button, month/year selectors, manual sync, and bulk sync
-- Remove all related state: `isSyncing`, `syncMenuOpen`, `syncMonth`, `syncYear`, `isBulkSyncing`, `bulkProgress`
-- Remove functions: `runSyncForMonth`, `handleManualSync`, `handleBulkSync`
-- Remove `SYNC_FUNCTION_MAP` import
-- Keep `RefreshCw` icon only if used elsewhere; remove if not
+Update three places where reach is aggregated:
 
-**`src/components/clients/dashboard/PlatformSection.tsx`**
-- Remove the `handleSyncNow` function and "Sync" button (lines 230–271)
-- Remove `triggerSync` import, `isSyncing` state, `Loader2`/`RefreshCw` icons if unused
-- Remove the `connectionId` and `onSyncComplete` props (update interface)
-- Keep the connection status badge and "Synced X ago" text
+- **Line 323 (`totalReach`)**: For Facebook platform, use `m.views` instead of falling through the `m.reach` chain
+  ```ts
+  const totalReach = filtered.reduce((sum, s) => {
+    const m = s.metrics_data;
+    if (s.platform === 'facebook') return sum + (m.views || 0);
+    return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
+  }, 0);
+  ```
 
-**`src/components/clients/ClientDashboard.tsx`**
-- Remove `onSyncComplete={fetchSnapshots}` prop from `PlatformSection` calls
+- **Line 334 (`prevReach`)**: Same Facebook-specific logic for previous period
 
-**`src/pages/Connections.tsx`**
-- Remove the `<RefreshCw>` ghost button from each connection card (line 107–109)
+- **Line 350 (`reachPlatforms`)**: Update the `platformsFor` callback to match the same Facebook-specific logic so the Facebook icon appears correctly
 
-**`src/pages/DebugConsole.tsx`**
-- Remove the "Sync Now" button and `handleSyncTest` function
+- **Line 414 (sparkline `reach`)**: Update the sparkline aggregation loop to use `views` for Facebook snapshots instead of `reach`
 
-### 2. Create `scheduled-sync` edge function
+### 2. GSC Search Performance Trend chart
 
-**`supabase/functions/scheduled-sync/index.ts`**
+**File: `src/components/clients/ClientDashboard.tsx`**
 
-New edge function that:
-- Queries all `platform_connections` where `is_connected = true` and `account_id IS NOT NULL`
-- Determines months to sync:
-  - Always sync current month
-  - If today's date is <= 7th of the month, also sync previous month (to catch late-reporting data)
-- For each connection, invokes the appropriate sync function (using the same `SYNC_FUNCTION_MAP` logic)
-- Processes connections sequentially or in small batches to avoid rate limits
-- Returns a summary of results
+Build a new `gscTrendData` array from `trendData`:
+- Filter to `google_search_console` snapshots only
+- Aggregate `search_impressions`, `search_clicks`, `search_ctr`, `search_position` per month over last 6 months
+- Pass as new prop to `PerformanceOverview`
 
-### 3. Set up pg_cron job for daily 5 AM sync
+**File: `src/components/clients/dashboard/PerformanceOverview.tsx`**
 
-- Use `supabase--read_query` to enable `pg_cron` and `pg_net` extensions
-- Create a cron job: `0 5 * * *` (5:00 AM UTC daily) that calls the `scheduled-sync` edge function
-
-### 4. Auto-sync 12 months on first connection
-
-**`src/components/clients/AccountPickerDialog.tsx`**
-- After `onComplete()` is called (account selection saved), trigger a background 12-month sync for the newly connected platform(s)
-- Use `triggerInitialSync` from `triggerSync.ts` but updated to 12 months
-- Run in background (fire-and-forget with toast notifications for progress/completion)
-- For Meta Ads multi-step: after all connections (meta_ads, facebook, instagram) are created, sync all of them
-
-### 5. Admin bulk sync button
-
-**`src/pages/admin/AdminOrgDetail.tsx`**
-- Add a "Sync All Platforms (12 months)" button to the Connection Health card header
-- When clicked: fetch all connected platform connections for this org, then sequentially sync each one for the last 12 months using `supabase.functions.invoke`
-- Show progress toast/badge during sync
-- This is the only place where manual sync remains in the entire app
+- Accept new `gscTrendData` prop (array of monthly GSC metrics)
+- Add a new "Search Performance Trend" card with an AreaChart
+- Four series: Search Impressions, Search Clicks, CTR (%), Avg. Position
+- Use independent Y-axis normalization (same pattern as existing Performance Trend)
+- Custom tooltip showing original values with proper formatting (CTR as `X.X%`, position as decimal)
+- Show GSC platform logo in the card header
 
 ### Files to modify
-1. `src/pages/clients/ClientDetail.tsx` — remove sync UI
-2. `src/components/clients/dashboard/PlatformSection.tsx` — remove sync button
-3. `src/components/clients/ClientDashboard.tsx` — remove onSyncComplete prop
-4. `src/pages/Connections.tsx` — remove refresh button
-5. `src/pages/DebugConsole.tsx` — remove sync test button
-6. `src/components/clients/AccountPickerDialog.tsx` — add auto 12-month sync on connect
-7. `src/lib/triggerSync.ts` — update `triggerInitialSync` default to 12 months
-8. `supabase/functions/scheduled-sync/index.ts` — new edge function
-9. `src/pages/admin/AdminOrgDetail.tsx` — add admin sync button
+1. `src/components/clients/ClientDashboard.tsx` — Facebook views fix + build GSC trend data
+2. `src/components/clients/dashboard/PerformanceOverview.tsx` — add GSC trend chart card
 
