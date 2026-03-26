@@ -285,7 +285,7 @@ const PlatformSection = ({
       <CardContent className="p-5 space-y-5">
         {/* Metric Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {allMetricKeys.slice(0, 10).map(key => (
+          {allMetricKeys.filter(k => !k.startsWith('paid_') && !k.startsWith('total_impressions') && !k.startsWith('total_video_views')).slice(0, 10).map(key => (
             <MetricCard
               key={key}
               metricKey={key}
@@ -295,6 +295,32 @@ const PlatformSection = ({
             />
           ))}
         </div>
+
+        {/* Facebook Boosted / Paid Performance sub-section */}
+        {platform === 'facebook' && (metricsData.paid_impressions > 0 || metricsData.paid_reach > 0 || metricsData.paid_video_views > 0) && (
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
+              <ChevronDown className="h-3.5 w-3.5 transition-transform" />
+              Boosted / Paid Performance
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {metricsData.paid_impressions > 0 && (
+                  <MetricCard metricKey="paid_impressions" value={metricsData.paid_impressions} change={computeChange('paid_impressions')} currSymbol={currSymbol} />
+                )}
+                {metricsData.paid_reach > 0 && (
+                  <MetricCard metricKey="paid_reach" value={metricsData.paid_reach} change={computeChange('paid_reach')} currSymbol={currSymbol} />
+                )}
+                {metricsData.paid_video_views > 0 && (
+                  <MetricCard metricKey="paid_video_views" value={metricsData.paid_video_views} change={computeChange('paid_video_views')} currSymbol={currSymbol} />
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground/60 mt-2 italic">
+                Paid data from boosted posts or ads run directly through Facebook. If Meta Ads is also connected, campaign-level paid data is shown separately under Meta Ads.
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         {/* Platform-specific explanation */}
         {METRIC_EXPLANATIONS[allMetricKeys[0]] && (

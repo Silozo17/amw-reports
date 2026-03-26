@@ -234,7 +234,7 @@ export const getCurrencySymbol = (code: string): string => {
 };
 
 /** Metrics that are internal/derived and should never show as individual cards */
-export const HIDDEN_METRICS = new Set(['campaign_count', 'pages_count', 'roas']);
+export const HIDDEN_METRICS = new Set(['campaign_count', 'pages_count', 'roas', 'total_impressions', 'total_video_views', 'paid_impressions', 'paid_reach', 'paid_video_views']);
 
 /** Ad-specific metrics that should NOT appear on organic-only platforms */
 export const AD_METRICS = new Set([
@@ -324,6 +324,10 @@ export const METRIC_LABELS: Record<string, string> = {
   total_video_count: 'Total Videos',
   total_likes_received: 'Total Likes Received',
   following: 'Following',
+  paid_reach: 'Paid Reach',
+  paid_video_views: 'Paid Video Views',
+  total_impressions: 'Total Impressions',
+  total_video_views: 'Total Video Views',
 };
 
 /** Platform-specific metrics — only these metrics are relevant per platform */
@@ -343,6 +347,7 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'engagement', 'engagement_rate', 'likes', 'comments', 'shares',
     'reactions', 'posts_published', 'video_views', 'reach',
     'organic_impressions',
+    'paid_impressions', 'paid_reach', 'paid_video_views',
   ],
   instagram: [
     'total_followers', 'follower_growth', 'profile_visits', 'reach',
