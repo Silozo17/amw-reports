@@ -867,7 +867,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     ytPosts.length > 0,
     filtered,
     platformConfigs,
-  ), [kpis, spendByPlatform, engagementStackedData, impressionsByPlatform, trendChartData, filteredPosts, gscPosts, gaPosts, ytPosts, filtered, platformConfigs]);
+    viewMode,
+  ), [kpis, spendByPlatform, engagementStackedData, impressionsByPlatform, trendChartData, filteredPosts, gscPosts, gaPosts, ytPosts, filtered, platformConfigs, viewMode]);
 
   // Merge saved state with defaults
   const widgets = useMemo(() => {
