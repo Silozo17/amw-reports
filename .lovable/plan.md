@@ -1,126 +1,58 @@
 
 
-# Settings Consolidation & Profile Dropdown Plan
+# Add Metric Tooltips & Improve Hero KPI Consolidation
 
 ## What Changes
 
-### 1. Profile Dropdown Menu (replaces sidebar items)
-Remove **Settings**, **Debug**, **Logs**, and **Sign Out** from the sidebar nav. Replace with a **popover/dropdown menu** that opens when clicking the profile name/avatar area at the bottom of the sidebar.
+### 1. Add (i) tooltip to every metric across the dashboard
 
-Menu items:
-- **Settings** → `/settings`
-- **Logs** → `/logs`
-- **Debug** → `/debug` (owner only)
-- **Sign Out**
+**`MetricTooltip.tsx`** already exists but uses a duplicate `METRIC_DESCRIPTIONS` dict. Consolidate to use `METRIC_EXPLANATIONS` from `src/types/metrics.ts` (which already has descriptions for all metrics). Remove the duplicate dict.
 
-**Files:** `src/components/layout/AppSidebar.tsx`
-- Remove Settings, Debug, Logs from `NAV_ITEMS`
-- Replace the bottom profile section with a `DropdownMenu` (from shadcn) triggered by the avatar + name
-- Display `profile.avatar_url` in the sidebar avatar (currently only shows initials)
+**`PlatformSection.tsx` → `MetricCard`** — Add `MetricTooltip` next to the metric label in every card. Show the (i) icon inline with the label text.
 
-### 2. Settings Page — Tab-Based Layout
-Restructure `/settings` into 4 tabs:
+**`HeroKPIs.tsx` → `HeroKPICard`** — Add `MetricTooltip` next to the KPI label in the header row.
 
-**Tab 1: Organisation**
-- Organisation name, slug (from existing `OrganisationSection`)
-- Team Members section (invite, remove — from existing inline code in `SettingsPage`)
+### 2. Consolidate MetricTooltip to use single source of truth
 
-**Tab 2: Account**
-- Existing `AccountSection` (profile fields, avatar, password)
-- **New: Avatar crop dialog** — when a non-square image is selected, show a crop modal before uploading
+Update `MetricTooltip.tsx` to import and use `METRIC_EXPLANATIONS` from `@/types/metrics` instead of its own hardcoded `METRIC_DESCRIPTIONS`. Delete the duplicate dict.
 
-**Tab 3: White Label**
-- `BrandingSection` (logo, colours, fonts)
-- `ReportSettingsSection` (PDF report layout options)
-- `CustomDomainSection` (custom domain management)
+### 3. Expand Hero KPIs with more cross-platform consolidated metrics
 
-**Tab 4: Metrics**
-- Current "Platform Metric Defaults" section
-- **Fix:** Instead of showing ALL_METRICS (284 entries) for every platform identically, filter available metrics per platform using `ORGANIC_PLATFORMS`, `AD_METRICS`, and platform-specific metric prefixes (e.g. `gbp_*` only for GBP, `search_*` only for GSC, `ga_*` only for GA4, `subscribers`/`watch_time` only for YouTube)
+Currently the hero shows: Spend, Video Views, Reach, Clicks, Engagement, Followers, Sessions (conditionally). Add these consolidated cross-platform KPIs when data exists:
 
-**Files:**
-- `src/pages/SettingsPage.tsx` — restructure into `Tabs` component with 4 tabs
-- `src/components/settings/OrganisationSection.tsx` — expand to include team members
-- `src/components/settings/AccountSection.tsx` — add crop functionality
-- New: `src/components/settings/MetricsDefaultsSection.tsx` — extracted from SettingsPage with platform-aware metric filtering
+- **Conversions** — sum from google_ads + meta_ads
+- **Page Views** — sum ga_page_views + page_views + gbp_views
+- **Website Clicks** — sum website_clicks + gbp_website_clicks + link_clicks
 
-### 3. Avatar Crop Function
-When user selects a profile photo that isn't 1:1:
-- Show a crop dialog using a canvas-based approach (no heavy library)
-- Allow user to position a square crop area over the image
-- Upload the cropped result
-- The cropped avatar URL reflects in the sidebar immediately (requires `useAuth` to re-fetch profile or the AccountSection to update auth context)
+Also add appropriate icons and METRIC_EXPLANATIONS entries for any missing consolidated descriptions (e.g. "Total Reach" explanation clarifying it combines reach, impressions, search impressions across platforms).
 
-**Implementation:** Use `HTMLCanvasElement` to crop — read the file as an image, render a crop UI with a draggable square overlay, then `canvas.toBlob()` the cropped region before uploading.
+### 4. Add missing METRIC_EXPLANATIONS
 
-**Files:**
-- New: `src/components/settings/AvatarCropDialog.tsx`
-- `src/components/settings/AccountSection.tsx` — use crop dialog instead of direct upload
-- `src/hooks/useAuth.tsx` — expose a `refetchProfile` method so avatar updates reflect in sidebar
+Ensure every metric key that can appear on the dashboard has an entry in `METRIC_EXPLANATIONS`. Currently missing: `cpm`, `frequency`, `search_impression_share`, `website_clicks`, `email_contacts`, `media_count`, `reel_count`, `image_count`, `carousel_count`. Add them.
 
-### 4. Sidebar Avatar Sync
-Currently the sidebar shows `profile?.full_name?.charAt(0)` as a text initial. Change to use `Avatar` + `AvatarImage` with `profile.avatar_url`, falling back to initials.
+## Files to Modify
 
-**Files:** `src/components/layout/AppSidebar.tsx`
-
-### 5. Platform-Specific Metric Filtering
-Define a `PLATFORM_AVAILABLE_METRICS` map that specifies which metrics each platform can actually have:
-
-```text
-google_ads:              spend, impressions, clicks, ctr, conversions, cpc, cpm, roas, ...
-meta_ads:                spend, impressions, reach, clicks, ctr, conversions, cpc, cpm, ...
-facebook:                total_followers, page_likes, page_views, engagement, ...
-instagram:               total_followers, profile_visits, reach, engagement, ...
-linkedin:                total_followers, impressions, engagement, ...
-tiktok:                  video_views, profile_views, total_likes_received, ...
-google_search_console:   search_clicks, search_impressions, search_ctr, search_position, ...
-google_analytics:        sessions, active_users, new_users, bounce_rate, ...
-google_business_profile: gbp_views, gbp_searches, gbp_calls, gbp_direction_requests, ...
-youtube:                 subscribers, views, watch_time, videos_published, ...
-```
-
-This replaces the current approach where every platform shows all ~80 metrics.
-
-**Files:**
-- `src/types/database.ts` — add `PLATFORM_AVAILABLE_METRICS` constant
-- New `src/components/settings/MetricsDefaultsSection.tsx` — use the map
-
-### 6. Route Updates
-- Remove `/settings`, `/debug`, `/logs` from sidebar `NAV_ITEMS` (they remain as routes in `App.tsx`)
-- Keep them accessible via the profile dropdown
-
-**Files:** `src/components/layout/AppSidebar.tsx`, `src/App.tsx` (no route changes, just nav)
+| File | Change |
+|------|--------|
+| `src/components/clients/MetricTooltip.tsx` | Remove duplicate dict, use `METRIC_EXPLANATIONS` |
+| `src/components/clients/dashboard/PlatformSection.tsx` | Add `MetricTooltip` to `MetricCard` label row |
+| `src/components/clients/dashboard/HeroKPIs.tsx` | Add `MetricTooltip` next to label |
+| `src/types/metrics.ts` | Add missing metric explanations |
+| `src/components/clients/ClientDashboard.tsx` | Add Conversions, Page Views, Website Clicks to hero KPIs |
 
 ## Technical Details
 
-### Crop Dialog Approach
-Canvas-based, no external library. Steps:
-1. `FileReader.readAsDataURL()` → load into `<img>`
-2. Check if image is square — if yes, skip crop, upload directly
-3. If not square, show dialog with image + draggable square overlay
-4. On confirm, draw cropped region to canvas at 256×256, export as blob
-5. Upload blob to storage
-
-### Auth Context Update
-Add `refetchProfile` to `AuthContextType`:
-```typescript
-const refetchProfile = async () => {
-  if (!user) return;
-  const { data } = await supabase.from('profiles').select('*').eq('user_id', user.id).single();
-  setProfile(data as Profile | null);
-};
+MetricCard label row changes from:
+```tsx
+<p className="text-[11px] ...truncate">{label}</p>
+```
+to:
+```tsx
+<div className="flex items-center gap-1">
+  <p className="text-[11px] ...truncate">{label}</p>
+  <MetricTooltip metricKey={metricKey} />
+</div>
 ```
 
-## Files Summary
-
-| Action | File |
-|--------|------|
-| Modify | `src/components/layout/AppSidebar.tsx` — dropdown menu, avatar image |
-| Modify | `src/pages/SettingsPage.tsx` — 4-tab layout |
-| Modify | `src/components/settings/OrganisationSection.tsx` — add team members |
-| Modify | `src/components/settings/AccountSection.tsx` — integrate crop dialog |
-| Modify | `src/hooks/useAuth.tsx` — add `refetchProfile` |
-| Modify | `src/types/database.ts` — add `PLATFORM_AVAILABLE_METRICS` |
-| Create | `src/components/settings/AvatarCropDialog.tsx` |
-| Create | `src/components/settings/MetricsDefaultsSection.tsx` |
+Same pattern for HeroKPICard — add `MetricTooltip` after the label span inside the icon+label row.
 
