@@ -18,7 +18,12 @@ import {
 import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
 import { PLATFORM_LOGOS, PLATFORM_LABELS } from '@/types/database';
 import ChartTypeSelector from './ChartTypeSelector';
-import { ExternalLink, ImageOff } from 'lucide-react';
+import { ExternalLink, ImageOff, Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   ResponsiveContainer,
   PieChart,
@@ -579,8 +584,17 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
               <img src={platformLogo} alt={platformLabel ?? ''} className="h-4 w-4 object-contain flex-shrink-0" />
             )}
             <CardTitle className="text-sm font-display leading-tight tracking-wide truncate">{widget.label}</CardTitle>
+            {widget.description && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground flex-shrink-0 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-xs">
+                  {widget.description}
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
-          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{widget.description}</p>
         </div>
         <ChartTypeSelector
           currentType={widget.type}
