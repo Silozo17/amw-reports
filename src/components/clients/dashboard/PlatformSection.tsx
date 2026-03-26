@@ -8,8 +8,7 @@ import { PLATFORM_LOGOS, PLATFORM_LABELS, HIDDEN_METRICS, AD_METRICS, ORGANIC_PL
 import { METRIC_EXPLANATIONS } from '@/types/metrics';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import type { PlatformType, JobStatus } from '@/types/database';
-import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff, RefreshCw, Loader2 } from 'lucide-react';
-import { triggerSync } from '@/lib/triggerSync';
+import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -64,14 +63,12 @@ interface PlatformSectionProps {
   metricsData: Record<string, number>;
   prevMetricsData?: Record<string, number>;
   connection?: ConnectionInfo;
-  connectionId?: string;
   topContent?: TopContentItem[];
   trendData?: Array<{ name: string; [key: string]: number | string }>;
   currSymbol: string;
   enabledMetrics?: string[];
   reportMonth: number;
   reportYear: number;
-  onSyncComplete?: () => void;
 }
 
 /** Priority metrics per platform category */
@@ -159,17 +156,14 @@ const PlatformSection = ({
   metricsData,
   prevMetricsData,
   connection,
-  connectionId,
   topContent,
   trendData,
   currSymbol,
   enabledMetrics,
   reportMonth,
   reportYear,
-  onSyncComplete,
 }: PlatformSectionProps) => {
   const [contentOpen, setContentOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const logo = PLATFORM_LOGOS[platform];
   const label = PLATFORM_LABELS[platform];
   const isOrganic = ORGANIC_PLATFORMS.has(platform);
@@ -227,22 +221,6 @@ const PlatformSection = ({
 
   if (allMetricKeys.length === 0) return null;
 
-  const handleSyncNow = async () => {
-    if (!connectionId) {
-      toast.error('No connection ID available');
-      return;
-    }
-    setIsSyncing(true);
-    const result = await triggerSync(connectionId, platform, reportMonth, reportYear);
-    if (result.success) {
-      toast.success(`${label} synced for ${reportMonth}/${reportYear}`);
-      onSyncComplete?.();
-    } else {
-      toast.error(`Sync failed: ${result.error}`);
-    }
-    setIsSyncing(false);
-  };
-
   return (
     <Card className="overflow-hidden">
       {/* Platform Header */}
@@ -257,18 +235,6 @@ const PlatformSection = ({
               <Clock className="h-3 w-3" />
               Synced {formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}
             </span>
-          )}
-          {connectionId && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-[10px] gap-1"
-              onClick={handleSyncNow}
-              disabled={isSyncing}
-            >
-              {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              Sync
-            </Button>
           )}
           <Badge
             variant={syncStatus === 'success' ? 'default' : syncStatus === 'failed' ? 'destructive' : 'secondary'}

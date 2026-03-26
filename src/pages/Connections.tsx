@@ -104,9 +104,6 @@ const Connections = () => {
                         Last sync: {new Date(conn.last_sync_at).toLocaleDateString()}
                       </span>
                     )}
-                    <Button size="sm" variant="ghost">
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
                   </div>
                 </CardContent>
               </Card>

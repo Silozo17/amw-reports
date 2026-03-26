@@ -621,14 +621,12 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
                   metricsData={snapshot.metrics_data}
                   prevMetricsData={prevSnapshot?.metrics_data}
                   connection={connection}
-                  connectionId={connection?.id}
                   topContent={platformPosts}
                   trendData={platformTrend}
                   currSymbol={currSymbol}
                   enabledMetrics={config?.enabled_metrics}
                   reportMonth={selectedPeriod.month}
                   reportYear={selectedPeriod.year}
-                  onSyncComplete={fetchSnapshots}
                 />
               );
             })}

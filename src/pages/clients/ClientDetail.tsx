@@ -23,7 +23,7 @@ import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
-import { SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
+import { triggerInitialSync, SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
 import ConnectionDisclaimer from '@/components/clients/ConnectionDisclaimer';
 import ShareDialog from '@/components/clients/ShareDialog';
 import { toast } from 'sonner';
@@ -140,113 +140,6 @@ const ClientDetail = () => {
   }, [fetchData]);
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncMenuOpen, setSyncMenuOpen] = useState(false);
-  const [syncMonth, setSyncMonth] = useState(() => {
-    const n = new Date();
-    return n.getMonth() === 0 ? 12 : n.getMonth();
-  });
-  const [syncYear, setSyncYear] = useState(() => {
-    const n = new Date();
-    return n.getMonth() === 0 ? n.getFullYear() - 1 : n.getFullYear();
-  });
-  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState('');
-
-  const runSyncForMonth = async (m: number, y: number) => {
-    let syncCount = 0;
-    const errors: string[] = [];
-
-    const syncPlatform = async (conn: PlatformConnection, functionName: string, label: string) => {
-      try {
-        const { data, error } = await supabase.functions.invoke(functionName, {
-          body: { connection_id: conn.id, month: m, year: y },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        syncCount += data.campaigns_synced || data.pages_synced || data.accounts_synced || 1;
-      } catch (e) {
-        console.error(`Sync error:`, e);
-        errors.push(`${label}: ${e instanceof Error ? e.message : 'failed'}`);
-      }
-    };
-
-    const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
-    if (connectedPlatformConns.length === 0) return { syncCount: 0, errors: ['No connected platforms'] };
-
-    await Promise.all(
-      connectedPlatformConns.map(conn => {
-        const fn = SYNC_FUNCTION_MAP[conn.platform];
-        if (fn) return syncPlatform(conn, fn, PLATFORM_LABELS[conn.platform]);
-        return Promise.resolve();
-      })
-    );
-
-    return { syncCount, errors };
-  };
-
-  const handleManualSync = async () => {
-    setIsSyncing(true);
-    setSyncMenuOpen(false);
-
-    const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
-    if (connectedPlatformConns.length === 0) {
-      toast.info('No fully configured platforms found. Connect and select accounts first.');
-      setIsSyncing(false);
-      return;
-    }
-
-    const { syncCount, errors } = await runSyncForMonth(syncMonth, syncYear);
-
-    if (errors.length > 0) {
-      toast.error(`Sync errors: ${errors.join('; ')}`);
-    } else {
-      toast.success(`Synced ${syncCount} items for ${syncMonth}/${syncYear}`);
-    }
-
-    fetchData();
-    setIsSyncing(false);
-  };
-
-  const handleBulkSync = async () => {
-    setIsBulkSyncing(true);
-    setSyncMenuOpen(false);
-
-    const connectedPlatformConns = connections.filter(c => c.is_connected && c.account_id);
-    if (connectedPlatformConns.length === 0) {
-      toast.info('No fully configured platforms found.');
-      setIsBulkSyncing(false);
-      return;
-    }
-
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    let m = currentMonth;
-    let y = currentYear;
-    let totalSynced = 0;
-    const allErrors: string[] = [];
-    const MONTH_NAMES_SHORT = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-    for (let i = 0; i < 12; i++) {
-      setBulkProgress(`Syncing ${MONTH_NAMES_SHORT[m]} ${y}... (${i + 1}/12)`);
-      const { syncCount, errors } = await runSyncForMonth(m, y);
-      totalSynced += syncCount;
-      allErrors.push(...errors);
-      m--;
-      if (m === 0) { m = 12; y--; }
-    }
-
-    if (allErrors.length > 0) {
-      toast.error(`Bulk sync completed with ${allErrors.length} errors`);
-    } else {
-      toast.success(`Bulk sync complete — synced ${totalSynced} items across 12 months`);
-    }
-
-    setBulkProgress('');
-    setIsBulkSyncing(false);
-    fetchData();
-  };
 
   const handleGenerateReport = async () => {
     if (!client) return;
@@ -300,35 +193,20 @@ const ClientDetail = () => {
 
     if (newPlatforms.length === 0) return;
 
-    // Auto-sync historical data for new platforms
-    toast.info('Syncing historical data for newly connected platform...');
+    // Auto-sync 12 months of historical data in the background
+    toast.info('Syncing 12 months of historical data in the background...');
     
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    let m = currentMonth;
-    let y = currentYear;
-    const MONTH_NAMES_SHORT = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-    for (let i = 0; i < 12; i++) {
-      toast.info(`Syncing historical data... ${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/12)`);
-      for (const conn of newPlatforms) {
-        const fn = SYNC_FUNCTION_MAP[conn.platform];
-        if (!fn) continue;
-        try {
-          await supabase.functions.invoke(fn, {
-            body: { connection_id: conn.id, month: m, year: y },
-          });
-        } catch (e) {
-          console.error(`Auto-sync error for ${conn.platform}:`, e);
+    for (const conn of newPlatforms) {
+      triggerInitialSync(conn.id, conn.platform, 12).then(results => {
+        const failures = results.filter(r => !r.success);
+        if (failures.length > 0) {
+          console.error(`Auto-sync errors for ${conn.platform}:`, failures);
         }
-      }
-      m--;
-      if (m === 0) { m = 12; y--; }
+        fetchData();
+      });
     }
 
-    toast.success('Historical data sync complete');
-    fetchData();
+    toast.success('Historical data sync started — data will appear as it completes');
   };
 
   const handleRemoveConnection = async (conn: PlatformConnection) => {
@@ -417,48 +295,6 @@ const ClientDetail = () => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <Popover open={syncMenuOpen} onOpenChange={setSyncMenuOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2" disabled={isSyncing || isBulkSyncing}>
-                  {isSyncing || isBulkSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{isBulkSyncing ? bulkProgress : isSyncing ? 'Syncing...' : 'Sync'}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-4 space-y-3" align="end">
-                <p className="text-sm font-medium">Sync Data</p>
-                <div className="flex gap-2">
-                  <Select value={String(syncMonth)} onValueChange={v => setSyncMonth(Number(v))}>
-                    <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <SelectItem key={i + 1} value={String(i + 1)}>
-                          {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][i]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={String(syncYear)} onValueChange={v => setSyncYear(Number(v))}>
-                    <SelectTrigger className="w-20 h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 5 }, (_, i) => {
-                        const yr = new Date().getFullYear() - i;
-                        return <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>;
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button size="sm" className="w-full gap-2" onClick={handleManualSync} disabled={isSyncing}>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Sync Selected Month
-                </Button>
-                <div className="border-t pt-2">
-                  <Button size="sm" variant="outline" className="w-full gap-2" onClick={handleBulkSync} disabled={isBulkSyncing}>
-                    <History className="h-3.5 w-3.5" />
-                    Sync Last 12 Months
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
             <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{isGenerating ? 'Generating...' : 'Report'}</span>
