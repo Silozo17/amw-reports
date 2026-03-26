@@ -16,6 +16,7 @@ import { PLATFORM_LABELS, METRIC_LABELS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
 import AccountSection from '@/components/settings/AccountSection';
 import OrganisationSection from '@/components/settings/OrganisationSection';
+import BrandingSection from '@/components/settings/BrandingSection';
 
 interface TeamMember {
   id: string;

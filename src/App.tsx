@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import BrandingProvider from "@/components/BrandingProvider";
 import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import ClientList from "./pages/clients/ClientList";
@@ -72,7 +73,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <BrandingProvider>
+            <AppRoutes />
+          </BrandingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

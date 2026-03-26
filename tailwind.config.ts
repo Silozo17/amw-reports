@@ -14,9 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        heading: ["Anton", "sans-serif"],
-        display: ["Anton", "sans-serif"],
-        body: ["Montserrat", "sans-serif"],
+        heading: ["var(--font-heading, Anton)", "sans-serif"],
+        display: ["var(--font-display, Anton)", "sans-serif"],
+        body: ["var(--font-body, Montserrat)", "sans-serif"],
         accent: ["Slowdex", "cursive"],
       },
       colors: {
