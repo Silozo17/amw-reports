@@ -22,16 +22,28 @@ const AdminOrgList = () => {
 
       const enriched = await Promise.all(
         orgData.map(async (org) => {
-          const [clientRes, connRes, subRes] = await Promise.all([
+          const [clientRes, subRes] = await Promise.all([
             supabase.from('clients').select('id', { count: 'exact', head: true }).eq('org_id', org.id),
-            supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('is_connected', true),
             supabase.from('org_subscriptions').select('*, subscription_plans(name, slug)').eq('org_id', org.id).maybeSingle(),
           ]);
+
+          // Count connections via clients belonging to this org
+          const { data: orgClients } = await supabase.from('clients').select('id').eq('org_id', org.id);
+          const clientIds = (orgClients ?? []).map(c => c.id);
+          let connectionCount = 0;
+          if (clientIds.length > 0) {
+            const { count } = await supabase
+              .from('platform_connections')
+              .select('id', { count: 'exact', head: true })
+              .in('client_id', clientIds)
+              .eq('is_connected', true);
+            connectionCount = count ?? 0;
+          }
 
           return {
             ...org,
             clientCount: clientRes.count ?? 0,
-            connectionCount: connRes.count ?? 0,
+            connectionCount,
             subscription: subRes.data as any,
           };
         })
