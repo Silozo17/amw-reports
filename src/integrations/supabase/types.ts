@@ -1006,6 +1006,7 @@ export type Database = {
         | "google_analytics"
         | "google_business_profile"
         | "youtube"
+        | "pinterest"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1146,6 +1147,7 @@ export const Constants = {
         "google_analytics",
         "google_business_profile",
         "youtube",
+        "pinterest",
       ],
     },
   },
