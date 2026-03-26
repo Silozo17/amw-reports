@@ -567,6 +567,16 @@ interface WidgetRendererProps {
 
 const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRendererProps) => {
   const { type, category } = widget;
+  const [platformFilter, setPlatformFilter] = useState('all');
+
+  // For compact widgets with platform sources, derive filtered data
+  const hasMultiplePlatforms = (widget.platformSources?.length ?? 0) > 1;
+  const effectiveData = useMemo(() => {
+    if (!hasMultiplePlatforms || platformFilter === 'all' || !data.platformBreakdown) return data;
+    const filteredValue = data.platformBreakdown[platformFilter] ?? 0;
+    const filteredChange = data.platformBreakdownChange?.[platformFilter];
+    return { ...data, value: filteredValue, change: filteredChange };
+  }, [data, platformFilter, hasMultiplePlatforms]);
 
   // KPI widgets shown as chart use sparkline data
   const isKpiAsChart = category === 'kpi' && type !== 'number' && type !== 'progress' && type !== 'gauge';
@@ -595,6 +605,27 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
               </Tooltip>
             )}
           </div>
+          {/* Compact mode platform filter */}
+          {hasMultiplePlatforms && widget.platformSources && (
+            <div className="mt-1">
+              <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                <SelectTrigger className="w-full h-6 text-[10px] border-none bg-muted/40 px-2 py-0">
+                  <SelectValue placeholder="All Platforms" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Platforms</SelectItem>
+                  {widget.platformSources.map(p => (
+                    <SelectItem key={p} value={p}>
+                      <span className="flex items-center gap-1.5">
+                        {PLATFORM_LOGOS[p] && <img src={PLATFORM_LOGOS[p]} alt="" className="h-3.5 w-3.5 object-contain" />}
+                        {PLATFORM_LABELS[p] ?? p}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <ChartTypeSelector
           currentType={widget.type}
@@ -603,15 +634,15 @@ const WidgetRenderer = ({ widget, data, onTypeChange, isEditMode }: WidgetRender
         />
       </CardHeader>
       <CardContent className="flex-1 px-4 pb-3 pt-1 min-h-0">
-        {type === 'number' && <NumberWidget data={data} />}
-        {type === 'progress' && <ProgressRingWidget data={data} />}
-        {type === 'gauge' && <GaugeWidget data={data} />}
-        {type === 'table' && <TableWidget data={data} widgetId={widget.id} />}
+        {type === 'number' && <NumberWidget data={effectiveData} />}
+        {type === 'progress' && <ProgressRingWidget data={effectiveData} />}
+        {type === 'gauge' && <GaugeWidget data={effectiveData} />}
+        {type === 'table' && <TableWidget data={effectiveData} widgetId={widget.id} />}
         {(isKpiAsChart || isPlatformAsChart) && (type === 'line' || type === 'area' || type === 'bar') && (
-          <SparklineChart data={data} type={type} />
+          <SparklineChart data={effectiveData} type={type} />
         )}
         {category === 'chart' && type !== 'table' && (
-          <ChartWidget data={data} type={type} />
+          <ChartWidget data={effectiveData} type={type} />
         )}
       </CardContent>
     </Card>
