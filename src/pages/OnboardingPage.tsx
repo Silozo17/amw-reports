@@ -11,47 +11,20 @@ import {
   Heart, Search, Share2, Calendar, MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PLATFORM_LOGOS, PLATFORM_LABELS, type PlatformType } from '@/types/database';
 
-const TOTAL_STEPS = 6; // 5 questions + 1 welcome
+const TOTAL_STEPS = 6;
 
-interface PlatformOption {
-  id: string;
-  label: string;
-  icon: string;
-}
-
-const PLATFORMS: PlatformOption[] = [
-  { id: 'google_ads', label: 'Google Ads', icon: '📊' },
-  { id: 'meta_ads', label: 'Meta Ads', icon: '📢' },
-  { id: 'facebook', label: 'Facebook', icon: '📘' },
-  { id: 'instagram', label: 'Instagram', icon: '📸' },
-  { id: 'tiktok', label: 'TikTok', icon: '🎵' },
-  { id: 'linkedin', label: 'LinkedIn', icon: '💼' },
-  { id: 'google_search_console', label: 'Search Console', icon: '🔍' },
-  { id: 'google_analytics', label: 'Google Analytics', icon: '📈' },
-  { id: 'google_business_profile', label: 'Google Business', icon: '📍' },
-  { id: 'youtube', label: 'YouTube', icon: '▶️' },
+const PLATFORM_IDS: PlatformType[] = [
+  'google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok',
+  'linkedin', 'google_search_console', 'google_analytics',
+  'google_business_profile', 'youtube',
 ];
 
 const ACCOUNT_TYPES = [
-  {
-    id: 'creator',
-    label: 'Creator',
-    description: 'I manage my own brand and content',
-    icon: Palette,
-  },
-  {
-    id: 'business',
-    label: 'Business',
-    description: 'I run a business and need marketing insights',
-    icon: Building2,
-  },
-  {
-    id: 'agency',
-    label: 'Agency',
-    description: 'I manage marketing for multiple clients',
-    icon: Users,
-  },
+  { id: 'creator', label: 'Creator', description: 'I manage my own brand and content', icon: Palette },
+  { id: 'business', label: 'Business', description: 'I run a business and need marketing insights', icon: Building2 },
+  { id: 'agency', label: 'Agency', description: 'I manage marketing for multiple clients', icon: Users },
 ];
 
 const REASONS = [
@@ -78,7 +51,6 @@ const OnboardingPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
 
-  // Form state
   const [accountType, setAccountType] = useState('');
   const [platformsUsed, setPlatformsUsed] = useState<string[]>([]);
   const [clientCount, setClientCount] = useState('');
@@ -86,16 +58,15 @@ const OnboardingPage = () => {
   const [referralSource, setReferralSource] = useState('');
   const [otherReferral, setOtherReferral] = useState('');
 
-  // Confetti particles for welcome screen
   const [particles, setParticles] = useState<Array<{ id: number; x: number; delay: number; color: string }>>([]);
 
   useEffect(() => {
     if (step === TOTAL_STEPS) {
       const colors = [
-        'hsl(295, 60%, 47%)', // primary/purple
-        'hsl(212, 64%, 59%)', // secondary/blue
-        'hsl(148, 60%, 57%)', // accent/green
-        'hsl(27, 84%, 57%)',  // orange
+        'hsl(295, 60%, 47%)',
+        'hsl(212, 64%, 59%)',
+        'hsl(148, 60%, 57%)',
+        'hsl(27, 84%, 57%)',
       ];
       setParticles(
         Array.from({ length: 40 }, (_, i) => ({
@@ -109,12 +80,6 @@ const OnboardingPage = () => {
   }, [step]);
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] ?? 'there';
-
-  // Skip step 3 (client count) if not agency
-  const getEffectiveStep = (s: number) => {
-    if (s === 3 && accountType !== 'agency') return 4;
-    return s;
-  };
 
   const goNext = () => {
     setDirection('forward');
@@ -151,7 +116,6 @@ const OnboardingPage = () => {
     if (!user) return;
     setIsSubmitting(true);
 
-    // Get user's org_id
     const { data: profile } = await supabase
       .from('profiles')
       .select('org_id')
@@ -165,7 +129,6 @@ const OnboardingPage = () => {
       return;
     }
 
-    // Insert onboarding responses
     const { error: insertError } = await supabase.from('onboarding_responses').insert({
       user_id: user.id,
       org_id: orgId,
@@ -183,7 +146,6 @@ const OnboardingPage = () => {
       return;
     }
 
-    // Mark onboarding as completed
     await supabase
       .from('profiles')
       .update({ onboarding_completed: true })
@@ -198,16 +160,17 @@ const OnboardingPage = () => {
     <div className="min-h-screen bg-sidebar-background text-sidebar-foreground relative overflow-hidden">
       {/* Progress bar */}
       {step < TOTAL_STEPS && (
-        <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-sidebar-border">
+        <div className="fixed top-0 left-0 right-0 z-50 h-1.5 bg-sidebar-border/50 rounded-full overflow-hidden">
           <div
-            className="h-full bg-primary transition-all duration-500 ease-out"
+            className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all duration-700 ease-out"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       )}
 
       {/* Ambient glow */}
-      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-150px] right-[-100px] w-[400px] h-[400px] rounded-full bg-secondary/8 blur-[100px] pointer-events-none" />
 
       {/* Main content */}
       <div className="relative z-10 flex min-h-screen items-center justify-center p-6">
@@ -233,22 +196,23 @@ const OnboardingPage = () => {
                       key={type.id}
                       onClick={() => setAccountType(type.id)}
                       className={cn(
-                        'group relative flex flex-col items-center gap-3 rounded-xl border-2 p-6 transition-all duration-200',
-                        'hover:border-primary/50 hover:bg-primary/5',
+                        'group relative flex flex-col items-center gap-4 rounded-2xl p-6 transition-all duration-300 cursor-pointer',
                         selected
-                          ? 'border-primary bg-primary/10 shadow-lg shadow-primary/10'
-                          : 'border-sidebar-border bg-sidebar-accent/30'
+                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.02]'
+                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
                       )}
                     >
                       <div className={cn(
-                        'flex h-14 w-14 items-center justify-center rounded-full transition-colors',
-                        selected ? 'bg-primary text-primary-foreground' : 'bg-sidebar-border text-sidebar-foreground'
+                        'flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-300',
+                        selected
+                          ? 'bg-primary/20 text-primary'
+                          : 'bg-sidebar-accent/60 text-sidebar-foreground/70'
                       )}>
                         <Icon className="h-6 w-6" />
                       </div>
                       <div className="text-center">
-                        <p className="font-heading text-lg">{type.label}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{type.description}</p>
+                        <p className="font-semibold text-lg text-sidebar-foreground">{type.label}</p>
+                        <p className="mt-1 text-xs text-sidebar-foreground/50 leading-relaxed">{type.description}</p>
                       </div>
                     </button>
                   );
@@ -265,22 +229,27 @@ const OnboardingPage = () => {
               subtitle="Select all that apply — you can change these later"
             >
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                {PLATFORMS.map((p) => {
-                  const selected = platformsUsed.includes(p.id);
+                {PLATFORM_IDS.map((platformId) => {
+                  const selected = platformsUsed.includes(platformId);
                   return (
                     <button
-                      key={p.id}
-                      onClick={() => togglePlatform(p.id)}
+                      key={platformId}
+                      onClick={() => togglePlatform(platformId)}
                       className={cn(
-                        'flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all duration-200',
-                        'hover:border-primary/50',
+                        'flex flex-col items-center gap-3 rounded-2xl p-4 transition-all duration-300 cursor-pointer',
                         selected
-                          ? 'border-primary bg-primary/10 shadow-md shadow-primary/10'
-                          : 'border-sidebar-border bg-sidebar-accent/30'
+                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.03]'
+                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
                       )}
                     >
-                      <span className="text-2xl">{p.icon}</span>
-                      <span className="text-xs font-medium text-center leading-tight">{p.label}</span>
+                      <img
+                        src={PLATFORM_LOGOS[platformId]}
+                        alt={PLATFORM_LABELS[platformId]}
+                        className="h-8 w-8 object-contain"
+                      />
+                      <span className="text-xs font-medium text-center leading-tight text-sidebar-foreground/80">
+                        {PLATFORM_LABELS[platformId]}
+                      </span>
                     </button>
                   );
                 })}
@@ -295,17 +264,16 @@ const OnboardingPage = () => {
               title="How many clients do you manage?"
               subtitle="This helps us recommend the right plan"
             >
-              <div className="flex flex-wrap justify-center gap-3">
+              <div className="flex flex-wrap justify-center gap-4">
                 {CLIENT_COUNTS.map((count) => (
                   <button
                     key={count}
                     onClick={() => setClientCount(count)}
                     className={cn(
-                      'rounded-full border-2 px-8 py-3 text-sm font-medium transition-all duration-200',
-                      'hover:border-primary/50',
+                      'rounded-full px-8 py-3.5 text-sm font-semibold transition-all duration-300 cursor-pointer',
                       clientCount === count
-                        ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                        : 'border-sidebar-border bg-sidebar-accent/30 text-sidebar-foreground'
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 scale-[1.05]'
+                        : 'bg-sidebar-accent/40 text-sidebar-foreground/80 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
                     )}
                   >
                     {count}
@@ -331,20 +299,21 @@ const OnboardingPage = () => {
                       key={reason.id}
                       onClick={() => setPrimaryReason(reason.id)}
                       className={cn(
-                        'flex items-center gap-4 rounded-xl border-2 p-5 text-left transition-all duration-200',
-                        'hover:border-primary/50',
+                        'flex items-center gap-4 rounded-2xl p-5 text-left transition-all duration-300 cursor-pointer',
                         selected
-                          ? 'border-primary bg-primary/10 shadow-md shadow-primary/10'
-                          : 'border-sidebar-border bg-sidebar-accent/30'
+                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.02]'
+                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
                       )}
                     >
                       <div className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors',
-                        selected ? 'bg-primary text-primary-foreground' : 'bg-sidebar-border text-sidebar-foreground'
+                        'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-300',
+                        selected
+                          ? 'bg-primary/20 text-primary'
+                          : 'bg-sidebar-accent/60 text-sidebar-foreground/70'
                       )}>
                         <Icon className="h-5 w-5" />
                       </div>
-                      <span className="text-sm font-medium">{reason.label}</span>
+                      <span className="text-sm font-medium text-sidebar-foreground">{reason.label}</span>
                     </button>
                   );
                 })}
@@ -368,15 +337,17 @@ const OnboardingPage = () => {
                       key={source.id}
                       onClick={() => setReferralSource(source.id)}
                       className={cn(
-                        'flex flex-col items-center gap-2 rounded-xl border-2 p-5 transition-all duration-200',
-                        'hover:border-primary/50',
+                        'flex flex-col items-center gap-3 rounded-2xl p-5 transition-all duration-300 cursor-pointer',
                         selected
-                          ? 'border-primary bg-primary/10 shadow-md shadow-primary/10'
-                          : 'border-sidebar-border bg-sidebar-accent/30'
+                          ? 'bg-primary/10 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.02]'
+                          : 'bg-sidebar-accent/40 shadow-sm hover:shadow-md hover:bg-sidebar-accent/60'
                       )}
                     >
-                      <Icon className={cn('h-5 w-5', selected ? 'text-primary' : 'text-muted-foreground')} />
-                      <span className="text-sm font-medium">{source.label}</span>
+                      <Icon className={cn(
+                        'h-5 w-5 transition-colors duration-300',
+                        selected ? 'text-primary' : 'text-sidebar-foreground/50'
+                      )} />
+                      <span className="text-sm font-medium text-sidebar-foreground">{source.label}</span>
                     </button>
                   );
                 })}
@@ -387,7 +358,7 @@ const OnboardingPage = () => {
                     value={otherReferral}
                     onChange={(e) => setOtherReferral(e.target.value)}
                     placeholder="Tell us more..."
-                    className="bg-sidebar-accent/30 border-sidebar-border text-sidebar-foreground placeholder:text-muted-foreground"
+                    className="bg-sidebar-accent/40 border-none text-sidebar-foreground placeholder:text-sidebar-foreground/30 focus-visible:ring-1 focus-visible:ring-primary/30"
                   />
                 </div>
               )}
@@ -403,7 +374,6 @@ const OnboardingPage = () => {
           {/* Step 6: Welcome Screen */}
           {step === TOTAL_STEPS && (
             <div className="flex flex-col items-center text-center space-y-8">
-              {/* Confetti particles */}
               {particles.map((p) => (
                 <div
                   key={p.id}
@@ -422,13 +392,13 @@ const OnboardingPage = () => {
               ))}
 
               <div className="animate-scale-in">
-                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-primary/20 mb-6">
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-primary/15 mb-6">
                   <Sparkles className="h-12 w-12 text-primary animate-pulse" />
                 </div>
-                <h1 className="text-4xl font-heading tracking-wide sm:text-5xl">
+                <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl text-sidebar-foreground">
                   Welcome, {firstName}!
                 </h1>
-                <p className="mt-4 text-lg text-muted-foreground font-body max-w-md mx-auto">
+                <p className="mt-4 text-lg text-sidebar-foreground/60 max-w-md mx-auto leading-relaxed">
                   Your workspace is ready. Let's get you set up with your first client and connections.
                 </p>
               </div>
@@ -437,7 +407,7 @@ const OnboardingPage = () => {
                 <Button
                   onClick={() => handleComplete(true)}
                   disabled={isSubmitting}
-                  className="flex-1 h-14 text-base gap-2 bg-primary hover:bg-primary/90"
+                  className="flex-1 h-14 text-base gap-2 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -452,7 +422,7 @@ const OnboardingPage = () => {
                   variant="outline"
                   onClick={() => handleComplete(false)}
                   disabled={isSubmitting}
-                  className="flex-1 h-14 text-base border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  className="flex-1 h-14 text-base border-sidebar-accent/60 text-sidebar-foreground hover:bg-sidebar-accent/40"
                 >
                   I'll explore on my own
                   <ArrowRight className="h-5 w-5 ml-2" />
@@ -463,7 +433,6 @@ const OnboardingPage = () => {
         </div>
       </div>
 
-      {/* Confetti keyframes */}
       <style>{`
         @keyframes confetti-fall {
           0% { transform: translateY(0) rotate(0deg); opacity: 1; }
@@ -485,9 +454,11 @@ function StepContainer({
 }) {
   return (
     <div className="space-y-8">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-heading tracking-wide sm:text-4xl">{title}</h2>
-        <p className="text-muted-foreground font-body">{subtitle}</p>
+      <div className="text-center space-y-3">
+        <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl text-sidebar-foreground">
+          {title}
+        </h2>
+        <p className="text-sidebar-foreground/50 text-base">{subtitle}</p>
       </div>
       {children}
     </div>
@@ -506,12 +477,12 @@ function StepActions({
   nextLabel?: string;
 }) {
   return (
-    <div className="flex items-center justify-between pt-6">
+    <div className="flex items-center justify-between pt-8">
       {onBack ? (
         <Button
           variant="ghost"
           onClick={onBack}
-          className="text-sidebar-foreground hover:bg-sidebar-accent/50 gap-2"
+          className="text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -522,7 +493,7 @@ function StepActions({
       <Button
         onClick={onNext}
         disabled={!canContinue}
-        className="gap-2 px-8"
+        className="gap-2 px-8 shadow-lg shadow-primary/20"
       >
         {nextLabel}
         <ArrowRight className="h-4 w-4" />
