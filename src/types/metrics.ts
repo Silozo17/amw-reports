@@ -16,7 +16,7 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   cost_per_conversion: 'Average cost to achieve one conversion',
   cost_per_lead: 'Average cost to acquire one lead',
   roas: 'Revenue generated for every pound spent on ads',
-  reach: 'Number of unique people who saw your content',
+  reach: 'Number of unique people who saw your content (includes both organic and paid reach)',
   frequency: 'Average number of times each person saw your ad',
   search_impression_share: 'Percentage of available search impressions you captured',
   leads: 'Number of potential customers who submitted their details',
