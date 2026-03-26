@@ -198,7 +198,30 @@ const AccountSection = () => {
             <div className="space-y-2">
               <Label>Position / Title</Label>
               <Input value={position} onChange={e => setPosition(e.target.value)} placeholder="e.g. Account Manager" />
+          </div>
+
+          {/* Account Type */}
+          <div className="space-y-2">
+            <Label>Account Type</Label>
+            <div className="flex gap-2">
+              {[
+                { id: 'creator', label: 'Creator' },
+                { id: 'business', label: 'Business' },
+                { id: 'agency', label: 'Agency' },
+              ].map(type => (
+                <Button
+                  key={type.id}
+                  type="button"
+                  variant={accountType === type.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setAccountType(type.id)}
+                >
+                  {type.label}
+                </Button>
+              ))}
             </div>
+            <p className="text-xs text-muted-foreground">This helps us tailor your experience. You can change it anytime.</p>
+          </div>
           </div>
 
           <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
