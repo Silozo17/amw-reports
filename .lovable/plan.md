@@ -1,29 +1,34 @@
 
 
-# Fix Instagram Sync & YouTube Data Issues
+# Fix Instagram Reach/Impressions Not Displaying
 
-## Issue 1: Instagram — `profile_views` metric error
+## Root Cause (Confirmed)
 
-**Root cause:** Line 108 of `sync-instagram/index.ts` requests `profile_views` with `period=day`, but the Instagram API now requires `metric_type=total_value` for `profile_views` (same as `website_clicks`).
+The previous version of `sync-instagram` bundled `profile_views` with `reach` in a **single API call**. The Instagram API rejected the entire request with a 400 error because `profile_views` requires `metric_type=total_value`. This meant **reach was never fetched**, so both `reach` and `impressions` (which mirrors reach) were stored as `0` in snapshots.
 
-The error from logs: `"(#100) The following metrics (profile_views) should be specified with parameter metric_type=total_value"`
+Edge function logs confirm this — every sync attempt logged:
+```
+Sync error: API error (400): profile_views should be specified with parameter metric_type=total_value
+```
 
-**Fix:** In `supabase/functions/sync-instagram/index.ts`:
-- Remove `profile_views` from the main insights call on line 108 (keep only `reach`)
-- Add a separate fetch for `profile_views` using `metric_type=total_value` (same pattern as `website_clicks` on lines 138-146)
+## Current Code Status
 
-## Issue 2: YouTube — parameter name mismatch
+The code fix from the previous message is **already correct**:
+- Line 108: fetches only `reach` with `period=day` ✅
+- Lines 136-146: fetches `profile_views` separately with `metric_type=total_value` ✅
+- Lines 148-157: fetches `website_clicks` separately ✅
 
-**Root cause:** `sync-youtube/index.ts` expects `report_month` and `report_year` (line 15), but `triggerSync.ts` sends `month` and `year` (line 44). This means the YouTube sync function receives `undefined` for both parameters and returns a 400 error immediately.
+**No code changes needed.** The existing snapshots just contain stale zero-values from the failed syncs.
 
-**Fix:** In `supabase/functions/sync-youtube/index.ts`:
-- Change the destructuring on line 15 from `{ connection_id, report_month, report_year }` to `{ connection_id, month, year }`, matching every other sync function
-- Update all references to `report_month` → `month` and `report_year` → `year` throughout the function
+## Action Required
 
-## Files to modify
+Re-trigger Instagram syncs for all connected clients to populate reach/impressions data. Also re-trigger YouTube syncs (parameter name fix was applied in the previous message but no syncs have run since — logs are empty).
 
-| File | Change |
-|------|--------|
-| `supabase/functions/sync-instagram/index.ts` | Move `profile_views` to its own `metric_type=total_value` fetch |
-| `supabase/functions/sync-youtube/index.ts` | Rename `report_month`/`report_year` to `month`/`year` |
+This will be done by invoking the edge functions directly for the current and recent months.
+
+## Steps
+
+1. Query `platform_connections` for all active Instagram and YouTube connections
+2. Invoke `sync-instagram` and `sync-youtube` for each connection for the last 3 months
+3. Verify the sync completes successfully by checking logs
 
