@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,17 @@ import LandingHero from '@/components/landing/LandingHero';
 type View = 'login' | 'signup' | 'otp';
 
 const LandingPage = () => {
-  const [view, setView] = useState<View>('login');
+  const [searchParams] = useSearchParams();
+  const initialView = searchParams.get('view') === 'signup' ? 'signup' : 'login';
+  const [view, setView] = useState<View>(initialView);
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const v = searchParams.get('view');
+    if (v === 'signup') setView('signup');
+  }, [searchParams]);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');

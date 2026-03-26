@@ -6,6 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import BrandingProvider from "@/components/BrandingProvider";
 import LandingPage from "./pages/LandingPage";
+import HomePage from "./pages/HomePage";
+import FeaturesPage from "./pages/FeaturesPage";
+import PricingPage from "./pages/PricingPage";
+import PublicLayout from "./components/landing/PublicLayout";
 import Index from "./pages/Index";
 import ClientList from "./pages/clients/ClientList";
 import ClientForm from "./pages/clients/ClientForm";
@@ -74,10 +78,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PublicPageRoute({ children }: { children: React.ReactNode }) {
+  return <PublicLayout>{children}</PublicLayout>;
+}
+
 const AppRoutes = () => (
   <Routes>
-    <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
-    <Route path="/login" element={<Navigate to="/" replace />} />
+    <Route path="/" element={<PublicPageRoute><HomePage /></PublicPageRoute>} />
+    <Route path="/features" element={<PublicPageRoute><FeaturesPage /></PublicPageRoute>} />
+    <Route path="/pricing" element={<PublicPageRoute><PricingPage /></PublicPageRoute>} />
+    <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/clients" element={<ProtectedRoute><ClientList /></ProtectedRoute>} />
     <Route path="/clients/new" element={<ProtectedRoute><ClientForm /></ProtectedRoute>} />
