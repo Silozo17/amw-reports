@@ -369,6 +369,7 @@ export type Database = {
           logo_url: string | null
           name: string
           primary_color: string | null
+          report_settings: Json | null
           secondary_color: string | null
           slug: string | null
           updated_at: string
@@ -383,6 +384,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           primary_color?: string | null
+          report_settings?: Json | null
           secondary_color?: string | null
           slug?: string | null
           updated_at?: string
@@ -397,6 +399,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           primary_color?: string | null
+          report_settings?: Json | null
           secondary_color?: string | null
           slug?: string | null
           updated_at?: string
