@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown, Check } from 'lucide-react';
 import { subMonths, addMonths, addWeeks, subWeeks, format, startOfWeek } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -19,7 +19,7 @@ export interface SelectedPeriod {
   endDate?: Date;
 }
 
-export type PlatformFilter = 'all' | PlatformType;
+export type PlatformFilter = PlatformType[] | 'all';
 
 interface DashboardHeaderProps {
   selectedPlatform: PlatformFilter;
@@ -50,10 +50,51 @@ const DashboardHeader = ({
   onPeriodChange,
   availablePlatforms,
 }: DashboardHeaderProps) => {
-  const platformOptions: Array<{ value: PlatformFilter; label: string }> = [
-    { value: 'all', label: 'All Platforms' },
-    ...availablePlatforms.map(p => ({ value: p as PlatformFilter, label: PLATFORM_LABELS[p] })),
-  ];
+  const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
+
+  const isAll = selectedPlatform === 'all';
+  const selectedArray = isAll ? [] : selectedPlatform;
+
+  const handleTogglePlatform = (platform: PlatformType) => {
+    if (isAll) {
+      // Switching from "all" to a single platform
+      onPlatformChange([platform]);
+      return;
+    }
+
+    const current = [...selectedArray];
+    const idx = current.indexOf(platform);
+
+    if (idx >= 0) {
+      // Deselecting — prevent empty selection
+      if (current.length <= 1) return;
+      current.splice(idx, 1);
+    } else {
+      current.push(platform);
+    }
+
+    // If all platforms are now selected, switch to "all"
+    if (current.length === availablePlatforms.length) {
+      onPlatformChange('all');
+    } else {
+      onPlatformChange(current);
+    }
+  };
+
+  const handleToggleAll = () => {
+    onPlatformChange('all');
+  };
+
+  const isPlatformSelected = (platform: PlatformType): boolean => {
+    if (isAll) return true;
+    return selectedArray.includes(platform);
+  };
+
+  const getTriggerLabel = () => {
+    if (isAll) return 'All Platforms';
+    if (selectedArray.length === 1) return PLATFORM_LABELS[selectedArray[0]];
+    return `${selectedArray.length} Platforms`;
+  };
 
   const handlePrev = () => {
     const { type, month, year } = selectedPeriod;
@@ -106,7 +147,6 @@ const DashboardHeader = ({
     }
   };
 
-  // Period label
   const getPeriodLabel = (): string => {
     const { type, month, year, startDate, endDate } = selectedPeriod;
     switch (type) {
@@ -138,27 +178,86 @@ const DashboardHeader = ({
 
   return (
     <div className="space-y-4">
-      {/* Platform Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {platformOptions.map(opt => {
-          const logo = PLATFORM_LOGOS[opt.value];
-          return (
-            <Button
-              key={opt.value}
-              variant={selectedPlatform === opt.value ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onPlatformChange(opt.value)}
-              className="gap-1.5"
-            >
-              {logo && <img src={logo} alt="" className="h-4 w-4 object-contain" />}
-              {opt.label}
-            </Button>
-          );
-        })}
-      </div>
-
-      {/* Time Range Controls */}
+      {/* Platform Multi-Select Dropdown + Time Range Controls on same row */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* Platform Multi-Select Dropdown */}
+        <Popover open={platformDropdownOpen} onOpenChange={setPlatformDropdownOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 min-w-[180px] justify-between">
+              <div className="flex items-center gap-1.5">
+                {isAll ? (
+                  <>
+                    <img src={PLATFORM_LOGOS.all} alt="" className="h-4 w-4 object-contain" />
+                    <span>All Platforms</span>
+                  </>
+                ) : selectedArray.length === 1 ? (
+                  <>
+                    <img src={PLATFORM_LOGOS[selectedArray[0]]} alt="" className="h-4 w-4 object-contain" />
+                    <span>{PLATFORM_LABELS[selectedArray[0]]}</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex -space-x-1">
+                      {selectedArray.slice(0, 3).map(p => (
+                        <img key={p} src={PLATFORM_LOGOS[p]} alt="" className="h-4 w-4 object-contain rounded-full border border-background" />
+                      ))}
+                    </div>
+                    <span>{selectedArray.length} Platforms</span>
+                  </>
+                )}
+              </div>
+              <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[220px] p-1" align="start">
+            {/* All Platforms option */}
+            <button
+              type="button"
+              onClick={handleToggleAll}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
+                isAll && "bg-accent"
+              )}
+            >
+              <div className={cn(
+                "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
+                isAll ? "bg-primary text-primary-foreground" : "opacity-50"
+              )}>
+                {isAll && <Check className="h-3 w-3" />}
+              </div>
+              <img src={PLATFORM_LOGOS.all} alt="" className="h-4 w-4 object-contain" />
+              <span>All Platforms</span>
+            </button>
+
+            <div className="my-1 h-px bg-border" />
+
+            {/* Individual platforms */}
+            {availablePlatforms.map(platform => {
+              const selected = isPlatformSelected(platform) && !isAll;
+              return (
+                <button
+                  key={platform}
+                  type="button"
+                  onClick={() => handleTogglePlatform(platform)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
+                    selected && "bg-accent/50"
+                  )}
+                >
+                  <div className={cn(
+                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
+                    selected ? "bg-primary text-primary-foreground" : "opacity-50"
+                  )}>
+                    {selected && <Check className="h-3 w-3" />}
+                  </div>
+                  <img src={PLATFORM_LOGOS[platform]} alt="" className="h-4 w-4 object-contain" />
+                  <span>{PLATFORM_LABELS[platform]}</span>
+                </button>
+              );
+            })}
+          </PopoverContent>
+        </Popover>
+
         {/* Period Type Dropdown */}
         <Select value={selectedPeriod.type} onValueChange={handleTypeChange}>
           <SelectTrigger className="w-[160px] h-9 text-sm">
@@ -171,7 +270,7 @@ const DashboardHeader = ({
           </SelectContent>
         </Select>
 
-        {/* Arrow Navigation (only for weekly/monthly/quarterly) */}
+        {/* Arrow Navigation */}
         {showArrows && (
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrev}>

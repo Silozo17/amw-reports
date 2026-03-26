@@ -93,6 +93,14 @@ interface PlatformConfigData {
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/** Check whether a platform passes the current filter */
+const matchesPlatformFilter = (filter: PlatformFilter, platform: PlatformType): boolean =>
+  filter === 'all' || filter.includes(platform);
+
+/** Check whether the filter includes a specific platform (for table sections) */
+const filterIncludesPlatform = (filter: PlatformFilter, platform: PlatformType): boolean =>
+  filter === 'all' || filter.includes(platform);
+
 // ─── Dashboard Skeleton ────────────────────────────────────────
 const DashboardSkeleton = () => (
   <div className="space-y-8">
@@ -376,7 +384,7 @@ function buildWidgetDataMap(
   }
 
   // GSC data
-  const gscPosts = (selectedPlatform === 'all' || selectedPlatform === 'google_search_console')
+  const gscPosts = filterIncludesPlatform(selectedPlatform, 'google_search_console')
     ? allPosts.filter(p => p.platform === 'google_search_console') : [];
   const gscQueries = gscPosts.filter(p => p.query);
   const gscPages = gscPosts.filter(p => p.page && !p.query);
@@ -410,7 +418,7 @@ function buildWidgetDataMap(
   }
 
   // GA data
-  const gaPosts = (selectedPlatform === 'all' || selectedPlatform === 'google_analytics')
+  const gaPosts = filterIncludesPlatform(selectedPlatform, 'google_analytics')
     ? allPosts.filter(p => p.platform === 'google_analytics' && (p.page || p.source)) : [];
   const gaPages = gaPosts.filter(p => p.page);
   const gaSources = gaPosts.filter(p => p.source && !p.page);
@@ -440,7 +448,7 @@ function buildWidgetDataMap(
   }
 
   // YT data
-  const ytPosts = (selectedPlatform === 'all' || selectedPlatform === 'youtube')
+  const ytPosts = filterIncludesPlatform(selectedPlatform, 'youtube')
     ? allPosts.filter(p => p.platform === 'youtube' && p.title) : [];
   if (ytPosts.length > 0) {
     map['table-yt-videos'] = {
@@ -677,9 +685,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   };
 
   // ─── Computed Data ───────────────────────────────────────────
-  const filtered = useMemo(() => (selectedPlatform === "all" ? snapshots : snapshots.filter(s => s.platform === selectedPlatform)), [snapshots, selectedPlatform]);
-  const filteredPrev = useMemo(() => (selectedPlatform === "all" ? prevSnapshots : prevSnapshots.filter(s => s.platform === selectedPlatform)), [prevSnapshots, selectedPlatform]);
-  const filteredPosts = useMemo(() => (selectedPlatform === "all" ? allPosts : allPosts.filter(p => p.platform === selectedPlatform)), [allPosts, selectedPlatform]);
+  const filtered = useMemo(() => (selectedPlatform === "all" ? snapshots : snapshots.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))), [snapshots, selectedPlatform]);
+  const filteredPrev = useMemo(() => (selectedPlatform === "all" ? prevSnapshots : prevSnapshots.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))), [prevSnapshots, selectedPlatform]);
+  const filteredPosts = useMemo(() => (selectedPlatform === "all" ? allPosts : allPosts.filter(p => matchesPlatformFilter(selectedPlatform, p.platform))), [allPosts, selectedPlatform]);
 
   const kpis = useMemo(() => {
     const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
@@ -704,8 +712,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const cc = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
     return [
-      ...(["all", "meta_ads", "google_ads"].includes(selectedPlatform) ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend" }] : []),
-      ...(selectedPlatform === "tiktok" ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views" }] : []),
+      ...((selectedPlatform === 'all' || filterIncludesPlatform(selectedPlatform, 'meta_ads') || filterIncludesPlatform(selectedPlatform, 'google_ads')) ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend" }] : []),
+      ...(filterIncludesPlatform(selectedPlatform, 'tiktok') ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views" }] : []),
       { label: "Reach", value: totalReach, change: cc(totalReach, prevReach), icon: Eye, metricKey: "reach" },
       { label: "Clicks", value: totalClicks, change: cc(totalClicks, prevClicks), icon: MousePointerClick, metricKey: "clicks" },
       { label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement" },
@@ -718,7 +726,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   const sparklineMap = useMemo(() => {
     const map: Record<string, Array<{ v: number; name: string }>> = {};
-    const relevantTrend = selectedPlatform === "all" ? trendData : trendData.filter(s => s.platform === selectedPlatform);
+    const relevantTrend = selectedPlatform === "all" ? trendData : trendData.filter(s => matchesPlatformFilter(selectedPlatform, s.platform));
     const monthMap = new Map<string, Record<string, number>>();
     for (const s of relevantTrend) {
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
@@ -750,7 +758,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
   const trendChartData = useMemo(() => {
     const monthMap = new Map<string, { spend: number; impressions: number; clicks: number; engagement: number; video_views: number; reach: number }>();
-    const relevantTrend = selectedPlatform === "all" ? trendData : trendData.filter(s => s.platform === selectedPlatform);
+    const relevantTrend = selectedPlatform === "all" ? trendData : trendData.filter(s => matchesPlatformFilter(selectedPlatform, s.platform));
     for (const s of relevantTrend) {
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
       const existing = monthMap.get(key) || { spend: 0, impressions: 0, clicks: 0, engagement: 0, video_views: 0, reach: 0 };
@@ -781,9 +789,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const allZeros = hasFilteredData && kpis.every(k => k.value === 0);
 
   // ─── Widget System ───────────────────────────────────────────
-  const gscPosts = useMemo(() => (selectedPlatform === 'all' || selectedPlatform === 'google_search_console') ? allPosts.filter(p => p.platform === 'google_search_console' && (p.query || p.page)) : [], [allPosts, selectedPlatform]);
-  const gaPosts = useMemo(() => (selectedPlatform === 'all' || selectedPlatform === 'google_analytics') ? allPosts.filter(p => p.platform === 'google_analytics' && (p.page || p.source)) : [], [allPosts, selectedPlatform]);
-  const ytPosts = useMemo(() => (selectedPlatform === 'all' || selectedPlatform === 'youtube') ? allPosts.filter(p => p.platform === 'youtube' && p.title) : [], [allPosts, selectedPlatform]);
+  const gscPosts = useMemo(() => filterIncludesPlatform(selectedPlatform, 'google_search_console') ? allPosts.filter(p => p.platform === 'google_search_console' && (p.query || p.page)) : [], [allPosts, selectedPlatform]);
+  const gaPosts = useMemo(() => filterIncludesPlatform(selectedPlatform, 'google_analytics') ? allPosts.filter(p => p.platform === 'google_analytics' && (p.page || p.source)) : [], [allPosts, selectedPlatform]);
+  const ytPosts = useMemo(() => filterIncludesPlatform(selectedPlatform, 'youtube') ? allPosts.filter(p => p.platform === 'youtube' && p.title) : [], [allPosts, selectedPlatform]);
 
   const defaultWidgets = useMemo(() => generateDefaultWidgets(
     kpis,
