@@ -260,6 +260,7 @@ function generateDefaultWidgets(
         visible: true,
         position: { x: (pIdx % 6) * 2, y: y + Math.floor(pIdx / 6) * 2, w: 2, h: 2, minW: 2, minH: 2 },
         compatibleTypes: COMPATIBLE_TYPES.platform,
+        platform,
       });
       pIdx++;
     }
