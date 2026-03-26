@@ -52,8 +52,9 @@ const PerformanceOverview = ({
   const hasEngagement = engagementStackedData.length > 0;
   const hasImpressions = impressionsByPlatform.length > 0;
   const hasTrend = trendChartData.length > 1;
+  const hasGscTrend = (gscTrendData?.length ?? 0) > 1;
 
-  if (!hasSpend && !hasEngagement && !hasImpressions && !hasTrend) return null;
+  if (!hasSpend && !hasEngagement && !hasImpressions && !hasTrend && !hasGscTrend) return null;
 
   // Determine which trend keys have data
   const trendKeys: { key: string; name: string; color: string }[] = [];
