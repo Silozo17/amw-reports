@@ -1,12 +1,13 @@
 import { ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Building2, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Building2, ScrollText, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const ADMIN_NAV = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { to: '/admin/organisations', label: 'Organisations', icon: Building2 },
+  { to: '/admin/activity', label: 'Activity Log', icon: ScrollText },
 ];
 
 interface AdminLayoutProps {
