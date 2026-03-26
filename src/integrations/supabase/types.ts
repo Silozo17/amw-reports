@@ -233,6 +233,44 @@ export type Database = {
           },
         ]
       }
+      custom_domains: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          is_active: boolean
+          org_id: string
+          verification_token: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          is_active?: boolean
+          org_id: string
+          verification_token?: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          verification_token?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_domains_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_logs: {
         Row: {
           client_id: string
@@ -761,6 +799,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_org_by_domain: { Args: { _domain: string }; Returns: string }
       get_portal_client: { Args: { _client_id: string }; Returns: Json }
       get_portal_org: { Args: { _org_id: string }; Returns: Json }
       get_portal_snapshots: {
