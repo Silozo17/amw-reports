@@ -9,7 +9,7 @@ import ReactMarkdown from "react-markdown";
 import {
   Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users,
   BarChart3, PieChartIcon, AlertCircle, Clock, Loader2, Activity,
-  Target, FileText, Link,
+  Target, FileText, Link, Search, Crosshair, Hash,
 } from "lucide-react";
 import { PLATFORM_LOGOS, PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS, AD_METRICS, ORGANIC_PLATFORMS } from "@/types/database";
 import { METRIC_EXPLANATIONS } from "@/types/metrics";
@@ -86,6 +86,8 @@ interface KpiItem {
   change?: number;
   icon: React.ElementType;
   isCost?: boolean;
+  isPercentage?: boolean;
+  isDecimal?: boolean;
   metricKey: string;
   platforms: PlatformType[];
 }
@@ -144,6 +146,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
   const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod>({
     type: "monthly", month: defaultMonth, year: defaultYear,
   });
+
   const [hasAutoDetected, setHasAutoDetected] = useState(false);
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
@@ -353,6 +356,34 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const pageViewsPlatforms = platformsFor(m => (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0));
     const websiteClicksPlatforms = platformsFor(m => (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0));
 
+    // GSC-specific metrics
+    const totalSearchImpressions = filtered.reduce((sum, s) => sum + (s.metrics_data.search_impressions || 0), 0);
+    const totalSearchClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.search_clicks || 0), 0);
+    const gscSnapshots = filtered.filter(s => s.platform === 'google_search_console' && s.metrics_data.search_ctr !== undefined);
+    const totalSearchCtr = gscSnapshots.length > 0 && totalSearchImpressions > 0
+      ? (totalSearchClicks / totalSearchImpressions) * 100
+      : 0;
+    const gscPositionSnapshots = filtered.filter(s => s.platform === 'google_search_console' && s.metrics_data.search_position > 0);
+    const avgSearchPosition = gscPositionSnapshots.length > 0
+      ? gscPositionSnapshots.reduce((sum, s) => sum + s.metrics_data.search_position, 0) / gscPositionSnapshots.length
+      : 0;
+
+    const prevSearchImpressions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.search_impressions || 0), 0);
+    const prevSearchClicks = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.search_clicks || 0), 0);
+    const prevGscSnapshots = filteredPrev.filter(s => s.platform === 'google_search_console' && s.metrics_data.search_ctr !== undefined);
+    const prevSearchCtr = prevGscSnapshots.length > 0 && prevSearchImpressions > 0
+      ? (prevSearchClicks / prevSearchImpressions) * 100
+      : 0;
+    const prevGscPositionSnapshots = filteredPrev.filter(s => s.platform === 'google_search_console' && s.metrics_data.search_position > 0);
+    const prevAvgSearchPosition = prevGscPositionSnapshots.length > 0
+      ? prevGscPositionSnapshots.reduce((sum, s) => sum + s.metrics_data.search_position, 0) / prevGscPositionSnapshots.length
+      : 0;
+
+    const searchImpressionsPlatforms = platformsFor(m => m.search_impressions || 0);
+    const searchClicksPlatforms = platformsFor(m => m.search_clicks || 0);
+    const searchCtrPlatforms = platformsFor(m => m.search_ctr !== undefined ? 1 : 0);
+    const searchPositionPlatforms = platformsFor(m => m.search_position > 0 ? 1 : 0);
+
     return [
       ...((selectedPlatform === 'all' || filterIncludesPlatform(selectedPlatform, 'meta_ads') || filterIncludesPlatform(selectedPlatform, 'google_ads')) && totalSpend > 0 ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend", platforms: spendPlatforms }] : []),
       ...(totalVideoViews > 0 ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views", platforms: videoViewsPlatforms }] : []),
@@ -361,6 +392,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       ...(totalEngagement > 0 ? [{ label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement", platforms: engagementPlatforms }] : []),
       ...(totalFollowers > 0 ? [{ label: "Followers", value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: "total_followers", platforms: followerPlatforms }] : []),
       ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions", platforms: sessionsPlatforms }] : []),
+      ...(totalSearchImpressions > 0 ? [{ label: "Search Impressions", value: totalSearchImpressions, change: cc(totalSearchImpressions, prevSearchImpressions), icon: Search, metricKey: "search_impressions", platforms: searchImpressionsPlatforms }] : []),
+      ...(totalSearchClicks > 0 ? [{ label: "Search Clicks", value: totalSearchClicks, change: cc(totalSearchClicks, prevSearchClicks), icon: MousePointerClick, metricKey: "search_clicks", platforms: searchClicksPlatforms }] : []),
+      ...(totalSearchCtr > 0 ? [{ label: "Search CTR", value: totalSearchCtr, change: cc(totalSearchCtr, prevSearchCtr), icon: Crosshair, metricKey: "search_ctr", platforms: searchCtrPlatforms, isPercentage: true }] : []),
+      ...(avgSearchPosition > 0 ? [{ label: "Avg. Position", value: avgSearchPosition, change: cc(avgSearchPosition, prevAvgSearchPosition), icon: Hash, metricKey: "search_position", platforms: searchPositionPlatforms, isDecimal: true }] : []),
       ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
       ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views", platforms: pageViewsPlatforms }] : []),
       ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks", platforms: websiteClicksPlatforms }] : []),
@@ -384,8 +419,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       monthMap.set(key, existing);
     }
     const sorted = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
-    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions"]) {
-      map[metricKey] = sorted.map(([key, data]) => { const [y, m] = key.split("-"); return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` }; });
+    // Also aggregate GSC sparkline metrics
+    for (const s of relevantTrend) {
+      const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
+      const existing = monthMap.get(key) || {};
+      existing.search_impressions = (existing.search_impressions || 0) + (s.metrics_data.search_impressions || 0);
+      existing.search_clicks = (existing.search_clicks || 0) + (s.metrics_data.search_clicks || 0);
+      monthMap.set(key, existing);
+    }
+    const sortedFinal = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+    for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions", "search_impressions", "search_clicks"]) {
+      map[metricKey] = sortedFinal.map(([key, data]) => { const [y, m] = key.split("-"); return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` }; });
     }
     return map;
   }, [trendData, selectedPlatform]);
