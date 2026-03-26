@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Shield, UserPlus, Trash2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { PLATFORM_LABELS, METRIC_LABELS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
+import AccountSection from '@/components/settings/AccountSection';
+import OrganisationSection from '@/components/settings/OrganisationSection';
 
 interface TeamMember {
   id: string;
@@ -38,8 +39,8 @@ const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instag
 const ALL_METRICS = Object.keys(METRIC_LABELS);
 
 const SettingsPage = () => {
-  const { isOwner, profile, role } = useAuth();
-  const { org, orgId } = useOrg();
+  const { isOwner } = useAuth();
+  const { orgId } = useOrg();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [metricDefaults, setMetricDefaults] = useState<MetricDefault[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,24 +131,8 @@ const SettingsPage = () => {
           <p className="text-muted-foreground font-body mt-1">Organisation & platform configuration</p>
         </div>
 
-        {/* Organisation */}
-        <Card>
-          <CardHeader><CardTitle className="font-display text-lg">Organisation</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{org?.name ?? '—'}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Slug</span><span>{org?.slug ?? '—'}</span></div>
-          </CardContent>
-        </Card>
-
-        {/* Account */}
-        <Card>
-          <CardHeader><CardTitle className="font-display text-lg">Your Account</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span>{profile?.full_name}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{profile?.email}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Role</span><Badge className="capitalize">{role}</Badge></div>
-          </CardContent>
-        </Card>
+        <AccountSection />
+        <OrganisationSection />
 
         {/* Team Members */}
         <Card>
