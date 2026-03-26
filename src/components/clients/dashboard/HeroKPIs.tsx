@@ -105,7 +105,7 @@ const HeroKPICard = ({
                       <img
                         src={PLATFORM_LOGOS[p]}
                         alt={PLATFORM_LABELS[p]}
-                        className="h-4 w-4 rounded-sm object-contain"
+                        className="h-4 w-4 object-contain"
                       />
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs">
