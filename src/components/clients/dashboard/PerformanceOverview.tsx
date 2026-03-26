@@ -257,6 +257,111 @@ const PerformanceOverview = ({
             </CardContent>
           </Card>
         )}
+
+        {/* GSC Search Performance Trend */}
+        {hasGscTrend && (() => {
+          const gscKeys = [
+            { key: 'search_impressions', name: 'Impressions', color: '#b32fbf', format: (v: number) => fmtNum(v) },
+            { key: 'search_clicks', name: 'Clicks', color: '#539BDB', format: (v: number) => fmtNum(v) },
+            { key: 'search_ctr', name: 'CTR', color: '#4ED68E', format: (v: number) => `${v.toFixed(1)}%` },
+            { key: 'search_position', name: 'Avg. Position', color: '#EE8733', format: (v: number) => v.toFixed(1) },
+          ].filter(tk => gscTrendData!.some(d => (d as Record<string, number>)[tk.key] > 0));
+
+          if (gscKeys.length === 0) return null;
+
+          // Normalize GSC data independently per metric
+          const ranges = gscKeys.reduce<Record<string, { min: number; max: number }>>((acc, tk) => {
+            let min = Infinity, max = -Infinity;
+            for (const d of gscTrendData!) {
+              const v = (d as Record<string, number>)[tk.key] ?? 0;
+              if (v < min) min = v;
+              if (v > max) max = v;
+            }
+            acc[tk.key] = { min, max };
+            return acc;
+          }, {});
+
+          const normalizedGscData = gscTrendData!.map(d => {
+            const row: Record<string, unknown> = { name: (d as Record<string, unknown>).name };
+            for (const tk of gscKeys) {
+              const v = (d as Record<string, number>)[tk.key] ?? 0;
+              const { min, max } = ranges[tk.key];
+              row[`_orig_${tk.key}`] = v;
+              row[`_norm_${tk.key}`] = max === min ? 0.5 : (v - min) / (max - min);
+            }
+            return row;
+          });
+
+          const GscTooltip = ({ active, payload, label }: any) => {
+            if (!active || !payload?.length) return null;
+            return (
+              <div className="rounded-lg border bg-popover px-3 py-2 shadow-xl text-xs space-y-1">
+                <p className="font-medium text-foreground">{label}</p>
+                {payload.map((entry: any, i: number) => {
+                  const origKey = entry.dataKey.replace('_norm_', '_orig_');
+                  const origVal = entry.payload?.[origKey] ?? 0;
+                  const tkMeta = gscKeys.find(k => `_norm_${k.key}` === entry.dataKey);
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                      <span className="text-muted-foreground">{tkMeta?.name || entry.dataKey}:</span>
+                      <span className="font-medium text-foreground tabular-nums">{tkMeta?.format(origVal) ?? fmtNum(origVal)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+
+          return (
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body">Search Performance Trend</p>
+                  <span className="text-[10px] text-muted-foreground/60 font-body">Last 6 Months</span>
+                  <div className="ml-auto">
+                    <img
+                      src={PLATFORM_LOGOS['google_search_console']}
+                      alt={PLATFORM_LABELS['google_search_console']}
+                      className="h-4 w-4 object-contain"
+                    />
+                  </div>
+                </div>
+                <div className="h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={normalizedGscData}>
+                      <defs>
+                        {gscKeys.map((tk) => (
+                          <linearGradient key={tk.key} id={`grad-gsc-${tk.key}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={tk.color} stopOpacity={0.2} />
+                            <stop offset="100%" stopColor={tk.color} stopOpacity={0} />
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                      <YAxis hide domain={[0, 1]} />
+                      <RechartsTooltip content={<GscTooltip />} />
+                      {gscKeys.map((tk) => (
+                        <Area
+                          key={tk.key}
+                          type="monotone"
+                          dataKey={`_norm_${tk.key}`}
+                          name={tk.name}
+                          stroke={tk.color}
+                          strokeWidth={2}
+                          fill={`url(#grad-gsc-${tk.key})`}
+                          dot={{ r: 2, fill: tk.color }}
+                        />
+                      ))}
+                      <Legend />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
       </div>
     </div>
   );
