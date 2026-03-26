@@ -313,7 +313,7 @@ const ClientDetail = () => {
     for (let i = 0; i < 12; i++) {
       toast.info(`Syncing historical data... ${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/12)`);
       for (const conn of newPlatforms) {
-        const fn = syncMap[conn.platform];
+        const fn = SYNC_FUNCTION_MAP[conn.platform];
         if (!fn) continue;
         try {
           await supabase.functions.invoke(fn, {
