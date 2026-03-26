@@ -1,0 +1,1 @@
+ALTER TABLE public.subscription_plans ADD COLUMN has_whitelabel boolean NOT NULL DEFAULT false;
