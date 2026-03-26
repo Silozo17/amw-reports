@@ -19,7 +19,6 @@ import type { DashboardWidget, WidgetData, WidgetType } from '@/types/widget';
 import { PLATFORM_LOGOS, PLATFORM_LABELS } from '@/types/database';
 import ChartTypeSelector from './ChartTypeSelector';
 import { ExternalLink, ImageOff } from 'lucide-react';
-import ChartTypeSelector from './ChartTypeSelector';
 import {
   ResponsiveContainer,
   PieChart,
