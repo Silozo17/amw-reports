@@ -529,6 +529,37 @@ function buildWidgetDataMap(
     }
   }
 
+  // Compact mode: merged metric widgets
+  const compactMetrics = new Map<string, { value: number; breakdown: Record<string, number>; breakdownChange: Record<string, number>; isCost: boolean }>();
+  for (const snapshot of filtered) {
+    const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
+    for (const [key, val] of Object.entries(snapshot.metrics_data)) {
+      if (typeof val !== 'number') continue;
+      const prevVal = prevSnapshot?.metrics_data[key];
+      const change = prevVal && prevVal !== 0 ? ((val - prevVal) / prevVal) * 100 : undefined;
+      const isCost = key === 'spend' || key === 'cpc' || key === 'cost_per_conversion' || key === 'cpm';
+
+      const existing = compactMetrics.get(key) || { value: 0, breakdown: {}, breakdownChange: {}, isCost };
+      existing.value += val;
+      existing.breakdown[snapshot.platform] = val;
+      if (change !== undefined) existing.breakdownChange[snapshot.platform] = change;
+      compactMetrics.set(key, existing);
+    }
+  }
+
+  for (const [key, info] of compactMetrics) {
+    const totalPrev = filteredPrev.reduce((sum, s) => sum + (s.metrics_data[key] ?? 0), 0);
+    const totalChange = totalPrev !== 0 ? ((info.value - totalPrev) / totalPrev) * 100 : undefined;
+    map[`compact-${key}`] = {
+      value: info.value,
+      change: totalChange,
+      isCost: info.isCost,
+      currSymbol,
+      platformBreakdown: info.breakdown,
+      platformBreakdownChange: info.breakdownChange,
+    };
+  }
+
   return map;
 }
 
