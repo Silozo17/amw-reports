@@ -87,6 +87,7 @@ interface KpiItem {
   icon: React.ElementType;
   isCost?: boolean;
   metricKey: string;
+  platforms: PlatformType[];
 }
 
 const matchesPlatformFilter = (filter: PlatformFilter, platform: PlatformType): boolean =>
@@ -337,17 +338,32 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
     const cc = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) * 100 : undefined);
 
+    // Helper to collect platforms contributing to a metric
+    const platformsFor = (metricFn: (m: Record<string, number>) => number): PlatformType[] =>
+      [...new Set(filtered.filter(s => metricFn(s.metrics_data) > 0).map(s => s.platform))];
+
+    const spendPlatforms = platformsFor(m => m.spend || 0);
+    const reachPlatforms = platformsFor(m => m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0);
+    const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0));
+    const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.comments || 0) + (m.shares || 0));
+    const followerPlatforms = platformsFor(m => m.total_followers || 0);
+    const sessionsPlatforms = platformsFor(m => m.sessions || 0);
+    const videoViewsPlatforms = platformsFor(m => m.video_views || 0);
+    const conversionsPlatforms = platformsFor(m => m.conversions || 0);
+    const pageViewsPlatforms = platformsFor(m => (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0));
+    const websiteClicksPlatforms = platformsFor(m => (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0));
+
     return [
-      ...((selectedPlatform === 'all' || filterIncludesPlatform(selectedPlatform, 'meta_ads') || filterIncludesPlatform(selectedPlatform, 'google_ads')) && totalSpend > 0 ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend" }] : []),
-      ...(totalVideoViews > 0 ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views" }] : []),
-      ...(totalReach > 0 ? [{ label: "Reach", value: totalReach, change: cc(totalReach, prevReach), icon: Eye, metricKey: "reach" }] : []),
-      ...(totalClicks > 0 ? [{ label: "Clicks", value: totalClicks, change: cc(totalClicks, prevClicks), icon: MousePointerClick, metricKey: "clicks" }] : []),
-      ...(totalEngagement > 0 ? [{ label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement" }] : []),
-      ...(totalFollowers > 0 ? [{ label: "Followers", value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: "total_followers" }] : []),
-      ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions" }] : []),
-      ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions" }] : []),
-      ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views" }] : []),
-      ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks" }] : []),
+      ...((selectedPlatform === 'all' || filterIncludesPlatform(selectedPlatform, 'meta_ads') || filterIncludesPlatform(selectedPlatform, 'google_ads')) && totalSpend > 0 ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend", platforms: spendPlatforms }] : []),
+      ...(totalVideoViews > 0 ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views", platforms: videoViewsPlatforms }] : []),
+      ...(totalReach > 0 ? [{ label: "Reach", value: totalReach, change: cc(totalReach, prevReach), icon: Eye, metricKey: "reach", platforms: reachPlatforms }] : []),
+      ...(totalClicks > 0 ? [{ label: "Clicks", value: totalClicks, change: cc(totalClicks, prevClicks), icon: MousePointerClick, metricKey: "clicks", platforms: clicksPlatforms }] : []),
+      ...(totalEngagement > 0 ? [{ label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement", platforms: engagementPlatforms }] : []),
+      ...(totalFollowers > 0 ? [{ label: "Followers", value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: "total_followers", platforms: followerPlatforms }] : []),
+      ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions", platforms: sessionsPlatforms }] : []),
+      ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
+      ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views", platforms: pageViewsPlatforms }] : []),
+      ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks", platforms: websiteClicksPlatforms }] : []),
     ] as KpiItem[];
   }, [filtered, filteredPrev, selectedPlatform]);
 
