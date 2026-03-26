@@ -87,11 +87,14 @@ Deno.serve(async (req) => {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-    // Convert to unix timestamps for IG insights (must be ≤30 days apart)
-    const sinceTs = Math.floor(new Date(startDate + "T00:00:00Z").getTime() / 1000);
-    // Use start of the day *after* the last day so the range is exactly the month
-    const nextDay = new Date(Date.UTC(year, month, 1)); // month is already 1-indexed, so this is 1st of next month
-    const untilTs = Math.floor(nextDay.getTime() / 1000);
+    // Build date ranges for IG insights (API limit: ≤30 days per request)
+    // Split month into two halves to stay within the limit
+    const midDay = Math.min(15, lastDay);
+    const midDate = `${year}-${String(month).padStart(2, "0")}-${String(midDay).padStart(2, "0")}`;
+    const dateRanges = [
+      { since: Math.floor(new Date(startDate + "T00:00:00Z").getTime() / 1000), until: Math.floor(new Date(midDate + "T23:59:59Z").getTime() / 1000) },
+      { since: Math.floor(new Date(midDate + "T00:00:00Z").getTime() / 1000) + 86400, until: Math.floor(new Date(endDate + "T23:59:59Z").getTime() / 1000) },
+    ].filter(r => r.since <= r.until);
 
     let totalImpressions = 0;
     let totalReach = 0;
