@@ -248,7 +248,7 @@ export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram',
 export const METRIC_LABELS: Record<string, string> = {
   spend: 'Spend',
   impressions: 'Impressions',
-  organic_impressions: 'Organic Impressions',
+  
   paid_impressions: 'Paid Impressions',
   clicks: 'Clicks',
   link_clicks: 'Link Clicks',
