@@ -311,7 +311,7 @@ function generateDefaultWidgets(
           type: 'number',
           category: 'platform',
           visible: true,
-          position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
+          position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 4, w: 3, h: 4, minW: 2, minH: 3 },
           compatibleTypes: COMPATIBLE_TYPES.platform,
           platform,
         });
