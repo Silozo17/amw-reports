@@ -410,7 +410,7 @@ const PlatformSection = ({
           );
         })() : hasChartData && (
           <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">{chartLabel} — {trendData && trendData.length > 0 ? `Last ${trendData.length} Month${trendData.length === 1 ? '' : 's'}` : 'Trend'}</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 font-body">{chartLabel} — Last 6 Months</p>
             <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
