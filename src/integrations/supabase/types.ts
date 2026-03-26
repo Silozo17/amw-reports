@@ -360,32 +360,44 @@ export type Database = {
       }
       organisations: {
         Row: {
+          accent_color: string | null
+          body_font: string | null
           created_at: string
           created_by: string | null
+          heading_font: string | null
           id: string
           logo_url: string | null
           name: string
           primary_color: string | null
+          secondary_color: string | null
           slug: string | null
           updated_at: string
         }
         Insert: {
+          accent_color?: string | null
+          body_font?: string | null
           created_at?: string
           created_by?: string | null
+          heading_font?: string | null
           id?: string
           logo_url?: string | null
           name: string
           primary_color?: string | null
+          secondary_color?: string | null
           slug?: string | null
           updated_at?: string
         }
         Update: {
+          accent_color?: string | null
+          body_font?: string | null
           created_at?: string
           created_by?: string | null
+          heading_font?: string | null
           id?: string
           logo_url?: string | null
           name?: string
           primary_color?: string | null
+          secondary_color?: string | null
           slug?: string | null
           updated_at?: string
         }

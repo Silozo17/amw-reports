@@ -8,6 +8,10 @@ export interface Organisation {
   slug: string | null;
   logo_url: string | null;
   primary_color: string | null;
+  secondary_color: string | null;
+  accent_color: string | null;
+  heading_font: string | null;
+  body_font: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -30,6 +34,34 @@ export function useOrg() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchOrg = async () => {
+    if (!user) return;
+
+    const { data: membership } = await supabase
+      .from('org_members')
+      .select('org_id, role')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single();
+
+    if (!membership) {
+      setIsLoading(false);
+      return;
+    }
+
+    setOrgId(membership.org_id);
+    setOrgRole(membership.role as 'owner' | 'manager');
+
+    const { data: orgData } = await supabase
+      .from('organisations')
+      .select('*')
+      .eq('id', membership.org_id)
+      .single();
+
+    setOrg(orgData as Organisation | null);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
     if (!user) {
       setOrg(null);
@@ -39,34 +71,8 @@ export function useOrg() {
       return;
     }
 
-    const fetchOrg = async () => {
-      const { data: membership } = await supabase
-        .from('org_members')
-        .select('org_id, role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single();
-
-      if (!membership) {
-        setIsLoading(false);
-        return;
-      }
-
-      setOrgId(membership.org_id);
-      setOrgRole(membership.role as 'owner' | 'manager');
-
-      const { data: orgData } = await supabase
-        .from('organisations')
-        .select('*')
-        .eq('id', membership.org_id)
-        .single();
-
-      setOrg(orgData as Organisation | null);
-      setIsLoading(false);
-    };
-
     fetchOrg();
   }, [user]);
 
-  return { org, orgId, orgRole, isOrgOwner: orgRole === 'owner', isLoading };
+  return { org, orgId, orgRole, isOrgOwner: orgRole === 'owner', isLoading, refetchOrg: fetchOrg };
 }

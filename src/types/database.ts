@@ -20,6 +20,10 @@ export interface Organisation {
   slug: string | null;
   logo_url: string | null;
   primary_color: string | null;
+  secondary_color: string | null;
+  accent_color: string | null;
+  heading_font: string | null;
+  body_font: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
