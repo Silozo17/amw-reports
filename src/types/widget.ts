@@ -22,6 +22,8 @@ export interface DashboardWidget {
   position: WidgetPosition;
   compatibleTypes: WidgetType[];
   platform?: string;
+  /** Compact mode: which platforms contribute data to this merged widget */
+  platformSources?: string[];
 }
 
 export interface WidgetData {
