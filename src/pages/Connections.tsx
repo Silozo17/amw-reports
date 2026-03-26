@@ -4,7 +4,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plug, RefreshCw, AlertCircle, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import { Plug, AlertCircle, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformConnection } from '@/types/database';
 import { useEntitlements } from '@/hooks/useEntitlements';
