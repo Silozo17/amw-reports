@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3, CalendarIcon, History, Trash2 } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, RefreshCw, FileText, Loader2, BarChart3, CalendarIcon, History, Trash2, Share2 } from 'lucide-react';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS, CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
@@ -24,6 +24,7 @@ import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import ConnectionDisclaimer from '@/components/clients/ConnectionDisclaimer';
+import ShareDialog from '@/components/clients/ShareDialog';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
@@ -409,6 +410,7 @@ const ClientDetail = () => {
             <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
+            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
             <AlertDialog>
               <AlertDialogTrigger asChild>

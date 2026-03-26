@@ -15,6 +15,7 @@ import Connections from "./pages/Connections";
 import Logs from "./pages/Logs";
 import DebugConsole from "./pages/DebugConsole";
 import SettingsPage from "./pages/SettingsPage";
+import ClientPortal from "./pages/ClientPortal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,7 @@ const AppRoutes = () => (
     <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
     <Route path="/debug" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
+    <Route path="/portal/:token" element={<ClientPortal />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
