@@ -117,7 +117,6 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
   const [drag, setDrag] = useState<DragInfo | null>(null);
   const dragRef = useRef<DragInfo | null>(null);
   const rafRef = useRef<number | null>(null);
-  const [isSnapping, setIsSnapping] = useState(false);
 
   const visibleWidgets = useMemo(() => widgets.filter((w) => w.visible), [widgets]);
 
@@ -174,10 +173,10 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
         ghostY: widget.position.y,
         currentX: 0,
         currentY: 0,
+        snapping: false,
       };
       dragRef.current = info;
       setDrag(info);
-      setIsSnapping(false);
     },
     [isEditMode, visibleWidgets],
   );
@@ -185,7 +184,7 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       const d = dragRef.current;
-      if (!d) return;
+      if (!d || d.snapping) return;
       e.preventDefault();
 
       const dx = e.clientX - d.startMouseX;
@@ -200,13 +199,11 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
       const gx = Math.max(0, Math.min(pixelToGridX(newLeft), COLS - widget.position.w));
       const gy = Math.max(0, pixelToGridY(newTop));
 
-      // Update ref immediately for smooth rendering
       d.currentX = dx;
       d.currentY = dy;
       d.ghostX = gx;
       d.ghostY = gy;
 
-      // Throttle state updates via rAF
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
         setDrag({ ...d });
@@ -219,7 +216,7 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       const d = dragRef.current;
-      if (!d) return;
+      if (!d || d.snapping) return;
       e.preventDefault();
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
 
@@ -228,10 +225,12 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
         rafRef.current = null;
       }
 
-      // Snap animation
-      setIsSnapping(true);
+      // Phase 1: mark as snapping — widget will transition to ghost position
+      d.snapping = true;
+      dragRef.current = { ...d };
+      setDrag({ ...d });
 
-      // Commit the ghost position
+      // Phase 2: after transition completes, commit layout and clear drag
       const finalLayout = compactLayout(visibleWidgets, d.widgetId, d.ghostX, d.ghostY);
       const updated = widgets.map((w) => {
         const found = finalLayout.find((l) => l.id === w.id);
@@ -241,14 +240,11 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
         return w;
       });
 
-      dragRef.current = null;
-      setDrag(null);
-
-      // Brief delay so snap transition plays, then commit
       setTimeout(() => {
-        setIsSnapping(false);
+        dragRef.current = null;
+        setDrag(null);
         onLayoutChange(updated);
-      }, 180);
+      }, 200);
     },
     [widgets, visibleWidgets, onLayoutChange],
   );
@@ -293,15 +289,20 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
         const height = item.pos.h * ROW_H + (item.pos.h - 1) * GAP;
 
         const isDragging = drag?.widgetId === item.id;
+        const isSnappingBack = isDragging && drag.snapping;
 
-        // Dragged widget follows cursor directly
-        const renderLeft = isDragging ? drag.startLeft + drag.currentX : left;
-        const renderTop = isDragging ? drag.startTop + drag.currentY : top;
+        // During drag: follow cursor. During snap: animate to ghost grid position. Otherwise: layout position.
+        const renderLeft = isDragging
+          ? (isSnappingBack ? left : drag.startLeft + drag.currentX)
+          : left;
+        const renderTop = isDragging
+          ? (isSnappingBack ? top : drag.startTop + drag.currentY)
+          : top;
 
         return (
           <div key={item.id}>
-            {/* Ghost placeholder – shown at target grid position while dragging */}
-            {isDragging && (
+            {/* Ghost placeholder – shown at target grid position while dragging (hidden during snap since widget is heading there) */}
+            {isDragging && !isSnappingBack && (
               <div
                 className="absolute rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 transition-all duration-300 ease-in-out"
                 style={{ left, top, width, height }}
@@ -313,9 +314,9 @@ const DashboardGrid = ({ widgets, dataMap, onLayoutChange, onTypeChange, isEditM
               className={cn(
                 'absolute touch-none',
                 isEditMode && 'cursor-grab',
-                isDragging && 'cursor-grabbing z-50 shadow-2xl ring-2 ring-primary/40 scale-[1.02] opacity-90',
-                !isDragging && !isSnapping && 'transition-all duration-300 ease-in-out',
-                !isDragging && isSnapping && 'transition-all duration-150 ease-out',
+                isDragging && !isSnappingBack && 'cursor-grabbing z-50 shadow-2xl ring-2 ring-primary/40 scale-[1.02] opacity-90',
+                isSnappingBack && 'z-50 transition-all duration-200 ease-out',
+                !isDragging && 'transition-all duration-300 ease-in-out',
               )}
               style={{
                 left: renderLeft,
