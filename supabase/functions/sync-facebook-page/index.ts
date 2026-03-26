@@ -121,18 +121,17 @@ Deno.serve(async (req) => {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-    // Accumulators
-    let totalImpressions = 0;
-    let totalVideoViews = 0;
+    // ── Accumulators ──
+    let totalViews = 0;
+    let totalUniqueViewers = 0;
     let totalEngagement = 0;
+    let totalCTAClicks = 0;
     let totalPageViews = 0;
     let totalLinkClicks = 0;
-    let paidImpressions = 0;
-    let paidVideoViews = 0;
-
+    let totalNewFollowers = 0;
+    let totalUnfollows = 0;
+    let currentFollowers = 0;
     let coreInsightsFetched = false;
-
-    const metricsAccum: Record<string, number> = {};
     const allTopPosts: any[] = [];
 
     for (const page of pages) {
@@ -146,60 +145,63 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Call A: Totals (stable, always-supported metrics) ──
+      // ── Batch 1: Views, unique viewers, engagement, CTA clicks ──
       try {
-        const totalMetrics = await fetchPageInsights(pageId, pageToken, [
+        const batch1 = await fetchPageInsights(pageId, pageToken, [
+          "page_media_view",
+          "page_total_media_view_unique",
           "page_post_engagements",
-          "page_follows",
-          "page_impressions",
-          "page_views_total",
-          "page_consumptions",
-          "page_video_views",
+          "page_total_actions",
         ], startDate, endDate);
 
-        totalEngagement += sumDailyValues(totalMetrics, "page_post_engagements");
-        totalImpressions += sumDailyValues(totalMetrics, "page_impressions");
-        totalVideoViews += sumDailyValues(totalMetrics, "page_video_views");
-        totalPageViews += sumDailyValues(totalMetrics, "page_views_total");
-        totalLinkClicks += sumDailyValues(totalMetrics, "page_consumptions");
-
-        // page_follows: get growth from first to last day
-        for (const metric of totalMetrics) {
-          if (metric.name === "page_follows") {
-            const values = metric.values || [];
-            const lastValue = values.at(-1)?.value || 0;
-            const firstValue = values.at(0)?.value || 0;
-            metricsAccum.total_fans = (metricsAccum.total_fans || 0) + Number(lastValue);
-            metricsAccum.follower_growth = (metricsAccum.follower_growth || 0) + (Number(lastValue) - Number(firstValue));
-          }
-        }
-
+        totalViews         += sumDailyValues(batch1, "page_media_view");
+        totalUniqueViewers += sumDailyValues(batch1, "page_total_media_view_unique");
+        totalEngagement    += sumDailyValues(batch1, "page_post_engagements");
+        totalCTAClicks     += sumDailyValues(batch1, "page_total_actions");
         coreInsightsFetched = true;
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Core totals error page ${pageId}:`, errorMsg);
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        console.error(`Batch 1 failed page ${pageId}:`, msg);
         await supabaseClient.from("platform_connections")
-          .update({ last_error: `Core insights failed: ${errorMsg}`, last_sync_status: "partial" })
+          .update({ last_error: `Batch 1 failed: ${msg}`, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
 
-      // ── Call B: Paid breakdown (separate, non-blocking) ──
+      // ── Batch 2: Page views, link clicks, follows ──
       try {
-        const paidMetrics = await fetchPageInsights(pageId, pageToken, [
-          "page_impressions_paid",
-          "page_video_views_paid",
+        const batch2 = await fetchPageInsights(pageId, pageToken, [
+          "page_views_total",
+          "page_consumptions",
+          "page_daily_follows_unique",
+          "page_daily_unfollows_unique",
         ], startDate, endDate);
 
-        paidImpressions += sumDailyValues(paidMetrics, "page_impressions_paid");
-        paidVideoViews += sumDailyValues(paidMetrics, "page_video_views_paid");
+        totalPageViews    += sumDailyValues(batch2, "page_views_total");
+        totalLinkClicks   += sumDailyValues(batch2, "page_consumptions");
+        totalNewFollowers += sumDailyValues(batch2, "page_daily_follows_unique");
+        totalUnfollows    += sumDailyValues(batch2, "page_daily_unfollows_unique");
       } catch (err) {
-        // Non-blocking: if paid metrics fail, paid = 0, so organic = total (safe)
-        console.warn(`Paid metrics unavailable for page ${pageId}:`, err instanceof Error ? err.message : err);
+        console.warn(`Batch 2 failed page ${pageId}:`, err instanceof Error ? err.message : err);
       }
 
-      // ── Posts: fetch all with per-post insights ──
+      // ── Call B: Total followers (last daily value) ──
       try {
-        let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=message,created_time,full_picture,permalink_url,likes.summary(true),comments.summary(true),shares,attachments{media_type,media,url,title}&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
+        const followerUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_follows&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const followerRes = await fetch(followerUrl);
+        if (followerRes.ok) {
+          const followerData = await followerRes.json();
+          const values = followerData.data?.[0]?.values || [];
+          if (values.length > 0) {
+            currentFollowers += Number(values[values.length - 1]?.value || 0);
+          }
+        }
+      } catch (err) {
+        console.warn(`Followers fetch failed page ${pageId}:`, err instanceof Error ? err.message : err);
+      }
+
+      // ── Posts: published_posts (organic only — dark ad posts excluded) ──
+      try {
+        let postsUrl: string | null = `${GRAPH_BASE}/${pageId}/published_posts?fields=id,message,created_time,full_picture,permalink_url,is_promoted,reactions.summary(true),comments.summary(true),shares,attachments{media_type,media,url,title}&since=${startDate}&until=${endDate}&limit=100&access_token=${pageToken}`;
 
         while (postsUrl) {
           const postsRes = await fetch(postsUrl);
@@ -209,117 +211,100 @@ Deno.serve(async (req) => {
           }
           const postsData = await postsRes.json();
 
-          if (postsData.data) {
-            for (const post of postsData.data) {
-              const likes = post.likes?.summary?.total_count || 0;
-              const comments = post.comments?.summary?.total_count || 0;
-              const shares = post.shares?.count || 0;
-              const attachmentType = post.attachments?.data?.[0]?.media_type || '';
-              const isVideo = attachmentType === 'video' || attachmentType === 'video_inline';
+          for (const post of (postsData.data || [])) {
+            const totalReactions = post.reactions?.summary?.total_count || 0;
+            const comments       = post.comments?.summary?.total_count || 0;
+            const shares         = post.shares?.count || 0;
+            const attachmentType = post.attachments?.data?.[0]?.media_type || 'status';
+            const isPromoted     = post.is_promoted === true;
 
-              let postOrganicReach = 0;
-              let postPaidReach = 0;
-              let postClicks = 0;
-              let postVideoViews = 0;
+            let postViews = 0;
+            let postClicks = 0;
+            let postEngagedUsers = 0;
+            let postClicksByType: Record<string, number> = {};
+            let reactionBreakdown: Record<string, number> = {};
 
-              try {
-                const insightMetrics = isVideo
-                  ? 'post_impressions_organic_unique,post_impressions_paid_unique,post_clicks,post_video_views'
-                  : 'post_impressions_organic_unique,post_impressions_paid_unique,post_clicks';
-
-                const postInsightsUrl = `${GRAPH_BASE}/${post.id}/insights?metric=${insightMetrics}&access_token=${pageToken}`;
-                const postInsightsRes = await fetch(postInsightsUrl);
-
-                if (postInsightsRes.ok) {
-                  const postInsightsData = await postInsightsRes.json();
-                  for (const insight of postInsightsData.data || []) {
-                    const val = insight.values?.[0]?.value || 0;
-                    if (insight.name === 'post_impressions_organic_unique') postOrganicReach = val;
-                    if (insight.name === 'post_impressions_paid_unique') postPaidReach = val;
-                    if (insight.name === 'post_clicks') postClicks = val;
-                    if (insight.name === 'post_video_views') postVideoViews = val;
-                  }
+            try {
+              const insightMetrics = 'post_media_view,post_clicks,post_clicks_by_type,post_engaged_users,post_reactions_by_type_total';
+              const piRes = await fetch(`${GRAPH_BASE}/${post.id}/insights?metric=${insightMetrics}&access_token=${pageToken}`);
+              if (piRes.ok) {
+                const piData = await piRes.json();
+                for (const insight of (piData.data || [])) {
+                  const val = insight.values?.[0]?.value;
+                  if (insight.name === 'post_media_view')              postViews = Number(val || 0);
+                  if (insight.name === 'post_clicks')                  postClicks = Number(val || 0);
+                  if (insight.name === 'post_engaged_users')           postEngagedUsers = Number(val || 0);
+                  if (insight.name === 'post_clicks_by_type')          postClicksByType = (typeof val === 'object' && val !== null) ? val : {};
+                  if (insight.name === 'post_reactions_by_type_total') reactionBreakdown = (typeof val === 'object' && val !== null) ? val : {};
                 }
-              } catch {} // non-blocking per-post
+              }
+            } catch {} // non-blocking per-post
 
-              const isBoosted = postPaidReach > 0;
-
-              allTopPosts.push({
-                page_name: page.name,
-                message: post.message || "",
-                created_time: post.created_time,
-                full_picture: post.full_picture || null,
-                permalink_url: post.permalink_url || null,
-                likes,
-                comments,
-                shares,
-                reach: postOrganicReach,
-                organic_reach: postOrganicReach,
-                paid_reach: postPaidReach,
-                clicks: postClicks,
-                video_views: postVideoViews > 0 ? postVideoViews : undefined,
-                media_type: attachmentType || 'status',
-                total_engagement: likes + comments + shares,
-                is_boosted: isBoosted,
-              });
-            }
+            allTopPosts.push({
+              page_name:      page.name,
+              message:        post.message || '',
+              created_time:   post.created_time,
+              full_picture:   post.full_picture || null,
+              permalink_url:  post.permalink_url || null,
+              media_type:     attachmentType,
+              is_promoted:    isPromoted,
+              reactions:      totalReactions,
+              likes:          totalReactions,
+              comments,
+              shares,
+              views:          postViews,
+              clicks:         postClicks,
+              engaged_users:  postEngagedUsers,
+              link_clicks:    postClicksByType['link clicks'] || postClicksByType['link_click'] || 0,
+              reaction_like:  reactionBreakdown['LIKE'] || 0,
+              reaction_love:  reactionBreakdown['LOVE'] || 0,
+              reaction_wow:   reactionBreakdown['WOW'] || 0,
+              reaction_haha:  reactionBreakdown['HAHA'] || 0,
+              reaction_sorry: reactionBreakdown['SORRY'] || 0,
+              reaction_anger: reactionBreakdown['ANGER'] || 0,
+              total_engagement: totalReactions + comments + shares,
+            });
           }
 
           postsUrl = postsData.paging?.next || null;
         }
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Posts sync error page ${pageId}:`, errorMsg);
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        console.error(`Posts sync error page ${pageId}:`, msg);
         await supabaseClient.from("platform_connections")
-          .update({ last_error: errorMsg, last_sync_status: "partial" })
+          .update({ last_error: msg, last_sync_status: "partial" })
           .eq("id", connectionId);
       }
     }
 
-    // Sort by engagement, keep all
     const topContent = allTopPosts.sort((a, b) => b.total_engagement - a.total_engagement);
 
-    // ── Organic = Total - Paid ──
-    const organicImpressions = Math.max(totalImpressions - paidImpressions, 0);
-    const organicVideoViews = Math.max(totalVideoViews - paidVideoViews, 0);
-
-    // Fallback: if page-level video views are 0, aggregate from posts
-    const monthlyVideoViewsFromPosts = allTopPosts.reduce((sum, p) => sum + (p.video_views || 0), 0);
-    const finalOrganicVideoViews = organicVideoViews > 0 ? organicVideoViews : monthlyVideoViewsFromPosts;
-
     const metricsData = {
-      // Organic (Total - Paid)
-      impressions: organicImpressions,
-      reach: organicImpressions, // organic impressions = organic reach proxy
-      video_views: finalOrganicVideoViews,
-
-      // Paid (stored separately for boosted sub-section)
-      paid_impressions: paidImpressions,
-      paid_reach: paidImpressions, // paid impressions = paid reach proxy
-      paid_video_views: paidVideoViews,
-
-      // Totals (for reference, hidden from cards)
-      total_impressions: totalImpressions,
-      total_video_views: totalVideoViews > 0 ? totalVideoViews : monthlyVideoViewsFromPosts,
-
-      // Engagement & other metrics (fine as totals)
-      engagement: totalEngagement,
-      page_views: totalPageViews,
-      link_clicks: totalLinkClicks,
-      follower_growth: metricsAccum.follower_growth || 0,
-      total_followers: metricsAccum.total_fans || 0,
-      likes: allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
-      comments: allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
-      shares: allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
+      views:           totalViews,
+      impressions:     totalViews,
+      reach:           totalUniqueViewers,
+      engagement:      totalEngagement,
+      engagement_rate: totalViews > 0 ? parseFloat(((totalEngagement / totalViews) * 100).toFixed(2)) : 0,
+      page_views:      totalPageViews,
+      link_clicks:     totalLinkClicks,
+      cta_clicks:      totalCTAClicks,
+      total_followers: currentFollowers,
+      new_followers:   totalNewFollowers,
+      unfollows:       totalUnfollows,
+      follower_growth: Math.max(totalNewFollowers - totalUnfollows, 0),
+      reactions:       allTopPosts.reduce((s, p) => s + (p.reactions || 0), 0),
+      likes:           allTopPosts.reduce((s, p) => s + (p.likes || 0), 0),
+      comments:        allTopPosts.reduce((s, p) => s + (p.comments || 0), 0),
+      shares:          allTopPosts.reduce((s, p) => s + (p.shares || 0), 0),
       posts_published: allTopPosts.length,
-      engagement_rate: organicImpressions > 0 ? (totalEngagement / organicImpressions) * 100 : 0,
-      pages_count: pages.length,
+      post_views:      allTopPosts.reduce((s, p) => s + (p.views || 0), 0),
+      post_clicks:     allTopPosts.reduce((s, p) => s + (p.clicks || 0), 0),
+      pages_count:     pages.length,
     };
 
     // ── Overwrite protection ──
-    // If core insights failed AND we have posts with likes, don't wipe existing data
-    const hasPostActivity = allTopPosts.some(p => (p.likes || 0) > 0);
-    const allCoreZero = metricsData.impressions === 0 && metricsData.engagement === 0 && metricsData.total_followers === 0;
+    const hasPostActivity = allTopPosts.some(p => (p.reactions || 0) > 0);
+    const allCoreZero = metricsData.views === 0 && metricsData.engagement === 0 && metricsData.total_followers === 0;
 
     const { data: existing } = await supabaseClient
       .from("monthly_snapshots")
@@ -332,28 +317,24 @@ Deno.serve(async (req) => {
 
     if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
 
-    // If new data is all zeros but posts have activity AND existing snapshot has real data, skip overwrite
     if (allCoreZero && hasPostActivity && existing) {
       const existingMetrics = existing.metrics_data as Record<string, number>;
-      if ((existingMetrics?.impressions || 0) > 0 || (existingMetrics?.engagement || 0) > 0) {
-        console.warn("Skipping overwrite: new data is all zeros but existing snapshot has real values. Core insights likely failed.");
+      if ((existingMetrics?.views || 0) > 0 || (existingMetrics?.engagement || 0) > 0) {
+        console.warn("Skipping overwrite: new data is all zeros but existing snapshot has real values.");
         await supabaseClient.from("platform_connections")
           .update({ last_sync_status: "partial", last_error: "Core page insights unavailable — existing data preserved." })
           .eq("id", connectionId);
-
         if (syncLog?.id) {
           await supabaseClient.from("sync_logs")
             .update({ status: "partial", completed_at: new Date().toISOString(), error_message: "Core insights failed, existing snapshot preserved" })
             .eq("id", syncLog.id);
         }
-
         return new Response(JSON.stringify({ success: false, error: "Core insights unavailable, existing data preserved", posts_count: allTopPosts.length }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
 
-    // Save snapshot
     if (existing) {
       await supabaseClient.from("monthly_snapshots")
         .update({ metrics_data: metricsData, top_content: topContent })
@@ -373,7 +354,7 @@ Deno.serve(async (req) => {
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete. organic_impressions=${organicImpressions}, paid_impressions=${paidImpressions}, organic_video_views=${finalOrganicVideoViews}, paid_video_views=${paidVideoViews}, posts=${allTopPosts.length}`);
+    console.log(`Facebook sync complete. views=${totalViews}, reach=${totalUniqueViewers}, engagement=${totalEngagement}, followers=${currentFollowers}, posts=${allTopPosts.length}`);
 
     return new Response(JSON.stringify({ success: true, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
