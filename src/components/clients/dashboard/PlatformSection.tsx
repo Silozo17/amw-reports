@@ -21,6 +21,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ExternalLink, ImageOff } from 'lucide-react';
 import { useState } from 'react';
+import MetricTooltip from '@/components/clients/MetricTooltip';
 
 const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
 

@@ -73,16 +73,6 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   videos_published: 'Total number of videos on your channel',
   avg_view_duration: 'Average time in seconds viewers watched your videos',
   top_videos: 'Your best-performing videos during this period',
-  // Additional metrics
-  cpm: 'Cost per 1,000 impressions — how much you pay for every thousand views of your ad',
-  frequency: 'Average number of times each person saw your ad during the period',
-  search_impression_share: 'Percentage of available search impressions you captured vs competitors',
-  website_clicks: 'Number of clicks to your website from your social profile or listings',
-  email_contacts: 'Number of times people tapped the email button on your profile',
-  media_count: 'Total number of posts currently on your profile',
-  reel_count: 'Number of Reels published during the period',
-  image_count: 'Number of image posts published during the period',
-  carousel_count: 'Number of carousel posts published during the period',
 };
 
 /** Timezone options for client configuration */
