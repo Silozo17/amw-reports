@@ -171,11 +171,11 @@ function generateDefaultWidgets(
       type: 'number',
       category: 'kpi',
       visible: true,
-      position: { x: (i % 6) * 2, y: Math.floor(i / 6) * 2, w: 2, h: 2, minW: 2, minH: 2 },
+      position: { x: (i % 4) * 3, y: Math.floor(i / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
       compatibleTypes: COMPATIBLE_TYPES.kpi,
     });
   });
-  y = Math.ceil(kpis.length / 6) * 2;
+  y = Math.ceil(kpis.length / 4) * 3;
 
   // Chart widgets
   if (hasSpendDistribution) {
@@ -262,13 +262,13 @@ function generateDefaultWidgets(
         type: 'number',
         category: 'platform',
         visible: true,
-        position: { x: (pIdx % 6) * 2, y: y + Math.floor(pIdx / 6) * 2, w: 2, h: 2, minW: 2, minH: 2 },
+        position: { x: (pIdx % 4) * 3, y: y + Math.floor(pIdx / 4) * 3, w: 3, h: 3, minW: 2, minH: 2 },
         compatibleTypes: COMPATIBLE_TYPES.platform,
         platform,
       });
       pIdx++;
     }
-    y += Math.ceil(pIdx / 6) * 2;
+    y += Math.ceil(pIdx / 4) * 3;
   }
 
   return widgets;
