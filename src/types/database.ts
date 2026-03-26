@@ -345,8 +345,7 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
   facebook: [
     'total_followers', 'follower_growth', 'page_likes', 'page_views',
     'engagement', 'engagement_rate', 'likes', 'comments', 'shares',
-    'reactions', 'posts_published', 'video_views', 'reach',
-    'organic_impressions',
+    'reactions', 'posts_published', 'video_views', 'reach', 'impressions',
     'paid_impressions', 'paid_reach', 'paid_video_views',
   ],
   instagram: [
