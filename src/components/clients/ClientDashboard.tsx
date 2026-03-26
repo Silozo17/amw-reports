@@ -600,6 +600,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             engagementStackedData={engagementStackedData as unknown as Array<Record<string, unknown>>}
             impressionsByPlatform={impressionsByPlatform as unknown as Array<Record<string, unknown>>}
             trendChartData={trendChartData as unknown as Array<Record<string, unknown>>}
+            trendPlatforms={[...new Set((selectedPlatform === "all" ? trendData : trendData.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))).map(s => s.platform))] as PlatformType[]}
           />
 
           {/* 3. Platform Sections */}
