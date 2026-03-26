@@ -1,44 +1,65 @@
 
 
-# Widget Improvements: Typography, New Chart Types, and Empty State Handling
+# Dashboard Widget Enhancements: Platform Logos, Sort, Resize, Focus Fix
 
-## Issues Identified
+## 1. Add platform logo to every widget
 
-1. **Widget titles too small and cramped** — Currently `text-xs` with no letter-spacing; bold text at that size runs together
-2. **Descriptions get cut off** — Currently `line-clamp-1` with `text-[10px]`, truncating useful context
-3. **Missing chart types** — No progress ring / radial gauge ("Apple Watch fitness circles") or standalone pie chart options for KPI/platform widgets
-4. **Empty gaps** — Widgets with value `0` are excluded from generation (line 248 of `ClientDashboard.tsx`), leaving holes in the grid; they should still render with a "No data" state
+**Problem**: Widget labels like "Impressions" appear for multiple platforms with no way to tell them apart.
 
-## Changes
+**Solution**: Add a `platform` field to `DashboardWidget` type. When generating widgets in `ClientDashboard.tsx`, extract the platform from the widget ID (e.g., `platform-google_ads-impressions` → `google_ads`) and store it. In `WidgetRenderer.tsx`, render the platform logo (from `PLATFORM_LOGOS`) as a small 16x16 image next to the widget title.
 
-### 1. Fix widget title typography (`WidgetRenderer.tsx`)
-- Change `CardTitle` from `text-xs` to `text-sm` and add `tracking-wide` for letter spacing
-- Change description from `line-clamp-1 text-[10px]` to `line-clamp-2 text-[11px]` so it wraps to 2 lines instead of truncating
+### Files
+- `src/types/widget.ts` — add optional `platform?: PlatformType` to `DashboardWidget`
+- `src/components/clients/ClientDashboard.tsx` — set `platform` field on each widget during generation (KPI widgets get no platform, platform widgets get their platform, chart/table widgets get assigned based on context)
+- `src/components/clients/widgets/WidgetRenderer.tsx` — render the platform logo in the card header next to the title
 
-### 2. Add new widget types (`src/types/widget.ts`)
-- Add `'progress'` and `'gauge'` to the `WidgetType` union
-- Add them to `COMPATIBLE_TYPES.kpi` and `COMPATIBLE_TYPES.platform`
+## 2. Add sort button to dashboard controls
 
-### 3. Add progress ring / radial gauge renderers (`WidgetRenderer.tsx`)
-- **Progress ring** — SVG circle with animated stroke-dashoffset showing percentage (0-100%), like Apple Watch rings; color-coded by performance
-- **Gauge** — Semi-circle arc with a needle indicator, useful for CTR, engagement rate, bounce rate
-- Both will use the widget's `value` and optional `change` data, rendering the numeric value in the center
+**Problem**: No way to sort/group widgets by platform or other criteria.
 
-### 4. Update `ChartTypeSelector.tsx`
-- Add icons for the new `progress` and `gauge` types (use `Circle` and `Gauge` from lucide)
-- Add labels: "Progress Ring", "Gauge"
+**Solution**: Add a sort dropdown next to the Edit Dashboard button with options: "Default", "By Platform", "By Type", "By Name". Sorting reorders the `widgets` array before passing to `DashboardGrid`, recalculating positions based on sort order.
 
-### 5. Show widgets with zero/missing data (`ClientDashboard.tsx`)
-- Remove the `val === 0` skip condition on line 248 — generate the widget regardless
-- Keep `val === 0` widgets in `buildWidgetDataMap` (they already have `value: 0`)
+### Files
+- `src/components/clients/ClientDashboard.tsx` — add `sortMode` state, a `Select` dropdown in the controls bar, and a `useMemo` that reorders widgets based on sort selection before passing to `DashboardGrid`
 
-### 6. Handle empty state in `NumberWidget` (`WidgetRenderer.tsx`)
-- When `data.value` is `0` or `undefined` and there's no sparkline data, show a subtle "No data to display" message instead of just "0"
+## 3. Enable widget resize via corner drag handle
 
-## Files Modified
+**Problem**: Users cannot resize widgets.
 
-- `src/types/widget.ts` — add `progress` | `gauge` types
-- `src/components/clients/widgets/WidgetRenderer.tsx` — title/description typography, new ProgressRing + Gauge components, empty state
-- `src/components/clients/widgets/ChartTypeSelector.tsx` — new type icons/labels
-- `src/components/clients/ClientDashboard.tsx` — remove `val === 0` skip on line 248
+**Solution**: Add a resize handle (bottom-right corner) visible in edit mode. When the user drags the handle, update `position.w` and `position.h` in grid units, respecting `minW`/`minH` constraints and a max of 12 columns wide / 8 rows tall.
+
+### Files
+- `src/types/widget.ts` — add `maxW?: number; maxH?: number` to `WidgetPosition`
+- `src/components/clients/widgets/DashboardGrid.tsx` — add resize state (`ResizeInfo`), a resize handle element on each widget in edit mode, pointer handlers for resize (separate from drag), update widget dimensions on release and reflow layout
+- `src/components/clients/ClientDashboard.tsx` — add `handleWidgetResize` callback to persist resized dimensions, pass it to `DashboardGrid`
+
+## 4. Remove purple focus ring from buttons/selectors
+
+**Problem**: The `--ring` CSS variable is set to the purple primary color (`295 60% 47%`), causing all focus rings to appear purple.
+
+**Solution**: Change `--ring` to a neutral color that doesn't look like an active/selected state. Use the border color value instead.
+
+### Files
+- `src/index.css` — change `--ring` from `295 60% 47%` to `32 20% 82%` (light mode) and from `295 60% 47%` to `340 7% 20%` (dark mode), matching `--border` values
+
+## Technical Details
+
+### Platform extraction logic
+Widget IDs follow patterns: `kpi-spend`, `chart-spend-distribution`, `platform-google_ads-impressions`, `table-gsc-queries`. Platform is extracted:
+- `platform-{platform}-{metric}` → platform field set directly
+- `kpi-*` → undefined (aggregated across platforms)
+- `chart-*` → undefined (cross-platform charts)
+- `table-gsc-*` → `google_search_console`, `table-ga-*` → `google_analytics`, `table-yt-*` → `youtube`
+
+### Resize constraints
+- Min: `minW` (default 2), `minH` (default 2)
+- Max: `maxW` (default 12), `maxH` (default 8)
+- Snap to grid units during resize
+- Reflows other widgets via `compactLayout` after resize commit
+
+### Sort modes
+- **Default**: Original position order
+- **By Platform**: Group widgets by platform, then alphabetical
+- **By Type**: Group by category (KPI → Chart → Table → Platform)
+- **By Name**: Alphabetical by label
 
