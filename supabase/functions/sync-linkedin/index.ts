@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const LI_HEADERS = (token: string) => ({
   Authorization: `Bearer ${token}`,
-  "LinkedIn-Version": "202401",
+  "LinkedIn-Version": "202503",
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
