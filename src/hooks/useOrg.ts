@@ -38,29 +38,39 @@ export function useOrg() {
   const fetchOrg = async () => {
     if (!user) return;
 
-    const { data: membership } = await supabase
-      .from('org_members')
-      .select('org_id, role')
-      .eq('user_id', user.id)
-      .limit(1)
-      .single();
+    try {
+      const { data: membership, error: membershipError } = await supabase
+        .from('org_members')
+        .select('org_id, role')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
 
-    if (!membership) {
+      if (membershipError) {
+        console.error('Failed to fetch org membership:', membershipError);
+        return;
+      }
+
+      if (!membership) return;
+
+      setOrgId(membership.org_id);
+      setOrgRole(membership.role as 'owner' | 'manager');
+
+      const { data: orgData, error: orgError } = await supabase
+        .from('organisations')
+        .select('*')
+        .eq('id', membership.org_id)
+        .single();
+
+      if (orgError) {
+        console.error('Failed to fetch organisation:', orgError);
+        return;
+      }
+
+      setOrg(orgData as Organisation | null);
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    setOrgId(membership.org_id);
-    setOrgRole(membership.role as 'owner' | 'manager');
-
-    const { data: orgData } = await supabase
-      .from('organisations')
-      .select('*')
-      .eq('id', membership.org_id)
-      .single();
-
-    setOrg(orgData as Organisation | null);
-    setIsLoading(false);
   };
 
   useEffect(() => {
