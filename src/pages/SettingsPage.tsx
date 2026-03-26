@@ -8,6 +8,7 @@ import BrandingSection from '@/components/settings/BrandingSection';
 import ReportSettingsSection from '@/components/settings/ReportSettingsSection';
 import CustomDomainSection from '@/components/settings/CustomDomainSection';
 import MetricsDefaultsSection from '@/components/settings/MetricsDefaultsSection';
+import BillingSection from '@/components/settings/BillingSection';
 
 const SettingsPage = () => {
   const { isOwner } = useAuth();
@@ -32,11 +33,12 @@ const SettingsPage = () => {
         </div>
 
         <Tabs defaultValue="organisation" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="organisation">Organisation</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="whitelabel">White Label</TabsTrigger>
             <TabsTrigger value="metrics">Metrics</TabsTrigger>
+            <TabsTrigger value="billing">Billing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="organisation" className="space-y-6 mt-6">
@@ -55,6 +57,11 @@ const SettingsPage = () => {
 
           <TabsContent value="metrics" className="space-y-6 mt-6">
             <MetricsDefaultsSection />
+          </TabsContent>
+
+          <TabsContent value="billing" className="space-y-6 mt-6">
+            <BillingSection />
+          </TabsContent>
           </TabsContent>
         </Tabs>
       </div>

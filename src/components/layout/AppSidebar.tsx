@@ -9,9 +9,11 @@ import {
   Bug,
   LogOut,
   ChevronUp,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/hooks/useOrg';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -36,6 +38,7 @@ interface AppSidebarProps {
 const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const { signOut, profile, role, isOwner } = useAuth();
   const { org } = useOrg();
+  const { isPlatformAdmin } = usePlatformAdmin();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -118,6 +121,12 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
               <DropdownMenuItem onClick={() => { navigate('/debug'); handleNavClick(); }}>
                 <Bug className="mr-2 h-4 w-4" />
                 Debug
+              </DropdownMenuItem>
+            )}
+            {isPlatformAdmin && (
+              <DropdownMenuItem onClick={() => { navigate('/admin'); handleNavClick(); }}>
+                <Shield className="mr-2 h-4 w-4" />
+                Platform Admin
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
