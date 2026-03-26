@@ -1,131 +1,43 @@
 
 
-# Sophisticated Onboarding Flow
+## Onboarding Redesign — Premium Overhaul
 
-## Overview
+### Problems Identified
+1. **Emojis** used for platform icons instead of the branded `.webp` logos already available in `PLATFORM_LOGOS` (from `src/types/database.ts`)
+2. **Title text invisible** — heading colour blends into the light background (`sidebar-background` is a warm beige, and `sidebar-foreground` may be too similar or the `font-heading` is barely rendering)
+3. **Cheap-looking selection cards** — thick `border-2` on every card with low-contrast fill creates a flat, budget feel
+4. **No premium polish** — missing subtle depth, spacing, and visual hierarchy
 
-After OTP verification, instead of navigating directly to `/dashboard`, redirect to `/onboarding` — a multi-step, animated onboarding wizard. Answers are stored in a new `onboarding_responses` table, visible to AMW admins in the org detail panel. After completion, show an animated welcome screen with guided setup or free exploration options.
+### Design Direction
+Replace the current flat-bordered grid with a glassmorphism/elevated card style:
+- **No borders on unselected cards** — use subtle background + shadow instead
+- **Selected state** — soft primary glow/shadow + slight scale, no thick border
+- **Platform step** — swap all emojis for the actual `PLATFORM_LOGOS` images already in the codebase
+- **Titles** — use `text-foreground` (dark) instead of `text-sidebar-foreground`, increase weight
+- **Account type icons** — keep Lucide icons but render them in a softer, more premium container (no dark circle)
 
-## Database
+### Technical Changes
 
-### New table: `onboarding_responses`
+**File: `src/pages/OnboardingPage.tsx`**
 
-```sql
-CREATE TABLE public.onboarding_responses (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  org_id uuid NOT NULL,
-  account_type text NOT NULL,          -- 'creator', 'business', 'agency'
-  platforms_used text[] DEFAULT '{}',   -- ['google_ads', 'instagram', ...]
-  client_count text,                    -- '1-5', '6-20', '21-50', '50+'
-  primary_reason text,                  -- 'reporting', 'time_saving', 'client_retention', 'growth'
-  referral_source text,                 -- 'google', 'social', 'referral', 'other'
-  biggest_challenge text,              -- free text or preset
-  completed_at timestamptz DEFAULT now(),
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(user_id)
-);
+1. **Import `PLATFORM_LOGOS` and `PLATFORM_LABELS`** from `@/types/database` — remove the local `PLATFORMS` array with emojis; build platform list from the existing constants instead
 
-ALTER TABLE public.onboarding_responses ENABLE ROW LEVEL SECURITY;
+2. **Fix title visibility** — change `StepContainer` heading from `font-heading` (Anton, which may render poorly at this size on light backgrounds) to explicit dark colour classes: `text-foreground` with proper font weight
 
--- Users can insert/view their own
-CREATE POLICY "Users can insert own onboarding" ON public.onboarding_responses
-  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+3. **Restyle all selection cards** (steps 1–5):
+   - Unselected: `bg-card/60 backdrop-blur-sm shadow-sm hover:shadow-md` — no border
+   - Selected: `bg-primary/8 shadow-lg shadow-primary/15 ring-1 ring-primary/30 scale-[1.02]` — subtle ring instead of thick border
+   - Transition: `transition-all duration-300`
 
-CREATE POLICY "Users can view own onboarding" ON public.onboarding_responses
-  FOR SELECT TO authenticated USING (user_id = auth.uid());
+4. **Platform grid (step 2)**: Replace `<span className="text-2xl">{p.icon}</span>` with `<img src={PLATFORM_LOGOS[p.id]} className="h-8 w-8 object-contain" />`
 
--- Platform admins can view all
-CREATE POLICY "Platform admins can view all onboarding" ON public.onboarding_responses
-  FOR SELECT TO authenticated USING (is_platform_admin(auth.uid()));
-```
+5. **Account type cards (step 1)**: Remove dark circle around icons; use a lighter, more refined icon container
 
-### Add `onboarding_completed` flag to `profiles`
+6. **Client count pills (step 3)**: Replace `border-2` with shadow-based styling, softer selected state
 
-```sql
-ALTER TABLE public.profiles ADD COLUMN onboarding_completed boolean DEFAULT false;
-```
+7. **Reason cards (step 4)** and **Referral cards (step 5)**: Same card restyle — drop borders, add depth
 
-## New Route
+8. **Progress bar**: Make slightly thicker (h-1.5) with rounded ends for polish
 
-| Route | Component | Purpose |
-|-------|-----------|---------|
-| `/onboarding` | `OnboardingPage.tsx` | Multi-step wizard, protected, only accessible if `onboarding_completed = false` |
-
-## Onboarding Steps (5 steps + welcome)
-
-### Step 1: Account Type
-"How would you describe yourself?" — Three large selectable cards:
-- **Creator** — icon + description ("I manage my own brand and content")
-- **Business** — ("I run a business and need marketing insights")
-- **Agency** — ("I manage marketing for multiple clients")
-
-### Step 2: Platforms Used
-"Which platforms do you use?" — Grid of platform cards with logos (reuse `PLATFORM_LOGOS` from `database.ts`). Multi-select with visual toggle state. All 10 platforms shown.
-
-### Step 3: Scale (conditional)
-- If **Agency**: "How many clients do you manage?" — selectable pills: 1-5, 6-20, 21-50, 50+
-- If **Business/Creator**: Skip this step automatically
-
-### Step 4: Primary Reason
-"What's your main reason for using AMW Reports?" — Selectable cards:
-- Save time on reporting
-- Impress clients with branded reports
-- Track performance across platforms
-- Retain and grow client base
-
-### Step 5: How Did You Hear About Us
-"How did you find AMW Reports?" — Simple selection:
-- Google search, Social media, Referral, Event/conference, Other (free text)
-
-### Step 6: Animated Welcome Screen
-Full-screen animated transition: "Welcome to AMW Reports, [First Name]!" with the mascot, subtle particle/confetti effect using CSS animations. Two CTAs:
-- **"Guide me through setup"** — navigates to `/dashboard` with a `?guided=true` query param that triggers a step-by-step tooltip overlay prompting: create first client → connect a platform
-- **"I'll explore on my own"** — navigates to `/dashboard` directly
-
-## UI/UX Design
-
-- Dark premium background (`bg-amw-dark`) consistent with brand
-- Progress indicator (dots or thin progress bar) at top
-- Smooth transitions between steps (slide/fade)
-- Each step is a centered card (max-w-2xl) with large, clickable option cards
-- Back button on steps 2+, skip not available (all required except step 3 for non-agencies)
-- "Continue" button activates only when a selection is made
-
-## Flow Integration
-
-### `LandingPage.tsx`
-After OTP verification and org creation, navigate to `/onboarding` instead of `/dashboard`.
-
-### `App.tsx`
-Add `/onboarding` as a protected route.
-
-### `Index.tsx` (Dashboard)
-On mount, check `profile.onboarding_completed`. If `false`, redirect to `/onboarding`. This prevents skipping.
-
-### Profile update
-After onboarding completes, set `profiles.onboarding_completed = true`.
-
-## Admin Panel Integration
-
-### `AdminOrgDetail.tsx`
-Add a new tab or section: **"Onboarding Data"** — displays the onboarding responses for each org member in a clean table format:
-- Account type, platforms, client count, reason, referral source
-- Submitted date
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/pages/OnboardingPage.tsx` | Multi-step onboarding wizard with all steps + welcome screen |
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/App.tsx` | Add `/onboarding` protected route |
-| `src/pages/LandingPage.tsx` | Change post-OTP navigate from `/dashboard` to `/onboarding` |
-| `src/pages/Index.tsx` | Add redirect to `/onboarding` if `onboarding_completed` is false |
-| `src/pages/admin/AdminOrgDetail.tsx` | Add onboarding responses section/tab |
-| Database migration | Create `onboarding_responses` table + add `onboarding_completed` column to profiles |
+9. **Ambient glow**: Increase opacity slightly so it's actually visible as a premium touch
 
