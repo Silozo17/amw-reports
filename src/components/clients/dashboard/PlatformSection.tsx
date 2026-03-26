@@ -152,12 +152,17 @@ const PlatformSection = ({
   metricsData,
   prevMetricsData,
   connection,
+  connectionId,
   topContent,
   trendData,
   currSymbol,
   enabledMetrics,
+  reportMonth,
+  reportYear,
+  onSyncComplete,
 }: PlatformSectionProps) => {
   const [contentOpen, setContentOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const logo = PLATFORM_LOGOS[platform];
   const label = PLATFORM_LABELS[platform];
   const isOrganic = ORGANIC_PLATFORMS.has(platform);
