@@ -12,11 +12,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { connection_id, report_month, report_year } = await req.json();
+    const { connection_id, month, year } = await req.json();
 
-    if (!connection_id || !report_month || !report_year) {
+    if (!connection_id || !month || !year) {
       return new Response(
-        JSON.stringify({ error: "connection_id, report_month, and report_year are required" }),
+        JSON.stringify({ error: "connection_id, month, and year are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -49,8 +49,8 @@ Deno.serve(async (req) => {
         client_id: conn.client_id,
         platform: "youtube",
         status: "running",
-        report_month,
-        report_year,
+        report_month: month,
+        report_year: year,
         org_id: orgId,
       })
       .select("id")
@@ -90,9 +90,9 @@ Deno.serve(async (req) => {
       if (!channelId) throw new Error("No YouTube channel selected");
 
       // Date range for the month
-      const startDate = `${report_year}-${String(report_month).padStart(2, "0")}-01`;
-      const lastDay = new Date(report_year, report_month, 0).getDate();
-      const endDate = `${report_year}-${String(report_month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
       // Query YouTube Analytics API
       const metricsParam = "views,estimatedMinutesWatched,likes,comments,shares,subscribersGained,subscribersLost,impressions,impressionClickThroughRate,averageViewDuration";
@@ -175,8 +175,8 @@ Deno.serve(async (req) => {
         .select("id, snapshot_locked")
         .eq("client_id", conn.client_id)
         .eq("platform", "youtube")
-        .eq("report_month", report_month)
-        .eq("report_year", report_year)
+        .eq("report_month", month)
+        .eq("report_year", year)
         .single();
 
       if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
@@ -192,8 +192,8 @@ Deno.serve(async (req) => {
           .insert({
             client_id: conn.client_id,
             platform: "youtube",
-            report_month,
-            report_year,
+            report_month: month,
+            report_year: year,
             metrics_data: metricsData,
             top_content: topContent,
           });
