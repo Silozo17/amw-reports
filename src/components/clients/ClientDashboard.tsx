@@ -317,7 +317,7 @@ function generateDefaultWidgets(
         });
         pIdx++;
       }
-      y += Math.ceil(pIdx / 4) * 3;
+      y += Math.ceil(pIdx / 4) * 4;
     }
   }
 
