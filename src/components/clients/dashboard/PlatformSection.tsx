@@ -302,9 +302,8 @@ const PlatformSection = ({
             const normalized: Record<string, number | string> = { name: d.name };
             for (const key of activeGscMetrics) {
               const val = typeof d[key] === 'number' ? (d[key] as number) : 0;
-              const { min, max } = metricRanges[key];
-              const range = max - min;
-              normalized[`_norm_${key}`] = range === 0 ? 0.5 : (val - min) / range;
+              const { max } = metricRanges[key];
+              normalized[`_norm_${key}`] = max === 0 ? 0 : val / max;
               normalized[`_orig_${key}`] = val; // keep original for tooltip
             }
             return normalized;
