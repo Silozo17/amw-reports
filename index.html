@@ -19,16 +19,20 @@
     <meta property="og:description" content="AMW Reports — Automated marketing reports for agencies. Connect 10+ platforms, generate branded PDF reports, and deliver insights to clients automatically.">
     <meta name="twitter:description" content="AMW Reports — Automated marketing reports for agencies. Connect 10+ platforms, generate branded PDF reports, and deliver insights to clients automatically.">
 
-    <!-- SEO static styles — scoped to #seo-static, hidden once React mounts -->
+    <!-- SEO static styles — scoped to #seo-static, visually hidden from users but readable by crawlers -->
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@300;400;500;600;700&display=swap');
       @font-face{font-family:'Slowdex';src:url('/fonts/Slowdex.otf') format('opentype');font-weight:400;font-style:normal;font-display:swap}
 
-      /* Hide static content the instant React renders anything into #root */
-      #root:not(:empty) ~ #seo-static { display: none }
-
-      /* ---------- Variables ---------- */
+      /* Visually hidden — crawlers still parse the DOM, users never see it (no flash) */
       #seo-static {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
         --bg: hsl(340 7% 13%);
         --fg: hsl(32 44% 92%);
         --primary: hsl(295 60% 47%);
@@ -48,83 +52,50 @@
         --font-heading: 'Anton', sans-serif;
         --font-body: 'Montserrat', sans-serif;
         --font-accent: 'Slowdex', sans-serif;
-
         background: var(--bg);
         color: var(--fg);
         font-family: var(--font-body);
         line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
       }
 
-      /* ---------- Resets inside static ---------- */
       #seo-static *, #seo-static *::before, #seo-static *::after { box-sizing: border-box; margin: 0; padding: 0; }
       #seo-static a { color: inherit; text-decoration: none; }
       #seo-static ul { list-style: none; }
       #seo-static img { max-width: 100%; height: auto; display: block; }
-
-      /* ---------- Layout ---------- */
       .ss-container { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
-      @media(min-width:640px){ .ss-container { padding: 0 1.5rem; } }
-      @media(min-width:1024px){ .ss-container { padding: 0 2rem; } }
       .ss-container-sm { max-width: 64rem; margin: 0 auto; padding: 0 1rem; }
-      @media(min-width:640px){ .ss-container-sm { padding: 0 1.5rem; } }
       .ss-container-xs { max-width: 48rem; margin: 0 auto; padding: 0 1rem; }
-
-      /* ---------- Navbar ---------- */
       .ss-nav { border-bottom: 1px solid var(--border); padding: 1rem 0; }
       .ss-nav-inner { display: flex; align-items: center; justify-content: space-between; }
       .ss-nav-brand { display: flex; align-items: center; gap: 0.5rem; }
       .ss-nav-brand img { height: 2rem; width: auto; }
-      .ss-nav-brand span { font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted5); font-family: var(--font-body); }
+      .ss-nav-brand span { font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted5); }
       .ss-nav-links { display: none; gap: 2rem; align-items: center; }
-      @media(min-width:768px){ .ss-nav-links { display: flex; } }
-      .ss-nav-links a { font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
-      .ss-nav-links a:hover { color: var(--primary); }
+      .ss-nav-links a { font-size: 0.875rem; font-weight: 500; }
       .ss-nav-actions { display: none; gap: 0.75rem; align-items: center; }
-      @media(min-width:768px){ .ss-nav-actions { display: flex; } }
-
-      /* ---------- Buttons ---------- */
-      .ss-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 600; font-family: var(--font-body); cursor: pointer; border: none; transition: opacity 0.2s; }
-      .ss-btn:hover { opacity: 0.9; }
+      .ss-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 600; font-family: var(--font-body); cursor: pointer; border: none; }
       .ss-btn-primary { background: var(--primary); color: #fff; }
       .ss-btn-outline { background: transparent; color: var(--fg); border: 1px solid var(--border); }
       .ss-btn-lg { padding: 1rem 2rem; font-size: 1rem; }
-
-      /* ---------- Sections ---------- */
       .ss-section { padding: 5rem 0; }
       .ss-section-lg { padding: 7rem 0; }
       .ss-section-border { border-top: 1px solid var(--border2); }
-
-      /* ---------- Hero ---------- */
       .ss-hero { position: relative; overflow: hidden; padding: 5rem 0; }
-      @media(min-width:1024px){ .ss-hero { padding: 8rem 0; } }
       .ss-hero-grid { display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: center; }
-      @media(min-width:1024px){ .ss-hero-grid { grid-template-columns: 1fr 1fr; } }
       .ss-hero-content { display: flex; flex-direction: column; gap: 1.5rem; }
       .ss-hero-logo img { height: 2.5rem; width: auto; }
       .ss-hero-sub { font-size: 0.875rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted3); font-weight: 600; }
       .ss-hero-accent { font-family: var(--font-accent); font-size: 1.5rem; color: var(--primary); }
-      @media(min-width:1024px){ .ss-hero-accent { font-size: 1.875rem; } }
       .ss-hero h1 { font-family: var(--font-heading); font-size: 2.5rem; line-height: 0.95; text-transform: uppercase; letter-spacing: 0.06em; }
-      @media(min-width:1024px){ .ss-hero h1 { font-size: 3.75rem; } }
-      @media(min-width:1280px){ .ss-hero h1 { font-size: 4.5rem; } }
       .ss-hero p.ss-hero-desc { font-size: 1.125rem; max-width: 28rem; line-height: 1.7; color: var(--muted3); }
       .ss-hero-cta { display: flex; flex-wrap: wrap; gap: 0.75rem; padding-top: 0.5rem; }
       .ss-hero-mascot { display: none; justify-content: center; }
-      @media(min-width:1024px){ .ss-hero-mascot { display: flex; } }
-      .ss-hero-mascot img { width: 26rem; object-fit: contain; }
-      @media(min-width:1280px){ .ss-hero-mascot img { width: 30rem; } }
       .ss-text-gradient { background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-
-      /* ---------- Platforms strip ---------- */
       .ss-platforms { padding: 3rem 0; border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); text-align: center; }
       .ss-platforms-label { font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted2); margin-bottom: 1.5rem; }
       .ss-platforms-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
       .ss-pill { padding: 0.5rem 1rem; border-radius: 9999px; background: var(--card-bg2); border: 1px solid var(--border); font-size: 0.75rem; color: var(--muted3); }
-
-      /* ---------- How it works ---------- */
       .ss-steps-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
-      @media(min-width:768px){ .ss-steps-grid { grid-template-columns: repeat(3, 1fr); } }
       .ss-step { position: relative; padding: 1.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); }
       .ss-step-num { position: absolute; top: 1rem; left: 1rem; font-size: 0.75rem; color: var(--muted2); }
       .ss-step-icon { width: 3rem; height: 3rem; border-radius: 50%; background: hsl(295 60% 47% / 0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
@@ -132,13 +103,8 @@
       .ss-step h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; text-align: center; }
       .ss-step p { font-size: 0.875rem; color: var(--muted); text-align: center; }
       .ss-section-title { font-family: var(--font-heading); font-size: 1.875rem; text-transform: uppercase; text-align: center; margin-bottom: 1rem; letter-spacing: 0.06em; }
-      @media(min-width:1024px){ .ss-section-title { font-size: 3rem; } }
       .ss-section-desc { color: var(--muted); text-align: center; max-width: 36rem; margin: 0 auto 3rem; }
-
-      /* ---------- Stats grid ---------- */
       .ss-stats-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-      @media(min-width:640px){ .ss-stats-grid { grid-template-columns: repeat(2, 1fr); } }
-      @media(min-width:1024px){ .ss-stats-grid { grid-template-columns: repeat(4, 1fr); } }
       .ss-stat-card { padding: 1.25rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); text-align: left; }
       .ss-stat-card h3 { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
       .ss-stat-card ul { display: flex; flex-direction: column; gap: 0.375rem; }
@@ -152,40 +118,27 @@
       .ss-bg-secondary { background: var(--secondary); }
       .ss-bg-accent { background: var(--accent); }
       .ss-bg-warning { background: var(--warning); }
-
-      /* ---------- Why section ---------- */
       .ss-why-grid { display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: center; }
-      @media(min-width:1024px){ .ss-why-grid { grid-template-columns: 1fr 1fr; } }
       .ss-why-grid h2 { font-family: var(--font-heading); font-size: 1.875rem; text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 0.06em; }
-      @media(min-width:1024px){ .ss-why-grid h2 { font-size: 3rem; } }
       .ss-why-grid > div:first-child p { color: var(--muted); margin-bottom: 2rem; }
       .ss-check-list { display: flex; flex-direction: column; gap: 1rem; }
       .ss-check-item { display: flex; gap: 0.75rem; align-items: flex-start; }
       .ss-check-icon { width: 1.25rem; height: 1.25rem; border-radius: 50%; background: hsl(148 60% 57% / 0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 0.125rem; }
       .ss-check-icon svg { width: 0.75rem; height: 0.75rem; stroke: var(--accent); fill: none; }
       .ss-check-item span { font-size: 0.875rem; color: var(--muted8); }
-
-      /* ---------- Quote ---------- */
       .ss-quote-icon { width: 2.5rem; height: 2.5rem; margin: 0 auto 1.5rem; color: hsl(295 60% 47% / 0.4); }
       .ss-quote-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; }
       .ss-blockquote { font-size: 1.25rem; font-style: italic; line-height: 1.7; color: var(--muted9); margin-bottom: 1.5rem; text-align: center; }
-      @media(min-width:1024px){ .ss-blockquote { font-size: 1.5rem; } }
       .ss-attribution { display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
       .ss-avatar { width: 3rem; height: 3rem; border-radius: 50%; background: hsl(295 60% 47% / 0.2); display: flex; align-items: center; justify-content: center; color: var(--primary); font-family: var(--font-heading); font-size: 1.125rem; }
       .ss-attribution-text p:first-child { font-size: 0.875rem; font-weight: 600; }
       .ss-attribution-text p:last-child { font-size: 0.75rem; color: var(--muted5); }
       .ss-attribution-text { text-align: left; }
-
-      /* ---------- CTA ---------- */
       .ss-cta { text-align: center; background: linear-gradient(to bottom, transparent, hsl(295 60% 47% / 0.05)); }
       .ss-cta h2 { font-family: var(--font-heading); font-size: 1.875rem; text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 0.06em; }
-      @media(min-width:1024px){ .ss-cta h2 { font-size: 3rem; } }
       .ss-cta p { color: var(--muted); margin-bottom: 1.5rem; }
-
-      /* ---------- Footer ---------- */
       .ss-footer { background: var(--bg); border-top: 1px solid var(--border); padding: 3rem 0; }
       .ss-footer-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
-      @media(min-width:768px){ .ss-footer-grid { grid-template-columns: 2fr 1fr 1fr; } }
       .ss-footer-brand { display: flex; flex-direction: column; gap: 0.75rem; }
       .ss-footer-brand-row { display: flex; align-items: center; gap: 0.5rem; }
       .ss-footer-brand-row img { height: 1.75rem; width: auto; }
@@ -193,18 +146,11 @@
       .ss-footer-brand p { font-size: 0.875rem; line-height: 1.6; max-width: 24rem; color: var(--muted3); }
       .ss-footer-brand .ss-footer-op { font-size: 0.75rem; color: var(--muted2); }
       .ss-footer-brand .ss-footer-op a { color: var(--muted); text-decoration: underline; }
-      .ss-footer-brand .ss-footer-op a:hover { color: var(--primary); }
       .ss-footer-col h4 { font-size: 0.875rem; font-weight: 600; color: var(--fg); margin-bottom: 0.75rem; }
-      .ss-footer-col a { display: block; font-size: 0.875rem; color: var(--muted3); margin-bottom: 0.5rem; transition: color 0.2s; }
-      .ss-footer-col a:hover { color: var(--primary); }
+      .ss-footer-col a { display: block; font-size: 0.875rem; color: var(--muted3); margin-bottom: 0.5rem; }
       .ss-footer-copy { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border2); font-size: 0.75rem; color: var(--muted2); }
-
-      /* ---------- Arrow SVG inline ---------- */
       .ss-arrow { width: 1rem; height: 1rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-      /* ---------- Platform grid (Features page) ---------- */
       .ss-platform-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-      @media(min-width:768px){ .ss-platform-grid { grid-template-columns: repeat(2, 1fr); } }
       .ss-platform-card { padding: 1.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); }
       .ss-platform-card h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
       .ss-platform-card .ss-platform-desc { font-size: 0.875rem; color: var(--muted5); margin-bottom: 1rem; }
@@ -220,12 +166,9 @@
       .ss-agency-icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--primary); fill: none; }
       .ss-agency-card h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; }
       .ss-agency-card p { font-size: 0.875rem; color: var(--muted); }
-
-      /* ---------- Plan grid (Pricing page) ---------- */
       .ss-plan-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-      @media(min-width:768px){ .ss-plan-grid { grid-template-columns: repeat(3, 1fr); } }
       .ss-plan-card { position: relative; padding: 1.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); display: flex; flex-direction: column; }
-      .ss-plan-card--highlight { border-color: var(--primary); background: hsl(295 60% 47% / 0.05); box-shadow: 0 0 0 1px hsl(295 60% 47% / 0.3); }
+      .ss-plan-card--highlight { border-color: var(--primary); background: hsl(295 60% 47% / 0.05); }
       .ss-plan-badge { position: absolute; top: -0.75rem; left: 50%; transform: translateX(-50%); padding: 0.125rem 0.75rem; border-radius: 9999px; background: var(--primary); color: #fff; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
       .ss-plan-card h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
       .ss-plan-price { font-family: var(--font-heading); font-size: 1.875rem; }
@@ -235,55 +178,41 @@
       .ss-plan-features li { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; color: var(--muted8); }
       .ss-plan-features .ss-check-sm { width: 1rem; height: 1rem; flex-shrink: 0; margin-top: 0.125rem; }
       .ss-plan-features .ss-check-sm svg { width: 100%; height: 100%; stroke: var(--accent); fill: none; }
-
-      /* ---------- Compare table ---------- */
       .ss-compare-table { width: 100%; text-align: left; border-collapse: collapse; }
       .ss-compare-table th, .ss-compare-table td { padding: 0.75rem 1rem; font-size: 0.875rem; border-bottom: 1px solid var(--border2); }
       .ss-compare-table th { font-weight: 600; color: var(--muted8); }
       .ss-compare-table td { color: var(--muted3); }
       .ss-compare-table .ss-col-highlight { color: var(--primary); }
       .ss-text-center { text-align: center; }
-
-      /* ---------- FAQ (Pricing page) ---------- */
       .ss-faq-item { border: 1px solid var(--card-bg2); border-radius: 0.75rem; overflow: hidden; margin-bottom: 0.75rem; }
-      .ss-faq-item summary { padding: 1rem; font-size: 0.875rem; font-weight: 600; color: var(--muted9); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+      .ss-faq-item summary { padding: 1rem; font-size: 0.875rem; font-weight: 600; color: var(--muted9); cursor: pointer; list-style: none; }
       .ss-faq-item summary::-webkit-details-marker { display: none; }
-      .ss-faq-item summary::after { content: '▾'; font-size: 0.75rem; color: var(--muted2); transition: transform 0.2s; }
-      .ss-faq-item[open] summary::after { transform: rotate(180deg); }
       .ss-faq-item .ss-faq-body { padding: 0 1rem 1rem; font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
-
-      /* ---------- Login page ---------- */
       .ss-login-card { max-width: 28rem; margin: 0 auto; padding: 2.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); text-align: center; }
       .ss-login-card h1 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 0.75rem; }
       .ss-login-card p { font-size: 0.875rem; color: var(--muted); margin-bottom: 1.5rem; }
       .ss-login-links { display: flex; flex-direction: column; gap: 0.75rem; }
+      .ss-page-hero { padding: 5rem 0; text-align: center; }
+      .ss-page-hero h1 { font-family: var(--font-heading); font-size: 2.5rem; text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 0.06em; }
+      .ss-page-hero p { font-size: 1.125rem; color: var(--muted); max-width: 36rem; margin: 0 auto; }
+      .ss-prose { color: var(--muted); line-height: 1.7; }
+      .ss-prose p { margin-bottom: 1rem; }
+      .ss-prose h2 { font-family: var(--font-heading); font-size: 1.875rem; text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 0.06em; color: var(--fg); }
+      .ss-prose h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--fg); }
     </style>
   </head>
 
   <body>
     <div id="root"></div>
 
-    <!-- SEO-only static content — hidden instantly when React mounts -->
+    <!-- SEO-only static content — visually hidden from users, fully readable by search engine crawlers -->
     <div id="seo-static">
-
-    <!-- Page switcher — show only the matching page block -->
-    <script>
-      (function(){
-        var p=location.pathname.replace(/\/$/,'') || '/';
-        var pages=document.querySelectorAll('[data-seo-page]');
-        for(var i=0;i<pages.length;i++){
-          var val=pages[i].getAttribute('data-seo-page');
-          pages[i].style.display=(val===p || (p==='/login' && val==='/login'))?'':'none';
-        }
-      })();
-    </script>
 
     <!-- ═══════════════════════════════════════ -->
     <!-- HOME PAGE                               -->
     <!-- ═══════════════════════════════════════ -->
     <div data-seo-page="/">
 
-      <!-- ══ NAVBAR ══ -->
       <nav class="ss-nav" aria-label="Main navigation">
         <div class="ss-container ss-nav-inner">
           <a href="/" class="ss-nav-brand" aria-label="AMW Reports home">
@@ -294,6 +223,8 @@
             <a href="/">Home</a>
             <a href="/features">Features</a>
             <a href="/pricing">Pricing</a>
+            <a href="/integrations">Integrations</a>
+            <a href="/how-it-works">How It Works</a>
           </div>
           <div class="ss-nav-actions">
             <a href="/login" class="ss-btn ss-btn-outline">Log In</a>
@@ -302,7 +233,6 @@
         </div>
       </nav>
 
-      <!-- ══ HERO ══ -->
       <section class="ss-hero">
         <div class="ss-container">
           <div class="ss-hero-grid">
@@ -315,7 +245,7 @@
               <h1>Automated Marketing<br>Reports That<br><span class="ss-text-gradient">Elevate</span> Your Agency</h1>
               <p class="ss-hero-desc">AMW Reports connects 10+ marketing platforms, generates stunning branded PDF reports, and delivers insights to your clients — automatically.</p>
               <div class="ss-hero-cta">
-                <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free <svg class="ss-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+                <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
                 <a href="/features" class="ss-btn ss-btn-outline ss-btn-lg">See Features</a>
               </div>
             </div>
@@ -326,56 +256,29 @@
         </div>
       </section>
 
-      <!-- ══ PLATFORMS ══ -->
       <section class="ss-platforms">
-        <div class="ss-container" style="text-align:center">
+        <div class="ss-container">
           <p class="ss-platforms-label">Trusted Integrations</p>
           <div class="ss-platforms-list">
-            <span class="ss-pill">Google Ads</span>
-            <span class="ss-pill">Meta Ads</span>
-            <span class="ss-pill">Google Analytics</span>
-            <span class="ss-pill">Google Search Console</span>
-            <span class="ss-pill">YouTube</span>
-            <span class="ss-pill">Facebook</span>
-            <span class="ss-pill">Instagram</span>
-            <span class="ss-pill">LinkedIn</span>
-            <span class="ss-pill">TikTok</span>
-            <span class="ss-pill">Google Business Profile</span>
+            <span class="ss-pill">Google Ads</span><span class="ss-pill">Meta Ads</span><span class="ss-pill">Google Analytics</span><span class="ss-pill">Google Search Console</span><span class="ss-pill">YouTube</span><span class="ss-pill">Facebook</span><span class="ss-pill">Instagram</span><span class="ss-pill">LinkedIn</span><span class="ss-pill">TikTok</span><span class="ss-pill">Google Business Profile</span>
           </div>
         </div>
       </section>
 
-      <!-- ══ HOW IT WORKS ══ -->
       <section class="ss-section">
         <div class="ss-container-sm" style="text-align:center">
           <h2 class="ss-section-title">How It Works</h2>
           <p class="ss-section-desc">Three simple steps to professional, branded reports your clients will love.</p>
           <div class="ss-steps-grid">
-            <div class="ss-step">
-              <span class="ss-step-num">01</span>
-              <div class="ss-step-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m5.66 5.66 4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66 4.24-4.24"/></svg></div>
-              <h3>Connect</h3>
-              <p>Link your marketing platforms with one click — Google, Meta, TikTok, LinkedIn, and more.</p>
-            </div>
-            <div class="ss-step">
-              <span class="ss-step-num">02</span>
-              <div class="ss-step-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></div>
-              <h3>Sync</h3>
-              <p>We automatically pull 70+ metrics across all your connected platforms every month.</p>
-            </div>
-            <div class="ss-step">
-              <span class="ss-step-num">03</span>
-              <div class="ss-step-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></svg></div>
-              <h3>Report</h3>
-              <p>Beautiful, branded PDF reports are generated and emailed to your clients automatically.</p>
-            </div>
+            <div class="ss-step"><span class="ss-step-num">01</span><h3>Connect</h3><p>Link your marketing platforms with one click — Google, Meta, TikTok, LinkedIn, and more.</p></div>
+            <div class="ss-step"><span class="ss-step-num">02</span><h3>Sync</h3><p>We automatically pull 70+ metrics across all your connected platforms every month.</p></div>
+            <div class="ss-step"><span class="ss-step-num">03</span><h3>Report</h3><p>Beautiful, branded PDF reports are generated and emailed to your clients automatically.</p></div>
           </div>
         </div>
       </section>
 
-      <!-- ══ 70+ METRICS ══ -->
       <section class="ss-section ss-section-border">
-        <div class="ss-container" style="max-width:72rem;text-align:center">
+        <div class="ss-container" style="text-align:center">
           <h2 class="ss-section-title">70+ Metrics Across 10 Platforms</h2>
           <p class="ss-section-desc">From ad spend to follower growth, we track everything your clients care about.</p>
           <div class="ss-stats-grid">
@@ -387,7 +290,6 @@
         </div>
       </section>
 
-      <!-- ══ WHY AMW REPORTS ══ -->
       <section class="ss-section ss-section-border">
         <div class="ss-container-sm">
           <div class="ss-why-grid">
@@ -396,66 +298,45 @@
               <p>We're not just another reporting tool. We built this platform because we run an agency ourselves and know exactly what you need.</p>
             </div>
             <ul class="ss-check-list">
-              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>White-label everything — your brand, your logo, your colours</span></li>
-              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Automated monthly email delivery to your clients</span></li>
-              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>10 platforms in one dashboard — no switching tools</span></li>
-              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>No per-seat pricing — your whole team for one price</span></li>
-              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Built by marketers who run an agency themselves</span></li>
-              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Client portal with shareable links for transparency</span></li>
+              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>White-label everything — your brand, your logo, your colours</span></li>
+              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Automated monthly email delivery to your clients</span></li>
+              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>10 platforms in one dashboard — no switching tools</span></li>
+              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>No per-seat pricing — your whole team for one price</span></li>
+              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Built by marketers who run an agency themselves</span></li>
+              <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Client portal with shareable links for transparency</span></li>
             </ul>
           </div>
         </div>
       </section>
 
-      <!-- ══ FOUNDER QUOTE ══ -->
       <section class="ss-section ss-section-border">
         <div class="ss-container-xs" style="text-align:center">
-          <div class="ss-quote-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21ZM15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1Z"/></svg></div>
-          <blockquote class="ss-blockquote">"We built AMW Reports because we were tired of spending hours manually compiling data from a dozen platforms. Our clients deserved better — and so did we. Now every agency can deliver professional, branded reports without the grind."</blockquote>
+          <blockquote class="ss-blockquote">"We built AMW Reports because we were tired of spending hours manually compiling data from a dozen platforms. Our clients deserved better — and so did we."</blockquote>
           <div class="ss-attribution">
             <div class="ss-avatar">A</div>
-            <div class="ss-attribution-text">
-              <p>Amir</p>
-              <p>Founder, AMW Media</p>
-            </div>
+            <div class="ss-attribution-text"><p>Amir</p><p>Founder, AMW Media</p></div>
           </div>
         </div>
       </section>
 
-      <!-- ══ CTA BANNER ══ -->
       <section class="ss-section ss-section-border ss-cta">
         <div class="ss-container-xs">
           <h2>Ready to Elevate Your Reporting?</h2>
           <p>Start for free. No credit card required.</p>
-          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free <svg class="ss-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
         </div>
       </section>
 
-      <!-- ══ FOOTER ══ -->
       <footer class="ss-footer">
         <div class="ss-container">
           <div class="ss-footer-grid">
             <div class="ss-footer-brand">
-              <div class="ss-footer-brand-row">
-                <img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28">
-                <span>Reports</span>
-              </div>
+              <div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div>
               <p>Automated marketing reports that elevate your agency. Built by marketers, for marketers.</p>
               <p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p>
             </div>
-            <div class="ss-footer-col">
-              <h4>Product</h4>
-              <a href="/features">Features</a>
-              <a href="/pricing">Pricing</a>
-              <a href="/login">Log In</a>
-              <a href="/login?view=signup">Sign Up</a>
-            </div>
-            <div class="ss-footer-col">
-              <h4>Legal</h4>
-              <a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a>
-              <a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a>
-              <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">amwmedia.co.uk</a>
-            </div>
+            <div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a><a href="/how-it-works">How It Works</a><a href="/about">About</a></div>
+            <div class="ss-footer-col"><h4>Use Cases</h4><a href="/social-media-reporting">Social Media Reporting</a><a href="/seo-reporting">SEO Reporting</a><a href="/ppc-reporting">PPC Reporting</a><a href="/white-label-reports">White-Label Reports</a></div>
           </div>
           <div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div>
         </div>
@@ -468,35 +349,30 @@
     <!-- ═══════════════════════════════════════ -->
     <div data-seo-page="/features">
 
-      <nav class="ss-nav" aria-label="Main navigation">
-        <div class="ss-container ss-nav-inner">
-          <a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a>
-          <div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div>
-          <div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div>
-        </div>
-      </nav>
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
 
-      <section class="ss-section-lg" style="text-align:center">
+      <section class="ss-page-hero">
         <div class="ss-container-sm">
-          <h1 style="font-family:var(--font-heading);font-size:2.5rem;text-transform:uppercase;margin-bottom:1rem;letter-spacing:0.06em">Everything You Need to<br>Report Like a <span class="ss-text-gradient">Pro</span></h1>
-          <p style="font-size:1.125rem;color:var(--muted);max-width:36rem;margin:0 auto">10 platforms, 70+ metrics, branded PDFs, automated delivery, and a client portal — all in one place.</p>
+          <h1>Everything You Need to Report Like a <span class="ss-text-gradient">Pro</span></h1>
+          <p>10 platforms, 70+ metrics, branded PDFs, automated delivery, and a client portal — all in one place.</p>
         </div>
       </section>
 
       <section class="ss-section ss-section-border">
-        <div class="ss-container" style="max-width:72rem">
+        <div class="ss-container">
           <h2 class="ss-section-title">Platform Integrations</h2>
-          <p class="ss-section-desc">Connect once, sync automatically. Here's every metric we track for each platform.</p>
+          <p class="ss-section-desc">Connect once, sync automatically. Here is every metric we track for each platform.</p>
           <div class="ss-platform-grid">
             <div class="ss-platform-card"><h3>Google Ads</h3><p class="ss-platform-desc">Track ad performance, conversions, and return on ad spend across all your Google campaigns.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">Conv. Value</span><span class="ss-metric-pill">CPC</span><span class="ss-metric-pill">CPM</span><span class="ss-metric-pill">ROAS</span><span class="ss-metric-pill">Cost/Conv.</span><span class="ss-metric-pill">Search Imp. Share</span></div></div>
-            <div class="ss-platform-card"><h3>Meta Ads</h3><p class="ss-platform-desc">Monitor your Facebook and Instagram ad campaigns with detailed spend, reach, and conversion metrics.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">Link Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">CPC</span><span class="ss-metric-pill">CPM</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">Conv. Value</span><span class="ss-metric-pill">ROAS</span><span class="ss-metric-pill">Frequency</span><span class="ss-metric-pill">Leads</span></div></div>
-            <div class="ss-platform-card"><h3>Google Analytics</h3><p class="ss-platform-desc">Understand your website traffic, user behaviour, and acquisition channels at a glance.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Sessions</span><span class="ss-metric-pill">Active Users</span><span class="ss-metric-pill">New Users</span><span class="ss-metric-pill">Page Views</span><span class="ss-metric-pill">Bounce Rate</span><span class="ss-metric-pill">Avg. Session Duration</span><span class="ss-metric-pill">Pages/Session</span><span class="ss-metric-pill">Traffic Sources</span></div></div>
-            <div class="ss-platform-card"><h3>Google Search Console</h3><p class="ss-platform-desc">See how your website performs in Google search — clicks, impressions, rankings, and top queries.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Search Clicks</span><span class="ss-metric-pill">Search Impressions</span><span class="ss-metric-pill">Search CTR</span><span class="ss-metric-pill">Avg. Position</span><span class="ss-metric-pill">Top Queries</span><span class="ss-metric-pill">Top Pages</span></div></div>
-            <div class="ss-platform-card"><h3>YouTube</h3><p class="ss-platform-desc">Track channel growth, video performance, and audience engagement for your YouTube presence.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Subscribers</span><span class="ss-metric-pill">Views</span><span class="ss-metric-pill">Watch Time</span><span class="ss-metric-pill">Avg. View Duration</span><span class="ss-metric-pill">Videos Published</span><span class="ss-metric-pill">Top Videos</span></div></div>
-            <div class="ss-platform-card"><h3>Facebook</h3><p class="ss-platform-desc">Monitor your Facebook Page performance including reach, engagement, and follower growth.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Page Likes</span><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagement</span><span class="ss-metric-pill">Reactions</span><span class="ss-metric-pill">Comments</span><span class="ss-metric-pill">Shares</span><span class="ss-metric-pill">Video Views</span><span class="ss-metric-pill">Posts Published</span></div></div>
-            <div class="ss-platform-card"><h3>Instagram</h3><p class="ss-platform-desc">Track your Instagram growth, content performance, and audience engagement.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagement</span><span class="ss-metric-pill">Likes</span><span class="ss-metric-pill">Comments</span><span class="ss-metric-pill">Saves</span><span class="ss-metric-pill">Shares</span><span class="ss-metric-pill">Profile Visits</span><span class="ss-metric-pill">Reels</span><span class="ss-metric-pill">Carousels</span></div></div>
-            <div class="ss-platform-card"><h3>LinkedIn</h3><p class="ss-platform-desc">Monitor your LinkedIn company page with follower analytics and post performance.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Follower Growth</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagement</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">Reactions</span><span class="ss-metric-pill">Comments</span><span class="ss-metric-pill">Shares</span><span class="ss-metric-pill">Posts Published</span></div></div>
-            <div class="ss-platform-card"><h3>TikTok</h3><p class="ss-platform-desc">Track your TikTok ad campaigns with detailed spend, reach, and engagement data.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">CPC</span><span class="ss-metric-pill">CPM</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">Conv. Value</span><span class="ss-metric-pill">Video Views</span></div></div>
+            <div class="ss-platform-card"><h3>Meta Ads</h3><p class="ss-platform-desc">Monitor Facebook and Instagram ad campaigns with detailed spend, reach, and conversion metrics.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">Link Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">CPC</span><span class="ss-metric-pill">CPM</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">ROAS</span><span class="ss-metric-pill">Frequency</span><span class="ss-metric-pill">Leads</span></div></div>
+            <div class="ss-platform-card"><h3>Google Analytics</h3><p class="ss-platform-desc">Track website traffic, user behaviour, and conversion goals from Google Analytics 4.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Sessions</span><span class="ss-metric-pill">Users</span><span class="ss-metric-pill">Page Views</span><span class="ss-metric-pill">Bounce Rate</span><span class="ss-metric-pill">Avg. Session Duration</span><span class="ss-metric-pill">New Users</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">Engagement Rate</span></div></div>
+            <div class="ss-platform-card"><h3>Google Search Console</h3><p class="ss-platform-desc">Monitor organic search performance with keyword rankings, impressions, and click-through rates.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Avg. Position</span><span class="ss-metric-pill">Top Queries</span><span class="ss-metric-pill">Top Pages</span></div></div>
+            <div class="ss-platform-card"><h3>Facebook Pages</h3><p class="ss-platform-desc">Track page growth, post engagement, and audience demographics for Facebook business pages.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Page Likes</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagement</span><span class="ss-metric-pill">Post Count</span><span class="ss-metric-pill">Video Views</span><span class="ss-metric-pill">Link Clicks</span></div></div>
+            <div class="ss-platform-card"><h3>Instagram</h3><p class="ss-platform-desc">Track follower growth, engagement rates, reach, and content performance on Instagram.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagement</span><span class="ss-metric-pill">Profile Views</span><span class="ss-metric-pill">Posts</span><span class="ss-metric-pill">Saves</span><span class="ss-metric-pill">Shares</span></div></div>
+            <div class="ss-platform-card"><h3>LinkedIn</h3><p class="ss-platform-desc">Monitor company page performance including follower growth, engagement, and content reach.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">Engagement Rate</span><span class="ss-metric-pill">Shares</span><span class="ss-metric-pill">Comments</span><span class="ss-metric-pill">Reactions</span></div></div>
+            <div class="ss-platform-card"><h3>YouTube</h3><p class="ss-platform-desc">Track channel performance including views, watch time, subscriber growth, and engagement.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Views</span><span class="ss-metric-pill">Watch Time</span><span class="ss-metric-pill">Subscribers</span><span class="ss-metric-pill">Likes</span><span class="ss-metric-pill">Comments</span><span class="ss-metric-pill">Shares</span><span class="ss-metric-pill">Avg. View Duration</span><span class="ss-metric-pill">Videos Published</span></div></div>
+            <div class="ss-platform-card"><h3>TikTok</h3><p class="ss-platform-desc">Track TikTok ad campaign performance with detailed spend and conversion metrics.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">CPC</span><span class="ss-metric-pill">CPM</span><span class="ss-metric-pill">ROAS</span></div></div>
+            <div class="ss-platform-card"><h3>Pinterest</h3><p class="ss-platform-desc">Track pin performance, audience engagement, and profile growth on Pinterest.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagements</span><span class="ss-metric-pill">Saves</span><span class="ss-metric-pill">Pin Clicks</span><span class="ss-metric-pill">Outbound Clicks</span><span class="ss-metric-pill">Total Audience</span></div></div>
             <div class="ss-platform-card"><h3>Google Business Profile</h3><p class="ss-platform-desc">See how customers find and interact with your Google Business listing.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Views</span><span class="ss-metric-pill">Searches</span><span class="ss-metric-pill">Calls</span><span class="ss-metric-pill">Direction Requests</span><span class="ss-metric-pill">Website Clicks</span><span class="ss-metric-pill">Reviews Count</span><span class="ss-metric-pill">Avg. Rating</span></div></div>
           </div>
         </div>
@@ -506,21 +382,10 @@
         <div class="ss-container-sm">
           <h2 class="ss-section-title">Reporting &amp; Delivery</h2>
           <div style="display:grid;grid-template-columns:1fr;gap:1.5rem">
-            <div class="ss-feature-row"><div class="ss-feature-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></svg></div><div><h3>Branded PDF Reports</h3><p>Automatically generated, beautifully designed PDF reports with your agency branding, logo, and colour palette.</p></div></div>
-            <div class="ss-feature-row"><div class="ss-feature-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></div><div><h3>Automated Email Delivery</h3><p>Reports are emailed directly to your clients on a monthly schedule — no manual work required.</p></div></div>
-            <div class="ss-feature-row"><div class="ss-feature-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M17 2H7a5 5 0 0 0-5 5v10a5 5 0 0 0 5 5h10a5 5 0 0 0 5-5V7a5 5 0 0 0-5-5Z"/></svg></div><div><h3>Full White-Label</h3><p>Customise everything — your logo, colours, fonts, and even your own custom domain for the client portal.</p></div></div>
-            <div class="ss-feature-row"><div class="ss-feature-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></div><div><h3>Client Portal</h3><p>Give clients access to an interactive dashboard via a unique shareable link. No login required for them.</p></div></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="ss-section-lg ss-section-border">
-        <div class="ss-container-sm">
-          <h2 class="ss-section-title">Agency Tools</h2>
-          <div style="display:grid;grid-template-columns:1fr;gap:1.5rem">
-            <div class="ss-agency-card"><div class="ss-agency-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3>Multi-Client Management</h3><p>Manage all your clients from a single dashboard. Add team members and assign roles.</p></div>
-            <div class="ss-agency-card"><div class="ss-agency-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div><h3>Per-Client Dashboards</h3><p>Each client gets their own configurable dashboard with the platforms and metrics that matter to them.</p></div>
-            <div class="ss-agency-card"><div class="ss-agency-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><h3>Custom Domain</h3><p>Serve your client portal from your own domain for a fully branded experience.</p></div>
+            <div class="ss-feature-row"><div><h3>Branded PDF Reports</h3><p>Automatically generated PDF reports with your agency branding, logo, and colour palette.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Automated Email Delivery</h3><p>Reports are emailed directly to your clients on a monthly schedule — no manual work required.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Full White-Label</h3><p>Customise everything — your logo, colours, fonts, and even your own custom domain for the client portal.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Client Portal</h3><p>Give clients access to an interactive dashboard via a unique shareable link. No login required for them.</p></div></div>
           </div>
         </div>
       </section>
@@ -528,21 +393,12 @@
       <section class="ss-section ss-section-border ss-cta">
         <div class="ss-container-xs">
           <h2>Start Your Free Account</h2>
-          <p>No credit card. No commitment. Upgrade when you're ready.</p>
-          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free <svg class="ss-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+          <p>No credit card. No commitment. Upgrade when you are ready.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
         </div>
       </section>
 
-      <footer class="ss-footer">
-        <div class="ss-container">
-          <div class="ss-footer-grid">
-            <div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated marketing reports that elevate your agency. Built by marketers, for marketers.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div>
-            <div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/login">Log In</a><a href="/login?view=signup">Sign Up</a></div>
-            <div class="ss-footer-col"><h4>Legal</h4><a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a><a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a><a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">amwmedia.co.uk</a></div>
-          </div>
-          <div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div>
-        </div>
-      </footer>
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated marketing reports that elevate your agency.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a></div><div class="ss-footer-col"><h4>Legal</h4><a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a><a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
 
     </div><!-- /features -->
 
@@ -551,71 +407,62 @@
     <!-- ═══════════════════════════════════════ -->
     <div data-seo-page="/pricing">
 
-      <nav class="ss-nav" aria-label="Main navigation">
-        <div class="ss-container ss-nav-inner">
-          <a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a>
-          <div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div>
-          <div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div>
-        </div>
-      </nav>
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
 
-      <section class="ss-section-lg" style="text-align:center">
+      <section class="ss-page-hero">
         <div class="ss-container-sm">
-          <h1 style="font-family:var(--font-heading);font-size:2.5rem;text-transform:uppercase;margin-bottom:1rem;letter-spacing:0.06em">Simple, Transparent Pricing</h1>
-          <p style="font-size:1.125rem;color:var(--muted);max-width:32rem;margin:0 auto">Start free. Upgrade when your agency grows. No hidden fees, no per-seat pricing.</p>
+          <h1>Simple, Transparent Pricing</h1>
+          <p>Start free. Upgrade when your agency grows. No hidden fees, no per-seat pricing.</p>
         </div>
       </section>
 
       <section style="padding-bottom:5rem">
         <div class="ss-container-sm">
           <div class="ss-plan-grid">
-            <!-- Creator -->
             <div class="ss-plan-card">
               <h3>Creator</h3>
               <div><span class="ss-plan-price">Free</span></div>
               <p class="ss-plan-desc">Perfect for trying out the platform with a single client.</p>
               <ul class="ss-plan-features">
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>1 client</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>5 platform connections</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Branded PDF reports</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Client portal</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Monthly sync (4th of each month)</li>
+                <li>1 client</li>
+                <li>5 platform connections</li>
+                <li>Branded PDF reports</li>
+                <li>Client portal</li>
+                <li>Monthly sync (4th of each month)</li>
               </ul>
-              <a href="/login?view=signup" class="ss-btn ss-btn-outline" style="width:100%;justify-content:center">Get Started Free <svg class="ss-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+              <a href="/login?view=signup" class="ss-btn ss-btn-outline">Get Started Free</a>
             </div>
-            <!-- Freelance -->
             <div class="ss-plan-card">
               <h3>Freelance</h3>
               <div><span class="ss-plan-price">£29.99</span><span class="ss-plan-period">/month</span></div>
               <p class="ss-plan-desc">For freelancers and small teams managing multiple clients.</p>
               <ul class="ss-plan-features">
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>5 clients included</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>25 platform connections</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Weekly data sync</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Branded PDF reports</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Automated email delivery</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Add-on clients £9.99/mo each</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Add-on connections £4.99/mo each</li>
+                <li>5 clients included</li>
+                <li>25 platform connections</li>
+                <li>Weekly data sync</li>
+                <li>Branded PDF reports</li>
+                <li>Automated email delivery</li>
+                <li>Add-on clients £9.99/mo each</li>
+                <li>Add-on connections £9.99/mo (5 pack)</li>
               </ul>
-              <a href="/login?view=signup" class="ss-btn ss-btn-outline" style="width:100%;justify-content:center">Get Started <svg class="ss-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+              <a href="/login?view=signup" class="ss-btn ss-btn-outline">Get Started</a>
             </div>
-            <!-- Agency -->
             <div class="ss-plan-card ss-plan-card--highlight">
               <span class="ss-plan-badge">Most Popular</span>
               <h3>Agency</h3>
               <div><span class="ss-plan-price">£49.99</span><span class="ss-plan-period">/month</span></div>
               <p class="ss-plan-desc">Full white-label branding and custom domain for your agency.</p>
               <ul class="ss-plan-features">
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>5 clients included</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>25 platform connections</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Daily data sync</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Full white-label branding</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Custom domain support</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Automated email delivery</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Add-on clients £9.99/mo each</li>
-                <li><div class="ss-check-sm"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>Add-on connections £9.99/mo (5 pack)</li>
+                <li>5 clients included</li>
+                <li>25 platform connections</li>
+                <li>Daily data sync</li>
+                <li>Full white-label branding</li>
+                <li>Custom domain support</li>
+                <li>Automated email delivery</li>
+                <li>Add-on clients £9.99/mo each</li>
+                <li>Add-on connections £9.99/mo (5 pack)</li>
               </ul>
-              <a href="/login?view=signup" class="ss-btn ss-btn-primary" style="width:100%;justify-content:center">Get Started <svg class="ss-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+              <a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a>
             </div>
           </div>
         </div>
@@ -624,39 +471,35 @@
       <section class="ss-section ss-section-border">
         <div class="ss-container-sm">
           <h2 class="ss-section-title">Compare Plans</h2>
-          <div style="overflow-x:auto">
-            <table class="ss-compare-table">
-              <thead><tr><th>Feature</th><th class="ss-text-center">Creator</th><th class="ss-text-center">Freelance</th><th class="ss-text-center ss-col-highlight">Agency</th></tr></thead>
-              <tbody>
-                <tr><td>Clients included</td><td class="ss-text-center">1</td><td class="ss-text-center">5</td><td class="ss-text-center">5</td></tr>
-                <tr><td>Connections included</td><td class="ss-text-center">5</td><td class="ss-text-center">25</td><td class="ss-text-center">25</td></tr>
-                <tr><td>Branded PDF Reports</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td></tr>
-                <tr><td>Client Portal</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td></tr>
-                <tr><td>Automated Email Delivery</td><td class="ss-text-center">✗</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td></tr>
-                <tr><td>White-Label Branding</td><td class="ss-text-center">✗</td><td class="ss-text-center">✗</td><td class="ss-text-center">✓</td></tr>
-                <tr><td>Custom Domain</td><td class="ss-text-center">✗</td><td class="ss-text-center">✗</td><td class="ss-text-center">✓</td></tr>
-                <tr><td>Additional Clients</td><td class="ss-text-center">✗</td><td class="ss-text-center">£9.99/mo each</td><td class="ss-text-center">£9.99/mo each</td></tr>
-                <tr><td>Additional Connections</td><td class="ss-text-center">✗</td><td class="ss-text-center">£9.99/mo (5 pack)</td><td class="ss-text-center">£9.99/mo (5 pack)</td></tr>
-                <tr><td>Data Sync Frequency</td><td class="ss-text-center">Monthly</td><td class="ss-text-center">Daily</td><td class="ss-text-center">Daily</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <table class="ss-compare-table">
+            <thead><tr><th>Feature</th><th class="ss-text-center">Creator</th><th class="ss-text-center">Freelance</th><th class="ss-text-center ss-col-highlight">Agency</th></tr></thead>
+            <tbody>
+              <tr><td>Clients included</td><td class="ss-text-center">1</td><td class="ss-text-center">5</td><td class="ss-text-center">5</td></tr>
+              <tr><td>Connections included</td><td class="ss-text-center">5</td><td class="ss-text-center">25</td><td class="ss-text-center">25</td></tr>
+              <tr><td>Branded PDF Reports</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td></tr>
+              <tr><td>Client Portal</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td></tr>
+              <tr><td>Automated Email Delivery</td><td class="ss-text-center">✗</td><td class="ss-text-center">✓</td><td class="ss-text-center">✓</td></tr>
+              <tr><td>White-Label Branding</td><td class="ss-text-center">✗</td><td class="ss-text-center">✗</td><td class="ss-text-center">✓</td></tr>
+              <tr><td>Custom Domain</td><td class="ss-text-center">✗</td><td class="ss-text-center">✗</td><td class="ss-text-center">✓</td></tr>
+              <tr><td>Additional Clients</td><td class="ss-text-center">✗</td><td class="ss-text-center">£9.99/mo each</td><td class="ss-text-center">£9.99/mo each</td></tr>
+              <tr><td>Additional Connections</td><td class="ss-text-center">✗</td><td class="ss-text-center">£9.99/mo (5 pack)</td><td class="ss-text-center">£9.99/mo (5 pack)</td></tr>
+              <tr><td>Data Sync Frequency</td><td class="ss-text-center">Monthly</td><td class="ss-text-center">Weekly</td><td class="ss-text-center">Daily</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
       <section class="ss-section ss-section-border">
         <div class="ss-container-xs">
           <h2 class="ss-section-title">Frequently Asked Questions</h2>
-          <div>
-            <details class="ss-faq-item"><summary>What counts as a connection?</summary><div class="ss-faq-body">A connection is a single link between one client and one platform. For example, connecting Google Ads and Instagram for the same client uses 2 connections.</div></details>
-            <details class="ss-faq-item"><summary>How does connection allocation work for add-on clients?</summary><div class="ss-faq-body">Each additional client account includes 5 connections — 3 are reserved exclusively for that client, and 2 are added to your flexible pool that can be used across any client.</div></details>
-            <details class="ss-faq-item"><summary>What is white-label branding?</summary><div class="ss-faq-body">White-label branding lets you replace AMW Reports branding with your own. Upload your logo, set your brand colours and fonts, and even use a custom domain.</div></details>
-            <details class="ss-faq-item"><summary>Can I upgrade or downgrade anytime?</summary><div class="ss-faq-body">Yes. You can upgrade at any time and the change takes effect immediately. If you downgrade, it takes effect at the end of your current billing period.</div></details>
-            <details class="ss-faq-item"><summary>Is there a contract or commitment?</summary><div class="ss-faq-body">No contracts. All plans are month-to-month and you can cancel at any time.</div></details>
-            <details class="ss-faq-item"><summary>What platforms are supported?</summary><div class="ss-faq-body">We currently support Google Ads, Meta Ads, Google Analytics, Google Search Console, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, Pinterest, and Google Business Profile.</div></details>
-            <details class="ss-faq-item"><summary>Do my clients need an account?</summary><div class="ss-faq-body">No. Clients can access their dashboard via a unique shareable link — no login required for them.</div></details>
-            <details class="ss-faq-item"><summary>How often is my data synced?</summary><div class="ss-faq-body">Creator plans sync data once per month on the 4th. Freelance and Agency plans benefit from daily automatic syncing.</div></details>
-          </div>
+          <details class="ss-faq-item"><summary>What counts as a connection?</summary><div class="ss-faq-body">A connection is a single link between one client and one platform. For example, connecting Google Ads and Instagram for the same client uses 2 connections.</div></details>
+          <details class="ss-faq-item"><summary>How does the add-on connection pack work?</summary><div class="ss-faq-body">Each add-on pack gives you 5 extra connections at £9.99/month. These connections can be used flexibly across any of your clients — assign all 5 to one client or spread them across several.</div></details>
+          <details class="ss-faq-item"><summary>What is white-label branding?</summary><div class="ss-faq-body">White-label branding lets you replace AMW Reports branding with your own. Upload your logo, set your brand colours and fonts, and even use a custom domain.</div></details>
+          <details class="ss-faq-item"><summary>Can I upgrade or downgrade anytime?</summary><div class="ss-faq-body">Yes. You can upgrade at any time and the change takes effect immediately. If you downgrade, it takes effect at the end of your current billing period.</div></details>
+          <details class="ss-faq-item"><summary>Is there a contract or commitment?</summary><div class="ss-faq-body">No contracts. All plans are month-to-month and you can cancel at any time.</div></details>
+          <details class="ss-faq-item"><summary>What platforms are supported?</summary><div class="ss-faq-body">We currently support Google Ads, Meta Ads, Google Analytics, Google Search Console, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, Pinterest, and Google Business Profile.</div></details>
+          <details class="ss-faq-item"><summary>Do my clients need an account?</summary><div class="ss-faq-body">No. Clients can access their dashboard via a unique shareable link — no login required for them.</div></details>
+          <details class="ss-faq-item"><summary>How often is my data synced?</summary><div class="ss-faq-body">Creator plans sync monthly on the 4th. Freelance plans sync weekly. Agency plans sync daily.</div></details>
         </div>
       </section>
 
@@ -664,20 +507,11 @@
         <div class="ss-container-xs">
           <h2>Start Free, Upgrade When Ready</h2>
           <p>No credit card required. Set up in under 5 minutes.</p>
-          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free <svg class="ss-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
         </div>
       </section>
 
-      <footer class="ss-footer">
-        <div class="ss-container">
-          <div class="ss-footer-grid">
-            <div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated marketing reports that elevate your agency. Built by marketers, for marketers.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div>
-            <div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/login">Log In</a><a href="/login?view=signup">Sign Up</a></div>
-            <div class="ss-footer-col"><h4>Legal</h4><a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a><a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a><a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">amwmedia.co.uk</a></div>
-          </div>
-          <div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div>
-        </div>
-      </footer>
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated marketing reports that elevate your agency.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/login">Log In</a></div><div class="ss-footer-col"><h4>Legal</h4><a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a><a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
 
     </div><!-- /pricing -->
 
@@ -686,37 +520,650 @@
     <!-- ═══════════════════════════════════════ -->
     <div data-seo-page="/login">
 
-      <nav class="ss-nav" aria-label="Main navigation">
-        <div class="ss-container ss-nav-inner">
-          <a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a>
-          <div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div>
-          <div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div>
-        </div>
-      </nav>
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
 
-      <section class="ss-section-lg" style="display:flex;align-items:center;justify-content:center;min-height:60vh">
+      <section class="ss-section-lg" style="text-align:center">
         <div class="ss-login-card">
           <h1>Sign In to AMW Reports</h1>
           <p>Automated marketing reports for agencies. Sign in to access your dashboard, manage clients, and generate reports.</p>
           <div class="ss-login-links">
-            <a href="/login" class="ss-btn ss-btn-primary" style="width:100%;justify-content:center">Sign In</a>
-            <a href="/login?view=signup" class="ss-btn ss-btn-outline" style="width:100%;justify-content:center">Create Account</a>
+            <a href="/login" class="ss-btn ss-btn-primary">Sign In</a>
+            <a href="/login?view=signup" class="ss-btn ss-btn-outline">Create Account</a>
           </div>
         </div>
       </section>
 
-      <footer class="ss-footer">
-        <div class="ss-container">
-          <div class="ss-footer-grid">
-            <div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated marketing reports that elevate your agency.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div>
-            <div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/login">Log In</a></div>
-            <div class="ss-footer-col"><h4>Legal</h4><a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a><a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a></div>
-          </div>
-          <div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div>
-        </div>
-      </footer>
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated marketing reports that elevate your agency.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/login">Log In</a></div><div class="ss-footer-col"><h4>Legal</h4><a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a><a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
 
     </div><!-- /login -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- SOCIAL MEDIA REPORTING PAGE             -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/social-media-reporting">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>Social Media Reporting <span class="ss-text-gradient">Automated</span></h1>
+          <p>Consolidate Facebook, Instagram, LinkedIn, TikTok, YouTube, and Pinterest data into one branded report. Delivered automatically to your clients every month.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Platforms We Support</h2>
+          <p class="ss-section-desc">Connect all major social media platforms in one click. We pull the metrics that matter.</p>
+          <div class="ss-platform-grid">
+            <div class="ss-platform-card"><h3>Facebook Pages</h3><p class="ss-platform-desc">Track page growth, post engagement, reach, impressions, and video views.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Engagement</span><span class="ss-metric-pill">Video Views</span><span class="ss-metric-pill">Post Count</span></div></div>
+            <div class="ss-platform-card"><h3>Instagram</h3><p class="ss-platform-desc">Monitor follower growth, engagement rates, reach, saves, and shares.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagement</span><span class="ss-metric-pill">Saves</span><span class="ss-metric-pill">Shares</span></div></div>
+            <div class="ss-platform-card"><h3>LinkedIn</h3><p class="ss-platform-desc">Track company page followers, impressions, clicks, and engagement rate.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Followers</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">Engagement Rate</span><span class="ss-metric-pill">Reactions</span></div></div>
+            <div class="ss-platform-card"><h3>YouTube</h3><p class="ss-platform-desc">Track views, watch time, subscribers, likes, comments, and engagement.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Views</span><span class="ss-metric-pill">Watch Time</span><span class="ss-metric-pill">Subscribers</span><span class="ss-metric-pill">Likes</span><span class="ss-metric-pill">Comments</span></div></div>
+            <div class="ss-platform-card"><h3>TikTok</h3><p class="ss-platform-desc">Monitor TikTok ad performance with spend, impressions, clicks, and ROAS.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Conversions</span></div></div>
+            <div class="ss-platform-card"><h3>Pinterest</h3><p class="ss-platform-desc">Track pin performance, saves, outbound clicks, and audience growth.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Engagements</span><span class="ss-metric-pill">Saves</span><span class="ss-metric-pill">Pin Clicks</span><span class="ss-metric-pill">Outbound Clicks</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Why AMW Reports for Social Media?</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>All social platforms in one unified dashboard — no more tab switching</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Branded PDF reports with your logo and colours ready to send to clients</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Automated monthly email delivery — set it and forget it</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Month-over-month and year-over-year comparisons built in</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Client portal with shareable links — no login needed for clients</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs">
+          <h2 class="ss-section-title">Frequently Asked Questions</h2>
+          <details class="ss-faq-item"><summary>Which social media platforms are supported?</summary><div class="ss-faq-body">We support Facebook Pages, Instagram, LinkedIn, YouTube, TikTok (ads), and Pinterest. More platforms are added regularly.</div></details>
+          <details class="ss-faq-item"><summary>How often is social media data synced?</summary><div class="ss-faq-body">Creator plans sync monthly. Freelance plans sync weekly. Agency plans sync daily.</div></details>
+          <details class="ss-faq-item"><summary>Can I customise which metrics appear in the report?</summary><div class="ss-faq-body">Yes. Each platform has a set of available metrics and you can choose which ones to include in your reports and dashboards.</div></details>
+          <details class="ss-faq-item"><summary>Can I white-label the social media reports?</summary><div class="ss-faq-body">Yes, on the Agency plan. Upload your logo, set brand colours and fonts. Clients will never know you use AMW Reports.</div></details>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Automate Your Social Media Reporting</h2>
+          <p>Free plan available. Set up in under 5 minutes.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated social media reporting for agencies and freelancers.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a></div><div class="ss-footer-col"><h4>Use Cases</h4><a href="/seo-reporting">SEO Reporting</a><a href="/ppc-reporting">PPC Reporting</a><a href="/white-label-reports">White-Label Reports</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /social-media-reporting -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- SEO REPORTING PAGE                      -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/seo-reporting">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>SEO Reporting for Agencies &amp; <span class="ss-text-gradient">Freelancers</span></h1>
+          <p>Combine Google Search Console and Google Analytics data into one branded SEO report. Show clients their organic growth with clear, visual metrics.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">SEO Metrics We Track</h2>
+          <div class="ss-platform-grid">
+            <div class="ss-platform-card"><h3>Google Search Console</h3><p class="ss-platform-desc">Organic search performance: keyword rankings, impressions, clicks, and CTR.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Avg. Position</span><span class="ss-metric-pill">Top Queries</span><span class="ss-metric-pill">Top Pages</span></div></div>
+            <div class="ss-platform-card"><h3>Google Analytics</h3><p class="ss-platform-desc">Website traffic and user behaviour: sessions, page views, bounce rate, and conversions.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Sessions</span><span class="ss-metric-pill">Users</span><span class="ss-metric-pill">Page Views</span><span class="ss-metric-pill">Bounce Rate</span><span class="ss-metric-pill">Avg. Session Duration</span><span class="ss-metric-pill">Conversions</span></div></div>
+            <div class="ss-platform-card"><h3>Google Business Profile</h3><p class="ss-platform-desc">Local SEO performance: search views, calls, direction requests, and reviews.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Views</span><span class="ss-metric-pill">Searches</span><span class="ss-metric-pill">Calls</span><span class="ss-metric-pill">Direction Requests</span><span class="ss-metric-pill">Reviews</span><span class="ss-metric-pill">Avg. Rating</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Why AMW Reports for SEO?</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Combine Search Console, Analytics, and Business Profile in one report</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Top-performing queries and pages highlighted automatically</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Month-over-month position and traffic changes</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Branded PDF reports your clients can understand</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs">
+          <h2 class="ss-section-title">Frequently Asked Questions</h2>
+          <details class="ss-faq-item"><summary>Which SEO platforms are supported?</summary><div class="ss-faq-body">Google Search Console, Google Analytics 4, and Google Business Profile. These cover organic search, website traffic, and local SEO.</div></details>
+          <details class="ss-faq-item"><summary>How often is SEO data synced?</summary><div class="ss-faq-body">Creator plans sync monthly. Freelance plans sync weekly. Agency plans sync daily.</div></details>
+          <details class="ss-faq-item"><summary>Can I combine SEO data with social and ads data?</summary><div class="ss-faq-body">Absolutely. Each client can have multiple platform connections. One report can include SEO, social media, and ads data together.</div></details>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Automate Your SEO Reporting</h2>
+          <p>Free plan available. No credit card required.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated SEO reporting for agencies and freelancers.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Use Cases</h4><a href="/social-media-reporting">Social Media Reporting</a><a href="/ppc-reporting">PPC Reporting</a><a href="/white-label-reports">White-Label Reports</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /seo-reporting -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- PPC REPORTING PAGE                      -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/ppc-reporting">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>PPC &amp; Paid Ads Reporting <span class="ss-text-gradient">Simplified</span></h1>
+          <p>Consolidate Google Ads, Meta Ads, and TikTok Ads data into one clean, branded PPC report. Show clients their ROAS, spend, and conversions at a glance.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">PPC Platforms We Track</h2>
+          <div class="ss-platform-grid">
+            <div class="ss-platform-card"><h3>Google Ads</h3><p class="ss-platform-desc">Track spend, impressions, clicks, CTR, conversions, ROAS, CPC, and more.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">ROAS</span><span class="ss-metric-pill">CPC</span><span class="ss-metric-pill">CPM</span></div></div>
+            <div class="ss-platform-card"><h3>Meta Ads</h3><p class="ss-platform-desc">Monitor Facebook and Instagram ad campaigns: spend, reach, link clicks, and conversion value.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Reach</span><span class="ss-metric-pill">Link Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">ROAS</span><span class="ss-metric-pill">Leads</span></div></div>
+            <div class="ss-platform-card"><h3>TikTok Ads</h3><p class="ss-platform-desc">Track TikTok ad campaign performance with spend, impressions, clicks, and conversions.</p><div class="ss-metric-pills"><span class="ss-metric-pill">Spend</span><span class="ss-metric-pill">Impressions</span><span class="ss-metric-pill">Clicks</span><span class="ss-metric-pill">CTR</span><span class="ss-metric-pill">Conversions</span><span class="ss-metric-pill">ROAS</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Why AMW Reports for PPC?</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>All ad platforms in one report — Google, Meta, and TikTok side by side</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>ROAS, spend, CPC, and conversions highlighted for easy client understanding</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Month-over-month comparisons built in automatically</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>White-label branding on Agency plan — your brand, not ours</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs">
+          <h2 class="ss-section-title">Frequently Asked Questions</h2>
+          <details class="ss-faq-item"><summary>Which PPC platforms are supported?</summary><div class="ss-faq-body">Google Ads, Meta Ads (Facebook and Instagram), and TikTok Ads. All major paid advertising platforms in one report.</div></details>
+          <details class="ss-faq-item"><summary>Can I combine PPC data with SEO and social data?</summary><div class="ss-faq-body">Yes. Connect any combination of platforms for each client. One report covers everything.</div></details>
+          <details class="ss-faq-item"><summary>How often is PPC data synced?</summary><div class="ss-faq-body">Creator plans sync monthly. Freelance plans sync weekly. Agency plans sync daily for up-to-date campaign data.</div></details>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Automate Your PPC Reporting</h2>
+          <p>Free plan available. Set up in under 5 minutes.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated PPC reporting for agencies and freelancers.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Use Cases</h4><a href="/social-media-reporting">Social Media Reporting</a><a href="/seo-reporting">SEO Reporting</a><a href="/white-label-reports">White-Label Reports</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /ppc-reporting -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- WHITE-LABEL REPORTS PAGE                -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/white-label-reports">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>White-Label Marketing Reports for <span class="ss-text-gradient">Your Agency</span></h1>
+          <p>Brand every report, portal, and email with your logo, colours, and fonts. Your clients will never know you use AMW Reports. Available on the Agency plan at just £49.99/month.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">What You Can Customise</h2>
+          <div style="display:grid;grid-template-columns:1fr;gap:1.5rem">
+            <div class="ss-feature-row"><div><h3>Your Logo on Every Report</h3><p>Upload your agency logo. It appears on PDF reports, the client portal, and automated emails.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Brand Colours &amp; Fonts</h3><p>Set your primary, secondary, and accent colours. Choose heading and body fonts. Charts use your palette too.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Custom Domain</h3><p>Serve the client portal from your own domain (e.g. reports.youragency.com) for a fully branded experience.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Branded Email Delivery</h3><p>Automated report emails go out with your branding — your clients see only your name.</p></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Why White-Label Matters</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Professional, agency-branded deliverables that build trust</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Clients see your brand on every report, portal page, and email</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Custom domain support — no AMW Reports URLs visible to clients</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Reinforce your agency identity and justify premium pricing</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Go White-Label Today</h2>
+          <p>Agency plan at £49.99/month. Full branding control from day one.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>White-label marketing reports for agencies.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Use Cases</h4><a href="/social-media-reporting">Social Media Reporting</a><a href="/seo-reporting">SEO Reporting</a><a href="/ppc-reporting">PPC Reporting</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /white-label-reports -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- INTEGRATIONS PAGE                       -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/integrations">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>Marketing Platform <span class="ss-text-gradient">Integrations</span></h1>
+          <p>Connect 11 marketing platforms with one click. We pull 70+ metrics automatically so you never have to log into each platform again.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">All Supported Platforms</h2>
+          <p class="ss-section-desc">Each platform connects via secure OAuth. One click to authorise, then data syncs automatically.</p>
+          <div class="ss-platforms-list" style="margin-bottom:3rem">
+            <span class="ss-pill">Google Ads</span><span class="ss-pill">Meta Ads</span><span class="ss-pill">Google Analytics</span><span class="ss-pill">Google Search Console</span><span class="ss-pill">YouTube</span><span class="ss-pill">Facebook Pages</span><span class="ss-pill">Instagram</span><span class="ss-pill">LinkedIn</span><span class="ss-pill">TikTok Ads</span><span class="ss-pill">Pinterest</span><span class="ss-pill">Google Business Profile</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">How Integrations Work</h2>
+          <div class="ss-steps-grid">
+            <div class="ss-step"><span class="ss-step-num">01</span><h3>Authorise</h3><p>Click "Connect" and sign in to the platform. We use secure OAuth — we never store your password.</p></div>
+            <div class="ss-step"><span class="ss-step-num">02</span><h3>Select Account</h3><p>Choose which ad account, property, or page you want to track for this client.</p></div>
+            <div class="ss-step"><span class="ss-step-num">03</span><h3>Auto-Sync</h3><p>Data syncs automatically based on your plan: monthly, weekly, or daily. No manual work needed.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Connection Limits by Plan</h2>
+          <table class="ss-compare-table">
+            <thead><tr><th>Plan</th><th class="ss-text-center">Connections</th><th class="ss-text-center">Sync</th><th class="ss-text-center">Add-ons</th></tr></thead>
+            <tbody>
+              <tr><td>Creator (Free)</td><td class="ss-text-center">5</td><td class="ss-text-center">Monthly</td><td class="ss-text-center">—</td></tr>
+              <tr><td>Freelance (£29.99/mo)</td><td class="ss-text-center">25</td><td class="ss-text-center">Weekly</td><td class="ss-text-center">£9.99/mo (5 pack)</td></tr>
+              <tr><td>Agency (£49.99/mo)</td><td class="ss-text-center">25</td><td class="ss-text-center">Daily</td><td class="ss-text-center">£9.99/mo (5 pack)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Connect Your Platforms Today</h2>
+          <p>Free plan includes 5 connections. Set up in minutes.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Connect 11 marketing platforms in one dashboard.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Use Cases</h4><a href="/social-media-reporting">Social Media Reporting</a><a href="/seo-reporting">SEO Reporting</a><a href="/ppc-reporting">PPC Reporting</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /integrations -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- HOW IT WORKS PAGE                       -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/how-it-works">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/how-it-works">How It Works</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>How AMW Reports <span class="ss-text-gradient">Works</span></h1>
+          <p>From sign-up to sending your first branded report — it takes under 5 minutes. Here is the step-by-step process.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Four Simple Steps</h2>
+          <div class="ss-stats-grid">
+            <div class="ss-stat-card"><h3>1. Create Your Account</h3><p style="font-size:0.875rem;color:var(--muted)">Sign up free in under 2 minutes. No credit card required. Set up your organisation and branding.</p></div>
+            <div class="ss-stat-card"><h3>2. Add Your Clients</h3><p style="font-size:0.875rem;color:var(--muted)">Enter client details and connect their marketing platforms with secure OAuth. One click per platform.</p></div>
+            <div class="ss-stat-card"><h3>3. We Sync the Data</h3><p style="font-size:0.875rem;color:var(--muted)">AMW Reports automatically pulls 70+ metrics from all connected platforms. Creator: monthly. Freelance: weekly. Agency: daily.</p></div>
+            <div class="ss-stat-card"><h3>4. Reports Delivered</h3><p style="font-size:0.875rem;color:var(--muted)">Beautiful, branded PDF reports are generated and emailed directly to your clients. Share via the client portal too.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">What Happens Behind the Scenes</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Secure OAuth connections — we never store your platform passwords</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Data is synced and stored securely, with month-over-month snapshots</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>AI-powered executive summaries and insights (optional)</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>PDF generation with your branding, colours, and fonts</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Automated email delivery to client recipients on your schedule</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Try It Free — Under 5 Minutes</h2>
+          <p>No credit card. No contracts. Cancel anytime.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Automated marketing reports in 4 simple steps.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a></div><div class="ss-footer-col"><h4>Use Cases</h4><a href="/for-agencies">For Agencies</a><a href="/for-freelancers">For Freelancers</a><a href="/for-smbs">For Small Businesses</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /how-it-works -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- FOR AGENCIES PAGE                       -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/for-agencies">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>Marketing Reporting for <span class="ss-text-gradient">Agencies</span></h1>
+          <p>Stop spending hours on manual client reports. AMW Reports connects 10+ platforms, generates branded PDFs, and delivers them automatically. White-label everything on the Agency plan.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Why Agencies Choose AMW Reports</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Full white-label branding — your logo, colours, fonts, and custom domain</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Multi-client management from a single dashboard</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Automated report generation and email delivery every month</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>No per-seat pricing — your entire team for one flat rate</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Client portal with shareable links — no client login required</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>10+ platforms: Google Ads, Meta Ads, Analytics, Instagram, LinkedIn, and more</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm" style="text-align:center">
+          <h2 class="ss-section-title">How It Works for Agencies</h2>
+          <div class="ss-steps-grid">
+            <div class="ss-step"><span class="ss-step-num">01</span><h3>Onboard Your Clients</h3><p>Add clients, connect their platforms, and set up branding in minutes.</p></div>
+            <div class="ss-step"><span class="ss-step-num">02</span><h3>Data Syncs Automatically</h3><p>We pull 70+ metrics across all connected platforms. Agency plan syncs daily.</p></div>
+            <div class="ss-step"><span class="ss-step-num">03</span><h3>Reports Delivered</h3><p>Branded PDFs generated and emailed to your clients on schedule.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs" style="text-align:center">
+          <h2 class="ss-section-title">Agency Plan — £49.99/month</h2>
+          <p style="color:var(--muted);margin-bottom:2rem">5 clients, 25 connections, daily sync, full white-label, custom domain, automated email delivery. Add extra clients at £9.99/month each. Add connection packs at £9.99/month per 5.</p>
+          <a href="/pricing" class="ss-btn ss-btn-outline">View All Plans</a>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Elevate Your Agency Reporting</h2>
+          <p>Start free. Upgrade to Agency when you are ready.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>White-label marketing reports built for agencies.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Audience</h4><a href="/for-freelancers">For Freelancers</a><a href="/for-smbs">For Small Businesses</a><a href="/for-creators">For Creators</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /for-agencies -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- FOR FREELANCERS PAGE                    -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/for-freelancers">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>Client Reporting for <span class="ss-text-gradient">Freelance Marketers</span></h1>
+          <p>Look bigger than a one-person shop. Deliver professional, branded marketing reports to your clients — automatically. Free plan available.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Why Freelancers Love AMW Reports</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Save hours every month — stop manually pulling data from 10 platforms</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Impress clients with professional branded PDF reports</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>White-label your deliverables — clients never know you use AMW Reports</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Start free, upgrade to Freelance at just £29.99/month</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm" style="text-align:center">
+          <h2 class="ss-section-title">How It Works</h2>
+          <div class="ss-steps-grid">
+            <div class="ss-step"><span class="ss-step-num">01</span><h3>Sign up free</h3><p>Create your account in under 2 minutes. No credit card needed.</p></div>
+            <div class="ss-step"><span class="ss-step-num">02</span><h3>Add your client</h3><p>Enter client details, connect their marketing platforms.</p></div>
+            <div class="ss-step"><span class="ss-step-num">03</span><h3>Generate reports</h3><p>We pull the data, format a branded PDF, and deliver it to your client.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs" style="text-align:center">
+          <h2 class="ss-section-title">Affordable Pricing for Freelancers</h2>
+          <p style="color:var(--muted);margin-bottom:2rem">Start free with the Creator plan (1 client, 5 connections). When you grow, upgrade to Freelance at just £29.99/month for 5 clients and 25 connections. No contracts, cancel anytime.</p>
+          <a href="/pricing" class="ss-btn ss-btn-outline">View All Plans</a>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Start Free. Look Professional.</h2>
+          <p>No credit card required. Set up in under 5 minutes.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Professional client reporting for freelance marketers.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Audience</h4><a href="/for-agencies">For Agencies</a><a href="/for-smbs">For Small Businesses</a><a href="/for-creators">For Creators</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /for-freelancers -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- FOR SMBS PAGE                           -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/for-smbs">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>Marketing Reports for <span class="ss-text-gradient">Small Businesses</span></h1>
+          <p>Understand your marketing without the jargon. See all your performance data in one clean dashboard and get beautiful PDF reports delivered automatically. Free plan available.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">What You Get</h2>
+          <div style="display:grid;grid-template-columns:1fr;gap:1.5rem">
+            <div class="ss-feature-row"><div><h3>One Dashboard for Everything</h3><p>See all your marketing performance — ads, social, SEO, website — in a single, easy-to-understand dashboard.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Clear Metrics, No Jargon</h3><p>We present your data in plain language with clear charts. No marketing expertise needed to understand your results.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Branded PDF Reports</h3><p>Generate professional PDF reports with your business logo that you can share with stakeholders or keep for records.</p></div></div>
+            <div class="ss-feature-row"><div><h3>Automatic Email Delivery</h3><p>Receive your monthly marketing report by email automatically. No need to log in or remember to check.</p></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm" style="text-align:center">
+          <h2 class="ss-section-title">All Your Marketing Tools in One Place</h2>
+          <div class="ss-platforms-list">
+            <span class="ss-pill">Google Ads</span><span class="ss-pill">Meta Ads</span><span class="ss-pill">Google Analytics</span><span class="ss-pill">Google Search Console</span><span class="ss-pill">YouTube</span><span class="ss-pill">Facebook</span><span class="ss-pill">Instagram</span><span class="ss-pill">LinkedIn</span><span class="ss-pill">TikTok</span><span class="ss-pill">Pinterest</span><span class="ss-pill">Google Business Profile</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs" style="text-align:center">
+          <h2 class="ss-section-title">Free Plan for Small Businesses</h2>
+          <p style="color:var(--muted);margin-bottom:2rem">The Creator plan is completely free — 1 client, 5 platform connections, branded PDF reports, and a client portal. No credit card needed. Perfect for small businesses that want to see their marketing data in one place.</p>
+          <a href="/pricing" class="ss-btn ss-btn-outline">View All Plans</a>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>See Your Marketing Clearly</h2>
+          <p>Free plan available. Set up in under 5 minutes.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Marketing analytics for small businesses, made simple.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Audience</h4><a href="/for-agencies">For Agencies</a><a href="/for-freelancers">For Freelancers</a><a href="/for-creators">For Creators</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /for-smbs -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- FOR CREATORS PAGE                       -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/for-creators">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>Analytics Dashboard for <span class="ss-text-gradient">Content Creators</span></h1>
+          <p>Track your YouTube, Instagram, TikTok, and more in one dashboard. Generate PDF media kits and reports to share with brands. Completely free on the Creator plan.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <h2 class="ss-section-title">Why Creators Use AMW Reports</h2>
+          <ul class="ss-check-list">
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>All your social platforms in one clean dashboard</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Generate PDF reports as professional media kits for brand pitches</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Track follower growth, engagement, views, and reach over time</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>Month-over-month comparisons to show your growth trajectory</span></li>
+            <li class="ss-check-item"><div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div><span>100% free on the Creator plan — no credit card needed</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm" style="text-align:center">
+          <h2 class="ss-section-title">Platforms for Creators</h2>
+          <div class="ss-platforms-list">
+            <span class="ss-pill">YouTube</span><span class="ss-pill">Instagram</span><span class="ss-pill">TikTok</span><span class="ss-pill">Facebook</span><span class="ss-pill">LinkedIn</span><span class="ss-pill">Pinterest</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs" style="text-align:center">
+          <h2 class="ss-section-title">Free Forever on the Creator Plan</h2>
+          <p style="color:var(--muted);margin-bottom:2rem">1 profile, 5 platform connections, branded PDF reports, and a shareable dashboard link. No credit card. No catch. Perfect for creators who want to track and share their growth.</p>
+          <a href="/pricing" class="ss-btn ss-btn-outline">View All Plans</a>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Track Your Growth. Share Your Stats.</h2>
+          <p>Free plan available. Set up in under 5 minutes.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Free analytics dashboard for content creators.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a></div><div class="ss-footer-col"><h4>Audience</h4><a href="/for-agencies">For Agencies</a><a href="/for-freelancers">For Freelancers</a><a href="/for-smbs">For Small Businesses</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /for-creators -->
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- ABOUT PAGE                              -->
+    <!-- ═══════════════════════════════════════ -->
+    <div data-seo-page="/about">
+
+      <nav class="ss-nav" aria-label="Main navigation"><div class="ss-container ss-nav-inner"><a href="/" class="ss-nav-brand" aria-label="AMW Reports home"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="120" height="32"><span>Reports</span></a><div class="ss-nav-links"><a href="/">Home</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/about">About</a></div><div class="ss-nav-actions"><a href="/login" class="ss-btn ss-btn-outline">Log In</a><a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a></div></div></nav>
+
+      <section class="ss-page-hero">
+        <div class="ss-container-sm">
+          <h1>About AMW Reports — Built by Marketers, for <span class="ss-text-gradient">Marketers</span></h1>
+          <p>AMW Reports was born from a real problem — spending too many hours every month building client reports manually. We built the tool we wished existed.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs ss-prose">
+          <h2>The Problem We Solved</h2>
+          <p>At AMW Media, our UK-based marketing agency, we were logging into 10 different platforms every month for every client — pulling screenshots, copying data into spreadsheets, formatting slides, and sending them out manually. It was tedious, error-prone, and took hours away from the strategic work we actually enjoyed.</p>
+          <p>We looked at the existing reporting tools on the market, but they were either too expensive for smaller agencies, too complex to set up, or lacked the white-label branding we needed to present reports as our own. So we built AMW Reports.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs ss-prose">
+          <h2>Our Mission</h2>
+          <p>Make professional reporting accessible to every marketer — whether you run a 50-person agency, freelance on your own, manage a small business, or create content. Beautiful, branded, data-driven reports without the manual grind.</p>
+          <p>We believe great reporting should not be a luxury reserved for agencies with big budgets. That is why we offer a genuinely free plan, transparent pricing, and no per-seat fees.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs" style="text-align:center">
+          <blockquote class="ss-blockquote">"We built AMW Reports because we were tired of spending hours manually compiling data from a dozen platforms. Our clients deserved better — and so did we."</blockquote>
+          <div class="ss-attribution">
+            <div class="ss-avatar">A</div>
+            <div class="ss-attribution-text"><p>Amir</p><p>Founder, AMW Media</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs ss-prose">
+          <h2>Built by AMW Media</h2>
+          <p>AMW Reports is developed and operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a>, a UK-based marketing agency. We use AMW Reports ourselves every day to manage our own client reporting — which means every feature is built from real-world agency experience.</p>
+        </div>
+      </section>
+
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Join Us. Start Free.</h2>
+          <p>No credit card required. Built by marketers who understand your workflow.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free</a>
+        </div>
+      </section>
+
+      <footer class="ss-footer"><div class="ss-container"><div class="ss-footer-grid"><div class="ss-footer-brand"><div class="ss-footer-brand-row"><img src="/amw-logo-white.png" alt="AMW Reports logo" width="112" height="28"><span>Reports</span></div><p>Built by marketers, for marketers. Operated by AMW Media.</p><p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website">AMW Media</a></p></div><div class="ss-footer-col"><h4>Product</h4><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/integrations">Integrations</a></div><div class="ss-footer-col"><h4>Legal</h4><a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy">Privacy Policy</a><a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions">Terms &amp; Conditions</a></div></div><div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div></div></footer>
+
+    </div><!-- /about -->
 
     </div><!-- /#seo-static -->
 
