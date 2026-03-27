@@ -668,8 +668,7 @@ Deno.serve(async (req) => {
     if (client_id) logEntry.client_id = client_id;
     if (report_id) logEntry.report_id = report_id;
 
-    // client_id is required by the table — use a fallback if not provided
-    if (!client_id) logEntry.client_id = "00000000-0000-0000-0000-000000000000";
+    // client_id is nullable — only set if provided
 
     await supabase.from("email_logs").insert(logEntry);
 
