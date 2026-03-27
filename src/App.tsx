@@ -120,9 +120,11 @@ const App = () => (
       <BrowserRouter>
         <ScrollToTop />
         <AuthProvider>
-          <BrandingProvider>
-            <AppRoutes />
-          </BrandingProvider>
+          <OrgProvider>
+            <BrandingProvider>
+              <AppRoutes />
+            </BrandingProvider>
+          </OrgProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
