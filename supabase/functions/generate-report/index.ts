@@ -122,6 +122,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Verify requesting user belongs to the client's org
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && client.org_id) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user: caller } } = await supabase.auth.getUser(token);
+      if (caller) {
+        const { data: membership } = await supabase.from("org_members").select("id").eq("user_id", caller.id).eq("org_id", client.org_id).limit(1).single();
+        if (!membership) {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+    }
+
     // Fetch organisation branding
     const { data: org } = await supabase.from("organisations").select("*").eq("id", client.org_id).single();
     const orgName = org?.name ?? "Your Agency";
