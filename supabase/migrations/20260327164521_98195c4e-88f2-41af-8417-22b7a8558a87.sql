@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS reports_client_month_year_unique ON public.reports (client_id, report_month, report_year);
