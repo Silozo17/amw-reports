@@ -1417,7 +1417,7 @@ Deno.serve(async (req) => {
     }
     doc.text(`${orgName} | ${T.confidential}`, W / 2, H - 5, { align: "center" });
 
-    let y = startNewPage(SECTION_TITLES.tableOfContents);
+    let y = startNewPage(T.tableOfContents);
     y += 2;
 
     const prevMonth = report_month === 1 ? 12 : report_month - 1;
@@ -1427,7 +1427,7 @@ Deno.serve(async (req) => {
 
     doc.setFontSize(9); setC(C.grey);
     y = wrapText(
-      `This report covers performance from 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. All figures compared to ${prevMonthName} ${prevYear} unless stated otherwise.`,
+      `${T.reportCovers} 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. ${T.allFigures} ${prevMonthName} ${prevYear} ${T.unlessStated}.`,
       M, y, CW, 5
     );
     y += 8;
