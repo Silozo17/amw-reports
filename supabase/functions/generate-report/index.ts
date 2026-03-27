@@ -1047,6 +1047,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Check if a report is already being generated for this client/month/year
+    const { data: existingRunning } = await supabase.from("reports")
+      .select("id, status")
+      .eq("client_id", client_id)
+      .eq("report_month", report_month)
+      .eq("report_year", report_year)
+      .eq("status", "running")
+      .maybeSingle();
+
+    if (existingRunning) {
+      return new Response(JSON.stringify({ error: "Report is already being generated for this period" }), {
+        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const [clientRes, snapshotsRes, configRes, prevSnapshotsRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year),
@@ -1062,6 +1077,22 @@ Deno.serve(async (req) => {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Upsert report record with "running" status immediately
+    const { data: runningReport } = await supabase.from("reports")
+      .upsert({
+        client_id,
+        report_month,
+        report_year,
+        org_id: client.org_id,
+        status: "running" as const,
+        generated_at: null,
+        pdf_storage_path: null,
+      }, { onConflict: "client_id,report_month,report_year", ignoreDuplicates: false })
+      .select("id")
+      .single();
+
+    const earlyReportId = runningReport?.id;
 
     const authHeader = req.headers.get("Authorization");
     if (authHeader && client.org_id) {
