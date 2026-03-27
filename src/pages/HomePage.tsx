@@ -5,6 +5,7 @@ import WarpedGrid from '@/components/landing/WarpedGrid';
 import StarDecoration from '@/components/landing/StarDecoration';
 import mascot from '@/assets/mascot.svg';
 import amwLogo from '@/assets/AMW_Logo_White.png';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const PLATFORMS = [
   'Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console',
@@ -33,7 +34,10 @@ const STAT_GROUPS = [
   { label: 'Web', metrics: ['Sessions', 'Bounce Rate', 'Page Views', 'Traffic Sources'], color: 'text-warning' },
 ];
 
-const HomePage = () => (
+const HomePage = () => {
+  usePageMeta({ title: 'AMW Reports — Automated Marketing Reports for Agencies', description: 'Connect 10+ platforms, generate branded PDF reports, and deliver client insights automatically. Built for agencies.' });
+
+  return (
   <>
     {/* ── HERO ── */}
     <section className="relative overflow-hidden py-20 lg:py-32">
@@ -195,6 +199,7 @@ const HomePage = () => (
       </div>
     </section>
   </>
-);
+  );
+};
 
 export default HomePage;

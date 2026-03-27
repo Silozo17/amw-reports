@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const PLANS = [
   {
@@ -62,11 +63,12 @@ const FAQS = [
 
 const CellValue = ({ value }: { value: boolean | string }) => {
   if (typeof value === 'string') return <span className="text-sm font-body text-amw-offwhite/80">{value}</span>;
-  return value ? <Check className="h-4 w-4 text-accent mx-auto" /> : <X className="h-4 w-4 text-amw-offwhite/20 mx-auto" />;
+  return value ? <Check className="h-4 w-4 text-accent mx-auto" aria-label="Included" /> : <X className="h-4 w-4 text-amw-offwhite/20 mx-auto" aria-label="Not included" />;
 };
 
 const PricingPage = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  usePageMeta({ title: 'Pricing — AMW Reports', description: 'Start free with 1 client. Upgrade to Freelance or Agency plans. No contracts, no per-seat pricing.' });
 
   return (
     <>

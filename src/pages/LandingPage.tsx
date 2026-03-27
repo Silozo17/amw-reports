@@ -9,6 +9,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import LandingHero from '@/components/landing/LandingHero';
+import usePageMeta from '@/hooks/usePageMeta';
 
 type View = 'login' | 'signup' | 'otp' | 'magic-link';
 
@@ -19,6 +20,7 @@ const LandingPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  usePageMeta({ title: 'Log In — AMW Reports', description: 'Sign in to your AMW Reports account or create a new one. Automated marketing reports for agencies.' });
 
   useEffect(() => {
     const v = searchParams.get('view');
