@@ -7,11 +7,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
-  role: AppRole | null;
   isLoading: boolean;
-  isOwner: boolean;
   isPlatformAdmin: boolean;
-  isManager: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;

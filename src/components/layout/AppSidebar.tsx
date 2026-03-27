@@ -46,8 +46,8 @@ interface AppSidebarProps {
 }
 
 const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
-  const { signOut, profile, role, isOwner, isPlatformAdmin } = useAuth();
-  const { org, orgId, allMemberships, switchOrg } = useOrg();
+  const { signOut, profile, isPlatformAdmin } = useAuth();
+  const { org, orgId, orgRole, allMemberships, switchOrg } = useOrg();
   
   const { pendingInvites, acceptInvite, declineInvite } = useInvites();
   const location = useLocation();
@@ -217,7 +217,7 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-body font-medium truncate">{profile?.full_name ?? 'User'}</p>
-                <p className="text-xs text-sidebar-foreground/50 capitalize">{role ?? 'member'}</p>
+                <p className="text-xs text-sidebar-foreground/50 capitalize">{orgRole ?? 'member'}</p>
               </div>
               <ChevronUp className="h-4 w-4 text-sidebar-foreground/40" />
             </button>
