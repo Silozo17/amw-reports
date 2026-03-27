@@ -353,7 +353,7 @@ Rules:
 - Mention any significant declines honestly but constructively
 - Never use jargon or acronyms without explaining them
 - End with a forward-looking sentence
-- Do NOT use markdown formatting, headers, or bullet points — just flowing prose
+- Do NOT use markdown formatting, headers, or bullet points — just flowing prose${langInstruction}
 Data: ${dataContext}`,
           600
         );
@@ -373,7 +373,7 @@ Rules:
 - If anything dropped, explain it simply and say whether it needs attention
 - Include one honest, actionable observation (not a sales pitch)
 - Do NOT use markdown, headers, or bullet points — flowing prose only
-- Never use acronyms without explaining them first (e.g. CTR = Click-Through Rate)
+- Never use acronyms without explaining them first (e.g. CTR = Click-Through Rate)${langInstruction}
 Data: ${platformContext}`,
             400
           );
