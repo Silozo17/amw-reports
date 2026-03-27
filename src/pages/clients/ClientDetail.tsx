@@ -3,13 +3,14 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, FileText, Loader2, BarChart3, CalendarIcon, Trash2, Share2, Clock, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, FileText, Loader2, BarChart3, CalendarIcon, Trash2, Share2, Clock, XCircle, AlertTriangle, UserPlus, Users } from 'lucide-react';
 import DeleteClientDialog from '@/components/clients/DeleteClientDialog';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS, CURRENCY_OPTIONS } from '@/types/database';
@@ -40,6 +41,9 @@ const ClientDetail = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [countdown, setCountdown] = useState('');
+  const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
   // Account picker state
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
@@ -127,20 +131,48 @@ const ClientDetail = () => {
 
   const fetchData = useCallback(async () => {
     if (!id) return;
-    const [clientRes, recipientsRes, connectionsRes] = await Promise.all([
+    const [clientRes, recipientsRes, connectionsRes, clientUsersRes] = await Promise.all([
       supabase.from('clients').select('*').eq('id', id).single(),
       supabase.from('client_recipients').select('*').eq('client_id', id),
       supabase.from('platform_connections').select('*').eq('client_id', id),
+      supabase.from('client_users').select('id, invited_email, user_id, created_at').eq('client_id', id),
     ]);
     setClient(clientRes.data as Client | null);
     setRecipients((recipientsRes.data as ClientRecipient[]) ?? []);
     setConnections((connectionsRes.data as PlatformConnection[]) ?? []);
+    setClientUsers((clientUsersRes.data as any[]) ?? []);
     setIsLoading(false);
   }, [id]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleInviteClient = async () => {
+    if (!inviteEmail.trim() || !id) return;
+    setIsInviting(true);
+    const { data, error } = await supabase.functions.invoke('invite-client-user', {
+      body: { client_id: id, email: inviteEmail.trim() },
+    });
+    if (error || data?.error) {
+      toast.error(data?.error ?? error?.message ?? 'Failed to send invite');
+    } else {
+      toast.success(data?.message ?? 'Invitation sent');
+      setInviteEmail('');
+      fetchData();
+    }
+    setIsInviting(false);
+  };
+
+  const handleRevokeClientUser = async (cuId: string) => {
+    const { error } = await supabase.from('client_users').delete().eq('id', cuId);
+    if (error) {
+      toast.error('Failed to revoke access');
+    } else {
+      toast.success('Client access revoked');
+      fetchData();
+    }
+  };
 
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -599,6 +631,67 @@ const ClientDetail = () => {
                     </Select>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Client Self-Service Access */}
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="font-display text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5" /> Client Access
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Invite your client to log in and manage their own platform connections via magic link.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="client@company.com"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleInviteClient} disabled={isInviting || !inviteEmail.trim()} size="sm">
+                    {isInviting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserPlus className="h-4 w-4 mr-1" />}
+                    Invite
+                  </Button>
+                </div>
+                {clientUsers.length > 0 && (
+                  <div className="space-y-2 border-t pt-3">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Invited Users</p>
+                    {clientUsers.map(cu => (
+                      <div key={cu.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                        <div>
+                          <p className="text-sm font-body">{cu.invited_email}</p>
+                          <p className="text-xs text-muted-foreground">Invited {new Date(cu.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-7 w-7">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Revoke access?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will remove {cu.invited_email}'s ability to log in and manage connections for this client.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRevokeClientUser(cu.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Revoke
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

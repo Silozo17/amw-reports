@@ -138,6 +138,54 @@ export type Database = {
           },
         ]
       }
+      client_users: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          invited_email: string | null
+          org_id: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          invited_email?: string | null
+          org_id: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          invited_email?: string | null
+          org_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           account_manager: string | null
@@ -1040,6 +1088,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_client_user_info: {
+        Args: { _user_id: string }
+        Returns: {
+          client_id: string
+          org_id: string
+        }[]
+      }
       get_org_by_domain: { Args: { _domain: string }; Returns: string }
       get_portal_client: { Args: { _client_id: string }; Returns: Json }
       get_portal_org: { Args: { _org_id: string }; Returns: Json }
@@ -1052,6 +1107,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_client_user: {
+        Args: { _client_id: string; _user_id: string }
         Returns: boolean
       }
       is_org_owner: { Args: { _user_id: string }; Returns: boolean }
