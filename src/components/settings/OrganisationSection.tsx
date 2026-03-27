@@ -79,7 +79,7 @@ const OrganisationSection = () => {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Your Role</span>
-            <Badge className="capitalize">{role}</Badge>
+            <Badge className="capitalize">{orgRole ?? 'member'}</Badge>
           </div>
         </CardContent>
       </Card>
