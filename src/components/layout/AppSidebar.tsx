@@ -46,7 +46,7 @@ interface AppSidebarProps {
 }
 
 const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
-  const { signOut, profile, role, isOwner } = useAuth();
+  const { signOut, profile, role, isOwner, isPlatformAdmin } = useAuth();
   const { org, orgId, allMemberships, switchOrg } = useOrg();
   const { isPlatformAdmin } = usePlatformAdmin();
   const { pendingInvites, acceptInvite, declineInvite } = useInvites();
@@ -231,7 +231,7 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
               <ScrollText className="mr-2 h-4 w-4" />
               Logs
             </DropdownMenuItem>
-            {isOwner && (
+            {isPlatformAdmin && (
               <DropdownMenuItem onClick={() => { navigate('/debug'); handleNavClick(); }}>
                 <Bug className="mr-2 h-4 w-4" />
                 Debug
