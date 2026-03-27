@@ -40,6 +40,9 @@ const ClientDetail = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [countdown, setCountdown] = useState('');
+  const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
   // Account picker state
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
@@ -127,20 +130,48 @@ const ClientDetail = () => {
 
   const fetchData = useCallback(async () => {
     if (!id) return;
-    const [clientRes, recipientsRes, connectionsRes] = await Promise.all([
+    const [clientRes, recipientsRes, connectionsRes, clientUsersRes] = await Promise.all([
       supabase.from('clients').select('*').eq('id', id).single(),
       supabase.from('client_recipients').select('*').eq('client_id', id),
       supabase.from('platform_connections').select('*').eq('client_id', id),
+      supabase.from('client_users').select('id, invited_email, user_id, created_at').eq('client_id', id),
     ]);
     setClient(clientRes.data as Client | null);
     setRecipients((recipientsRes.data as ClientRecipient[]) ?? []);
     setConnections((connectionsRes.data as PlatformConnection[]) ?? []);
+    setClientUsers((clientUsersRes.data as any[]) ?? []);
     setIsLoading(false);
   }, [id]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleInviteClient = async () => {
+    if (!inviteEmail.trim() || !id) return;
+    setIsInviting(true);
+    const { data, error } = await supabase.functions.invoke('invite-client-user', {
+      body: { client_id: id, email: inviteEmail.trim() },
+    });
+    if (error || data?.error) {
+      toast.error(data?.error ?? error?.message ?? 'Failed to send invite');
+    } else {
+      toast.success(data?.message ?? 'Invitation sent');
+      setInviteEmail('');
+      fetchData();
+    }
+    setIsInviting(false);
+  };
+
+  const handleRevokeClientUser = async (cuId: string) => {
+    const { error } = await supabase.from('client_users').delete().eq('id', cuId);
+    if (error) {
+      toast.error('Failed to revoke access');
+    } else {
+      toast.success('Client access revoked');
+      fetchData();
+    }
+  };
 
   const [isGenerating, setIsGenerating] = useState(false);
 
