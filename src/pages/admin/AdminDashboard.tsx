@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, Plug } from 'lucide-react';
 
@@ -30,11 +31,11 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <AppLayout>
       <div>
         <h1 className="text-3xl font-display">Platform Overview</h1>
         <p className="text-muted-foreground font-body mt-1">AMW Reports platform statistics</p>
-      </div>
+    </AppLayout>
 
       {isLoading ? (
         <div className="text-muted-foreground">Loading...</div>
