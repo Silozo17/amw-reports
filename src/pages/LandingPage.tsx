@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import LandingHero from '@/components/landing/LandingHero';
 
-type View = 'login' | 'signup' | 'otp';
+type View = 'login' | 'signup' | 'otp' | 'magic-link';
 
 const LandingPage = () => {
   const [searchParams] = useSearchParams();
@@ -27,6 +27,8 @@ const LandingPage = () => {
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [magicLinkEmail, setMagicLinkEmail] = useState('');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -98,6 +100,24 @@ const LandingPage = () => {
     setIsLoading(false);
   };
 
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: magicLinkEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/client-portal`,
+      },
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setMagicLinkSent(true);
+      toast.success('Check your email for a login link');
+    }
+    setIsLoading(false);
+  };
+
   const handleResendOtp = async () => {
     const { error } = await supabase.auth.resend({ type: 'signup', email: signupEmail });
     if (error) toast.error(error.message);
@@ -138,6 +158,13 @@ const LandingPage = () => {
                 Don't have an account?{' '}
                 <button onClick={() => setView('signup')} className="text-primary font-medium hover:underline">Create one</button>
               </p>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">or</span></div>
+              </div>
+              <button onClick={() => setView('magic-link')} className="w-full text-sm text-muted-foreground hover:text-foreground font-body transition-colors text-center">
+                Client? <span className="text-primary font-medium hover:underline">Sign in with magic link</span>
+              </button>
             </>
           )}
 
@@ -185,6 +212,41 @@ const LandingPage = () => {
               <p className="text-center text-sm text-muted-foreground font-body">
                 Already have an account?{' '}
                 <button onClick={() => setView('login')} className="text-primary font-medium hover:underline">Sign in</button>
+              </p>
+            </>
+          )}
+
+          {view === 'magic-link' && (
+            <>
+              <div>
+                <h2 className="text-2xl font-heading">Client Login</h2>
+                <p className="text-muted-foreground font-body mt-1">
+                  {magicLinkSent ? 'Check your email for a login link' : 'Enter your email to receive a sign-in link'}
+                </p>
+              </div>
+              {!magicLinkSent ? (
+                <form onSubmit={handleMagicLink} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="magic-email">Email</Label>
+                    <Input id="magic-email" type="email" value={magicLinkEmail} onChange={e => setMagicLinkEmail(e.target.value)} placeholder="you@company.com" required />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sending...</> : <>Send Magic Link <ArrowRight className="h-4 w-4 ml-2" /></>}
+                  </Button>
+                </form>
+              ) : (
+                <div className="text-center space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    We sent a login link to <span className="font-medium text-foreground">{magicLinkEmail}</span>
+                  </p>
+                  <Button variant="outline" onClick={() => { setMagicLinkSent(false); setMagicLinkEmail(''); }}>
+                    Try a different email
+                  </Button>
+                </div>
+              )}
+              <p className="text-center text-sm text-muted-foreground font-body">
+                Agency login?{' '}
+                <button onClick={() => setView('login')} className="text-primary font-medium hover:underline">Sign in with password</button>
               </p>
             </>
           )}
