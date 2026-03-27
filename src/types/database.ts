@@ -160,7 +160,18 @@ export interface EmailLog {
   error_message: string | null;
   sent_at: string | null;
   created_at: string;
+  email_type: string;
 }
+
+export type EmailTemplateType =
+  | 'auth_magic_link' | 'auth_welcome' | 'auth_email_change' | 'auth_recovery' | 'auth_deletion'
+  | 'team_invitation' | 'invitation_accepted' | 'invitation_expiring' | 'role_changed' | 'member_removed'
+  | 'report_delivery' | 'report_link_only' | 'report_reminder'
+  | 'token_expiring' | 'token_expired' | 'sync_failed' | 'report_generation_failed'
+  | 'subscription_activated' | 'subscription_upgraded' | 'subscription_downgraded'
+  | 'payment_failed' | 'trial_ending' | 'trial_expired'
+  | 'monthly_digest'
+  | 'new_device_login' | 'failed_login_attempts';
 
 export const PLATFORM_LABELS: Record<PlatformType, string> = {
   google_ads: 'Google Ads',

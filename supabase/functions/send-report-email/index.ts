@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
+/* ═══════════════════════════════════════════════════════════
+   SEND-REPORT-EMAIL — sends monthly reports via the
+   centralised send-branded-email function. Fully white-labelled.
+   ═══════════════════════════════════════════════════════════ */
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -7,92 +12,12 @@ const corsHeaders = {
 };
 
 const MONTH_NAMES = [
-  "",
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "", "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 interface SendRequest {
   report_id: string;
-}
-
-function buildEmailHtml(
-  clientName: string,
-  companyName: string,
-  month: string,
-  year: number,
-  downloadUrl: string,
-  summary: string | null
-): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#f4ede3;font-family:'Montserrat',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4ede3;padding:40px 0;">
-<tr><td align="center">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-
-  <!-- Header -->
-  <tr><td style="background-color:#241f21;padding:30px 40px;text-align:center;border-radius:12px 12px 0 0;">
-    <span style="font-size:36px;font-weight:900;color:#b32fbf;letter-spacing:2px;">AMW</span>
-    <span style="display:block;font-size:12px;color:#f4ede3;letter-spacing:6px;margin-top:4px;">M E D I A</span>
-  </td></tr>
-
-  <!-- Body -->
-  <tr><td style="background-color:#ffffff;padding:40px;">
-    <h1 style="font-size:22px;color:#241f21;margin:0 0 8px;">Monthly Marketing Report</h1>
-    <p style="font-size:14px;color:#787878;margin:0 0 24px;">${month} ${year}</p>
-
-    <p style="font-size:14px;color:#241f21;line-height:1.6;margin:0 0 16px;">
-      Hi ${clientName},
-    </p>
-    <p style="font-size:14px;color:#241f21;line-height:1.6;margin:0 0 24px;">
-      Your monthly marketing performance report for <strong>${companyName}</strong> is ready.
-      ${summary ? "Here's a quick overview:" : "Click the button below to download your full report."}
-    </p>
-
-    ${
-      summary
-        ? `<div style="background-color:#f4ede3;border-left:4px solid #b32fbf;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-      <p style="font-size:13px;color:#241f21;line-height:1.6;margin:0;">${summary}</p>
-    </div>`
-        : ""
-    }
-
-    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
-      <tr><td style="background-color:#b32fbf;border-radius:8px;text-align:center;">
-        <a href="${downloadUrl}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
-          Download Report (PDF)
-        </a>
-      </td></tr>
-    </table>
-
-    <p style="font-size:12px;color:#787878;line-height:1.5;margin:24px 0 0;text-align:center;">
-      This link expires in 7 days. Contact your account manager if you need a new link.
-    </p>
-  </td></tr>
-
-  <!-- Footer -->
-  <tr><td style="background-color:#241f21;padding:24px 40px;text-align:center;border-radius:0 0 12px 12px;">
-    <p style="font-size:12px;color:#787878;margin:0 0 4px;">Prepared by AMW Media</p>
-    <p style="font-size:12px;color:#b32fbf;margin:0;">amwmedia.co.uk</p>
-  </td></tr>
-
-</table>
-</td></tr>
-</table>
-</body>
-</html>`;
 }
 
 Deno.serve(async (req) => {
@@ -101,11 +26,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      throw new Error("RESEND_API_KEY is not configured");
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -119,7 +39,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch report with client
+    // Fetch report
     const { data: report, error: reportErr } = await supabase
       .from("reports")
       .select("*")
@@ -174,73 +94,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    const monthName = MONTH_NAMES[report.report_month] ?? "";
     const results: { email: string; status: string; error?: string }[] = [];
 
-    // Send to each recipient
+    // Send to each recipient via send-branded-email
     for (const recipient of recipients) {
-      const html = buildEmailHtml(
-        recipient.name,
-        client.company_name,
-        monthName,
-        report.report_year,
-        signedUrlData.signedUrl,
-        report.ai_executive_summary
-      );
-
       try {
-        const resendRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${resendApiKey}`,
-          },
-          body: JSON.stringify({
-            from: `AMW Media <reports@amwmedia.co.uk>`,
-            to: [recipient.email],
-            subject: `${client.company_name} — ${monthName} ${report.report_year} Marketing Report`,
-            html,
-          }),
-        });
+        const { data: sendResult, error: sendError } = await supabase.functions.invoke(
+          "send-branded-email",
+          {
+            body: {
+              template_name: "report_delivery",
+              recipient_email: recipient.email,
+              recipient_name: recipient.name,
+              org_id: client.org_id,
+              client_id: client.id,
+              report_id: report.id,
+              data: {
+                company_name: client.company_name,
+                report_month: report.report_month,
+                report_year: report.report_year,
+                download_url: signedUrlData.signedUrl,
+                ai_executive_summary: report.ai_executive_summary,
+              },
+            },
+          }
+        );
 
-        const resendData = await resendRes.json();
-
-        if (!resendRes.ok) {
-          const errMsg = resendData?.message ?? JSON.stringify(resendData);
+        if (sendError) {
+          const errMsg = sendError.message ?? String(sendError);
           results.push({ email: recipient.email, status: "failed", error: errMsg });
-
-          await supabase.from("email_logs").insert({
-            client_id: client.id,
-            report_id: report.id,
-            recipient_email: recipient.email,
-            status: "failed",
-            error_message: errMsg,
-            org_id: client.org_id,
-          });
         } else {
           results.push({ email: recipient.email, status: "sent" });
-
-          await supabase.from("email_logs").insert({
-            client_id: client.id,
-            report_id: report.id,
-            recipient_email: recipient.email,
-            status: "sent",
-            sent_at: new Date().toISOString(),
-            org_id: client.org_id,
-          });
         }
       } catch (sendErr) {
         const errMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
         results.push({ email: recipient.email, status: "failed", error: errMsg });
-
-        await supabase.from("email_logs").insert({
-          client_id: client.id,
-          report_id: report.id,
-          recipient_email: recipient.email,
-          status: "failed",
-          error_message: errMsg,
-          org_id: client.org_id,
-        });
       }
     }
 
