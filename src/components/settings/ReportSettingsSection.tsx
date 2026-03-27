@@ -48,7 +48,7 @@ const ReportSettingsSection = () => {
 
   useEffect(() => {
     if (org) {
-      const raw = (org as Record<string, unknown>).report_settings as Record<string, unknown> | null;
+      const raw = (org as unknown as Record<string, unknown>).report_settings as Record<string, unknown> | null;
       setSettings({
         show_logo: raw?.show_logo !== false,
         show_ai_insights: raw?.show_ai_insights !== false,
