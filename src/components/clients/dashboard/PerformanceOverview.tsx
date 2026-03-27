@@ -82,7 +82,7 @@ const PerformanceOverview = ({
         const v = (d as Record<string, number>)[tk.key] ?? 0;
         const { min, max } = ranges[tk.key];
         row[`_orig_${tk.key}`] = v;
-        row[`_norm_${tk.key}`] = max === min ? 0.5 : (v - min) / (max - min);
+        row[`_norm_${tk.key}`] = max === 0 ? 0 : v / max;
       }
       return row;
     });
@@ -287,7 +287,7 @@ const PerformanceOverview = ({
               const v = (d as Record<string, number>)[tk.key] ?? 0;
               const { min, max } = ranges[tk.key];
               row[`_orig_${tk.key}`] = v;
-              row[`_norm_${tk.key}`] = max === min ? 0.5 : (v - min) / (max - min);
+              row[`_norm_${tk.key}`] = max === 0 ? 0 : v / max;
             }
             return row;
           });
