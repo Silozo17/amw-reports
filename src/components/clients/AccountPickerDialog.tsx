@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, ChevronRight, ChevronLeft, Info, BarChart3, Building2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Loader2, Check, ChevronRight, ChevronLeft, Info, BarChart3, Building2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
@@ -30,11 +31,24 @@ interface AccountPickerDialogProps {
 
 type MetaStep = 'ad_account' | 'pages' | 'confirm';
 
+const SearchInput = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+  <div className="relative">
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <Input
+      placeholder="Search accounts..."
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="pl-9 h-9"
+    />
+  </div>
+);
+
 const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clientId }: AccountPickerDialogProps) => {
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [metaStep, setMetaStep] = useState<MetaStep>('ad_account');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const metadata = connection?.metadata as Record<string, unknown> | null;
   const platform = connection?.platform;
@@ -44,7 +58,13 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
     setSelectedAccountId('');
     setSelectedPages([]);
     setMetaStep('ad_account');
+    setSearchQuery('');
   }, [connection?.id]);
+
+  // Clear search when changing steps
+  useEffect(() => {
+    setSearchQuery('');
+  }, [metaStep]);
 
   if (!connection || !metadata) return null;
 
@@ -84,6 +104,12 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
     setSelectedPages(prev =>
       prev.includes(pageId) ? prev.filter(id => id !== pageId) : [...prev, pageId]
     );
+  };
+
+  const filterBySearch = <T extends { name: string }>(items: T[]): T[] => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(item => item.name.toLowerCase().includes(q));
   };
 
   const handleSave = async () => {
@@ -157,6 +183,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
       if (platform === 'linkedin' && selectedPages.length > 0) {
         const selectedOrg = organizations.find(o => selectedPages.includes(o.id));
         if (selectedOrg) {
+          const selectedAccount = accounts.find(a => a.id === selectedAccountId);
           await supabase
             .from('platform_connections')
             .update({
@@ -179,12 +206,26 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
     }
   };
 
-  // ─── META MULTI-STEP ───
+  // ─── META MULTI-STEP (2-step: Ad Account → Confirm) ───
   if (isMeta && !hasNoAssets) {
     const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-    const selectedPageObjects = pages.filter(p => selectedPages.includes(p.id));
 
-    const stepNumber = metaStep === 'ad_account' ? 1 : metaStep === 'pages' ? 2 : 3;
+    // Meta Ads: skip pages step entirely — go straight from ad_account to confirm
+    const metaSteps: MetaStep[] = ['ad_account', 'confirm'];
+    const stepIndex = metaSteps.indexOf(metaStep);
+    const stepNumber = stepIndex + 1;
+    const totalSteps = metaSteps.length;
+
+    const goNext = () => {
+      const nextIdx = stepIndex + 1;
+      if (nextIdx < metaSteps.length) setMetaStep(metaSteps[nextIdx]);
+    };
+    const goBack = () => {
+      const prevIdx = stepIndex - 1;
+      if (prevIdx >= 0) setMetaStep(metaSteps[prevIdx]);
+    };
+
+    const filteredAccounts = filterBySearch(accounts);
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -196,23 +237,23 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
             </DialogTitle>
             {/* Step indicator */}
             <div className="flex items-center gap-2 pt-3">
-              {[1, 2, 3].map(s => (
+              {metaSteps.map((s, i) => (
                 <div key={s} className="flex items-center gap-2">
                   <div className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
-                    s < stepNumber ? 'bg-primary text-primary-foreground' :
-                    s === stepNumber ? 'bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2' :
+                    i + 1 < stepNumber ? 'bg-primary text-primary-foreground' :
+                    i + 1 === stepNumber ? 'bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2' :
                     'bg-muted text-muted-foreground'
                   )}>
-                    {s < stepNumber ? <Check className="h-4 w-4" /> : s}
+                    {i + 1 < stepNumber ? <Check className="h-4 w-4" /> : i + 1}
                   </div>
                   <span className={cn(
                     'text-xs font-medium hidden sm:inline',
-                    s === stepNumber ? 'text-foreground' : 'text-muted-foreground'
+                    i + 1 === stepNumber ? 'text-foreground' : 'text-muted-foreground'
                   )}>
-                    {s === 1 ? 'Ad Account' : s === 2 ? 'Facebook Page' : 'Confirm'}
+                    {s === 'ad_account' ? 'Ad Account' : 'Confirm'}
                   </span>
-                  {s < 3 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  {i < totalSteps - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                 </div>
               ))}
             </div>
@@ -225,127 +266,65 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
               {accounts.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">No ad accounts discovered. You can skip this step.</p>
               ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {accounts.map(acct => (
-                    <button
-                      key={acct.id}
-                      onClick={() => setSelectedAccountId(acct.id)}
-                      className={cn(
-                        'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
-                        selectedAccountId === acct.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-card'
-                      )}
-                    >
-                      <div className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-                        selectedAccountId === acct.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground'
-                      )}>
-                        {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : acct.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{acct.name}</p>
-                        
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 2: Facebook Pages */}
-          {metaStep === 'pages' && (
-            <div className="space-y-3 py-2">
-              <p className="text-sm text-muted-foreground">Select the Facebook Page(s) for this client:</p>
-              <div className="flex items-start gap-2 rounded-md bg-secondary/10 border border-secondary/20 p-3">
-                <Info className="h-4 w-4 text-secondary shrink-0 mt-0.5" />
-                <p className="text-xs text-secondary">
-                  If an Instagram Business account is linked to this page, it will be connected automatically.
-                </p>
-              </div>
-              {pages.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No Facebook Pages discovered.</p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {pages.map(page => (
-                    <button
-                      key={page.id}
-                      onClick={() => togglePage(page.id)}
-                      className={cn(
-                        'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
-                        selectedPages.includes(page.id)
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-card'
-                      )}
-                    >
-                      <div className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-                        selectedPages.includes(page.id)
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground'
-                      )}>
-                        {selectedPages.includes(page.id) ? <Check className="h-5 w-5" /> : '📄'}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{page.name}</p>
-                        {page.instagram && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            📸 Instagram: @{page.instagram.username || page.instagram.id}
-                          </p>
+                <>
+                  {accounts.length > 5 && <SearchInput value={searchQuery} onChange={setSearchQuery} />}
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                    {filteredAccounts.map(acct => (
+                      <button
+                        key={acct.id}
+                        onClick={() => setSelectedAccountId(acct.id)}
+                        className={cn(
+                          'flex w-full items-center gap-4 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                          selectedAccountId === acct.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card'
                         )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                      >
+                        <div className={cn(
+                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+                          selectedAccountId === acct.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
+                        )}>
+                          {selectedAccountId === acct.id ? <Check className="h-5 w-5" /> : acct.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{acct.name}</p>
+                        </div>
+                      </button>
+                    ))}
+                    {filteredAccounts.length === 0 && searchQuery && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No accounts match "{searchQuery}"</p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}
 
-          {/* Step 3: Confirmation */}
+          {/* Step 2: Confirmation */}
           {metaStep === 'confirm' && (
             <div className="space-y-4 py-2">
-              <p className="text-sm text-muted-foreground">Review your selections before saving:</p>
+              <p className="text-sm text-muted-foreground">Review your selection before saving:</p>
               <div className="space-y-3">
                 <div className="rounded-lg border bg-card p-4">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ad Account</p>
                   <p className="font-medium text-sm">{selectedAccount?.name || 'None selected'}</p>
                 </div>
-
-                {selectedPageObjects.length > 0 && (
-                  <div className="rounded-lg border bg-card p-4">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Facebook Pages & Instagram</p>
-                    <div className="space-y-2">
-                      {selectedPageObjects.map(page => (
-                        <div key={page.id} className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary shrink-0" />
-                          <span>{page.name}</span>
-                          {page.instagram && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              + @{page.instagram.username || page.instagram.id}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
           <DialogFooter className="flex-row gap-2">
-            {metaStep !== 'ad_account' && (
-              <Button variant="outline" onClick={() => setMetaStep(metaStep === 'confirm' ? 'pages' : 'ad_account')}>
+            {stepIndex > 0 && (
+              <Button variant="outline" onClick={goBack}>
                 <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
             )}
             <div className="flex-1" />
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             {metaStep !== 'confirm' ? (
-              <Button onClick={() => setMetaStep(metaStep === 'ad_account' ? 'pages' : 'confirm')}>
+              <Button onClick={goNext}>
                 Next <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
@@ -361,6 +340,9 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
   }
 
   // ─── NON-META / SINGLE STEP ───
+  const filteredAccounts = filterBySearch(accounts);
+  const filteredOrganizations = filterBySearch(organizations);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg sm:max-w-xl">
@@ -391,8 +373,9 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                    platform === 'youtube' ? 'Select a YouTube channel:' :
                    'Select an Ad Account:'}
                 </p>
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {accounts.map(acct => {
+                {accounts.length > 5 && <SearchInput value={searchQuery} onChange={setSearchQuery} />}
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {filteredAccounts.map(acct => {
                     return (
                       <button
                         key={acct.id}
@@ -418,6 +401,9 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                       </button>
                     );
                   })}
+                  {filteredAccounts.length === 0 && searchQuery && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No accounts match "{searchQuery}"</p>
+                  )}
                 </div>
               </div>
             )}
@@ -426,8 +412,9 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
             {organizations.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Select a Company Page:</p>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {organizations.map(org => (
+                {organizations.length > 5 && <SearchInput value={searchQuery} onChange={setSearchQuery} />}
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {filteredOrganizations.map(org => (
                     <button
                       key={org.id}
                       onClick={() => togglePage(org.id)}
@@ -451,6 +438,9 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                       </div>
                     </button>
                   ))}
+                  {filteredOrganizations.length === 0 && searchQuery && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No organizations match "{searchQuery}"</p>
+                  )}
                 </div>
               </div>
             )}
