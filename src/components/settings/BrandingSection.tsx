@@ -5,15 +5,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Save, Loader2, Upload, Building2 } from 'lucide-react';
+import { Save, Loader2, Upload, Building2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const FONT_OPTIONS = [
   'Anton', 'Inter', 'Montserrat', 'Poppins', 'Roboto', 'Open Sans',
   'Lato', 'Playfair Display', 'Raleway', 'Oswald', 'Nunito',
   'Source Sans 3', 'DM Sans', 'Space Grotesk', 'Outfit',
+];
+
+const REPORT_LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'fr', label: 'French' },
+  { value: 'de', label: 'German' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'it', label: 'Italian' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'pl', label: 'Polish' },
+  { value: 'da', label: 'Danish' },
 ];
 
 /** Convert hex (#rrggbb) to HSL string "h s% l%" */
@@ -50,18 +63,76 @@ const hslToHex = (hsl: string): string => {
     if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
     return p;
   };
-  let r, g, b;
-  if (s === 0) { r = g = b = l; }
+  let r2, g2, b2;
+  if (s === 0) { r2 = g2 = b2 = l; }
   else {
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
     const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1 / 3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1 / 3);
+    r2 = hue2rgb(p, q, h + 1 / 3);
+    g2 = hue2rgb(p, q, h);
+    b2 = hue2rgb(p, q, h - 1 / 3);
   }
   const toHex = (x: number) => Math.round(x * 255).toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`;
 };
+
+/** Calculate relative luminance for contrast ratio */
+const getLuminance = (hex: string): number => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return 0;
+  const [r, g, b] = [parseInt(result[1], 16) / 255, parseInt(result[2], 16) / 255, parseInt(result[3], 16) / 255]
+    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const getContrastRatio = (hex1: string, hex2: string): number => {
+  const l1 = getLuminance(hex1);
+  const l2 = getLuminance(hex2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+/** Color picker with label */
+const ColorField = ({
+  label,
+  description,
+  value,
+  onChange,
+  placeholder,
+  onReset,
+}: {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (hex: string) => void;
+  placeholder?: string;
+  onReset?: () => void;
+}) => (
+  <div className="space-y-1.5">
+    <Label className="text-sm font-medium">{label}</Label>
+    <p className="text-xs text-muted-foreground">{description}</p>
+    <div className="flex items-center gap-2">
+      <input
+        type="color"
+        value={value || '#000000'}
+        onChange={e => onChange(e.target.value)}
+        className="h-10 w-10 rounded border border-input cursor-pointer"
+      />
+      <Input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="flex-1 font-mono text-xs max-w-[120px]"
+      />
+      {onReset && value && (
+        <Button size="sm" variant="ghost" onClick={onReset} className="text-xs">
+          Reset
+        </Button>
+      )}
+    </div>
+  </div>
+);
 
 const BrandingSection = () => {
   const { org, orgId, isOrgOwner, refetchOrg } = useOrg();
@@ -69,11 +140,24 @@ const BrandingSection = () => {
 
   const [orgName, setOrgName] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [showOrgName, setShowOrgName] = useState(true);
   const [primaryColor, setPrimaryColor] = useState('#b32fbf');
   const [secondaryColor, setSecondaryColor] = useState('#539BDB');
   const [accentColor, setAccentColor] = useState('#4ED68E');
+  const [buttonColor, setButtonColor] = useState('');
+  const [buttonTextColor, setButtonTextColor] = useState('');
+  const [textOnDark, setTextOnDark] = useState('');
+  const [textOnLight, setTextOnLight] = useState('');
+  const [chartColor1, setChartColor1] = useState('');
+  const [chartColor2, setChartColor2] = useState('');
+  const [chartColor3, setChartColor3] = useState('');
+  const [chartColor4, setChartColor4] = useState('');
   const [headingFont, setHeadingFont] = useState('Anton');
   const [bodyFont, setBodyFont] = useState('Inter');
+  // Report settings
+  const [showLogo, setShowLogo] = useState(true);
+  const [showAiInsights, setShowAiInsights] = useState(true);
+  const [reportAccentColor, setReportAccentColor] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -81,11 +165,25 @@ const BrandingSection = () => {
     if (org) {
       setOrgName(org.name);
       setLogoUrl(org.logo_url ?? '');
+      setShowOrgName(org.show_org_name !== false);
       setPrimaryColor(org.primary_color ? hslToHex(org.primary_color) : '#b32fbf');
       setSecondaryColor(org.secondary_color ? hslToHex(org.secondary_color) : '#539BDB');
       setAccentColor(org.accent_color ? hslToHex(org.accent_color) : '#4ED68E');
+      setButtonColor(org.button_color ? hslToHex(org.button_color) : '');
+      setButtonTextColor(org.button_text_color ? hslToHex(org.button_text_color) : '');
+      setTextOnDark(org.text_on_dark ? hslToHex(org.text_on_dark) : '');
+      setTextOnLight(org.text_on_light ? hslToHex(org.text_on_light) : '');
+      setChartColor1(org.chart_color_1 ? hslToHex(org.chart_color_1) : '');
+      setChartColor2(org.chart_color_2 ? hslToHex(org.chart_color_2) : '');
+      setChartColor3(org.chart_color_3 ? hslToHex(org.chart_color_3) : '');
+      setChartColor4(org.chart_color_4 ? hslToHex(org.chart_color_4) : '');
       setHeadingFont(org.heading_font ?? 'Anton');
       setBodyFont(org.body_font ?? 'Inter');
+      // Report settings
+      const rs = org.report_settings;
+      setShowLogo(rs?.show_logo !== false);
+      setShowAiInsights(rs?.show_ai_insights !== false);
+      setReportAccentColor(rs?.report_accent_color ?? '');
     }
   }, [org]);
 
@@ -135,11 +233,25 @@ const BrandingSection = () => {
       .from('organisations')
       .update({
         name: orgName.trim(),
+        show_org_name: showOrgName,
         primary_color: hexToHsl(primaryColor),
         secondary_color: hexToHsl(secondaryColor),
         accent_color: hexToHsl(accentColor),
+        button_color: buttonColor ? hexToHsl(buttonColor) : null,
+        button_text_color: buttonTextColor ? hexToHsl(buttonTextColor) : null,
+        text_on_dark: textOnDark ? hexToHsl(textOnDark) : null,
+        text_on_light: textOnLight ? hexToHsl(textOnLight) : null,
+        chart_color_1: chartColor1 ? hexToHsl(chartColor1) : null,
+        chart_color_2: chartColor2 ? hexToHsl(chartColor2) : null,
+        chart_color_3: chartColor3 ? hexToHsl(chartColor3) : null,
+        chart_color_4: chartColor4 ? hexToHsl(chartColor4) : null,
         heading_font: headingFont,
         body_font: bodyFont,
+        report_settings: {
+          show_logo: showLogo,
+          show_ai_insights: showAiInsights,
+          report_accent_color: reportAccentColor || null,
+        },
       })
       .eq('id', orgId);
 
@@ -152,122 +264,245 @@ const BrandingSection = () => {
     setIsSaving(false);
   };
 
+  const effectiveButtonBg = buttonColor || primaryColor;
+  const effectiveButtonText = buttonTextColor || '#ffffff';
+  const contrastRatio = getContrastRatio(effectiveButtonBg, effectiveButtonText);
+  const contrastWarning = contrastRatio < 4.5;
+
+  const effectiveChart1 = chartColor1 || primaryColor;
+  const effectiveChart2 = chartColor2 || secondaryColor;
+  const effectiveChart3 = chartColor3 || accentColor;
+  const effectiveChart4 = chartColor4 || '#EE8733';
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-display text-lg">Branding</CardTitle>
-        <p className="text-sm text-muted-foreground">Customise your organisation's look and feel across the platform.</p>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Logo & Org Name */}
-        <div className="flex items-start gap-6">
-          <div className="relative group shrink-0">
-            <Avatar className="h-20 w-20 rounded-lg">
-              <AvatarImage src={logoUrl} className="object-contain" />
-              <AvatarFallback className="rounded-lg bg-muted"><Building2 className="h-8 w-8 text-muted-foreground" /></AvatarFallback>
-            </Avatar>
-            <button
-              onClick={() => logoRef.current?.click()}
-              className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-              disabled={isUploading}
-            >
-              {isUploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white" />}
-            </button>
-            <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-          </div>
-          <div className="flex-1 space-y-2">
-            <Label>Organisation Name</Label>
-            <Input value={orgName} onChange={e => setOrgName(e.target.value)} />
-          </div>
-        </div>
-
-        {/* Colors */}
-        <div>
-          <Label className="mb-3 block">Brand Colors</Label>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Primary</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={primaryColor}
-                  onChange={e => setPrimaryColor(e.target.value)}
-                  className="h-10 w-10 rounded border border-input cursor-pointer"
-                />
-                <Input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="flex-1 font-mono text-xs" />
-              </div>
+    <div className="space-y-6">
+      {/* Section 1 — Identity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg">Identity</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-start gap-6">
+            <div className="relative group shrink-0">
+              <Avatar className="h-20 w-20 rounded-lg">
+                <AvatarImage src={logoUrl} className="object-contain" />
+                <AvatarFallback className="rounded-lg bg-muted"><Building2 className="h-8 w-8 text-muted-foreground" /></AvatarFallback>
+              </Avatar>
+              <button
+                onClick={() => logoRef.current?.click()}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                disabled={isUploading}
+              >
+                {isUploading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Upload className="h-5 w-5 text-white" />}
+              </button>
+              <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Secondary</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={secondaryColor}
-                  onChange={e => setSecondaryColor(e.target.value)}
-                  className="h-10 w-10 rounded border border-input cursor-pointer"
-                />
-                <Input value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="flex-1 font-mono text-xs" />
+            <div className="flex-1 space-y-4">
+              <div className="space-y-2">
+                <Label>Organisation Name</Label>
+                <Input value={orgName} onChange={e => setOrgName(e.target.value)} />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Accent</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={accentColor}
-                  onChange={e => setAccentColor(e.target.value)}
-                  className="h-10 w-10 rounded border border-input cursor-pointer"
-                />
-                <Input value={accentColor} onChange={e => setAccentColor(e.target.value)} className="flex-1 font-mono text-xs" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium">Show name in sidebar</Label>
+                  <p className="text-xs text-muted-foreground">When off, only the logo appears</p>
+                </div>
+                <Switch checked={showOrgName} onCheckedChange={setShowOrgName} />
               </div>
             </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Preview Swatch */}
-        <div>
-          <Label className="mb-2 block text-xs text-muted-foreground">Preview</Label>
-          <div className="flex gap-2 h-8">
-            <div className="flex-1 rounded" style={{ backgroundColor: primaryColor }} />
-            <div className="flex-1 rounded" style={{ backgroundColor: secondaryColor }} />
-            <div className="flex-1 rounded" style={{ backgroundColor: accentColor }} />
+      {/* Section 2 — Colours */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg">Colours</CardTitle>
+          <p className="text-sm text-muted-foreground">Define your brand palette. All colours apply across the platform and reports.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-5">
+              <ColorField label="Primary" description="Headers, buttons, and key accents" value={primaryColor} onChange={setPrimaryColor} />
+              <ColorField label="Secondary" description="Charts, links, and supporting elements" value={secondaryColor} onChange={setSecondaryColor} />
+              <ColorField label="Accent" description="Highlights, success states, and CTAs" value={accentColor} onChange={setAccentColor} />
+              <ColorField label="Button background" description="Defaults to Primary if not set" value={buttonColor} onChange={setButtonColor} placeholder="Use primary" onReset={() => setButtonColor('')} />
+              <div className="space-y-1.5">
+                <ColorField label="Button text" description="Auto-calculated if not set" value={buttonTextColor} onChange={setButtonTextColor} placeholder="Auto" onReset={() => setButtonTextColor('')} />
+                {contrastWarning && (
+                  <div className="flex items-center gap-1.5 text-destructive text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Contrast ratio {contrastRatio.toFixed(1)}:1 — below WCAG AA (4.5:1)
+                  </div>
+                )}
+              </div>
+              <ColorField label="Text on dark backgrounds" description="Text colour on primary-coloured backgrounds" value={textOnDark} onChange={setTextOnDark} placeholder="#ffffff" onReset={() => setTextOnDark('')} />
+              <ColorField label="Text on light backgrounds" description="Body text on white/light backgrounds" value={textOnLight} onChange={setTextOnLight} placeholder="#1e1e1e" onReset={() => setTextOnLight('')} />
+            </div>
+
+            {/* Live preview */}
+            <div className="space-y-4">
+              <Label className="text-xs text-muted-foreground block">Live Preview</Label>
+              <div className="rounded-lg border p-4 space-y-4 bg-card">
+                {/* Header bar */}
+                <div className="h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+                {/* Button */}
+                <button
+                  className="rounded-md px-4 py-2 text-sm font-medium"
+                  style={{ backgroundColor: effectiveButtonBg, color: effectiveButtonText }}
+                >
+                  Sample Button
+                </button>
+                {/* Metric card */}
+                <div className="rounded-lg border p-3" style={{ borderTopWidth: '3px', borderTopColor: primaryColor }}>
+                  <p className="text-xs text-muted-foreground uppercase">Impressions</p>
+                  <p className="text-xl font-bold">12,450</p>
+                  <span className="text-xs" style={{ color: accentColor }}>↑ 8.3%</span>
+                </div>
+                {/* Mini bar chart */}
+                <div className="flex items-end gap-1 h-12">
+                  {[60, 80, 45, 90].map((h, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-t"
+                      style={{
+                        height: `${h}%`,
+                        backgroundColor: [effectiveChart1, effectiveChart2, effectiveChart3, effectiveChart4][i],
+                      }}
+                    />
+                  ))}
+                </div>
+                {/* Colour swatch */}
+                <div className="flex gap-1.5 h-6">
+                  <div className="flex-1 rounded" style={{ backgroundColor: primaryColor }} />
+                  <div className="flex-1 rounded" style={{ backgroundColor: secondaryColor }} />
+                  <div className="flex-1 rounded" style={{ backgroundColor: accentColor }} />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Fonts */}
-        <div className="grid grid-cols-2 gap-4">
+      {/* Section 3 — Chart Colours */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg">Chart Palette</CardTitle>
+          <p className="text-sm text-muted-foreground">Controls all graphs and charts across the platform and in reports.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <ColorField label="Chart 1" description="Default: Primary" value={chartColor1} onChange={setChartColor1} placeholder={primaryColor} onReset={() => setChartColor1('')} />
+            <ColorField label="Chart 2" description="Default: Secondary" value={chartColor2} onChange={setChartColor2} placeholder={secondaryColor} onReset={() => setChartColor2('')} />
+            <ColorField label="Chart 3" description="Default: Accent" value={chartColor3} onChange={setChartColor3} placeholder={accentColor} onReset={() => setChartColor3('')} />
+            <ColorField label="Chart 4" description="Default: Orange" value={chartColor4} onChange={setChartColor4} placeholder="#EE8733" onReset={() => setChartColor4('')} />
+          </div>
+          {/* Mini chart preview */}
+          <div className="flex items-end gap-2 h-16 max-w-xs">
+            {[70, 90, 55, 80].map((h, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-t transition-colors"
+                style={{
+                  height: `${h}%`,
+                  backgroundColor: [effectiveChart1, effectiveChart2, effectiveChart3, effectiveChart4][i],
+                }}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 4 — Typography */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg">Typography</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Heading Font</Label>
+              <Select value={headingFont} onValueChange={setHeadingFont}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FONT_OPTIONS.map(f => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Body Font</Label>
+              <Select value={bodyFont} onValueChange={setBodyFont}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FONT_OPTIONS.map(f => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="rounded-lg border p-4 space-y-2">
+            <p className="text-lg" style={{ fontFamily: headingFont }}>Your Brand Name</p>
+            <p className="text-sm text-muted-foreground" style={{ fontFamily: bodyFont }}>Performance data and insights for your business.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 5 — Report Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg">Report Settings</CardTitle>
+          <p className="text-sm text-muted-foreground">Control how generated PDF reports look. Changes apply to all future reports.</p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="font-medium">Show Organisation Logo</Label>
+              <p className="text-xs text-muted-foreground">Display your logo on the cover and closing pages</p>
+            </div>
+            <Switch checked={showLogo} onCheckedChange={setShowLogo} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="font-medium">Include AI Insights</Label>
+              <p className="text-xs text-muted-foreground">Add AI-generated platform analysis section</p>
+            </div>
+            <Switch checked={showAiInsights} onCheckedChange={setShowAiInsights} />
+          </div>
           <div className="space-y-2">
-            <Label>Heading Font</Label>
-            <Select value={headingFont} onValueChange={setHeadingFont}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {FONT_OPTIONS.map(f => (
-                  <SelectItem key={f} value={f}>{f}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-lg" style={{ fontFamily: headingFont }}>Preview Heading</p>
+            <Label className="font-medium">Report Accent Colour</Label>
+            <p className="text-xs text-muted-foreground">Override the primary colour used in reports. Leave empty to use your primary colour.</p>
+            <div className="flex items-center gap-3">
+              <Input
+                type="color"
+                value={reportAccentColor || primaryColor}
+                onChange={(e) => setReportAccentColor(e.target.value)}
+                className="w-12 h-10 p-1 cursor-pointer"
+              />
+              <Input
+                type="text"
+                value={reportAccentColor}
+                onChange={(e) => setReportAccentColor(e.target.value)}
+                placeholder="e.g. #B32FBF"
+                className="w-32 font-mono text-sm"
+              />
+              {reportAccentColor && (
+                <Button size="sm" variant="ghost" onClick={() => setReportAccentColor('')}>
+                  Reset
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Body Font</Label>
-            <Select value={bodyFont} onValueChange={setBodyFont}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {FONT_OPTIONS.map(f => (
-                  <SelectItem key={f} value={f}>{f}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm" style={{ fontFamily: bodyFont }}>Preview body text for your reports and dashboard.</p>
-          </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Branding
-        </Button>
-      </CardContent>
-    </Card>
+      <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        Save Branding
+      </Button>
+    </div>
   );
 };
 
