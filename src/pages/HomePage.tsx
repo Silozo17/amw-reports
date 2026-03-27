@@ -70,7 +70,7 @@ const HomePage = () => (
               <Button size="lg" asChild>
                 <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
               </Button>
-              <Button size="lg" asChild className="border border-amw-offwhite/30 bg-transparent text-amw-offwhite hover:bg-amw-offwhite/10">
+              <Button size="lg" variant="outline" asChild>
                 <Link to="/features">See Features</Link>
               </Button>
             </div>

@@ -1,5 +1,6 @@
 import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AccountSection from '@/components/settings/AccountSection';
@@ -12,6 +13,7 @@ import BillingSection from '@/components/settings/BillingSection';
 
 const SettingsPage = () => {
   const { isOwner } = useAuth();
+  const { hasWhitelabel } = useEntitlements();
 
   if (!isOwner) {
     return (
@@ -24,6 +26,8 @@ const SettingsPage = () => {
     );
   }
 
+  const tabGridClass = hasWhitelabel ? 'grid-cols-5' : 'grid-cols-4';
+
   return (
     <AppLayout>
       <div className="space-y-6 max-w-4xl">
@@ -33,10 +37,10 @@ const SettingsPage = () => {
         </div>
 
         <Tabs defaultValue="organisation" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className={`grid w-full ${tabGridClass}`}>
             <TabsTrigger value="organisation">Organisation</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
-            <TabsTrigger value="whitelabel">White Label</TabsTrigger>
+            {hasWhitelabel && <TabsTrigger value="whitelabel">White Label</TabsTrigger>}
             <TabsTrigger value="metrics">Metrics</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
           </TabsList>
@@ -49,11 +53,13 @@ const SettingsPage = () => {
             <AccountSection />
           </TabsContent>
 
-          <TabsContent value="whitelabel" className="space-y-6 mt-6">
-            <BrandingSection />
-            <ReportSettingsSection />
-            <CustomDomainSection />
-          </TabsContent>
+          {hasWhitelabel && (
+            <TabsContent value="whitelabel" className="space-y-6 mt-6">
+              <BrandingSection />
+              <ReportSettingsSection />
+              <CustomDomainSection />
+            </TabsContent>
+          )}
 
           <TabsContent value="metrics" className="space-y-6 mt-6">
             <MetricsDefaultsSection />

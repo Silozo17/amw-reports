@@ -16,11 +16,17 @@ const STRIPE_PLANS = {
     priceId: null,
     features: ['1 client', '5 connections', 'Basic reports'],
   },
-  agency: {
-    name: 'Agency',
+  freelance: {
+    name: 'Freelance',
     price: '£49.99/mo',
     priceId: 'price_1TFHsVHCGP7kst5ZpWooaPlh',
-    features: ['5 clients', '25 connections', 'Branded reports', 'AI insights', 'Priority support'],
+    features: ['5 clients', '25 connections', 'Branded reports', 'Email delivery'],
+  },
+  agency: {
+    name: 'Agency',
+    price: '£69.99/mo',
+    priceId: 'price_1TFNmfHCGP7kst5ZS17zNsEQ',
+    features: ['5 clients', '25 connections', 'White-label branding', 'Custom domain', 'Email delivery'],
   },
 };
 
@@ -41,17 +47,14 @@ const BillingSection = () => {
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [stripeStatus, setStripeStatus] = useState<{ subscribed: boolean; plan: string } | null>(null);
 
-  // Check for checkout success
   useEffect(() => {
     const checkoutStatus = searchParams.get('checkout');
     if (checkoutStatus === 'success') {
       toast.success('Subscription activated! Your plan has been upgraded.');
-      // Trigger subscription check
       checkSubscription();
     }
   }, [searchParams]);
 
-  // Check Stripe subscription on mount
   useEffect(() => {
     checkSubscription();
   }, []);
@@ -105,7 +108,6 @@ const BillingSection = () => {
   }
 
   const currentPlanSlug = plan?.slug || 'starter';
-  const isAgency = currentPlanSlug === 'agency' || stripeStatus?.plan === 'agency';
 
   return (
     <div className="space-y-6">
@@ -194,9 +196,9 @@ const BillingSection = () => {
       {!isUnlimited && (
         <div>
           <h3 className="text-lg font-display mb-4">Available Plans</h3>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             {Object.entries(STRIPE_PLANS).map(([slug, p]) => {
-              const isCurrent = currentPlanSlug === slug || (slug === 'agency' && isAgency);
+              const isCurrent = currentPlanSlug === slug;
               return (
                 <Card
                   key={slug}
@@ -251,7 +253,7 @@ const BillingSection = () => {
         <Card>
           <CardContent className="py-6 text-center space-y-2">
             <Sparkles className="h-5 w-5 text-primary mx-auto" />
-            <p className="text-sm font-body font-medium">Need a custom plan?</p>
+            <p className="text-sm font-body font-medium">Need more?</p>
             <p className="text-xs text-muted-foreground">
               Contact us at <a href="mailto:info@amwmedia.co.uk" className="text-primary hover:underline">info@amwmedia.co.uk</a> for
               custom pricing with additional clients and connections.

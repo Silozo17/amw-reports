@@ -854,6 +854,7 @@ export type Database = {
           additional_connection_price: number
           base_price: number
           created_at: string
+          has_whitelabel: boolean
           id: string
           included_clients: number
           included_connections: number
@@ -866,6 +867,7 @@ export type Database = {
           additional_connection_price?: number
           base_price?: number
           created_at?: string
+          has_whitelabel?: boolean
           id?: string
           included_clients?: number
           included_connections?: number
@@ -878,6 +880,7 @@ export type Database = {
           additional_connection_price?: number
           base_price?: number
           created_at?: string
+          has_whitelabel?: boolean
           id?: string
           included_clients?: number
           included_connections?: number
