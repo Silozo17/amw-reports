@@ -81,7 +81,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
             accepted_at: new Date().toISOString(),
           });
           activeMemberships = [{ org_id: profile.org_id, role: 'manager' }];
-          console.log('Recovered: linked user to existing org from profile', profile.org_id);
+          
         } else {
           // No profile org_id — create a brand new org
           const orgName =
@@ -133,7 +133,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
           }
 
           activeMemberships = [{ org_id: newOrg.id, role: 'owner' }];
-          console.log('Recovered: created new org for user', user.id);
+          
         }
       }
 

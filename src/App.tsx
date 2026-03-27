@@ -101,7 +101,7 @@ const AppRoutes = () => (
     <Route path="/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
     <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-    <Route path="/debug" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
+    <Route path="/debug" element={<AdminRoute><DebugConsole /></AdminRoute>} />
     <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
     <Route path="/admin/organisations" element={<AdminRoute><AdminOrgList /></AdminRoute>} />
     <Route path="/admin/organisations/:id" element={<AdminRoute><AdminOrgDetail /></AdminRoute>} />

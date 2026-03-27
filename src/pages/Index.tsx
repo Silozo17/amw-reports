@@ -107,7 +107,7 @@ const Dashboard = () => {
             });
           }
 
-          console.log('Recovered org for user', user.id);
+          
         }
       }
 

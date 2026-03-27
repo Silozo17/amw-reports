@@ -209,7 +209,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
       setPrevSnapshots((data.prevSnapshots ?? []) as SnapshotData[]);
       setTrendData((data.trendData ?? []) as SnapshotData[]);
 
-      const platforms = (data.connections ?? []).map((c: any) => c.platform as PlatformType).filter((v: PlatformType, i: number, a: PlatformType[]) => a.indexOf(v) === i);
+      const platforms = (data.connections ?? []).map((c: ConnectionData) => c.platform as PlatformType).filter((v: PlatformType, i: number, a: PlatformType[]) => a.indexOf(v) === i);
       setAvailablePlatforms(platforms);
 
       autoDetectPeriod(currentSnapshots, data.trendData ?? []);
@@ -284,7 +284,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
     setPrevSnapshots((prevRes.data ?? []) as SnapshotData[]);
     setTrendData((trendRes.data ?? []) as SnapshotData[]);
 
-    const platforms = [...new Set((connectionsRes.data ?? []).map((c: any) => c.platform as PlatformType))];
+    const platforms = [...new Set((connectionsRes.data ?? []).map((c: ConnectionData) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
 
     autoDetectPeriod(currentSnapshots, (trendRes.data ?? []) as SnapshotData[]);
@@ -519,24 +519,30 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
   }, [trendData, selectedPlatform]);
 
   // Per-platform trend data
+  interface ChartDataEntry {
+    name: string;
+    _key?: string;
+    [key: string]: number | string | undefined;
+  }
+
   const platformTrendMap = useMemo(() => {
-    const map = new Map<PlatformType, Array<{ name: string; [key: string]: number | string }>>();
+    const map = new Map<PlatformType, ChartDataEntry[]>();
     for (const s of trendData) {
       const existing = map.get(s.platform) || [];
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
-      let entry = existing.find(e => (e as any)._key === key);
+      let entry = existing.find(e => (e as ChartDataEntry)._key === key);
       if (!entry) {
         const [y, m] = key.split("-");
-        entry = { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, _key: key } as any;
+        entry = { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, _key: key } as ChartDataEntry;
         existing.push(entry);
       }
       for (const [mk, mv] of Object.entries(s.metrics_data)) {
-        if (typeof mv === 'number') (entry as any)[mk] = ((entry as any)[mk] || 0) + mv;
+        if (typeof mv === 'number') (entry as ChartDataEntry)[mk] = ((entry as ChartDataEntry)[mk] as number || 0) + mv;
       }
       map.set(s.platform, existing);
     }
     for (const [platform, data] of map) {
-      data.sort((a, b) => ((a as any)._key as string).localeCompare((b as any)._key as string));
+      data.sort((a, b) => ((a as ChartDataEntry)._key as string).localeCompare((b as ChartDataEntry)._key as string));
       map.set(platform, data.slice(-6));
     }
     return map;
