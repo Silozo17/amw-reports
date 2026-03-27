@@ -241,8 +241,19 @@ const AccountSection = () => {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">This helps us tailor your experience. You can change it anytime.</p>
-          </div>
-          </div>
+                </div>
+                {newPassword && (
+                  <div className="space-y-1">
+                    <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${getPasswordStrength(newPassword).color}`}
+                        style={{ width: `${getPasswordStrength(newPassword).value}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{getPasswordStrength(newPassword).label}</p>
+                  </div>
+                )}
+              </div>
 
           <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
