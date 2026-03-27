@@ -1079,12 +1079,12 @@ Deno.serve(async (req) => {
     const orgName = org?.name ?? "Your Agency";
     const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
     const showLogo = reportSettings.show_logo !== false;
-    const reportAccentColor = (reportSettings.report_accent_color as string) || null;
     const orgEmail = (reportSettings.email as string) || "";
     const orgWebsite = (reportSettings.website as string) || "";
     const orgPhone = (reportSettings.phone as string) || "";
 
-    const primaryColor = parseColorToRgb(reportAccentColor || org?.primary_color, [179, 47, 191]);
+    // PDF uses org primary_color directly — no separate override
+    const primaryColor = parseColorToRgb(org?.primary_color, [179, 47, 191]);
     const secondaryColor = parseColorToRgb(org?.secondary_color, [83, 155, 219]);
     const accentColor = parseColorToRgb(org?.accent_color, [78, 214, 142]);
     const primaryHex = rgbToHex(primaryColor);
