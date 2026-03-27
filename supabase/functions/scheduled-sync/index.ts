@@ -121,14 +121,61 @@ Deno.serve(async (req) => {
             success: true,
           });
         } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : "Unknown error";
           results.push({
             connection_id: conn.id,
             platform: conn.platform,
             month,
             year,
             success: false,
-            error: e instanceof Error ? e.message : "Unknown error",
+            error: errorMsg,
           });
+
+          // Send sync_failed email notification to org owner
+          try {
+            const orgId = (conn as any).clients.org_id;
+            const { data: ownerMember } = await supabase
+              .from("org_members")
+              .select("user_id")
+              .eq("org_id", orgId)
+              .eq("role", "owner")
+              .limit(1)
+              .maybeSingle();
+
+            if (ownerMember?.user_id) {
+              const { data: ownerProfile } = await supabase
+                .from("profiles")
+                .select("email")
+                .eq("user_id", ownerMember.user_id)
+                .maybeSingle();
+
+              if (ownerProfile?.email) {
+                // Get client name
+                const { data: clientData } = await supabase
+                  .from("clients")
+                  .select("company_name")
+                  .eq("id", conn.client_id)
+                  .maybeSingle();
+
+                await supabase.functions.invoke("send-branded-email", {
+                  body: {
+                    template_name: "sync_failed",
+                    recipient_email: ownerProfile.email,
+                    org_id: orgId,
+                    data: {
+                      platform: conn.platform,
+                      client_name: clientData?.company_name ?? "Unknown client",
+                      error_message: errorMsg,
+                      month,
+                      year,
+                    },
+                  },
+                });
+              }
+            }
+          } catch (emailErr) {
+            console.error("Failed to send sync_failed email:", emailErr);
+          }
         }
       }
     }

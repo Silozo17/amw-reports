@@ -54,11 +54,61 @@ const OrganisationSection = () => {
     if (orgId) fetchMembers();
   }, [orgId]);
 
-  const handleRemoveMember = async (id: string) => {
-    const { error } = await supabase.from('org_members').delete().eq('id', id);
-    if (error) toast.error('Failed to remove');
-    else {
+  const handleRemoveMember = async (member: TeamMember) => {
+    const removedEmail = member.profiles?.email ?? member.invited_email;
+    const removedName = member.profiles?.full_name ?? member.invited_email ?? 'Unknown';
+
+    const { error } = await supabase.from('org_members').delete().eq('id', member.id);
+    if (error) {
+      toast.error('Failed to remove');
+    } else {
       toast.success('Member removed');
+
+      // Send member_removed email (fire-and-forget)
+      if (removedEmail && orgId) {
+        sendBrandedEmail({
+          templateName: 'member_removed',
+          recipientEmail: removedEmail,
+          orgId,
+          data: {
+            member_name: removedName,
+            org_name: org?.name ?? 'your organisation',
+          },
+        }).catch(err => console.error('Failed to send member_removed email:', err));
+      }
+
+      fetchMembers();
+    }
+  };
+
+  const handleRoleChange = async (memberId: string, member: TeamMember, newRole: 'owner' | 'manager') => {
+    if (member.role === newRole) return;
+
+    const { error } = await supabase
+      .from('org_members')
+      .update({ role: newRole })
+      .eq('id', memberId);
+
+    if (error) {
+      toast.error('Failed to update role');
+    } else {
+      toast.success(`Role updated to ${newRole}`);
+
+      const memberEmail = member.profiles?.email ?? member.invited_email;
+      if (memberEmail && orgId) {
+        sendBrandedEmail({
+          templateName: 'role_changed',
+          recipientEmail: memberEmail,
+          orgId,
+          data: {
+            member_name: member.profiles?.full_name ?? memberEmail,
+            old_role: member.role,
+            new_role: newRole,
+            org_name: org?.name ?? 'your organisation',
+          },
+        }).catch(err => console.error('Failed to send role_changed email:', err));
+      }
+
       fetchMembers();
     }
   };
@@ -112,13 +162,29 @@ const OrganisationSection = () => {
                       )}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="capitalize">{member.role}</Badge>
-                    {member.role !== 'owner' && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveMember(member.id)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    )}
+                   <div className="flex items-center gap-2">
+                     {role === 'owner' && member.role !== 'owner' && (
+                       <Select
+                         value={member.role}
+                         onValueChange={(v) => handleRoleChange(member.id, member, v as 'owner' | 'manager')}
+                       >
+                         <SelectTrigger className="h-7 w-[110px] text-xs">
+                           <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="manager">Manager</SelectItem>
+                           <SelectItem value="owner">Owner</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     )}
+                     {(role !== 'owner' || member.role === 'owner') && (
+                       <Badge variant="outline" className="capitalize">{member.role}</Badge>
+                     )}
+                     {member.role !== 'owner' && (
+                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveMember(member)}>
+                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                       </Button>
+                     )}
                   </div>
                 </div>
               ))}
