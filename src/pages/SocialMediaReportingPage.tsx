@@ -2,6 +2,10 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import instagramPlatform from '@/assets/screenshots/instagram.webp';
+import facebookPlatform from '@/assets/screenshots/facebook.webp';
+import tiktokPlatform from '@/assets/screenshots/tiktok.webp';
+import youtubePlatform from '@/assets/screenshots/YouTube.webp';
 
 const PLATFORMS = [
   { name: 'Facebook', metrics: ['Page Likes', 'Followers', 'Reach', 'Impressions', 'Engagement', 'Reactions', 'Comments', 'Shares', 'Video Views', 'Posts Published'] },
@@ -44,9 +48,16 @@ const SocialMediaReportingPage = () => {
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
             Consolidate Facebook, Instagram, LinkedIn, TikTok, YouTube, and Pinterest data into one clean, client-ready report — automatically. Free plan available.
           </p>
-          <Button size="lg" asChild>
+          <Button size="lg" asChild className="mb-12">
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
+
+          {/* Instagram Screenshot */}
+          <img
+            src={instagramPlatform}
+            alt="Instagram analytics card showing followers, reach, impressions, engagement, likes, comments, saves, and profile visits"
+            className="w-full max-w-3xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+          />
         </div>
       </section>
 
@@ -63,6 +74,33 @@ const SocialMediaReportingPage = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Platform Screenshots Gallery */}
+      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">See Your Social Data in Action</h2>
+          <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-12">Here's what your social media reporting looks like inside AMW Reports.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="screenshot-fade-bottom rounded-xl border border-sidebar-border/30 shadow-2xl overflow-hidden">
+              <img
+                src={facebookPlatform}
+                alt="Facebook Page analytics showing page likes, followers, reach, impressions, engagement, reactions, comments, shares, and video views"
+                className="w-full"
+              />
+            </div>
+            <img
+              src={youtubePlatform}
+              alt="YouTube channel analytics showing subscribers, views, watch time, average view duration, and top-performing videos"
+              className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
+            <img
+              src={tiktokPlatform}
+              alt="TikTok Ads reporting showing spend, impressions, clicks, CTR, CPC, CPM, conversions, and video views"
+              className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
           </div>
         </div>
       </section>

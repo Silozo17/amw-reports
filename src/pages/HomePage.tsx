@@ -3,8 +3,9 @@ import { ArrowRight, Plug, RefreshCw, FileText, Check, Quote, BarChart3, Palette
 import { Button } from '@/components/ui/button';
 import WarpedGrid from '@/components/landing/WarpedGrid';
 import StarDecoration from '@/components/landing/StarDecoration';
-import mascot from '@/assets/mascot.svg';
 import amwLogo from '@/assets/AMW_Logo_White.png';
+import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
+import perfOverview from '@/assets/screenshots/Performance_Overview.webp';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const PLATFORMS = [
@@ -102,7 +103,11 @@ const HomePage = () => {
               </div>
             </div>
             <div className="hidden lg:flex justify-center">
-              <img src={mascot} alt="AMW Media mascot illustration" className="w-72 lg:w-[26rem] xl:w-[30rem] object-contain" />
+              <img
+                src={dashboardSnapshot}
+                alt="AMW Reports dashboard showing multi-platform marketing analytics with KPI cards, charts, and performance metrics"
+                className="w-full max-w-xl rounded-xl border border-sidebar-border/30 shadow-2xl"
+              />
             </div>
           </div>
         </div>
@@ -172,6 +177,15 @@ const HomePage = () => {
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
             ))}
+          </div>
+
+          {/* Performance Overview Screenshot */}
+          <div className="mt-16">
+            <img
+              src={perfOverview}
+              alt="AMW Reports performance overview showing monthly trends, engagement charts, and platform comparison data"
+              className="w-full max-w-5xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
           </div>
         </div>
       </section>

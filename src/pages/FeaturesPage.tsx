@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, FileText, Mail, Palette, Globe, Users, BarChart3, Share2, Clock, Layers, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
+import perfOverview from '@/assets/screenshots/Performance_Overview.webp';
 
 const PLATFORM_DETAILS = [
   { name: 'Google Ads', desc: 'Track ad performance, conversions, and return on ad spend across all your Google campaigns.', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'] },
@@ -53,7 +55,7 @@ const FeaturesPage = () => {
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
             A client-ready reporting and analytics platform that consolidates data from 10+ marketing platforms into one clean, branded, easy-to-digest format — ready to present to clients.
           </p>
-          <div className="flex flex-wrap justify-center gap-3">
+          <div className="flex flex-wrap justify-center gap-3 mb-12">
             <Button size="lg" asChild>
               <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
@@ -61,6 +63,13 @@ const FeaturesPage = () => {
               <Link to="/pricing">View Pricing</Link>
             </Button>
           </div>
+
+          {/* Dashboard Screenshot Showcase */}
+          <img
+            src={dashboardSnapshot}
+            alt="AMW Reports main dashboard showing client KPIs, platform connections, and multi-channel marketing analytics overview"
+            className="w-full max-w-5xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+          />
         </div>
       </section>
 
@@ -91,18 +100,25 @@ const FeaturesPage = () => {
       <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Automated Reporting & Delivery</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {REPORTING_FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-                  <Icon className="h-5 w-5 text-primary" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {REPORTING_FEATURES.map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-body font-semibold mb-1">{title}</h3>
+                    <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-body font-semibold mb-1">{title}</h3>
-                  <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <img
+              src={perfOverview}
+              alt="Performance overview report showing monthly marketing trends with engagement metrics and platform comparison charts"
+              className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
           </div>
         </div>
       </section>
@@ -159,7 +175,7 @@ const FeaturesPage = () => {
               </div>
             </div>
             <div className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-center">
-              <Share2 className="h-16 w-16 text-primary/40 mx-auto mb-4" />
+              <Share2 className="h-16 w-16 text-primary/40 mx-auto mb-4" aria-hidden="true" />
               <p className="text-sm font-body text-amw-offwhite/50">Client portal preview — branded dashboard with your logo, colours, and metrics.</p>
             </div>
           </div>

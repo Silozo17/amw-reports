@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Users, Palette, Mail, Globe, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
+import googleAdsPlatform from '@/assets/screenshots/Google_ads.webp';
 
 const PAIN_POINTS = [
   { title: 'Hours wasted on manual reports', desc: 'Logging into 10 platforms, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },
@@ -41,9 +43,16 @@ const ForAgenciesPage = () => {
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
             Stop spending hours on client reports. AMW Reports automates data collection, report generation, and delivery — so your team can focus on strategy, not spreadsheets. Built by an agency, for agencies.
           </p>
-          <Button size="lg" asChild>
+          <Button size="lg" asChild className="mb-12">
             <Link to="/login?view=signup">Start Your Free Agency Account <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
+
+          {/* Dashboard Screenshot */}
+          <img
+            src={dashboardSnapshot}
+            alt="AMW Reports agency dashboard showing multi-client overview with KPI cards, platform connections, and marketing performance data"
+            className="w-full max-w-5xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+          />
         </div>
       </section>
 
@@ -78,16 +87,23 @@ const ForAgenciesPage = () => {
       <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Key Features for Agencies</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {KEY_FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center mb-4">
-                  <Icon className="h-5 w-5 text-primary" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {KEY_FEATURES.map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center mb-4">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <h3 className="text-sm font-body font-semibold mb-2">{title}</h3>
+                  <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
                 </div>
-                <h3 className="text-sm font-body font-semibold mb-2">{title}</h3>
-                <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+            <img
+              src={googleAdsPlatform}
+              alt="Google Ads reporting card showing ad spend, impressions, clicks, CTR, conversions, and ROAS metrics"
+              className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
           </div>
         </div>
       </section>
