@@ -10,6 +10,8 @@ interface AuthContextType {
   role: AppRole | null;
   isLoading: boolean;
   isOwner: boolean;
+  isPlatformAdmin: boolean;
+  isManager: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -40,6 +43,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .limit(1)
       .single();
     setRole((memberData?.role as AppRole) ?? null);
+
+    const { data: adminData } = await supabase
+      .from('platform_admins')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    setIsPlatformAdmin(!!adminData);
   }, []);
 
   const refetchProfile = useCallback(async () => {
@@ -58,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
           setRole(null);
+          setIsPlatformAdmin(false);
         }
         setIsLoading(false);
       }
@@ -99,6 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         isLoading,
         isOwner: role === 'owner',
+        isPlatformAdmin,
+        isManager: role === 'manager',
         signIn,
         signUp,
         signOut,
@@ -109,7 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
-
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

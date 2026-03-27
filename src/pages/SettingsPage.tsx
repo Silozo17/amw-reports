@@ -12,21 +12,37 @@ import MetricsDefaultsSection from '@/components/settings/MetricsDefaultsSection
 import BillingSection from '@/components/settings/BillingSection';
 
 const SettingsPage = () => {
-  const { isOwner } = useAuth();
+  const { isOwner, isPlatformAdmin, isManager } = useAuth();
   const { hasWhitelabel } = useEntitlements();
 
-  if (!isOwner) {
+  const canAccessSettings = isOwner || isPlatformAdmin || isManager;
+
+  if (!canAccessSettings) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center py-20">
           <Shield className="h-12 w-12 text-muted-foreground/40 mb-4" />
-          <p className="text-muted-foreground">Owner access required</p>
+          <p className="text-muted-foreground">Access denied</p>
         </div>
       </AppLayout>
     );
   }
 
-  const tabGridClass = hasWhitelabel ? 'grid-cols-5' : 'grid-cols-4';
+  const canManageOrg = isOwner || isPlatformAdmin;
+  const canManageMetrics = isOwner || isPlatformAdmin;
+  const canManageBilling = isOwner || isPlatformAdmin;
+  const showWhitelabel = hasWhitelabel;
+
+  // Build visible tabs
+  const tabs: { value: string; label: string }[] = [];
+  if (canManageOrg) tabs.push({ value: 'organisation', label: 'Organisation' });
+  tabs.push({ value: 'account', label: 'Account' });
+  if (showWhitelabel) tabs.push({ value: 'whitelabel', label: 'White Label' });
+  if (canManageMetrics) tabs.push({ value: 'metrics', label: 'Metrics' });
+  if (canManageBilling) tabs.push({ value: 'billing', label: 'Billing' });
+
+  const defaultTab = tabs[0]?.value ?? 'account';
+  const tabGridClass = `grid-cols-${tabs.length}`;
 
   return (
     <AppLayout>
@@ -36,24 +52,24 @@ const SettingsPage = () => {
           <p className="text-muted-foreground font-body mt-1">Organisation & platform configuration</p>
         </div>
 
-        <Tabs defaultValue="organisation" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className={`grid w-full ${tabGridClass}`}>
-            <TabsTrigger value="organisation">Organisation</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
-            {hasWhitelabel && <TabsTrigger value="whitelabel">White Label</TabsTrigger>}
-            <TabsTrigger value="metrics">Metrics</TabsTrigger>
-            <TabsTrigger value="billing">Billing</TabsTrigger>
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+            ))}
           </TabsList>
 
-          <TabsContent value="organisation" className="space-y-6 mt-6">
-            <OrganisationSection />
-          </TabsContent>
+          {canManageOrg && (
+            <TabsContent value="organisation" className="space-y-6 mt-6">
+              <OrganisationSection />
+            </TabsContent>
+          )}
 
           <TabsContent value="account" className="space-y-6 mt-6">
             <AccountSection />
           </TabsContent>
 
-          {hasWhitelabel && (
+          {showWhitelabel && (
             <TabsContent value="whitelabel" className="space-y-6 mt-6">
               <BrandingSection />
               <ReportSettingsSection />
@@ -61,13 +77,17 @@ const SettingsPage = () => {
             </TabsContent>
           )}
 
-          <TabsContent value="metrics" className="space-y-6 mt-6">
-            <MetricsDefaultsSection />
-          </TabsContent>
+          {canManageMetrics && (
+            <TabsContent value="metrics" className="space-y-6 mt-6">
+              <MetricsDefaultsSection />
+            </TabsContent>
+          )}
 
-          <TabsContent value="billing" className="space-y-6 mt-6">
-            <BillingSection />
-          </TabsContent>
+          {canManageBilling && (
+            <TabsContent value="billing" className="space-y-6 mt-6">
+              <BillingSection />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </AppLayout>
