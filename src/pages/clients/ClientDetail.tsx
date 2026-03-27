@@ -584,6 +584,25 @@ const ClientDetail = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Report Language</p>
+                    <p className="text-xs text-muted-foreground">Language used for report text</p>
+                  </div>
+                  <Select value={(client as any).report_language ?? 'en'} onValueChange={v => handleSettingChange('report_language', v)}>
+                    <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="fr">French</SelectItem>
+                      <SelectItem value="de">German</SelectItem>
+                      <SelectItem value="es">Spanish</SelectItem>
+                      <SelectItem value="it">Italian</SelectItem>
+                      <SelectItem value="nl">Dutch</SelectItem>
+                      <SelectItem value="pt">Portuguese</SelectItem>
+                      <SelectItem value="pl">Polish</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 {[
                   { key: 'enable_mom_comparison', label: 'MoM Comparison', desc: 'Compare with previous month' },
                   { key: 'enable_yoy_comparison', label: 'YoY Comparison', desc: 'Compare with same month last year' },
