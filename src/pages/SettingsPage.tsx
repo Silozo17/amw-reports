@@ -1,7 +1,7 @@
 import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { useOrg } from '@/hooks/useOrg';
+import { useOrg } from '@/contexts/OrgContext';
 import { Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AccountSection from '@/components/settings/AccountSection';

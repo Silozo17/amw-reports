@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import BrandingProvider from "@/components/BrandingProvider";
+import { OrgProvider } from "@/contexts/OrgContext";
 import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import FeaturesPage from "./pages/FeaturesPage";
