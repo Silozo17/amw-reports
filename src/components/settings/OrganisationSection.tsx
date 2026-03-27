@@ -28,15 +28,19 @@ const OrganisationSection = () => {
 
   const fetchMembers = async () => {
     if (!orgId) return;
-    const [membersRes, profilesRes] = await Promise.all([
-      supabase.from('org_members').select('*').eq('org_id', orgId),
-      supabase.from('profiles').select('user_id, full_name, email'),
-    ]);
+    const membersRes = await supabase.from('org_members').select('*').eq('org_id', orgId);
 
     const members = (membersRes.data ?? []) as Array<{
       id: string; org_id: string; user_id: string | null; role: 'owner' | 'manager';
       invited_email: string | null; accepted_at: string | null;
     }>;
+
+    // Only fetch profiles for members that have a user_id (accepted members)
+    const memberUserIds = members.map(m => m.user_id).filter(Boolean) as string[];
+    const profilesRes = memberUserIds.length > 0
+      ? await supabase.from('profiles').select('user_id, full_name, email').in('user_id', memberUserIds)
+      : { data: [] };
+
     const profiles = (profilesRes.data ?? []) as Array<{ user_id: string; full_name: string | null; email: string | null }>;
 
     const enriched: TeamMember[] = members.map(m => ({

@@ -122,7 +122,9 @@ const App = () => (
         <AuthProvider>
           <OrgProvider>
             <BrandingProvider>
-              <AppRoutes />
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
             </BrandingProvider>
           </OrgProvider>
         </AuthProvider>
