@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Save, Loader2, Upload, Building2, AlertTriangle } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Save, Loader2, Upload, Building2, AlertTriangle, Globe, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 const FONT_OPTIONS = [
@@ -29,27 +30,7 @@ const REPORT_LANGUAGES = [
   { value: 'da', label: 'Danish' },
 ];
 
-/** Convert hex (#rrggbb) to HSL string "h s% l%" */
-const hexToHsl = (hex: string): string | null => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return null;
-  let r = parseInt(result[1], 16) / 255;
-  let g = parseInt(result[2], 16) / 255;
-  let b = parseInt(result[3], 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-    else if (max === g) h = ((b - r) / d + 2) / 6;
-    else h = ((r - g) / d + 4) / 6;
-  }
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-};
-
-/** Convert HSL string "h s% l%" to hex */
+/** Convert HSL string "h s% l%" to hex (for backward compat with old DB values) */
 const hslToHex = (hsl: string): string => {
   const parts = hsl.match(/[\d.]+/g);
   if (!parts || parts.length < 3) return '#b32fbf';
@@ -74,6 +55,14 @@ const hslToHex = (hsl: string): string => {
   }
   const toHex = (x: number) => Math.round(x * 255).toString(16).padStart(2, '0');
   return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`;
+};
+
+/** Detect if a stored value is hex or HSL — return hex either way */
+const toHexDisplay = (dbValue: string | null, fallback: string): string => {
+  if (!dbValue) return fallback;
+  if (dbValue.startsWith('#')) return dbValue;
+  // It's HSL from old data — convert to hex
+  return hslToHex(dbValue);
 };
 
 /** Calculate relative luminance for contrast ratio */
@@ -154,36 +143,35 @@ const BrandingSection = () => {
   const [chartColor4, setChartColor4] = useState('');
   const [headingFont, setHeadingFont] = useState('Anton');
   const [bodyFont, setBodyFont] = useState('Inter');
-  // Report settings
   const [showLogo, setShowLogo] = useState(true);
   const [showAiInsights, setShowAiInsights] = useState(true);
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
 
   useEffect(() => {
     if (org) {
       setOrgName(org.name);
       setLogoUrl(org.logo_url ?? '');
       setShowOrgName(org.show_org_name !== false);
-      setPrimaryColor(org.primary_color ? hslToHex(org.primary_color) : '#b32fbf');
-      setSecondaryColor(org.secondary_color ? hslToHex(org.secondary_color) : '#539BDB');
-      setAccentColor(org.accent_color ? hslToHex(org.accent_color) : '#4ED68E');
-      setButtonColor(org.button_color ? hslToHex(org.button_color) : '');
-      setButtonTextColor(org.button_text_color ? hslToHex(org.button_text_color) : '');
-      setTextOnDark(org.text_on_dark ? hslToHex(org.text_on_dark) : '');
-      setTextOnLight(org.text_on_light ? hslToHex(org.text_on_light) : '');
-      setChartColor1(org.chart_color_1 ? hslToHex(org.chart_color_1) : '');
-      setChartColor2(org.chart_color_2 ? hslToHex(org.chart_color_2) : '');
-      setChartColor3(org.chart_color_3 ? hslToHex(org.chart_color_3) : '');
-      setChartColor4(org.chart_color_4 ? hslToHex(org.chart_color_4) : '');
+      setPrimaryColor(toHexDisplay(org.primary_color, '#b32fbf'));
+      setSecondaryColor(toHexDisplay(org.secondary_color, '#539BDB'));
+      setAccentColor(toHexDisplay(org.accent_color, '#4ED68E'));
+      setButtonColor(toHexDisplay(org.button_color, ''));
+      setButtonTextColor(toHexDisplay(org.button_text_color, ''));
+      setTextOnDark(toHexDisplay(org.text_on_dark, ''));
+      setTextOnLight(toHexDisplay(org.text_on_light, ''));
+      setChartColor1(toHexDisplay(org.chart_color_1, ''));
+      setChartColor2(toHexDisplay(org.chart_color_2, ''));
+      setChartColor3(toHexDisplay(org.chart_color_3, ''));
+      setChartColor4(toHexDisplay(org.chart_color_4, ''));
       setHeadingFont(org.heading_font ?? 'Anton');
       setBodyFont(org.body_font ?? 'Inter');
-      // Report settings
       const rs = org.report_settings;
       setShowLogo(rs?.show_logo !== false);
       setShowAiInsights(rs?.show_ai_insights !== false);
-      
     }
   }, [org]);
 
@@ -229,22 +217,23 @@ const BrandingSection = () => {
     if (!orgId) return;
     setIsSaving(true);
 
+    // Save hex values directly — no conversion
     const { error } = await supabase
       .from('organisations')
       .update({
         name: orgName.trim(),
         show_org_name: showOrgName,
-        primary_color: hexToHsl(primaryColor),
-        secondary_color: hexToHsl(secondaryColor),
-        accent_color: hexToHsl(accentColor),
-        button_color: buttonColor ? hexToHsl(buttonColor) : null,
-        button_text_color: buttonTextColor ? hexToHsl(buttonTextColor) : null,
-        text_on_dark: textOnDark ? hexToHsl(textOnDark) : null,
-        text_on_light: textOnLight ? hexToHsl(textOnLight) : null,
-        chart_color_1: chartColor1 ? hexToHsl(chartColor1) : null,
-        chart_color_2: chartColor2 ? hexToHsl(chartColor2) : null,
-        chart_color_3: chartColor3 ? hexToHsl(chartColor3) : null,
-        chart_color_4: chartColor4 ? hexToHsl(chartColor4) : null,
+        primary_color: primaryColor || null,
+        secondary_color: secondaryColor || null,
+        accent_color: accentColor || null,
+        button_color: buttonColor || null,
+        button_text_color: buttonTextColor || null,
+        text_on_dark: textOnDark || null,
+        text_on_light: textOnLight || null,
+        chart_color_1: chartColor1 || null,
+        chart_color_2: chartColor2 || null,
+        chart_color_3: chartColor3 || null,
+        chart_color_4: chartColor4 || null,
         heading_font: headingFont,
         body_font: bodyFont,
         report_settings: {
@@ -263,6 +252,49 @@ const BrandingSection = () => {
     setIsSaving(false);
   };
 
+  const handleExtractBranding = async () => {
+    if (!websiteUrl.trim()) return;
+    setIsExtracting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-branding', {
+        body: { url: websiteUrl.trim() },
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data.branding) {
+        const b = data.branding;
+        if (b.colors?.primary) setPrimaryColor(b.colors.primary);
+        if (b.colors?.secondary) setSecondaryColor(b.colors.secondary);
+        if (b.colors?.accent) setAccentColor(b.colors.accent);
+        if (b.colors?.background && b.colors.background !== '#FFFFFF' && b.colors.background !== '#ffffff') {
+          // Only set text colors if they're interesting
+          if (b.colors.textPrimary) setTextOnLight(b.colors.textPrimary);
+        }
+        if (b.typography?.fontFamilies?.heading) {
+          const hf = b.typography.fontFamilies.heading;
+          if (FONT_OPTIONS.includes(hf)) setHeadingFont(hf);
+        }
+        if (b.typography?.fontFamilies?.primary) {
+          const bf = b.typography.fontFamilies.primary;
+          if (FONT_OPTIONS.includes(bf)) setBodyFont(bf);
+        }
+        if (b.images?.logo || b.logo) {
+          // Don't auto-set logo — just notify
+          toast.info('Logo found — upload it manually to ensure quality');
+        }
+        toast.success('Branding extracted — review and save');
+      } else {
+        toast.error(data?.error || 'Could not extract branding from this website');
+      }
+    } catch (err) {
+      console.error('Branding extraction error:', err);
+      toast.error('Failed to extract branding. Make sure the URL is valid.');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   const effectiveButtonBg = buttonColor || primaryColor;
   const effectiveButtonText = buttonTextColor || '#ffffff';
   const contrastRatio = getContrastRatio(effectiveButtonBg, effectiveButtonText);
@@ -274,13 +306,19 @@ const BrandingSection = () => {
   const effectiveChart4 = chartColor4 || '#EE8733';
 
   return (
-    <div className="space-y-6">
-      {/* Section 1 — Identity */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg">Identity</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <CardTitle className="font-display text-lg">Branding</CardTitle>
+        <Button onClick={handleSave} disabled={isSaving} size="sm" className="gap-2">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save
+        </Button>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        {/* ── Identity ── */}
+        <div>
+          <h3 className="text-sm font-semibold mb-4">Identity</h3>
           <div className="flex items-start gap-6">
             <div className="relative group shrink-0">
               <Avatar className="h-20 w-20 rounded-lg">
@@ -310,16 +348,36 @@ const BrandingSection = () => {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Section 2 — Colours */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg">Colours</CardTitle>
-          <p className="text-sm text-muted-foreground">Define your brand palette. All colours apply across the platform and reports.</p>
-        </CardHeader>
-        <CardContent>
+          {/* Import from website */}
+          <div className="mt-4 flex items-center gap-2">
+            <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Input
+              value={websiteUrl}
+              onChange={e => setWebsiteUrl(e.target.value)}
+              placeholder="https://yourwebsite.com"
+              className="flex-1 max-w-sm text-sm"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExtractBranding}
+              disabled={isExtracting || !websiteUrl.trim()}
+              className="gap-1.5 shrink-0"
+            >
+              {isExtracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Import branding
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 ml-6">Extract colours and fonts from your website automatically</p>
+        </div>
+
+        <Separator />
+
+        {/* ── Colours ── */}
+        <div>
+          <h3 className="text-sm font-semibold mb-1">Colours</h3>
+          <p className="text-xs text-muted-foreground mb-4">Define your brand palette. All colours apply across the platform and reports.</p>
           <div className="grid md:grid-cols-2 gap-8">
             <div className="space-y-5">
               <ColorField label="Primary" description="Headers, buttons, and key accents" value={primaryColor} onChange={setPrimaryColor} />
@@ -339,85 +397,63 @@ const BrandingSection = () => {
               <ColorField label="Text on light backgrounds" description="Body text on white/light backgrounds" value={textOnLight} onChange={setTextOnLight} placeholder="#1e1e1e" onReset={() => setTextOnLight('')} />
             </div>
 
-            {/* Live preview */}
-            <div className="space-y-4">
-              <Label className="text-xs text-muted-foreground block">Live Preview</Label>
-              <div className="rounded-lg border p-4 space-y-4 bg-card">
-                {/* Header bar */}
-                <div className="h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
-                {/* Button */}
-                <button
-                  className="rounded-md px-4 py-2 text-sm font-medium"
-                  style={{ backgroundColor: effectiveButtonBg, color: effectiveButtonText }}
-                >
-                  Sample Button
-                </button>
-                {/* Metric card */}
-                <div className="rounded-lg border p-3" style={{ borderTopWidth: '3px', borderTopColor: primaryColor }}>
-                  <p className="text-xs text-muted-foreground uppercase">Impressions</p>
-                  <p className="text-xl font-bold">12,450</p>
-                  <span className="text-xs" style={{ color: accentColor }}>↑ 8.3%</span>
+            {/* Live preview + Chart palette below it */}
+            <div className="space-y-6">
+              <div>
+                <Label className="text-xs text-muted-foreground block mb-2">Live Preview</Label>
+                <div className="rounded-lg border p-4 space-y-4 bg-card">
+                  <div className="h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+                  <button
+                    className="rounded-md px-4 py-2 text-sm font-medium"
+                    style={{ backgroundColor: effectiveButtonBg, color: effectiveButtonText }}
+                  >
+                    Sample Button
+                  </button>
+                  <div className="rounded-lg border p-3" style={{ borderTopWidth: '3px', borderTopColor: primaryColor }}>
+                    <p className="text-xs text-muted-foreground uppercase">Impressions</p>
+                    <p className="text-xl font-bold">12,450</p>
+                    <span className="text-xs" style={{ color: accentColor }}>↑ 8.3%</span>
+                  </div>
+                  <div className="flex items-end gap-1 h-12">
+                    {[60, 80, 45, 90].map((h, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-t"
+                        style={{
+                          height: `${h}%`,
+                          backgroundColor: [effectiveChart1, effectiveChart2, effectiveChart3, effectiveChart4][i],
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5 h-6">
+                    <div className="flex-1 rounded" style={{ backgroundColor: primaryColor }} />
+                    <div className="flex-1 rounded" style={{ backgroundColor: secondaryColor }} />
+                    <div className="flex-1 rounded" style={{ backgroundColor: accentColor }} />
+                  </div>
                 </div>
-                {/* Mini bar chart */}
-                <div className="flex items-end gap-1 h-12">
-                  {[60, 80, 45, 90].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-t"
-                      style={{
-                        height: `${h}%`,
-                        backgroundColor: [effectiveChart1, effectiveChart2, effectiveChart3, effectiveChart4][i],
-                      }}
-                    />
-                  ))}
-                </div>
-                {/* Colour swatch */}
-                <div className="flex gap-1.5 h-6">
-                  <div className="flex-1 rounded" style={{ backgroundColor: primaryColor }} />
-                  <div className="flex-1 rounded" style={{ backgroundColor: secondaryColor }} />
-                  <div className="flex-1 rounded" style={{ backgroundColor: accentColor }} />
+              </div>
+
+              {/* Chart Palette — directly below preview */}
+              <div>
+                <h4 className="text-sm font-semibold mb-1">Chart Palette</h4>
+                <p className="text-xs text-muted-foreground mb-3">Controls all graphs and charts across the platform and in reports.</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <ColorField label="Chart 1" description="Default: Primary" value={chartColor1} onChange={setChartColor1} placeholder={primaryColor} onReset={() => setChartColor1('')} />
+                  <ColorField label="Chart 2" description="Default: Secondary" value={chartColor2} onChange={setChartColor2} placeholder={secondaryColor} onReset={() => setChartColor2('')} />
+                  <ColorField label="Chart 3" description="Default: Accent" value={chartColor3} onChange={setChartColor3} placeholder={accentColor} onReset={() => setChartColor3('')} />
+                  <ColorField label="Chart 4" description="Default: Orange" value={chartColor4} onChange={setChartColor4} placeholder="#EE8733" onReset={() => setChartColor4('')} />
                 </div>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Section 3 — Chart Colours */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg">Chart Palette</CardTitle>
-          <p className="text-sm text-muted-foreground">Controls all graphs and charts across the platform and in reports.</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <ColorField label="Chart 1" description="Default: Primary" value={chartColor1} onChange={setChartColor1} placeholder={primaryColor} onReset={() => setChartColor1('')} />
-            <ColorField label="Chart 2" description="Default: Secondary" value={chartColor2} onChange={setChartColor2} placeholder={secondaryColor} onReset={() => setChartColor2('')} />
-            <ColorField label="Chart 3" description="Default: Accent" value={chartColor3} onChange={setChartColor3} placeholder={accentColor} onReset={() => setChartColor3('')} />
-            <ColorField label="Chart 4" description="Default: Orange" value={chartColor4} onChange={setChartColor4} placeholder="#EE8733" onReset={() => setChartColor4('')} />
-          </div>
-          {/* Mini chart preview */}
-          <div className="flex items-end gap-2 h-16 max-w-xs">
-            {[70, 90, 55, 80].map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 rounded-t transition-colors"
-                style={{
-                  height: `${h}%`,
-                  backgroundColor: [effectiveChart1, effectiveChart2, effectiveChart3, effectiveChart4][i],
-                }}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        <Separator />
 
-      {/* Section 4 — Typography */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg">Typography</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        {/* ── Typography ── */}
+        <div>
+          <h3 className="text-sm font-semibold mb-4">Typography</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Heading Font</Label>
@@ -442,42 +478,37 @@ const BrandingSection = () => {
               </Select>
             </div>
           </div>
-          <div className="rounded-lg border p-4 space-y-2">
+          <div className="rounded-lg border p-4 space-y-2 mt-4">
             <p className="text-lg" style={{ fontFamily: headingFont }}>Your Brand Name</p>
             <p className="text-sm text-muted-foreground" style={{ fontFamily: bodyFont }}>Performance data and insights for your business.</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Section 5 — Report Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg">Report Settings</CardTitle>
-          <p className="text-sm text-muted-foreground">Control how generated PDF reports look. Changes apply to all future reports.</p>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="font-medium">Show Organisation Logo</Label>
-              <p className="text-xs text-muted-foreground">Display your logo on the cover and closing pages</p>
-            </div>
-            <Switch checked={showLogo} onCheckedChange={setShowLogo} />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="font-medium">Include AI Insights</Label>
-              <p className="text-xs text-muted-foreground">Add AI-generated platform analysis section</p>
-            </div>
-            <Switch checked={showAiInsights} onCheckedChange={setShowAiInsights} />
-          </div>
-        </CardContent>
-      </Card>
+        <Separator />
 
-      <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-        Save Branding
-      </Button>
-    </div>
+        {/* ── Report Settings ── */}
+        <div>
+          <h3 className="text-sm font-semibold mb-1">Report Settings</h3>
+          <p className="text-xs text-muted-foreground mb-4">Control how generated PDF reports look. Changes apply to all future reports.</p>
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="font-medium">Show Organisation Logo</Label>
+                <p className="text-xs text-muted-foreground">Display your logo on the cover and closing pages</p>
+              </div>
+              <Switch checked={showLogo} onCheckedChange={setShowLogo} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="font-medium">Include AI Insights</Label>
+                <p className="text-xs text-muted-foreground">Add AI-generated platform analysis section</p>
+              </div>
+              <Switch checked={showAiInsights} onCheckedChange={setShowAiInsights} />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
