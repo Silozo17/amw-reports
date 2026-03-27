@@ -57,6 +57,10 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        "button-primary": {
+          DEFAULT: "hsl(var(--button-primary, var(--primary)))",
+          foreground: "hsl(var(--button-primary-foreground, var(--primary-foreground)))",
+        },
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",

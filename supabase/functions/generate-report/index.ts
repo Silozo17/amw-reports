@@ -1086,7 +1086,14 @@ Deno.serve(async (req) => {
 
     const primaryColor = parseColorToRgb(reportAccentColor || org?.primary_color, [179, 47, 191]);
     const secondaryColor = parseColorToRgb(org?.secondary_color, [83, 155, 219]);
+    const accentColor = parseColorToRgb(org?.accent_color, [78, 214, 142]);
     const primaryHex = rgbToHex(primaryColor);
+
+    // Chart colours — use org chart palette if set, otherwise derive
+    const chart1 = parseColorToRgb(org?.chart_color_1 ?? org?.primary_color, [179, 47, 191]);
+    const chart2 = parseColorToRgb(org?.chart_color_2 ?? org?.secondary_color, [83, 155, 219]);
+    const chart3 = parseColorToRgb(org?.chart_color_3 ?? org?.accent_color, [78, 214, 142]);
+    const chart4 = parseColorToRgb(org?.chart_color_4, [238, 135, 51]);
 
     const C = {
       offWhite: DEFAULTS.offWhite,
@@ -1097,6 +1104,11 @@ Deno.serve(async (req) => {
       primaryMid: lighten(primaryColor, 0.7),
       secondary: secondaryColor,
       secondaryLight: lighten(secondaryColor, 0.88),
+      accent: accentColor,
+      accentLight: lighten(accentColor, 0.88),
+      // Chart colours (same as dashboard)
+      charts: [chart1, chart2, chart3, chart4],
+      // Semantic — FIXED, never overridden by branding
       green: DEFAULTS.green,
       greenLight: lighten(DEFAULTS.green, 0.88),
       amber: DEFAULTS.amber,
@@ -1106,7 +1118,7 @@ Deno.serve(async (req) => {
       white: DEFAULTS.white,
       grey: DEFAULTS.grey,
       lightGrey: DEFAULTS.lightGrey,
-      summaryBg: DEFAULTS.summaryBg,
+      summaryBg: lighten(secondaryColor, 0.88),
       summaryBorder: secondaryColor,
       coverDark: DEFAULTS.coverDark,
       coverDarkPanel: DEFAULTS.coverDarkPanel,
@@ -1125,6 +1137,7 @@ Deno.serve(async (req) => {
       metricValue: DEFAULTS.metricValue,
       sectionLabel: DEFAULTS.sectionLabel,
       sectionDivider: DEFAULTS.sectionDivider,
+      textFaint: [180, 180, 180] as [number, number, number],
     };
 
     const snapshots = snapshotsRes.data ?? [];

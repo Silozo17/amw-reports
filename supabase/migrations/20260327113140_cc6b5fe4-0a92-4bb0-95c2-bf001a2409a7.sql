@@ -1,0 +1,10 @@
+ALTER TABLE organisations
+  ADD COLUMN IF NOT EXISTS button_color text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS button_text_color text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS text_on_dark text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS text_on_light text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS show_org_name boolean DEFAULT true,
+  ADD COLUMN IF NOT EXISTS chart_color_1 text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS chart_color_2 text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS chart_color_3 text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS chart_color_4 text DEFAULT NULL;

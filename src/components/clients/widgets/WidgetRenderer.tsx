@@ -49,7 +49,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
-const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
+import { useChartColors } from '@/hooks/useChartColors';
 
 // ─── Animated Counter ──────────────────────────────────────────
 function useAnimatedCounter(target: number, duration = 700): number {
@@ -349,6 +349,7 @@ const GaugeWidget = ({ data }: { data: WidgetData }) => {
 
 // ─── Sparkline-as-chart (for KPI widgets shown as line/area/bar) ─
 const SparklineChart = ({ data, type }: { data: WidgetData; type: 'line' | 'area' | 'bar' }) => {
+  const CHART_COLORS = useChartColors();
   const chartData = data.sparklineData ?? [];
   if (chartData.length < 2) return <p className="text-xs text-muted-foreground italic">Insufficient data</p>;
 

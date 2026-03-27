@@ -74,7 +74,9 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <h1 className="text-xl font-display tracking-wide text-primary truncate">{orgName}</h1>
+        {org?.show_org_name !== false && (
+          <h1 className="text-xl font-display tracking-wide text-primary truncate">{orgName}</h1>
+        )}
         <p className="text-[10px] tracking-[0.3em] text-sidebar-foreground/60 uppercase font-body">Reports</p>
       </div>
       {hasMultipleOrgs && (

@@ -7,7 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend,
 } from 'recharts';
 
-const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
+import { useChartColors } from '@/hooks/useChartColors';
 
 const fmtNum = (v: number) => v.toLocaleString();
 
@@ -48,6 +48,7 @@ const PerformanceOverview = ({
   trendPlatforms,
   gscTrendData,
 }: PerformanceOverviewProps) => {
+  const CHART_COLORS = useChartColors();
   const hasSpend = spendByPlatform.length > 1;
   const hasEngagement = engagementStackedData.length > 0;
   const hasImpressions = impressionsByPlatform.length > 0;
@@ -58,10 +59,10 @@ const PerformanceOverview = ({
 
   // Determine which trend keys have data
   const trendKeys: { key: string; name: string; color: string }[] = [];
-  if (trendChartData.some(d => (d as Record<string, number>).impressions > 0)) trendKeys.push({ key: 'impressions', name: 'Impressions', color: '#b32fbf' });
-  if (trendChartData.some(d => (d as Record<string, number>).clicks > 0)) trendKeys.push({ key: 'clicks', name: 'Clicks', color: '#539BDB' });
-  if (trendChartData.some(d => (d as Record<string, number>).engagement > 0)) trendKeys.push({ key: 'engagement', name: 'Engagement', color: '#4ED68E' });
-  if (trendChartData.some(d => (d as Record<string, number>).reach > 0)) trendKeys.push({ key: 'reach', name: 'Reach', color: '#EE8733' });
+  if (trendChartData.some(d => (d as Record<string, number>).impressions > 0)) trendKeys.push({ key: 'impressions', name: 'Impressions', color: CHART_COLORS[0] });
+  if (trendChartData.some(d => (d as Record<string, number>).clicks > 0)) trendKeys.push({ key: 'clicks', name: 'Clicks', color: CHART_COLORS[1] });
+  if (trendChartData.some(d => (d as Record<string, number>).engagement > 0)) trendKeys.push({ key: 'engagement', name: 'Engagement', color: CHART_COLORS[2] });
+  if (trendChartData.some(d => (d as Record<string, number>).reach > 0)) trendKeys.push({ key: 'reach', name: 'Reach', color: CHART_COLORS[3] });
 
   // Normalize trend data so each metric has its own 0–1 scale
   const normalizedTrendData = (() => {
@@ -186,8 +187,8 @@ const PerformanceOverview = ({
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={fmtNum} />
                     <RechartsTooltip content={<CustomTooltip />} />
-                    <Bar dataKey="impressions" name="Impressions" fill="#539BDB" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="clicks" name="Clicks" fill="#4ED68E" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="impressions" name="Impressions" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="clicks" name="Clicks" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
                     <Legend />
                   </BarChart>
                 </ResponsiveContainer>
@@ -261,10 +262,10 @@ const PerformanceOverview = ({
         {/* GSC Search Performance Trend */}
         {hasGscTrend && (() => {
           const gscKeys = [
-            { key: 'search_impressions', name: 'Impressions', color: '#b32fbf', format: (v: number) => fmtNum(v) },
-            { key: 'search_clicks', name: 'Clicks', color: '#539BDB', format: (v: number) => fmtNum(v) },
-            { key: 'search_ctr', name: 'CTR', color: '#4ED68E', format: (v: number) => `${v.toFixed(1)}%` },
-            { key: 'search_position', name: 'Avg. Position', color: '#EE8733', format: (v: number) => v.toFixed(1) },
+            { key: 'search_impressions', name: 'Impressions', color: CHART_COLORS[0], format: (v: number) => fmtNum(v) },
+            { key: 'search_clicks', name: 'Clicks', color: CHART_COLORS[1], format: (v: number) => fmtNum(v) },
+            { key: 'search_ctr', name: 'CTR', color: CHART_COLORS[2], format: (v: number) => `${v.toFixed(1)}%` },
+            { key: 'search_position', name: 'Avg. Position', color: CHART_COLORS[3], format: (v: number) => v.toFixed(1) },
           ].filter(tk => gscTrendData!.some(d => (d as Record<string, number>)[tk.key] > 0));
 
           if (gscKeys.length === 0) return null;
