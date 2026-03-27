@@ -252,7 +252,7 @@ const AdminUserList = () => {
   };
 
   return (
-    <>
+    <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -591,7 +591,7 @@ const AdminUserList = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </AppLayout>
   );
 };
 

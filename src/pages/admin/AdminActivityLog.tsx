@@ -77,7 +77,7 @@ const AdminActivityLog = () => {
         <div>
           <h1 className="text-3xl font-display">Activity Log</h1>
           <p className="text-muted-foreground font-body mt-1">Platform-wide sync and report activity</p>
-        </div>
+    </AppLayout>
 
         <Card>
           <CardHeader>
