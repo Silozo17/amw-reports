@@ -12,9 +12,11 @@ import {
   Shield,
   ChevronsUpDown,
   Check,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/hooks/useOrg';
+import { useInvites } from '@/hooks/useInvites';
 import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -47,9 +49,11 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const { signOut, profile, role, isOwner } = useAuth();
   const { org, orgId, allMemberships, switchOrg } = useOrg();
   const { isPlatformAdmin } = usePlatformAdmin();
+  const { pendingInvites, acceptInvite, declineInvite } = useInvites();
   const location = useLocation();
   const navigate = useNavigate();
   const [orgPopoverOpen, setOrgPopoverOpen] = useState(false);
+  const [invitePopoverOpen, setInvitePopoverOpen] = useState(false);
 
   const handleNavClick = () => {
     onNavigate?.();
@@ -144,6 +148,62 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
           );
         })}
       </nav>
+
+      {pendingInvites.length > 0 && (
+        <div className="border-t border-sidebar-border px-3 pt-3">
+          <Popover open={invitePopoverOpen} onOpenChange={setInvitePopoverOpen}>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 hover:bg-sidebar-accent transition-colors text-left text-sm font-body font-medium text-sidebar-foreground/70">
+                <div className="relative">
+                  <Bell className="h-4 w-4" />
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    {pendingInvites.length}
+                  </span>
+                </div>
+                Invitations
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="start" className="w-72 p-2">
+              <p className="px-2 pb-2 text-xs font-body font-semibold text-muted-foreground uppercase tracking-wider">
+                Pending Invites
+              </p>
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {pendingInvites.map((invite) => (
+                  <div key={invite.id} className="rounded-md border border-border p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      {invite.org_logo ? (
+                        <img src={invite.org_logo} alt={invite.org_name} className="h-6 w-6 rounded object-contain" />
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground text-xs font-display">
+                          {invite.org_name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-body font-medium truncate">{invite.org_name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{invite.role}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { acceptInvite(invite.id); setInvitePopoverOpen(false); }}
+                        className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => declineInvite(invite.id)}
+                        className="flex-1 rounded-md border border-input px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
 
       <div className="border-t border-sidebar-border px-3 py-4">
         <DropdownMenu>
