@@ -1272,7 +1272,7 @@ Deno.serve(async (req) => {
       }
 
       doc.setFontSize(6.5); setC(C.grey);
-      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year} | Page ${pageCount}`, W - M, 9, { align: "right" });
+      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year} | ${T.page} ${pageCount}`, W - M, 9, { align: "right" });
 
       // Brand colour line under header
       setF(C.primary); doc.rect(0, 14, W, 0.5, 'F');
@@ -1282,7 +1282,7 @@ Deno.serve(async (req) => {
       setD(C.lightGrey); doc.setLineWidth(0.3);
       doc.line(M, H - 10, W - M, H - 10);
       doc.setFontSize(6.5); setC(C.grey);
-      doc.text(`${orgName} | Confidential`, M, H - 6);
+      doc.text(`${orgName} | ${T.confidential}`, M, H - 6);
       const footerRight = orgEmail || orgWebsite;
       if (footerRight) {
         doc.text(footerRight, W - M, H - 6, { align: "right" });
