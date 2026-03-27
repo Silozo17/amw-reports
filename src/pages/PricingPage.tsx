@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 
 const PLANS = [
   {
-    name: 'Starter',
+    name: 'Creator',
     price: 'Free',
     period: '',
     desc: 'Perfect for trying out the platform with a single client.',
@@ -128,7 +128,7 @@ const PricingPage = () => {
               <thead>
                 <tr className="border-b border-sidebar-border/40">
                   <th className="py-3 pr-4 text-sm font-body font-semibold text-amw-offwhite/80">Feature</th>
-                  <th className="py-3 px-4 text-sm font-body font-semibold text-center">Starter</th>
+                  <th className="py-3 px-4 text-sm font-body font-semibold text-center">Creator</th>
                   <th className="py-3 px-4 text-sm font-body font-semibold text-center">Freelance</th>
                   <th className="py-3 pl-4 text-sm font-body font-semibold text-center text-primary">Agency</th>
                 </tr>
