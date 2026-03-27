@@ -10,6 +10,7 @@ import { Plus, Search, Building2, Mail, Phone } from 'lucide-react';
 import type { Client } from '@/types/database';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UsageBadge from '@/components/entitlements/UsageBadge';
+import { useOrg } from '@/hooks/useOrg';
 
 const ClientList = () => {
   const { currentClients, maxClients } = useEntitlements();

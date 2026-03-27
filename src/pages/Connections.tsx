@@ -9,6 +9,7 @@ import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformConnection } from '@/types/database';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UsageBadge from '@/components/entitlements/UsageBadge';
+import { useOrg } from '@/hooks/useOrg';
 
 const META_PERMISSIONS_UPDATE_DATE = '2026-03-24';
 

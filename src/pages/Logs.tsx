@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollText, RefreshCw, FileText, Mail } from 'lucide-react';
 import { PLATFORM_LABELS } from '@/types/database';
+import { useOrg } from '@/hooks/useOrg';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   success: 'default',
