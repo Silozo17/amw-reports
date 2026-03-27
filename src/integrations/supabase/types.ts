@@ -386,6 +386,30 @@ export type Database = {
           },
         ]
       }
+      known_devices: {
+        Row: {
+          first_seen_at: string
+          id: string
+          ip_hash: string
+          ua_hash: string
+          user_id: string
+        }
+        Insert: {
+          first_seen_at?: string
+          id?: string
+          ip_hash: string
+          ua_hash: string
+          user_id: string
+        }
+        Update: {
+          first_seen_at?: string
+          id?: string
+          ip_hash?: string
+          ua_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       metric_defaults: {
         Row: {
           available_metrics: string[]
@@ -459,6 +483,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_tracking: {
+        Row: {
+          id: string
+          notification_type: string
+          reference_id: string
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          notification_type: string
+          reference_id: string
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          notification_type?: string
+          reference_id?: string
+          sent_at?: string
+        }
+        Relationships: []
       }
       onboarding_responses: {
         Row: {
@@ -618,6 +663,7 @@ export type Database = {
           chart_color_4: string | null
           created_at: string
           created_by: string | null
+          digest_enabled: boolean
           heading_font: string | null
           id: string
           logo_url: string | null
@@ -642,6 +688,7 @@ export type Database = {
           chart_color_4?: string | null
           created_at?: string
           created_by?: string | null
+          digest_enabled?: boolean
           heading_font?: string | null
           id?: string
           logo_url?: string | null
@@ -666,6 +713,7 @@ export type Database = {
           chart_color_4?: string | null
           created_at?: string
           created_by?: string | null
+          digest_enabled?: boolean
           heading_font?: string | null
           id?: string
           logo_url?: string | null
@@ -1134,6 +1182,17 @@ export type Database = {
       get_portal_snapshots: {
         Args: { _client_id: string; _month: number; _year: number }
         Returns: Json
+      }
+      get_recent_auth_events: {
+        Args: { _since: string }
+        Returns: {
+          created_at: string
+          factor_type: string
+          id: string
+          ip: string
+          payload: Json
+          user_id: string
+        }[]
       }
       has_role: {
         Args: {
