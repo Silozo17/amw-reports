@@ -2067,10 +2067,42 @@ Deno.serve(async (req) => {
       generated_at: new Date().toISOString(),
     };
 
+    let currentReportId: string;
     if (existingReport) {
       await supabase.from("reports").update(reportData).eq("id", existingReport.id);
+      currentReportId = existingReport.id;
     } else {
-      await supabase.from("reports").insert({ client_id, report_month, report_year, org_id: client.org_id, ...reportData });
+      const { data: insertedReport } = await supabase.from("reports").insert({ client_id, report_month, report_year, org_id: client.org_id, ...reportData }).select("id").single();
+      currentReportId = insertedReport?.id ?? "";
+    }
+
+    // ── Enforce 12-report cap per client ──
+    try {
+      const { data: allReports } = await supabase
+        .from("reports")
+        .select("id, pdf_storage_path")
+        .eq("client_id", client_id)
+        .order("report_year", { ascending: false })
+        .order("report_month", { ascending: false });
+
+      if (allReports && allReports.length > 12) {
+        const reportsToDelete = allReports.slice(12);
+        const pdfPaths = reportsToDelete
+          .map(r => r.pdf_storage_path)
+          .filter(Boolean) as string[];
+
+        // Delete PDFs from storage
+        if (pdfPaths.length > 0) {
+          await supabase.storage.from("reports").remove(pdfPaths);
+        }
+
+        // Delete report rows
+        const idsToDelete = reportsToDelete.map(r => r.id);
+        await supabase.from("reports").delete().in("id", idsToDelete);
+        console.log(`Cleaned up ${idsToDelete.length} old reports for client ${client_id}`);
+      }
+    } catch (cleanupErr) {
+      console.error("Report cleanup error (non-fatal):", cleanupErr);
     }
 
     await supabase.from("report_logs").insert({
