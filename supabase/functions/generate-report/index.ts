@@ -1643,15 +1643,15 @@ Deno.serve(async (req) => {
             const change = calcChange(val, prevVal);
             const indicator = formatChangeIndicator(change.pct, INVERTED_METRICS.has(key));
             if (indicator.isPositive === true) {
-              doc.setTextColor(22, 163, 74);
+              setC(C.green);
             } else if (indicator.isPositive === false) {
-              doc.setTextColor(220, 38, 38);
+              setC(C.red);
             } else {
-              doc.setTextColor(150, 150, 150);
+              setC(C.grey);
             }
             doc.setFontSize(7.5);
             doc.text(indicator.label, cardX + 6, y + 24);
-            doc.setTextColor(0, 0, 0);
+            setC(C.metricValue);
           } else {
             doc.setFontSize(7.5); setC(C.grey);
             doc.text(T.newThisMonth, cardX + 6, y + 24);
@@ -1769,14 +1769,14 @@ Deno.serve(async (req) => {
               const change = calcChange(val, prevVal);
               const indicator = formatChangeIndicator(change.pct, INVERTED_METRICS.has(key));
               if (indicator.isPositive === true) {
-                doc.setTextColor(22, 163, 74);
+                setC(C.green);
               } else if (indicator.isPositive === false) {
-                doc.setTextColor(220, 38, 38);
+                setC(C.red);
               } else {
-                doc.setTextColor(150, 150, 150);
+                setC(C.grey);
               }
               doc.text(indicator.label, rx + 4, y + 1);
-              doc.setTextColor(0, 0, 0);
+              setC(C.metricValue);
             } else if (prevVal !== undefined && key in section.prevMetrics) {
               setC(C.grey); doc.text("0.0%", rx + 4, y + 1);
             } else {
@@ -1996,7 +1996,7 @@ Deno.serve(async (req) => {
     setF(C.primary); doc.rect(0, 0, W, 4, 'F');
 
     // Bottom footer bar
-    doc.setFillColor(40, 40, 40); doc.rect(0, H - 20, W, 20, 'F');
+    setF(C.coverDarkPanel); doc.rect(0, H - 20, W, 20, 'F');
 
     const clientFirstName = client.full_name.split(" ")[0];
 
@@ -2016,7 +2016,7 @@ Deno.serve(async (req) => {
     doc.setFont('helvetica', 'normal');
 
     // Body text
-    doc.setTextColor(180, 180, 180);
+    setC(C.textFaint);
     doc.setFontSize(8.5);
     const endText = T.closingLine;
     const endLines = doc.splitTextToSize(endText, 110);
@@ -2030,7 +2030,7 @@ Deno.serve(async (req) => {
     }
 
     // Org details in footer
-    doc.setTextColor(120, 120, 120);
+    setC(C.grey);
     doc.setFontSize(7);
     const endFooterParts: string[] = [];
     if (orgEmail) endFooterParts.push(orgEmail);
