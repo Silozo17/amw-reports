@@ -40,7 +40,13 @@ const SyncProgressBar = ({ activeSyncs, startTime }: SyncProgressBarProps) => {
   const remaining = perItem * (totalItems - totalCompleted);
   const mins = Math.floor(remaining / 60);
   const secs = Math.floor(remaining % 60);
-  const timeLeft = totalCompleted > 0 ? `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} min` : 'Estimating...';
+  const timeLeft = totalCompleted > 0
+    ? remaining < 60
+      ? `~${secs} sec`
+      : mins < 60
+        ? `~${mins} min ${secs} sec`
+        : `~${Math.floor(mins / 60)} hr ${mins % 60} min`
+    : 'Estimating...';
 
   const platformLabel = currentPlatform ? (PLATFORM_LABELS[currentPlatform as PlatformType] || currentPlatform) : '';
   const monthLabel = currentMonth ? `${MONTH_NAMES[currentMonth]} ${currentYear}` : '';
