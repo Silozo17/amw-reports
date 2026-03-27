@@ -3,6 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import type { AppRole, Profile } from '@/types/database';
 
+interface ClientUserInfo {
+  client_id: string;
+  org_id: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -12,6 +17,8 @@ interface AuthContextType {
   isOwner: boolean;
   isPlatformAdmin: boolean;
   isManager: boolean;
+  isClientUser: boolean;
+  clientUserInfo: ClientUserInfo | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -26,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [clientUserInfo, setClientUserInfo] = useState<ClientUserInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -50,6 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', userId)
       .maybeSingle();
     setIsPlatformAdmin(!!adminData);
+
+    // Check if user is a client_user
+    const { data: cuData } = await supabase
+      .rpc('get_client_user_info', { _user_id: userId });
+    if (cuData && cuData.length > 0) {
+      setClientUserInfo({ client_id: cuData[0].client_id, org_id: cuData[0].org_id });
+    } else {
+      setClientUserInfo(null);
+    }
   }, []);
 
   const refetchProfile = useCallback(async () => {
@@ -69,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setRole(null);
           setIsPlatformAdmin(false);
+          setClientUserInfo(null);
         }
         setIsLoading(false);
       }
@@ -112,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isOwner: role === 'owner',
         isPlatformAdmin,
         isManager: role === 'manager',
+        isClientUser: !!clientUserInfo,
+        clientUserInfo,
         signIn,
         signUp,
         signOut,
