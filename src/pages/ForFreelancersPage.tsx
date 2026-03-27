@@ -7,7 +7,7 @@ const WHY_POINTS = [
   { title: 'Save hours every month', desc: 'Stop manually pulling data from 10 platforms. AMW Reports does it automatically.' },
   { title: 'Impress clients with professional reports', desc: 'Branded PDF reports with your logo make you look like a full-service agency.' },
   { title: 'White-label your deliverables', desc: 'Clients see your brand on every report and portal page. They will never know you use AMW Reports.' },
-  { title: 'Start free, upgrade when ready', desc: 'The Creator plan is free with 1 client and 5 connections. Upgrade to Freelance at just \u00A349.99/mo.' },
+  { title: 'Start free, upgrade when ready', desc: 'The Creator plan is free with 1 client and 5 connections. Upgrade to Freelance at just £29.99/mo.' },
 ];
 
 const STEPS = [
@@ -76,7 +76,7 @@ const ForFreelancersPage = () => {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Affordable Pricing for Freelancers</h2>
           <p className="text-amw-offwhite/60 font-body mb-8">
-            Start free with the Creator plan (1 client, 5 connections). When you grow, upgrade to Freelance at just £49.99/month for 5 clients and 25 connections. No contracts, cancel anytime.
+            Start free with the Creator plan (1 client, 5 connections). When you grow, upgrade to Freelance at just £29.99/month for 5 clients and 25 connections. No contracts, cancel anytime.
           </p>
           <Button asChild variant="outline">
             <Link to="/pricing">View All Plans <ArrowRight className="ml-2 h-4 w-4" /></Link>

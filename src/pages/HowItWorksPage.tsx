@@ -61,7 +61,7 @@ const HowItWorksPage = () => {
             <div className="order-1 lg:order-2">
               <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Step 2: We Sync Your Data</h2>
               <p className="text-amw-offwhite/60 font-body">
-                Once connected, AMW Reports automatically pulls 70+ metrics across all your platforms. Freelance and Agency plans sync daily. The free Creator plan syncs monthly on the 4th. Data is stored securely and ready for report generation at any time.
+                Once connected, AMW Reports automatically pulls 70+ metrics across all your platforms. Agency plans sync daily, Freelance plans sync weekly (every Monday), and the free Creator plan syncs monthly on the 4th. Data is stored securely and ready for report generation at any time.
               </p>
             </div>
           </div>
