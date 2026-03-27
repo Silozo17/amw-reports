@@ -1,61 +1,61 @@
 
 
-# Fix Client Creation Bug & Add Organisation Switcher
+# In-Platform Organisation Invites
 
-## Problem Analysis
-
-**Root cause of "cannot add clients"**: The test user (`test@test.com`) and 3 other users have **no `org_members` record**. The `user_org_id()` database function returns `NULL` for them, which means:
-- Every RLS policy that checks `org_id = user_org_id(auth.uid())` blocks all operations
-- The `useOrg` hook's recovery path creates a **brand new org** instead of linking to their existing one, making the problem worse
-
-Current state of affected users:
-
-```text
-User                              | profile.org_id       | org_members record
-----------------------------------+----------------------+-------------------
-test@test.com                     | AMW Media (exists)   | MISSING
-ms@redigital.dk                   | NULL                 | MISSING
-piotrsolarsolarski@gmail.com      | NULL                 | MISSING
-k.hejmanowski@yahoo.co.uk        | NULL                 | MISSING
-```
-
-**Org switcher**: Currently no UI or data model supports switching between multiple orgs for a single user.
-
----
+## Problem
+Existing users cannot see or act on org invites inside the app — invites only work via the `handle_new_user` trigger on signup.
 
 ## Plan
 
-### 1. Data Fix — Insert missing `org_members` records (DB Migration)
+### 1. DB Migration — RLS policies on `org_members` for invite recipients
 
-For the test user who already has `profiles.org_id` set to AMW Media: insert an `org_members` row linking them as `manager` to that org.
+Add 3 new policies using a security definer function to avoid recursion:
 
-For the 3 users with NULL org_id: the `useOrg` recovery path will handle creating orgs for them on next login (this already works once the membership exists).
+```sql
+-- Security definer function to get current user's email
+CREATE OR REPLACE FUNCTION public.user_email(_user_id uuid)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT email FROM public.profiles WHERE user_id = _user_id LIMIT 1
+$$;
 
-### 2. Fix `useOrg` recovery logic (`src/hooks/useOrg.ts`)
+-- SELECT: see invites addressed to you
+CREATE POLICY "Users can view own invites" ON org_members
+FOR SELECT TO authenticated
+USING (invited_email = user_email(auth.uid()) AND accepted_at IS NULL AND user_id IS NULL);
 
-Update the recovery path so that when no `org_members` record is found, it first checks if `profiles.org_id` is set. If so, it creates a membership for that existing org (as `manager`) instead of creating a brand new org. Only create a new org if `profiles.org_id` is also NULL.
+-- UPDATE: accept invite
+CREATE POLICY "Users can accept own invites" ON org_members
+FOR UPDATE TO authenticated
+USING (invited_email = user_email(auth.uid()) AND accepted_at IS NULL AND user_id IS NULL);
 
-### 3. Add Organisation Switcher to Sidebar (`src/components/layout/AppSidebar.tsx`)
+-- DELETE: decline invite
+CREATE POLICY "Users can decline own invites" ON org_members
+FOR DELETE TO authenticated
+USING (invited_email = user_email(auth.uid()) AND accepted_at IS NULL AND user_id IS NULL);
+```
 
-- Query all orgs the user belongs to via `org_members`
-- If the user has access to more than one org, render a dropdown in the sidebar header area (where the org name/logo currently sits) allowing them to switch
-- Switching sets a `selectedOrgId` in `useOrg` context/state, which overrides the default first-org fetch
-- Requires updating `useOrg` to accept an override and exposing a `switchOrg` function
+### 2. New hook — `src/hooks/useInvites.ts`
 
-### 4. Update `useOrg` for multi-org support (`src/hooks/useOrg.ts`)
+- Query `org_members` where `invited_email` matches current user email, `accepted_at IS NULL`, `user_id IS NULL`
+- Join with `organisations` to get org name/logo for display
+- `acceptInvite(id)`: update row → set `user_id = auth.uid()`, `accepted_at = now()`; then call `refetchOrg()`
+- `declineInvite(id)`: delete the row
 
-- Fetch ALL `org_members` records for the user (not just first)
-- Expose `orgs: OrgMembership[]` list
-- Store selected org in `localStorage` for persistence across reloads
-- Add `switchOrg(orgId: string)` function
+### 3. UI — Bell icon in `src/components/layout/AppSidebar.tsx`
 
----
+- Add a `Bell` icon with badge count near the user menu area (above the user dropdown)
+- Clicking opens a `Popover` listing pending invites showing org name, role, and Accept/Decline buttons
+- On accept, trigger `refetchOrg()` so the org switcher updates immediately
+- Hide bell entirely when no pending invites exist
 
-## Files to Modify
+## Files
 
 | File | Change |
 |---|---|
-| DB Migration | Insert missing `org_members` row for test user |
-| `src/hooks/useOrg.ts` | Fix recovery logic; add multi-org support with `switchOrg` |
-| `src/components/layout/AppSidebar.tsx` | Add org switcher dropdown in header |
+| DB Migration | Add `user_email()` function + 3 RLS policies on `org_members` |
+| `src/hooks/useInvites.ts` | New hook: fetch pending invites, accept, decline |
+| `src/components/layout/AppSidebar.tsx` | Add bell icon with invite notification popover |
 
