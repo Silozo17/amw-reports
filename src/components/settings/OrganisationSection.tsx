@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/hooks/useOrg';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,8 +22,7 @@ interface TeamMember {
 }
 
 const OrganisationSection = () => {
-  const { role } = useAuth();
-  const { org, orgId } = useOrg();
+  const { org, orgId, orgRole } = useOrg();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -80,7 +78,7 @@ const OrganisationSection = () => {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Your Role</span>
-            <Badge className="capitalize">{role}</Badge>
+            <Badge className="capitalize">{orgRole ?? 'member'}</Badge>
           </div>
         </CardContent>
       </Card>
