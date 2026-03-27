@@ -17,7 +17,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/hooks/useOrg';
 import { useInvites } from '@/hooks/useInvites';
-import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
+
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -48,7 +48,7 @@ interface AppSidebarProps {
 const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const { signOut, profile, role, isOwner, isPlatformAdmin } = useAuth();
   const { org, orgId, allMemberships, switchOrg } = useOrg();
-  const { isPlatformAdmin } = usePlatformAdmin();
+  
   const { pendingInvites, acceptInvite, declineInvite } = useInvites();
   const location = useLocation();
   const navigate = useNavigate();
