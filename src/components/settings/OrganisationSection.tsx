@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Trash2, Mail } from 'lucide-react';
+import { UserPlus, Trash2, Mail, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sendBrandedEmail } from '@/lib/sendBrandedEmail';
 
@@ -23,11 +24,34 @@ interface TeamMember {
   profiles?: { full_name: string | null; email: string | null } | null;
 }
 
+const TEAM_SIZE_OPTIONS = ['1-5', '6-15', '16-50', '51-200', '200+'];
+
 const OrganisationSection = () => {
   const { role } = useAuth();
-  const { org, orgId } = useOrg();
+  const { org, orgId, orgRole, refetchOrg } = useOrg();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Editable org fields
+  const [orgName, setOrgName] = useState('');
+  const [orgPhone, setOrgPhone] = useState('');
+  const [orgEmail, setOrgEmail] = useState('');
+  const [orgWebsite, setOrgWebsite] = useState('');
+  const [orgAddress, setOrgAddress] = useState('');
+  const [orgTeamSize, setOrgTeamSize] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync form state when org loads
+  useEffect(() => {
+    if (org) {
+      setOrgName(org.name ?? '');
+      setOrgPhone(org.phone ?? '');
+      setOrgEmail(org.email ?? '');
+      setOrgWebsite(org.website ?? '');
+      setOrgAddress(org.address ?? '');
+      setOrgTeamSize(org.team_size ?? '');
+    }
+  }, [org]);
 
   const fetchMembers = async () => {
     if (!orgId) return;
@@ -54,17 +78,44 @@ const OrganisationSection = () => {
     if (orgId) fetchMembers();
   }, [orgId]);
 
+  const handleSaveOrg = async () => {
+    if (!orgId || !orgName.trim()) {
+      toast.error('Organisation name is required');
+      return;
+    }
+    setIsSaving(true);
+    const { error } = await supabase
+      .from('organisations')
+      .update({
+        name: orgName.trim(),
+        phone: orgPhone.trim() || null,
+        email: orgEmail.trim() || null,
+        website: orgWebsite.trim() || null,
+        address: orgAddress.trim() || null,
+        team_size: orgTeamSize || null,
+      })
+      .eq('id', orgId);
+
+    if (error) {
+      toast.error('Failed to save organisation');
+    } else {
+      toast.success('Organisation updated');
+      await refetchOrg();
+    }
+    setIsSaving(false);
+  };
+
   const handleRemoveMember = async (member: TeamMember) => {
     const removedEmail = member.profiles?.email ?? member.invited_email;
     const removedName = member.profiles?.full_name ?? member.invited_email ?? 'Unknown';
+    const isPending = !member.accepted_at;
 
     const { error } = await supabase.from('org_members').delete().eq('id', member.id);
     if (error) {
-      toast.error('Failed to remove');
+      toast.error(isPending ? 'Failed to revoke invite' : 'Failed to remove');
     } else {
-      toast.success('Member removed');
+      toast.success(isPending ? 'Invite revoked' : 'Member removed');
 
-      // Send member_removed email (fire-and-forget)
       if (removedEmail && orgId) {
         sendBrandedEmail({
           templateName: 'member_removed',
@@ -113,25 +164,69 @@ const OrganisationSection = () => {
     }
   };
 
+  // Determine if the current user can remove/revoke a given member
+  const canRemoveMember = (member: TeamMember) => {
+    const isPending = !member.accepted_at;
+    // Pending invites can always be revoked (by owners)
+    if (isPending) return true;
+    // Accepted owners cannot be removed
+    if (member.role === 'owner') return false;
+    // Accepted managers can be removed by owners
+    return true;
+  };
+
   return (
     <div className="space-y-6">
-      {/* Org Details */}
+      {/* Org Details — Editable */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="font-display text-lg">Organisation</CardTitle>
+          <Button size="sm" onClick={handleSaveOrg} disabled={isSaving} className="gap-2">
+            {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Name</span>
-            <span className="font-medium">{org?.name ?? '—'}</span>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="Organisation name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input value={orgPhone} onChange={e => setOrgPhone(e.target.value)} placeholder="+44 123 456 7890" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={orgEmail} onChange={e => setOrgEmail(e.target.value)} placeholder="hello@agency.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Website</Label>
+              <Input value={orgWebsite} onChange={e => setOrgWebsite(e.target.value)} placeholder="https://agency.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Team Size</Label>
+              <Select value={orgTeamSize} onValueChange={setOrgTeamSize}>
+                <SelectTrigger><SelectValue placeholder="Select team size" /></SelectTrigger>
+                <SelectContent>
+                  {TEAM_SIZE_OPTIONS.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Slug</Label>
+              <Input value={org?.slug ?? ''} disabled className="opacity-60" />
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Slug</span>
-            <span>{org?.slug ?? '—'}</span>
+          <div className="space-y-2">
+            <Label>Address</Label>
+            <Textarea value={orgAddress} onChange={e => setOrgAddress(e.target.value)} placeholder="Business address" rows={2} />
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Your Role</span>
-            <Badge className="capitalize">{role}</Badge>
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Your Role</span>
+            <Badge className="capitalize">{orgRole}</Badge>
           </div>
         </CardContent>
       </Card>
@@ -149,45 +244,57 @@ const OrganisationSection = () => {
             <p className="text-sm text-muted-foreground text-center py-4">No team members found</p>
           ) : (
             <div className="space-y-2">
-              {teamMembers.map(member => (
-                <div key={member.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
-                  <div>
-                    <p className="text-sm font-body font-medium">
-                      {member.profiles?.full_name ?? member.invited_email ?? 'Unknown'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {member.profiles?.email ?? member.invited_email ?? ''}
-                      {!member.accepted_at && member.invited_email && (
-                        <span className="ml-2 text-warning">· Pending invite</span>
+              {teamMembers.map(member => {
+                const isPending = !member.accepted_at;
+                return (
+                  <div key={member.id} className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                    <div>
+                      <p className="text-sm font-body font-medium">
+                        {member.profiles?.full_name ?? member.invited_email ?? 'Unknown'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {member.profiles?.email ?? member.invited_email ?? ''}
+                        {isPending && member.invited_email && (
+                          <span className="ml-2 text-warning">· Pending invite</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {orgRole === 'owner' && !isPending && member.role !== 'owner' && (
+                        <Select
+                          value={member.role}
+                          onValueChange={(v) => handleRoleChange(member.id, member, v as 'owner' | 'manager')}
+                        >
+                          <SelectTrigger className="h-7 w-[110px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="owner">Owner</SelectItem>
+                          </SelectContent>
+                        </Select>
                       )}
-                    </p>
+                      {(orgRole !== 'owner' || (!isPending && member.role === 'owner')) && (
+                        <Badge variant="outline" className="capitalize">{member.role}</Badge>
+                      )}
+                      {isPending && (
+                        <Badge variant="secondary" className="text-xs">Pending</Badge>
+                      )}
+                      {canRemoveMember(member) && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => handleRemoveMember(member)}
+                          title={isPending ? 'Revoke invite' : 'Remove member'}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                   <div className="flex items-center gap-2">
-                     {role === 'owner' && member.role !== 'owner' && (
-                       <Select
-                         value={member.role}
-                         onValueChange={(v) => handleRoleChange(member.id, member, v as 'owner' | 'manager')}
-                       >
-                         <SelectTrigger className="h-7 w-[110px] text-xs">
-                           <SelectValue />
-                         </SelectTrigger>
-                         <SelectContent>
-                           <SelectItem value="manager">Manager</SelectItem>
-                           <SelectItem value="owner">Owner</SelectItem>
-                         </SelectContent>
-                       </Select>
-                     )}
-                     {(role !== 'owner' || member.role === 'owner') && (
-                       <Badge variant="outline" className="capitalize">{member.role}</Badge>
-                     )}
-                     {member.role !== 'owner' && (
-                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveMember(member)}>
-                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                       </Button>
-                     )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -219,7 +326,6 @@ const InviteDialog = ({ orgId, onInvite }: { orgId: string; onInvite: () => void
     if (error) {
       toast.error(error.message.includes('unique') ? 'This email has already been invited' : 'Failed to send invite');
     } else {
-      // Send team_invitation email (fire-and-forget)
       sendBrandedEmail({
         templateName: 'team_invitation',
         recipientEmail: email.trim().toLowerCase(),
