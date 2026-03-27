@@ -654,6 +654,7 @@ export type Database = {
       organisations: {
         Row: {
           accent_color: string | null
+          address: string | null
           body_font: string | null
           button_color: string | null
           button_text_color: string | null
@@ -664,21 +665,26 @@ export type Database = {
           created_at: string
           created_by: string | null
           digest_enabled: boolean
+          email: string | null
           heading_font: string | null
           id: string
           logo_url: string | null
           name: string
+          phone: string | null
           primary_color: string | null
           report_settings: Json | null
           secondary_color: string | null
           show_org_name: boolean | null
           slug: string | null
+          team_size: string | null
           text_on_dark: string | null
           text_on_light: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
           accent_color?: string | null
+          address?: string | null
           body_font?: string | null
           button_color?: string | null
           button_text_color?: string | null
@@ -689,21 +695,26 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           digest_enabled?: boolean
+          email?: string | null
           heading_font?: string | null
           id?: string
           logo_url?: string | null
           name: string
+          phone?: string | null
           primary_color?: string | null
           report_settings?: Json | null
           secondary_color?: string | null
           show_org_name?: boolean | null
           slug?: string | null
+          team_size?: string | null
           text_on_dark?: string | null
           text_on_light?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
           accent_color?: string | null
+          address?: string | null
           body_font?: string | null
           button_color?: string | null
           button_text_color?: string | null
@@ -714,18 +725,22 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           digest_enabled?: boolean
+          email?: string | null
           heading_font?: string | null
           id?: string
           logo_url?: string | null
           name?: string
+          phone?: string | null
           primary_color?: string | null
           report_settings?: Json | null
           secondary_color?: string | null
           show_org_name?: boolean | null
           slug?: string | null
+          team_size?: string | null
           text_on_dark?: string | null
           text_on_light?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
