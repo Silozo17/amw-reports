@@ -1,111 +1,65 @@
 
 
-# Add Platform Screenshots Across the Entire Marketing Website
+# Improve Page Readability: Orange Pills + Alternating Dark/Light Sections
 
-## Overview
+## Two Problems
 
-Copy 10 uploaded screenshots into `src/assets/screenshots/` and place them strategically across all public marketing pages to showcase the platform. The Facebook screenshot gets a CSS gradient fade at the bottom. All images get descriptive alt tags. Images are imported as ES modules for proper bundling.
+1. **Purple metric pills** (`bg-primary/10 text-primary`) are nearly invisible on the dark `bg-amw-black` background
+2. **All sections look the same** — monotone dark creates visual fatigue and makes content hard to scan
 
-## Image Inventory
+## Solution
 
-| File | Asset name | Strategic use |
-|---|---|---|
-| `Dashboard_Snapshot.webp` | `dashboardSnapshot` | HomePage hero area, FeaturesPage, ForAgenciesPage |
-| `Performance_Overview.webp` | `perfOverview` | HomePage (features section), FeaturesPage |
-| `facebook.webp` | `facebookPlatform` | SocialMediaReportingPage, ForCreatorsPage |
-| `instagram.webp` | `instagramPlatform` | SocialMediaReportingPage, ForCreatorsPage, ForFreelancersPage |
-| `Google_ads.webp` | `googleAdsPlatform` | PpcReportingPage, ForAgenciesPage |
-| `Meta_ads.webp` | `metaAdsPlatform` | PpcReportingPage |
-| `G4A.webp` | `gaPlatform` | SeoReportingPage, ForSmbsPage |
-| `gsc.webp` | `gscPlatform` | SeoReportingPage |
-| `tiktok.webp` | `tiktokPlatform` | SocialMediaReportingPage |
-| `YouTube.webp` | `youtubePlatform` | SocialMediaReportingPage, ForCreatorsPage |
+### 1. Change Metric Pills to Orange on Dark Backgrounds
 
-## Facebook Gradient Fade
+Replace all instances of `bg-primary/10 text-primary` on metric pill/badge spans with `bg-amw-orange/15 text-amw-orange` across all marketing pages. This applies to the metric tags inside platform cards (e.g., "Search Clicks", "Sessions", "Spend" etc.).
 
-Wrap the Facebook image in a container with a CSS pseudo-element or a div overlay gradient from transparent to background colour at the bottom ~20% of the image, since the screenshot was cut off.
+Also update the platform strip tags (e.g., "Google Ads", "Meta Ads") which currently use `bg-sidebar-accent/40 border border-sidebar-border/50 text-amw-offwhite/70` — these are fine as-is since they're neutral, but the metric-specific pills need the orange treatment.
 
-```css
-.screenshot-fade-bottom {
-  position: relative;
-}
-.screenshot-fade-bottom::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 25%;
-  background: linear-gradient(to bottom, transparent, hsl(var(--background)));
-}
+### 2. Alternate Dark/Light Sections
+
+Introduce alternating section backgrounds across all pages. Every other section gets a slightly lighter background to create visual rhythm:
+
+- **Dark sections** (default): no extra class — inherits `bg-amw-black` from the page
+- **Light sections**: add `bg-[hsl(340_7%_18%)]` (a slightly lighter shade of the dark theme, matching `--sidebar-accent`) — this creates a subtle but noticeable contrast band
+
+Pattern per page: Hero (dark) → next section (light) → next (dark) → next (light) → etc.
+
+The light sections replace the current `border-t border-sidebar-border/30` dividers with the background contrast itself, making dividers optional but still kept for extra definition.
+
+## Files to Modify
+
+| File | Changes |
+|---|---|
+| `src/pages/HomePage.tsx` | Orange pills on metric tags; alternate `bg-sidebar-accent/30` on even sections |
+| `src/pages/FeaturesPage.tsx` | Orange pills on platform metric badges; alternate light sections |
+| `src/pages/SeoReportingPage.tsx` | Orange pills; alternate light sections |
+| `src/pages/SocialMediaReportingPage.tsx` | Orange pills; alternate light sections |
+| `src/pages/PpcReportingPage.tsx` | Orange pills; alternate light sections |
+| `src/pages/WhiteLabelReportsPage.tsx` | Alternate light sections |
+| `src/pages/ForAgenciesPage.tsx` | Orange pills on platform strip; alternate light sections |
+| `src/pages/ForFreelancersPage.tsx` | Alternate light sections |
+| `src/pages/ForSmbsPage.tsx` | Orange pills on platform strip; alternate light sections |
+| `src/pages/ForCreatorsPage.tsx` | Alternate light sections |
+
+## Specific Changes
+
+### Pill colour change (all pages)
+```
+// Before
+bg-primary/10 text-primary
+
+// After
+bg-amw-orange/15 text-amw-orange
 ```
 
-## Strategic Placement Per Page
+### Alternating section backgrounds
+Every other `<section>` gets an additional class to create the light band:
+```
+// Light band section
+className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30"
+```
+This `bg-white/[0.03]` is extremely subtle on dark backgrounds — enough to break the monotony without looking jarring. Combined with the existing border-t dividers, it creates clear content zones.
 
-### 1. HomePage (`src/pages/HomePage.tsx`)
-- **Hero section**: Replace mascot on desktop with `dashboardSnapshot` — full-width showcase of the actual product (much more impactful than a mascot illustration)
-- **"How it Works" section**: Add `perfOverview` below the 3 steps to show what the output looks like
-
-### 2. FeaturesPage (`src/pages/FeaturesPage.tsx`)
-- **Hero section**: Add `dashboardSnapshot` below the hero text as a large centred showcase
-- **Reporting Features section**: Add `perfOverview` alongside the reporting features cards
-
-### 3. SocialMediaReportingPage (`src/pages/SocialMediaReportingPage.tsx`)
-- **Hero section**: Add `instagramPlatform` below hero CTA
-- **Platform cards section**: Add `facebookPlatform` (with fade), `tiktokPlatform`, `youtubePlatform` interspersed between or after the platform cards
-
-### 4. SeoReportingPage (`src/pages/SeoReportingPage.tsx`)
-- **Hero section**: Add `gscPlatform` below hero CTA
-- **Platform section**: Add `gaPlatform` alongside the platform detail cards
-
-### 5. PpcReportingPage (`src/pages/PpcReportingPage.tsx`)
-- **Hero section**: Add `googleAdsPlatform` below hero CTA
-- **Platform section**: Add `metaAdsPlatform` alongside ad platform cards
-
-### 6. WhiteLabelReportsPage (`src/pages/WhiteLabelReportsPage.tsx`)
-- **"How it works" section**: Add `dashboardSnapshot` to show the branding in context
-
-### 7. ForAgenciesPage (`src/pages/ForAgenciesPage.tsx`)
-- **Hero or solution section**: Add `dashboardSnapshot` showing multi-platform overview
-- **Features section**: Add `googleAdsPlatform` to show per-platform depth
-
-### 8. ForFreelancersPage (`src/pages/ForFreelancersPage.tsx`)
-- **Hero section**: Add `instagramPlatform` to show what a freelancer's client sees
-
-### 9. ForSmbsPage (`src/pages/ForSmbsPage.tsx`)
-- **Features section**: Add `gaPlatform` to show simple analytics view
-
-### 10. ForCreatorsPage (`src/pages/ForCreatorsPage.tsx`)
-- **Hero section**: Add `youtubePlatform` to show creator-relevant metrics
-- **Metrics section**: Add `instagramPlatform`
-
-## Image Styling
-
-All screenshots will be styled consistently:
-- `rounded-xl border border-sidebar-border/30 shadow-2xl` for card-like appearance
-- Max-width constrained to `max-w-5xl` for larger showcases, `max-w-3xl` for inline
-- On dark backgrounds, they'll pop naturally since they have transparent backgrounds — add `bg-background/50 backdrop-blur-sm` to give them a subtle backing
-
-## Files Modified
-
-| File | Change |
-|---|---|
-| `src/assets/screenshots/` | Copy all 10 `.webp` files |
-| `src/index.css` | Add `.screenshot-fade-bottom` utility class |
-| `src/pages/HomePage.tsx` | Replace mascot with dashboard screenshot, add perfOverview |
-| `src/pages/FeaturesPage.tsx` | Add dashboard + perfOverview screenshots |
-| `src/pages/SocialMediaReportingPage.tsx` | Add instagram, facebook (faded), tiktok, youtube |
-| `src/pages/SeoReportingPage.tsx` | Add gsc + ga screenshots |
-| `src/pages/PpcReportingPage.tsx` | Add google ads + meta ads screenshots |
-| `src/pages/WhiteLabelReportsPage.tsx` | Add dashboard screenshot |
-| `src/pages/ForAgenciesPage.tsx` | Add dashboard + google ads screenshots |
-| `src/pages/ForFreelancersPage.tsx` | Add instagram screenshot |
-| `src/pages/ForSmbsPage.tsx` | Add ga screenshot |
-| `src/pages/ForCreatorsPage.tsx` | Add youtube + instagram screenshots |
-
-## Implementation Batches
-
-1. **Batch 1**: Copy all images, add CSS utility, update HomePage + FeaturesPage + ForAgenciesPage
-2. **Batch 2**: Update all reporting pages (Social, SEO, PPC, White-Label)
-3. **Batch 3**: Update audience pages (Freelancers, SMBs, Creators)
+### Implementation order
+1. All 10 pages updated in parallel — pill colour swap is a simple find-replace, section backgrounds are added to alternating sections
 
