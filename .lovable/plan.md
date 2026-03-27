@@ -1,74 +1,58 @@
 
 
-# Fix Branding Color Drift + Redesign Layout + Website Branding Extraction
+# Assessment: Your Proposed Extract-Branding Setup
 
-## Problem: Color Values Change on Save
+## What's Already Built
 
-The color drift is caused by **lossy hex↔HSL round-trip conversion**. The flow is:
+The edge function (`extract-branding/index.ts`) and the UI in `BrandingSection.tsx` are **already fully implemented and working**. The current setup:
 
-1. User enters hex `#5B9BD5` → converted to HSL `"212 56% 60%"` via `hexToHsl()` (uses `Math.round()`)
-2. Saved to DB as HSL
-3. On reload, HSL `"212 56% 60%"` → converted back to hex via `hslToHex()` → produces `#5499D4` (slightly different)
+- Edge function uses Firecrawl's `formats: ['branding']` endpoint
+- UI has the URL input, Import button, and auto-applies extracted colors/fonts
+- Font validation against `FONT_OPTIONS` is already in place
+- URL prefix handling (prepending `https://`) is already done
 
-The rounding in both directions compounds. Every save-reload cycle can shift the color.
+## Your Proposed Changes vs Current Implementation
 
-**Fix**: Store hex values directly in the database. Convert to HSL only in `BrandingProvider` at render time (a read-only conversion that never persists). This eliminates the round-trip entirely.
+| Aspect | Current | Your Proposal |
+|---|---|---|
+| Firecrawl format | `formats: ['branding']` (structured) | `formats: ['extract']` with LLM schema |
+| Response shape | `data.branding.colors.primary` | `data.extract.primary_color` |
+| UI flow | Auto-applies on extract | Two-step: preview extracted values, then "Apply" button |
+| Review panel | None — toast notification only | Color swatches + font names shown before applying |
 
----
+## Recommendation
 
-## Changes
+Your proposal is a **valid improvement** in two areas:
 
-### 1. Store hex in DB, convert only in BrandingProvider
+1. **Two-step apply flow** — showing extracted values before applying is better UX. The current version silently overwrites form fields, which can surprise users.
+2. **`extract` format with schema** — gives more control over what Firecrawl extracts (explicit hex codes, font names, logo URL, org name). The `branding` format returns a more complex nested structure that sometimes has unexpected shapes.
 
-**`BrandingSection.tsx`** — Remove `hexToHsl()` from `handleSave()`. Save raw hex strings directly. Remove `hslToHex()` from the `useEffect` that loads org data (values are already hex). Keep the conversion functions only for backward compatibility during the initial load (detect if value starts with `#` or is HSL).
+However, there are a few issues to fix in the proposal:
 
-**`BrandingProvider.tsx`** — Add a helper that detects whether a stored value is hex or HSL and converts hex→HSL before setting CSS variables. This makes BrandingProvider work with both old HSL data and new hex data.
+### Fixes needed
 
-### 2. Consolidate into a single card with save button at top-right
+1. **Edge function already exists** — don't create a new file, update the existing `supabase/functions/extract-branding/index.ts`
+2. **The UI markup in your proposal is missing JSX tags** — it's rendered as plain text. I'll build it properly with the correct component structure.
+3. **Onboarding integration** — I need to check the onboarding page structure before adding the auto-import link there.
 
-Merge Identity, Colours, Chart Palette, Typography, and Report Settings into **one Card**. Place the Save button in the `CardHeader` aligned to the right. Use section dividers (`<Separator />`) between logical groups internally.
+## Plan
 
-Layout within the single card:
-```text
-┌─────────────────────────────────────────────┐
-│ Branding                         [SaveBtn] │
-├─────────────────────────────────────────────┤
-│ Identity (logo, name, toggle)               │
-│─────────────────────────────────────────────│
-│ Colours (left)  |  Live Preview (right)     │
-│                 |  Chart Palette (below)    │
-│─────────────────────────────────────────────│
-│ Typography                                  │
-│─────────────────────────────────────────────│
-│ Report Settings                             │
-└─────────────────────────────────────────────┘
-```
+### File 1: `supabase/functions/extract-branding/index.ts`
+Replace the `formats: ['branding']` approach with the `formats: ['extract']` + schema approach from your proposal. Normalise hex codes. Return a flat object with `primary_color`, `secondary_color`, `accent_color`, `heading_font`, `body_font`, `logo_url`, `org_name`.
 
-### 3. Move Chart Palette below Live Preview
+### File 2: `src/components/settings/BrandingSection.tsx`
+- Add `extractedResult` state for the two-step review flow
+- Update `handleExtractBranding` to store the result in state instead of immediately applying
+- Add a review panel showing extracted color swatches and font names
+- Add `applyExtractedBranding` that copies values into form state (with font validation against `FONT_OPTIONS`)
+- Show friendly message when no colors detected
 
-Currently the chart palette is in a separate card. Move it into the right column, directly below the live preview box. This way the user can see color changes reflected immediately in the preview bar chart above.
+### File 3: `src/pages/OnboardingPage.tsx`
+- Add optional "Auto-import branding from this website" link after the website URL field (needs investigation of current onboarding structure)
 
-### 4. Website branding extraction
-
-Firecrawl is available in the workspace but **not linked to this project**. Once linked, we can use Firecrawl's `branding` scrape format to extract colors, fonts, and logo from any URL.
-
-**Implementation**:
-- Link Firecrawl connector to the project
-- Create a `supabase/functions/extract-branding/index.ts` edge function that calls Firecrawl with `formats: ['branding']`
-- Add a small "Import from website" button/input in the Identity section of BrandingSection. User pastes a URL → calls the edge function → auto-populates primary/secondary/accent colors, fonts, and logo from the response
-- Pre-fill during onboarding: if the org's website field is set (from `OnboardingPage`), offer to auto-extract branding on first visit to settings
-
----
-
-## Files to Modify
-
-| File | Change |
-|---|---|
-| `src/components/settings/BrandingSection.tsx` | Consolidate to single card, fix hex storage, move chart palette, add "Import from website" |
-| `src/components/BrandingProvider.tsx` | Add hex detection + conversion helper |
-| `supabase/functions/extract-branding/index.ts` | New edge function for Firecrawl branding extraction |
-
-## Connector Required
-
-Firecrawl needs to be linked to this project before the website extraction feature can work.
+### Constraints respected
+- No changes to sync functions or report generation
+- Fonts validated against existing `FONT_OPTIONS` list
+- Logo URL shown but not auto-applied (manual upload for quality)
+- URLs without `https://` prefix handled
 
