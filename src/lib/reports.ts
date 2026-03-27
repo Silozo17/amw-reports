@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { sendBrandedEmail } from '@/lib/sendBrandedEmail';
 
 export const generateReport = async (clientId: string, month: number, year: number) => {
   const { data, error } = await supabase.functions.invoke('generate-report', {
@@ -8,16 +9,47 @@ export const generateReport = async (clientId: string, month: number, year: numb
 
   if (error) {
     toast.error(`Report generation failed: ${error.message}`);
+    notifyReportFailure(clientId, month, year, error.message);
     return null;
   }
 
   if (data?.error) {
     toast.error(`Report error: ${data.error}`);
+    notifyReportFailure(clientId, month, year, data.error);
     return null;
   }
 
   toast.success(data.message ?? 'Report generated successfully');
   return data;
+};
+
+/** Fire-and-forget email notification when report generation fails */
+const notifyReportFailure = async (clientId: string, month: number, year: number, errorMessage: string) => {
+  try {
+    // Get client + org info for the email
+    const { data: client } = await supabase
+      .from('clients')
+      .select('company_name, org_id')
+      .eq('id', clientId)
+      .single();
+
+    if (!client) return;
+
+    sendBrandedEmail({
+      templateName: 'report_generation_failed',
+      recipientEmail: '', // edge function resolves org owner email
+      orgId: client.org_id,
+      clientId,
+      data: {
+        client_name: client.company_name,
+        report_month: month,
+        report_year: year,
+        error_message: errorMessage,
+      },
+    }).catch(err => console.error('Failed to send report failure email:', err));
+  } catch (err) {
+    console.error('Failed to notify report failure:', err);
+  }
 };
 
 export const downloadReport = async (pdfPath: string, filename: string) => {
