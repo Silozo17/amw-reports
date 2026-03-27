@@ -1,73 +1,52 @@
 
 
-# Role-Based Access Control Overhaul
+# Rewrite Client Portal to Reuse the Real Dashboard
 
-## Summary
+## Problem
+The current `ClientPortal.tsx` is a completely separate, simplified implementation with basic KPI cards and flat metric grids. It doesn't match the styled dashboard users see inside the platform (Hero KPIs with sparklines, Performance Overview charts, Platform Sections with trend data, etc.).
 
-Enforce three distinct roles across the platform with specific permission boundaries:
-
-- **Admin** (platform admin, info@amwmedia.co.uk only): Full access to everything — admin panel, debug console, all org settings, can manage every user/org
-- **Owner** (org owner): Full org settings, billing, logs — no debug console
-- **Manager** (org member): Branding settings + view logs only
-
-## Current State
-
-- `isOwner` gates Settings page entirely (blocks managers)
-- Debug console is gated by `isOwner` (should be admin-only)
-- No role-based tab filtering in Settings — it's all-or-nothing
-- `info@amwmedia.co.uk` org_members role is `owner`, needs to stay as-is (platform admin status comes from `platform_admins` table)
+## Approach
+Replace the custom portal rendering with the actual `ClientDashboard` component, feeding it data from the `portal-data` edge function. The portal will be view-only but fully interactive for month/platform selection.
 
 ## Changes
 
-### 1. Update `useAuth` hook — expose `isPlatformAdmin` and `isManager`
+### 1. Make `ClientDashboard` work without auth (portal mode)
 
-Add `isPlatformAdmin` check directly into the auth context (query `platform_admins` table alongside profile fetch). Expose:
-- `isPlatformAdmin: boolean`
-- `isOwner: boolean` (unchanged)
-- `isManager: boolean` (role === 'manager')
+Currently `ClientDashboard` fetches its own data from Supabase using the authenticated client. For the portal, we need to pass pre-fetched data or let it fetch via the edge function.
 
-This removes the need for the separate `usePlatformAdmin` hook in most places.
+**Best approach**: Add an optional `portalToken` prop to `ClientDashboard`. When present:
+- Instead of querying Supabase tables directly, call the `portal-data` edge function with the token + selected period
+- Hide admin-only features (AI Analysis button, sync status, metric config)
+- Keep all interactivity: period selector, platform filter, charts, sparklines
 
-### 2. Update `info@amwmedia.co.uk` org_members role to `owner`
+This avoids duplicating the entire dashboard. The edge function already returns all needed data (snapshots, prevSnapshots, trendData, configs, connections).
 
-Use the insert tool to ensure the admin user's `org_members.role` is `owner` (it likely already is). No schema change needed — admin powers come from `platform_admins` table.
+### 2. Update `portal-data` edge function
 
-### 3. Settings Page — role-based tab visibility
+The edge function currently only supports a single month. Update it to accept the same period parameters the dashboard uses (`type`, `month`, `year`, `startDate`, `endDate`) and return aggregated data accordingly — mirroring the logic in `ClientDashboard.fetchSnapshots`.
 
-Instead of blocking managers entirely, show Settings with filtered tabs:
+### 3. Rewrite `ClientPortal.tsx`
 
-| Tab | Admin | Owner | Manager |
-|-----|-------|-------|---------|
-| Organisation | ✅ | ✅ | ❌ |
-| Account | ✅ | ✅ | ✅ (own account) |
-| White Label | ✅ | ✅ | ✅ (branding only) |
-| Metrics | ✅ | ✅ | ❌ |
-| Billing | ✅ | ✅ | ❌ |
+Strip it down to:
+- Token validation via `portal-data` (initial call to get client + org info)
+- Apply org branding (keep existing `applyBranding`)
+- Render a portal header (org logo + client name)
+- Render `<ClientDashboard clientId={...} clientName={...} currencyCode={...} portalToken={token} />`
+- Footer with "Powered by {org.name}"
 
-Managers see: Account + White Label (branding) tabs only.
+### 4. `ClientDashboard` changes (detail)
 
-### 4. Sidebar — role-based menu items
+Add `portalToken?: string` prop. When set:
+- Replace all `supabase.from(...)` queries in `fetchSnapshots` with a single `supabase.functions.invoke('portal-data', { body: { token, ...period } })`
+- Map the response to the same state variables (snapshots, prevSnapshots, trendData, connections, platformConfigs)
+- Hide: AI Analysis button, sync timestamps, any edit/config controls
+- Keep: `DashboardHeader` (platform filter + period selector), `HeroKPIs`, `PerformanceOverview`, `PlatformSection`
 
-| Menu Item | Admin | Owner | Manager |
-|-----------|-------|-------|---------|
-| Settings | ✅ | ✅ | ✅ |
-| Logs | ✅ | ✅ | ✅ (view only) |
-| Debug | ✅ | ❌ | ❌ |
-| Platform Admin | ✅ | ❌ | ❌ |
-
-Key change: Debug moves from `isOwner` gate to `isPlatformAdmin` gate.
-
-### 5. Route protection for Debug Console
-
-Change `/debug` route from `ProtectedRoute` to a new check: redirect non-admins away. The simplest approach is to add a guard inside the `DebugConsole` component itself that checks `isPlatformAdmin`.
-
-## Files to Modify
+## Files
 
 | File | Change |
 |---|---|
-| `src/hooks/useAuth.tsx` | Add `isPlatformAdmin` query + `isManager` derived boolean |
-| `src/pages/SettingsPage.tsx` | Allow managers in, show role-filtered tabs |
-| `src/components/layout/AppSidebar.tsx` | Debug → admin-only; keep Settings visible for all roles |
-| `src/pages/DebugConsole.tsx` | Add admin-only guard (redirect or block) |
-| `src/hooks/usePlatformAdmin.ts` | Keep for `AdminRoute` but `useAuth` will also expose it |
+| `supabase/functions/portal-data/index.ts` | Support full period types (quarterly, ytd, custom, etc.) + return trend data properly |
+| `src/components/clients/ClientDashboard.tsx` | Add `portalToken` prop; when set, fetch via edge function and hide admin controls |
+| `src/pages/ClientPortal.tsx` | Rewrite to validate token, apply branding, render real `ClientDashboard` |
 
