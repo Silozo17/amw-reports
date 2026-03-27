@@ -349,6 +349,7 @@ const GaugeWidget = ({ data }: { data: WidgetData }) => {
 
 // ─── Sparkline-as-chart (for KPI widgets shown as line/area/bar) ─
 const SparklineChart = ({ data, type }: { data: WidgetData; type: 'line' | 'area' | 'bar' }) => {
+  const CHART_COLORS = useChartColors();
   const chartData = data.sparklineData ?? [];
   if (chartData.length < 2) return <p className="text-xs text-muted-foreground italic">Insufficient data</p>;
 
