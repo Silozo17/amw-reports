@@ -1944,7 +1944,7 @@ Deno.serve(async (req) => {
     // Body text
     doc.setTextColor(180, 180, 180);
     doc.setFontSize(8.5);
-    const endText = 'This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We look forward to building on this next month.';
+    const endText = T.closingLine;
     const endLines = doc.splitTextToSize(endText, 110);
     doc.text(endLines, 14, 85);
 
