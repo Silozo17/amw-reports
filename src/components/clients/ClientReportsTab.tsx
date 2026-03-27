@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,12 +21,21 @@ interface ReportRow {
 }
 
 const MONTH_NAMES = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   success: 'default',
   pending: 'secondary',
   running: 'secondary',
   failed: 'destructive',
   partial: 'outline',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'QUEUED',
+  running: 'GENERATING',
+  success: 'SUCCESS',
+  failed: 'FAILED',
+  partial: 'PARTIAL',
 };
 
 interface Props {
@@ -45,6 +54,7 @@ const ClientReportsTab = ({ clientId, clientName, orgId, reportMonth, reportYear
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchReports = async () => {
     const [reportsRes, emailLogsRes] = await Promise.all([
@@ -85,6 +95,23 @@ const ClientReportsTab = ({ clientId, clientName, orgId, reportMonth, reportYear
   useEffect(() => {
     fetchReports();
   }, [clientId]);
+
+  // Poll while any report is pending or running
+  useEffect(() => {
+    const hasActive = reports.some(r => r.status === 'pending' || r.status === 'running');
+    if (hasActive && !pollRef.current) {
+      pollRef.current = setInterval(fetchReports, 3000);
+    } else if (!hasActive && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [reports]);
 
   const handleGenerateNew = async () => {
     if (!reportMonth || !reportYear) {
@@ -165,12 +192,17 @@ const ClientReportsTab = ({ clientId, clientName, orgId, reportMonth, reportYear
         <div className="space-y-2">
           {reports.map(report => {
             const isRegenerating = generatingIds.has(report.id);
+            const isActive = report.status === 'pending' || report.status === 'running';
             return (
               <Card key={report.id}>
                 <CardContent className="flex items-center justify-between p-3">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-primary" />
+                      {isActive ? (
+                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      ) : (
+                        <FileText className="h-4 w-4 text-primary" />
+                      )}
                     </div>
                     <div>
                       <p className="font-body font-semibold text-sm">
@@ -178,6 +210,7 @@ const ClientReportsTab = ({ clientId, clientName, orgId, reportMonth, reportYear
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {report.generated_at && `Generated ${new Date(report.generated_at).toLocaleDateString()}`}
+                        {isActive && 'Report is being generated...'}
                       </p>
                       {report.emailStatus && (
                         <p className={`text-xs mt-0.5 ${report.emailStatus === 'sent' ? 'text-accent' : report.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
@@ -189,17 +222,20 @@ const ClientReportsTab = ({ clientId, clientName, orgId, reportMonth, reportYear
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'} className="text-xs">{report.status}</Badge>
-                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path} onClick={() => handlePreview(report)} title="Preview">
+                    <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'} className="text-xs">
+                      {isActive && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                      {STATUS_LABEL[report.status] ?? report.status}
+                    </Badge>
+                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} title="Preview">
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path} onClick={() => handleDownload(report)} title="Download">
+                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handleDownload(report)} title="Download">
                       <Download className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={isRegenerating} onClick={() => handleRegenerate(report)} title="Regenerate">
+                    <Button size="sm" variant="ghost" disabled={isRegenerating || isActive} onClick={() => handleRegenerate(report)} title="Regenerate">
                       {isRegenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || sendingIds.has(report.id)} onClick={() => handleSendEmail(report)} title="Send email">
+                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || sendingIds.has(report.id) || isActive} onClick={() => handleSendEmail(report)} title="Send email">
                       {sendingIds.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
