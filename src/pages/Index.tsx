@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Users, FileText, AlertTriangle, Plug, ArrowRight, RefreshCw,
-  CheckCircle, XCircle, Mail, Clock,
+  CheckCircle, XCircle, Mail, Clock, Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -46,9 +46,16 @@ const Dashboard = () => {
     disconnected: 0,
   });
   const [clientHealth, setClientHealth] = useState<ClientHealth[]>([]);
+  const [pendingDeletion, setPendingDeletion] = useState<Array<{ id: string; company_name: string; scheduled_deletion_at: string }>>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Check org recovery + onboarding
   useEffect(() => {
@@ -136,7 +143,7 @@ const Dashboard = () => {
       // Guard: if no clients, use impossible ID to avoid empty .in() error
       const safeClientIds = orgClientIds.length > 0 ? orgClientIds : ['00000000-0000-0000-0000-000000000000'];
 
-      const [clientsRes, reportsRes, syncsRes, emailsRes, connectionsRes, allClientsRes, allConnectionsRes, allSyncLogsRes, recentSyncsRes, recentReportsRes, recentEmailsRes] = await Promise.all([
+      const [clientsRes, reportsRes, syncsRes, emailsRes, connectionsRes, allClientsRes, allConnectionsRes, allSyncLogsRes, recentSyncsRes, recentReportsRes, recentEmailsRes, pendingDeletionRes] = await Promise.all([
         supabase.from('clients').select('id', { count: 'exact' }).eq('is_active', true).eq('org_id', orgId),
         supabase.from('reports').select('id, status', { count: 'exact' }).eq('org_id', orgId),
         supabase.from('sync_logs').select('id', { count: 'exact' }).eq('status', 'failed').eq('org_id', orgId),
@@ -148,6 +155,7 @@ const Dashboard = () => {
         supabase.from('sync_logs').select('id, client_id, platform, status, started_at').eq('org_id', orgId).order('started_at', { ascending: false }).limit(5),
         supabase.from('reports').select('id, client_id, status, created_at').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
         supabase.from('email_logs').select('id, client_id, status, created_at, recipient_email').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('clients').select('id, company_name, scheduled_deletion_at').not('scheduled_deletion_at', 'is', null).eq('org_id', orgId),
       ]);
 
       setStats({
@@ -199,6 +207,15 @@ const Dashboard = () => {
 
       setClientHealth(health);
       setActivity(items.slice(0, 8));
+
+      // Pending deletion clients (filter to future only)
+      const pendingRaw = (pendingDeletionRes.data ?? []) as Array<{ id: string; company_name: string; scheduled_deletion_at: string | null }>;
+      setPendingDeletion(
+        pendingRaw
+          .filter(c => c.scheduled_deletion_at && new Date(c.scheduled_deletion_at) > new Date())
+          .map(c => ({ id: c.id, company_name: c.company_name, scheduled_deletion_at: c.scheduled_deletion_at! }))
+      );
+
       setIsLoading(false);
     };
 
