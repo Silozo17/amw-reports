@@ -1,69 +1,73 @@
 
 
-# Admin: Full Org & User Management
+# Role-Based Access Control Overhaul
+
+## Summary
+
+Enforce three distinct roles across the platform with specific permission boundaries:
+
+- **Admin** (platform admin, info@amwmedia.co.uk only): Full access to everything — admin panel, debug console, all org settings, can manage every user/org
+- **Owner** (org owner): Full org settings, billing, logs — no debug console
+- **Manager** (org member): Branding settings + view logs only
 
 ## Current State
 
-The admin panel already supports:
-- Viewing all orgs and users
-- Editing org names, subscriptions, member roles
-- Editing user profiles, changing org assignment, resetting passwords, deactivating/deleting users
+- `isOwner` gates Settings page entirely (blocks managers)
+- Debug console is gated by `isOwner` (should be admin-only)
+- No role-based tab filtering in Settings — it's all-or-nothing
+- `info@amwmedia.co.uk` org_members role is `owner`, needs to stay as-is (platform admin status comes from `platform_admins` table)
 
-**What's missing:**
-1. **Create Organisation** — no button on the org list page
-2. **Delete Organisation** — no option on the org detail page
-3. **Add Member to Org** — no way to link an existing user or invite someone directly from the org detail members tab
-4. **RLS gaps** — platform admins cannot INSERT or DELETE on `org_members` for other orgs, and cannot INSERT or DELETE on `organisations`
+## Changes
 
-## Plan
+### 1. Update `useAuth` hook — expose `isPlatformAdmin` and `isManager`
 
-### 1. DB Migration — Add platform admin RLS policies
+Add `isPlatformAdmin` check directly into the auth context (query `platform_admins` table alongside profile fetch). Expose:
+- `isPlatformAdmin: boolean`
+- `isOwner: boolean` (unchanged)
+- `isManager: boolean` (role === 'manager')
 
-```sql
--- Platform admins can fully manage org_members
-CREATE POLICY "Platform admins can manage all members"
-ON public.org_members FOR ALL TO authenticated
-USING (is_platform_admin(auth.uid()))
-WITH CHECK (is_platform_admin(auth.uid()));
+This removes the need for the separate `usePlatformAdmin` hook in most places.
 
--- Platform admins can create organisations
-CREATE POLICY "Platform admins can create orgs"
-ON public.organisations FOR INSERT TO authenticated
-WITH CHECK (is_platform_admin(auth.uid()));
+### 2. Update `info@amwmedia.co.uk` org_members role to `owner`
 
--- Platform admins can delete organisations
-CREATE POLICY "Platform admins can delete orgs"
-ON public.organisations FOR DELETE TO authenticated
-USING (is_platform_admin(auth.uid()));
-```
+Use the insert tool to ensure the admin user's `org_members.role` is `owner` (it likely already is). No schema change needed — admin powers come from `platform_admins` table.
 
-### 2. AdminOrgList — Add "Create Organisation" button
+### 3. Settings Page — role-based tab visibility
 
-- Dialog with name field
-- On submit: insert into `organisations`, then optionally create a starter subscription
-- Refresh the list after creation
+Instead of blocking managers entirely, show Settings with filtered tabs:
 
-### 3. AdminOrgDetail — Add "Delete Organisation" and "Add Member"
+| Tab | Admin | Owner | Manager |
+|-----|-------|-------|---------|
+| Organisation | ✅ | ✅ | ❌ |
+| Account | ✅ | ✅ | ✅ (own account) |
+| White Label | ✅ | ✅ | ✅ (branding only) |
+| Metrics | ✅ | ✅ | ❌ |
+| Billing | ✅ | ✅ | ❌ |
 
-**Delete Org:**
-- Destructive action with confirmation dialog
-- Deletes org_members, org_subscriptions, then the organisation itself
-- Redirects back to org list
+Managers see: Account + White Label (branding) tabs only.
 
-**Add Member (Members tab):**
-- Button next to "Members" tab header
-- Dialog with: email input (to search existing users or invite), role selector
-- If a user with that email exists in profiles → create `org_members` row linking them + update their `profiles.org_id`
-- If no user found → create a pending invite row (like the existing invite flow)
+### 4. Sidebar — role-based menu items
 
-### 4. AdminUserList — No changes needed
-The edit dialog already supports changing a user's org and role, which covers "link users to organisations".
+| Menu Item | Admin | Owner | Manager |
+|-----------|-------|-------|---------|
+| Settings | ✅ | ✅ | ✅ |
+| Logs | ✅ | ✅ | ✅ (view only) |
+| Debug | ✅ | ❌ | ❌ |
+| Platform Admin | ✅ | ❌ | ❌ |
 
-## Files
+Key change: Debug moves from `isOwner` gate to `isPlatformAdmin` gate.
+
+### 5. Route protection for Debug Console
+
+Change `/debug` route from `ProtectedRoute` to a new check: redirect non-admins away. The simplest approach is to add a guard inside the `DebugConsole` component itself that checks `isPlatformAdmin`.
+
+## Files to Modify
 
 | File | Change |
 |---|---|
-| DB Migration | 3 new RLS policies for platform admin management |
-| `src/pages/admin/AdminOrgList.tsx` | Add "Create Organisation" dialog |
-| `src/pages/admin/AdminOrgDetail.tsx` | Add "Delete Organisation" button + "Add Member" dialog in members tab |
+| `src/hooks/useAuth.tsx` | Add `isPlatformAdmin` query + `isManager` derived boolean |
+| `src/pages/SettingsPage.tsx` | Allow managers in, show role-filtered tabs |
+| `src/components/layout/AppSidebar.tsx` | Debug → admin-only; keep Settings visible for all roles |
+| `src/pages/DebugConsole.tsx` | Add admin-only guard (redirect or block) |
+| `src/hooks/usePlatformAdmin.ts` | Keep for `AdminRoute` but `useAuth` will also expose it |
 
