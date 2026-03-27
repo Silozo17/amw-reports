@@ -273,7 +273,8 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
                   <SelectItem value="it">Italian</SelectItem>
                   <SelectItem value="nl">Dutch</SelectItem>
                   <SelectItem value="pt">Portuguese</SelectItem>
-                  <SelectItem value="pl">Polish</SelectItem>
+                   <SelectItem value="pl">Polish</SelectItem>
+                   <SelectItem value="da">Danish</SelectItem>
                 </SelectContent>
               </Select>
             </div>
