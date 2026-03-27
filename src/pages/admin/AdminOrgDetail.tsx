@@ -71,7 +71,7 @@ const AdminOrgDetail = () => {
   const { data: plans = [] } = useQuery({
     queryKey: ['subscription-plans'],
     queryFn: async () => {
-      const { data } = await supabase.from('subscription_plans').select('*').eq('is_active', true);
+      const { data } = await supabase.from('subscription_plans').select('*').eq('is_active', true).order('base_price', { ascending: true });
       return data ?? [];
     },
   });

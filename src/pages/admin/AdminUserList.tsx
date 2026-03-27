@@ -163,12 +163,13 @@ const AdminUserList = () => {
         }
         // Add new membership
         if (newOrgId) {
-          await supabase.from('org_members').insert({
+          const { error: memberError } = await supabase.from('org_members').insert({
             org_id: newOrgId,
             user_id: editTarget.user_id,
             role: editRole,
             accepted_at: new Date().toISOString(),
           });
+          if (memberError) throw memberError;
         }
       } else if (editTarget.membership_id && editRole !== editTarget.role) {
         // Just update role
