@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, FileText, Mail, Palette, Globe, Users, BarChart3, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const PLATFORM_DETAILS = [
   {
@@ -68,7 +69,10 @@ const AGENCY_TOOLS = [
   { icon: Globe, title: 'Custom Domain', desc: 'Serve your client portal from your own domain for a fully branded experience.' },
 ];
 
-const FeaturesPage = () => (
+const FeaturesPage = () => {
+  usePageMeta({ title: 'Features — AMW Reports', description: '10 platforms, 70+ metrics, branded PDFs, automated email delivery, and a white-label client portal.' });
+
+  return (
   <>
     {/* Hero */}
     <section className="py-20 lg:py-28 text-center">
@@ -156,6 +160,7 @@ const FeaturesPage = () => (
       </div>
     </section>
   </>
-);
+  );
+};
 
 export default FeaturesPage;

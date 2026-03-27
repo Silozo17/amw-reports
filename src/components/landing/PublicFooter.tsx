@@ -37,9 +37,9 @@ const PublicFooter = () => (
         <div className="space-y-3">
           <h4 className="text-sm font-body font-semibold text-amw-offwhite">Legal</h4>
           <div className="flex flex-col gap-2 text-sm font-body">
-            <a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Terms & Conditions</a>
-            <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">amwmedia.co.uk</a>
+            <a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Privacy Policy" className="hover:text-primary transition-colors">Privacy Policy</a>
+            <a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer" aria-label="AMW Reports Terms and Conditions" className="hover:text-primary transition-colors">Terms & Conditions</a>
+            <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website" className="hover:text-primary transition-colors">amwmedia.co.uk</a>
           </div>
         </div>
       </div>
