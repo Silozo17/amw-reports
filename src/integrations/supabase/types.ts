@@ -327,7 +327,7 @@ export type Database = {
       }
       email_logs: {
         Row: {
-          client_id: string
+          client_id: string | null
           created_at: string
           email_type: string | null
           error_message: string | null
@@ -339,7 +339,7 @@ export type Database = {
           status: string
         }
         Insert: {
-          client_id: string
+          client_id?: string | null
           created_at?: string
           email_type?: string | null
           error_message?: string | null
@@ -351,7 +351,7 @@ export type Database = {
           status?: string
         }
         Update: {
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           email_type?: string | null
           error_message?: string | null

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
+import { sendBrandedEmail } from '@/lib/sendBrandedEmail';
 
 export interface PendingInvite {
   id: string;
@@ -63,6 +64,8 @@ export function useInvites() {
   const acceptInvite = useCallback(async (inviteId: string) => {
     if (!user) return;
 
+    const invite = pendingInvites.find(i => i.id === inviteId);
+
     const { error } = await supabase
       .from('org_members')
       .update({ user_id: user.id, accepted_at: new Date().toISOString() })
@@ -73,9 +76,22 @@ export function useInvites() {
       return;
     }
 
+    // Send invitation_accepted notification (fire-and-forget)
+    if (invite) {
+      sendBrandedEmail({
+        templateName: 'invitation_accepted',
+        recipientEmail: invite.invited_email,
+        orgId: invite.org_id,
+        data: {
+          member_name: profile?.full_name ?? profile?.email ?? invite.invited_email,
+          org_name: invite.org_name,
+        },
+      }).catch(err => console.error('Failed to send acceptance email:', err));
+    }
+
     setPendingInvites(prev => prev.filter(i => i.id !== inviteId));
     await refetchOrg();
-  }, [user, refetchOrg]);
+  }, [user, refetchOrg, pendingInvites, profile]);
 
   const declineInvite = useCallback(async (inviteId: string) => {
     const { error } = await supabase
