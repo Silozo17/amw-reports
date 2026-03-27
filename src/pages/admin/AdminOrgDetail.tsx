@@ -508,56 +508,11 @@ const AdminOrgDetail = () => {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="font-display text-lg">Connection Health</CardTitle>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2"
-                      disabled={isBulkSyncing}
-                      onClick={async () => {
-                        setIsBulkSyncing(true);
-                        const activeConns = connections.filter(c => c.is_connected && c.account_id);
-                        if (activeConns.length === 0) {
-                          toast.info('No active connections to sync');
-                          setIsBulkSyncing(false);
-                          return;
-                        }
-
-                        const now = new Date();
-                        let m = now.getMonth() + 1;
-                        let y = now.getFullYear();
-                        const MONTH_NAMES_SHORT = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                        let successCount = 0;
-                        let failCount = 0;
-
-                        for (let i = 0; i < 12; i++) {
-                          setBulkSyncProgress(`${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/12)`);
-                          for (const conn of activeConns) {
-                            const fn = SYNC_FUNCTION_MAP[conn.platform];
-                            if (!fn) continue;
-                            try {
-                              const { data, error } = await supabase.functions.invoke(fn, {
-                                body: { connection_id: conn.id, month: m, year: y },
-                              });
-                              if (error || data?.error) { failCount++; } else { successCount++; }
-                            } catch { failCount++; }
-                          }
-                          m--;
-                          if (m === 0) { m = 12; y--; }
-                        }
-
-                        if (failCount > 0) {
-                          toast.error(`Bulk sync done: ${successCount} ok, ${failCount} failed`);
-                        } else {
-                          toast.success(`Bulk sync complete: ${successCount} syncs across 12 months`);
-                        }
-                        setBulkSyncProgress('');
-                        setIsBulkSyncing(false);
-                        queryClient.invalidateQueries({ queryKey: ['admin-org-connections', id] });
-                      }}
-                    >
-                      {isBulkSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                      {isBulkSyncing ? bulkSyncProgress : 'Sync All (12 months)'}
-                    </Button>
+                    <AdminSyncDialog
+                      clients={clients}
+                      connections={connections}
+                      onComplete={() => queryClient.invalidateQueries({ queryKey: ['admin-org-connections', id] })}
+                    />
                   </div>
                 </CardHeader>
                 <CardContent>
