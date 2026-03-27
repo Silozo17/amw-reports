@@ -296,6 +296,21 @@ const ClientDetail = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Pending deletion banner */}
+        {isDeletionPending && (
+          <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+            <p className="flex-1">
+              This client is scheduled for deletion in <span className="font-bold">{countdown}</span>.
+              All data will be permanently removed when the timer expires.
+            </p>
+            <Button variant="outline" size="sm" onClick={handleCancelDeletion} disabled={isDeleting} className="shrink-0 gap-1.5">
+              <XCircle className="h-3.5 w-3.5" />
+              Cancel Deletion
+            </Button>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
@@ -315,28 +330,25 @@ const ClientDetail = () => {
             </Badge>
             <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Delete</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete {client.company_name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete this client and all associated data including connections, snapshots, reports, and sync logs. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    {isDeleting ? 'Deleting...' : 'Delete Client'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {isDeletionPending ? (
+              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={handleCancelDeletion} disabled={isDeleting}>
+                <Clock className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{countdown}</span>
+                <span className="text-xs">Cancel Delete</span>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+            )}
+            <DeleteClientDialog
+              open={deleteDialogOpen}
+              onOpenChange={setDeleteDialogOpen}
+              clientName={client.company_name}
+              onConfirm={handleScheduleDeletion}
+              isLoading={isDeleting}
+            />
             <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{isGenerating ? 'Generating...' : 'Report'}</span>

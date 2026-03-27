@@ -83,6 +83,7 @@ export interface Client {
   created_at: string;
   updated_at: string;
   logo_url: string | null;
+  scheduled_deletion_at: string | null;
 }
 
 export interface ClientRecipient {
