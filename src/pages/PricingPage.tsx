@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 
 const PLANS = [
   {
-    name: 'Starter',
+    name: 'Creator',
     price: 'Free',
     period: '',
     desc: 'Perfect for trying out the platform with a single client.',
