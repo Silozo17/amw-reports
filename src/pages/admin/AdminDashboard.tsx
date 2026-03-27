@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, Plug } from 'lucide-react';
 
@@ -31,7 +31,7 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <AdminLayout>
+    <AppLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-display">Platform Overview</h1>
@@ -56,7 +56,7 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </AppLayout>
   );
 };
 

@@ -9,7 +9,27 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Camera, Save, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
 import AvatarCropDialog from './AvatarCropDialog';
+
+const getPasswordStrength = (password: string) => {
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  const levels = [
+    { label: 'Very Weak', color: 'bg-destructive', value: 20 },
+    { label: 'Weak', color: 'bg-destructive', value: 30 },
+    { label: 'Fair', color: 'bg-orange-500', value: 50 },
+    { label: 'Good', color: 'bg-yellow-500', value: 70 },
+    { label: 'Strong', color: 'bg-green-500', value: 100 },
+  ];
+  const idx = Math.min(score, 4);
+  return levels[idx];
+};
 
 const AccountSection = () => {
   const { user, profile, refetchProfile } = useAuth();
@@ -221,8 +241,19 @@ const AccountSection = () => {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">This helps us tailor your experience. You can change it anytime.</p>
-          </div>
-          </div>
+                </div>
+                {newPassword && (
+                  <div className="space-y-1">
+                    <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${getPasswordStrength(newPassword).color}`}
+                        style={{ width: `${getPasswordStrength(newPassword).value}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{getPasswordStrength(newPassword).label}</p>
+                  </div>
+                )}
+              </div>
 
           <Button onClick={handleSaveProfile} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
