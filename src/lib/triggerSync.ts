@@ -26,6 +26,14 @@ interface SyncResult {
   error?: string;
 }
 
+export interface SyncProgress {
+  platform: string;
+  completed: number;
+  total: number;
+  currentMonth: number;
+  currentYear: number;
+}
+
 /**
  * Triggers a sync for a single platform connection for a specific month/year.
  */
@@ -59,11 +67,13 @@ export async function triggerSync(
 
 /**
  * Triggers sync for the last N months sequentially (to avoid rate limits).
+ * Calls onProgress after each month completes.
  */
 export async function triggerInitialSync(
   connectionId: string,
   platform: PlatformType,
   months: number = 12,
+  onProgress?: (progress: SyncProgress) => void,
 ): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
   const now = new Date();
@@ -72,8 +82,13 @@ export async function triggerInitialSync(
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const month = d.getMonth() + 1;
     const year = d.getFullYear();
+
+    onProgress?.({ platform, completed: i, total: months, currentMonth: month, currentYear: year });
+
     const result = await triggerSync(connectionId, platform, month, year);
     results.push(result);
+
+    onProgress?.({ platform, completed: i + 1, total: months, currentMonth: month, currentYear: year });
   }
 
   return results;

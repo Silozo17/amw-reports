@@ -1034,6 +1034,7 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let earlyReportId: string | undefined;
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1044,6 +1045,21 @@ Deno.serve(async (req) => {
     if (!client_id || !report_month || !report_year) {
       return new Response(JSON.stringify({ error: "Missing client_id, report_month, or report_year" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if a report is already being generated for this client/month/year
+    const { data: existingRunning } = await supabase.from("reports")
+      .select("id, status")
+      .eq("client_id", client_id)
+      .eq("report_month", report_month)
+      .eq("report_year", report_year)
+      .eq("status", "running")
+      .maybeSingle();
+
+    if (existingRunning) {
+      return new Response(JSON.stringify({ error: "Report is already being generated for this period" }), {
+        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -1062,6 +1078,22 @@ Deno.serve(async (req) => {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Upsert report record with "running" status immediately
+    const { data: runningReport } = await supabase.from("reports")
+      .upsert({
+        client_id,
+        report_month,
+        report_year,
+        org_id: client.org_id,
+        status: "running" as const,
+        generated_at: null,
+        pdf_storage_path: null,
+      }, { onConflict: "client_id,report_month,report_year", ignoreDuplicates: false })
+      .select("id")
+      .single();
+
+    earlyReportId = runningReport?.id;
 
     const authHeader = req.headers.get("Authorization");
     if (authHeader && client.org_id) {
@@ -2050,14 +2082,16 @@ Deno.serve(async (req) => {
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
+      // Mark report as failed
+      if (earlyReportId) {
+        await supabase.from("reports").update({ status: "failed" as const }).eq("id", earlyReportId);
+      }
       return new Response(JSON.stringify({ error: "Failed to upload PDF" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: existingReport } = await supabase.from("reports")
-      .select("id").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year).maybeSingle();
-
+    // Update the report record to success
     const reportData = {
       status: "success" as const,
       pdf_storage_path: storagePath,
@@ -2067,13 +2101,8 @@ Deno.serve(async (req) => {
       generated_at: new Date().toISOString(),
     };
 
-    let currentReportId: string;
-    if (existingReport) {
-      await supabase.from("reports").update(reportData).eq("id", existingReport.id);
-      currentReportId = existingReport.id;
-    } else {
-      const { data: insertedReport } = await supabase.from("reports").insert({ client_id, report_month, report_year, org_id: client.org_id, ...reportData }).select("id").single();
-      currentReportId = insertedReport?.id ?? "";
+    if (earlyReportId) {
+      await supabase.from("reports").update(reportData).eq("id", earlyReportId);
     }
 
     // ── Enforce 12-report cap per client ──
@@ -2091,12 +2120,10 @@ Deno.serve(async (req) => {
           .map(r => r.pdf_storage_path)
           .filter(Boolean) as string[];
 
-        // Delete PDFs from storage
         if (pdfPaths.length > 0) {
           await supabase.storage.from("reports").remove(pdfPaths);
         }
 
-        // Delete report rows
         const idsToDelete = reportsToDelete.map(r => r.id);
         await supabase.from("reports").delete().in("id", idsToDelete);
         console.log(`Cleaned up ${idsToDelete.length} old reports for client ${client_id}`);
@@ -2106,7 +2133,7 @@ Deno.serve(async (req) => {
     }
 
     await supabase.from("report_logs").insert({
-      client_id, report_id: existingReport?.id ?? null, status: "success", org_id: client.org_id,
+      client_id, report_id: earlyReportId ?? null, status: "success", org_id: client.org_id,
     });
 
     return new Response(JSON.stringify({
@@ -2116,6 +2143,21 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     console.error("Report generation error:", err);
+
+    // Try to mark the report as failed
+    try {
+      if (earlyReportId) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sb = createClient(supabaseUrl, serviceRoleKey);
+        await sb.from("reports")
+          .update({ status: "failed" as const })
+          .eq("id", earlyReportId);
+      }
+    } catch (_) {
+      // Best effort
+    }
+
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

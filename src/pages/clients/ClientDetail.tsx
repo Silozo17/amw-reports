@@ -24,8 +24,9 @@ import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
-import { triggerInitialSync, SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
+import { triggerInitialSync, SYNC_FUNCTION_MAP, type SyncProgress } from '@/lib/triggerSync';
 import ConnectionDisclaimer from '@/components/clients/ConnectionDisclaimer';
+import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
 import UpsellTab from '@/components/clients/UpsellTab';
 import ClientReportsTab from '@/components/clients/ClientReportsTab';
@@ -45,6 +46,8 @@ const ClientDetail = () => {
   const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncProgress>>(new Map());
+  const [syncStartTime, setSyncStartTime] = useState(0);
 
   // Account picker state
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
@@ -293,20 +296,32 @@ const ClientDetail = () => {
 
     if (newPlatforms.length === 0) return;
 
-    // Auto-sync 12 months of historical data in the background
-    toast.info('Syncing 12 months of historical data in the background...');
+    // Auto-sync 12 months of historical data with progress tracking
+    setSyncStartTime(Date.now());
     
     for (const conn of newPlatforms) {
-      triggerInitialSync(conn.id, conn.platform, 12).then(results => {
+      triggerInitialSync(conn.id, conn.platform, 12, (progress) => {
+        setActiveSyncs(prev => {
+          const next = new Map(prev);
+          next.set(conn.platform, progress);
+          return next;
+        });
+      }).then(results => {
         const failures = results.filter(r => !r.success);
         if (failures.length > 0) {
           console.error(`Auto-sync errors for ${conn.platform}:`, failures);
         }
+        // Remove completed platform from active syncs
+        setActiveSyncs(prev => {
+          const next = new Map(prev);
+          next.delete(conn.platform);
+          return next;
+        });
         fetchData();
       });
     }
 
-    toast.success('Historical data sync started — data will appear as it completes');
+    toast.success('Historical data sync started — progress shown below');
   };
 
   const handleRemoveConnection = async (conn: PlatformConnection) => {
@@ -429,6 +444,10 @@ const ClientDetail = () => {
             </Button>
           </div>
         </div>
+
+        {activeSyncs.size > 0 && (
+          <SyncProgressBar activeSyncs={activeSyncs} startTime={syncStartTime} />
+        )}
 
         <Tabs defaultValue="dashboard">
           <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">

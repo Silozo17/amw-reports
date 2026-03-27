@@ -3,6 +3,27 @@ import { toast } from 'sonner';
 import { sendBrandedEmail } from '@/lib/sendBrandedEmail';
 
 export const generateReport = async (clientId: string, month: number, year: number) => {
+  // Insert a pending report record immediately so the UI can show it
+  const { data: clientData } = await supabase
+    .from('clients')
+    .select('org_id')
+    .eq('id', clientId)
+    .single();
+
+  if (clientData?.org_id) {
+    await supabase.from('reports').upsert(
+      {
+        client_id: clientId,
+        report_month: month,
+        report_year: year,
+        org_id: clientData.org_id,
+        status: 'pending' as any,
+      },
+      { onConflict: 'client_id,report_month,report_year', ignoreDuplicates: false }
+    );
+  }
+
+  // Invoke the edge function (which will update status to running → success/failed)
   const { data, error } = await supabase.functions.invoke('generate-report', {
     body: { client_id: clientId, report_month: month, report_year: year },
   });
