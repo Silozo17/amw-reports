@@ -30,6 +30,7 @@ import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
 import UpsellTab from '@/components/clients/UpsellTab';
 import ClientReportsTab from '@/components/clients/ClientReportsTab';
+import ClientSwitcher from '@/components/clients/ClientSwitcher';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
@@ -393,7 +394,10 @@ const ClientDetail = () => {
               <img src={client.logo_url} alt={`${client.company_name} logo`} className="h-10 w-10 rounded-lg object-contain border bg-muted" />
             )}
             <div>
-              <h1 className="text-2xl sm:text-3xl font-display">{client.company_name}</h1>
+              <div className="flex items-center gap-1">
+                <h1 className="text-2xl sm:text-3xl font-display">{client.company_name}</h1>
+                <ClientSwitcher currentClientId={client.id} />
+              </div>
               <p className="text-muted-foreground font-body mt-1 text-sm">{client.full_name}{client.position && ` · ${client.position}`}</p>
             </div>
           </div>
