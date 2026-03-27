@@ -18,6 +18,7 @@ const MONTH_NAMES = [
 
 interface SendRequest {
   report_id: string;
+  link_only?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { report_id } = (await req.json()) as SendRequest;
+    const { report_id, link_only = false } = (await req.json()) as SendRequest;
 
     if (!report_id) {
       return new Response(
@@ -96,6 +97,9 @@ Deno.serve(async (req) => {
 
     const results: { email: string; status: string; error?: string }[] = [];
 
+    // Choose template based on link_only flag
+    const templateName = link_only ? "report_link_only" : "report_delivery";
+
     // Send to each recipient via send-branded-email
     for (const recipient of recipients) {
       try {
@@ -103,7 +107,7 @@ Deno.serve(async (req) => {
           "send-branded-email",
           {
             body: {
-              template_name: "report_delivery",
+              template_name: templateName,
               recipient_email: recipient.email,
               recipient_name: recipient.name,
               org_id: client.org_id,
