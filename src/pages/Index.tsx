@@ -224,6 +224,14 @@ const Dashboard = () => {
 
   const needsAttention = clientHealth.filter(c => c.failedSyncs > 0 || c.disconnected > 0);
 
+  const formatCountdown = (scheduledAt: string): string => {
+    const diff = new Date(scheduledAt).getTime() - now.getTime();
+    if (diff <= 0) return 'Deleting soon';
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
   const getStatusIcon = (status: string) => {
     if (status === 'success') return <CheckCircle className="h-3.5 w-3.5 text-accent" />;
     if (status === 'failed') return <XCircle className="h-3.5 w-3.5 text-destructive" />;
