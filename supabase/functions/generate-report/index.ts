@@ -738,7 +738,7 @@ ${JSON.stringify(defaultLabels)}`,
         setF(C.offWhite); doc.roundedRect(M, y, CW, 4, 2, 2, "F"); // Placeholder, will size
 
         doc.setFontSize(10); setC(C.primary);
-        doc.text("What This Means", M + 6, y + 6);
+        doc.text(labels.whatThisMeans, M + 6, y + 6);
         y += 10;
         doc.setFontSize(9); setC(C.black);
         const insightY = wrapText(platformInsight, M + 6, y, CW - 12, 4.5);
