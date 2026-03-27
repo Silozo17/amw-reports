@@ -9,10 +9,14 @@ import {
   Bug,
   LogOut,
   ChevronUp,
+  ChevronDown,
+  ChevronRight,
   Shield,
   ChevronsUpDown,
   Check,
   Bell,
+  Building2,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
@@ -24,7 +28,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -32,6 +35,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
@@ -39,6 +43,16 @@ const NAV_ITEMS = [
   { to: '/clients', label: 'Clients', icon: Users },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/connections', label: 'Connections', icon: Plug },
+  { to: '/settings', label: 'Settings', icon: Settings },
+];
+
+const ADMIN_SUB_ITEMS = [
+  { to: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { to: '/admin/organisations', label: 'Organisations', icon: Building2 },
+  { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/activity', label: 'Activity Log', icon: Activity },
+  { to: '/debug', label: 'Debug', icon: Bug },
+  { to: '/logs', label: 'Logs', icon: ScrollText },
 ];
 
 interface AppSidebarProps {
@@ -54,6 +68,9 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const navigate = useNavigate();
   const [orgPopoverOpen, setOrgPopoverOpen] = useState(false);
   const [invitePopoverOpen, setInvitePopoverOpen] = useState(false);
+
+  const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname === '/debug' || location.pathname === '/logs';
+  const [adminOpen, setAdminOpen] = useState(isAdminRoute);
 
   const handleNavClick = () => {
     onNavigate?.();
@@ -127,7 +144,7 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
         )}
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const isActive = item.to === '/dashboard'
             ? location.pathname === '/dashboard'
@@ -150,6 +167,52 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
             </NavLink>
           );
         })}
+
+        {/* Platform Admin collapsible section */}
+        {isPlatformAdmin && (
+          <Collapsible open={adminOpen} onOpenChange={setAdminOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-body font-medium transition-colors',
+                  isAdminRoute
+                    ? 'bg-sidebar-accent text-sidebar-primary'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                <span className="flex-1 text-left">Platform Admin</span>
+                {adminOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-3">
+                {ADMIN_SUB_ITEMS.map((item) => {
+                  const isActive = item.exact
+                    ? location.pathname === item.to
+                    : location.pathname.startsWith(item.to);
+
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={handleNavClick}
+                      className={cn(
+                        'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-body font-medium transition-colors',
+                        isActive
+                          ? 'bg-sidebar-accent text-sidebar-primary'
+                          : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                      )}
+                    >
+                      <item.icon className="h-3.5 w-3.5" />
+                      {item.label}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </nav>
 
       {pendingInvites.length > 0 && (
@@ -226,27 +289,6 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuItem onClick={() => { navigate('/settings'); handleNavClick(); }}>
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { navigate('/logs'); handleNavClick(); }}>
-              <ScrollText className="mr-2 h-4 w-4" />
-              Logs
-            </DropdownMenuItem>
-            {isPlatformAdmin && (
-              <DropdownMenuItem onClick={() => { navigate('/debug'); handleNavClick(); }}>
-                <Bug className="mr-2 h-4 w-4" />
-                Debug
-              </DropdownMenuItem>
-            )}
-            {isPlatformAdmin && (
-              <DropdownMenuItem onClick={() => { navigate('/admin'); handleNavClick(); }}>
-                <Shield className="mr-2 h-4 w-4" />
-                Platform Admin
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => { signOut(); handleNavClick(); }}>
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
