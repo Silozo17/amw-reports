@@ -84,6 +84,8 @@ const OnboardingPage = () => {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [orgWebsite, setOrgWebsite] = useState('');
+  const [isExtractingBranding, setIsExtractingBranding] = useState(false);
 
   const [particles, setParticles] = useState<Array<{ id: number; x: number; delay: number; color: string }>>([]);
 
@@ -408,7 +410,51 @@ const OnboardingPage = () => {
                   </div>
                 </div>
 
-                {/* Brand Colours */}
+                {/* Website URL + auto-import */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-foreground">Website <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={orgWebsite}
+                      onChange={(e) => setOrgWebsite(e.target.value)}
+                      placeholder="https://yourcompany.com"
+                      className="flex-1 bg-card border-border text-foreground placeholder:text-muted-foreground/60"
+                    />
+                    {orgWebsite.trim() && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsExtractingBranding(true);
+                          try {
+                            const { data, error } = await supabase.functions.invoke('extract-branding', {
+                              body: { url: orgWebsite.trim() },
+                            });
+                            if (error) throw error;
+                            if (data?.error) throw new Error(data.error);
+                            if (data?.primary_color) setPrimaryColor(data.primary_color);
+                            if (data?.secondary_color) setSecondaryColor(data.secondary_color);
+                            if (data?.accent_color) setAccentColor(data.accent_color);
+                            toast.success('Brand colours imported from your website');
+                          } catch (err) {
+                            console.error('Extract branding error:', err);
+                            toast.error('Could not extract branding — set colours manually below');
+                          } finally {
+                            setIsExtractingBranding(false);
+                          }
+                        }}
+                        disabled={isExtractingBranding}
+                        className="text-xs text-primary hover:underline whitespace-nowrap disabled:opacity-50"
+                      >
+                        {isExtractingBranding ? (
+                          <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Importing...</span>
+                        ) : (
+                          <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> Auto-import branding</span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   <Label className="text-sm font-medium text-foreground">Brand Colours <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="grid grid-cols-3 gap-4">
