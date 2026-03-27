@@ -58,7 +58,7 @@ const LandingHero = () => {
             </p>
 
             {/* Feature cards */}
-            <div className="grid grid-cols-2 gap-3 mt-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8">
               {FEATURES.map(({ icon: Icon, title, desc }) => (
                 <div key={title} className="flex gap-3 p-3 rounded-lg bg-sidebar-accent/40 backdrop-blur-sm border border-sidebar-border/50">
                   <Icon className="h-5 w-5 text-primary shrink-0 mt-0.5" />

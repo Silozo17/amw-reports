@@ -179,11 +179,11 @@ const DashboardHeader = ({
   return (
     <div className="space-y-4">
       {/* Platform Multi-Select Dropdown + Time Range Controls on same row */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Platform Multi-Select Dropdown */}
         <Popover open={platformDropdownOpen} onOpenChange={setPlatformDropdownOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 min-w-[180px] justify-between">
+            <Button variant="outline" size="sm" className="gap-2 min-w-0 sm:min-w-[180px] justify-between">
               <div className="flex items-center gap-1.5">
                 {isAll ? (
                   <>
@@ -260,7 +260,7 @@ const DashboardHeader = ({
 
         {/* Period Type Dropdown */}
         <Select value={selectedPeriod.type} onValueChange={handleTypeChange}>
-          <SelectTrigger className="w-[160px] h-9 text-sm">
+          <SelectTrigger className="w-[120px] sm:w-[160px] h-9 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -273,11 +273,11 @@ const DashboardHeader = ({
         {/* Arrow Navigation */}
         {showArrows && (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrev}>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handlePrev} aria-label="Previous period">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium min-w-[180px] text-center">{getPeriodLabel()}</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNext}>
+            <span className="text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[180px] text-center">{getPeriodLabel()}</span>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleNext} aria-label="Next period">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

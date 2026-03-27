@@ -152,11 +152,13 @@ const ClientReportsTab = ({ clientId, clientName, orgId, reportMonth, reportYear
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-lg">Reports</h3>
-        <div className="flex items-center gap-2">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg">Reports</h3>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={reportMonth?.toString() ?? ''} onValueChange={v => setReportMonth(Number(v))}>
-            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="Month" /></SelectTrigger>
+            <SelectTrigger className="w-24 sm:w-28 h-8 text-xs"><SelectValue placeholder="Month" /></SelectTrigger>
             <SelectContent>
               {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
                 <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
@@ -195,47 +197,49 @@ const ClientReportsTab = ({ clientId, clientName, orgId, reportMonth, reportYear
             const isActive = report.status === 'pending' || report.status === 'running';
             return (
               <Card key={report.id}>
-                <CardContent className="flex items-center justify-between p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
-                      {isActive ? (
-                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                      ) : (
-                        <FileText className="h-4 w-4 text-primary" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-body font-semibold text-sm">
-                        {MONTH_NAMES[report.report_month]} {report.report_year}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {report.generated_at && `Generated ${new Date(report.generated_at).toLocaleDateString()}`}
-                        {isActive && 'Report is being generated...'}
-                      </p>
-                      {report.emailStatus && (
-                        <p className={`text-xs mt-0.5 ${report.emailStatus === 'sent' ? 'text-accent' : report.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
-                          {report.emailStatus === 'sent' ? `✓ Emailed${report.emailSentAt ? ` on ${new Date(report.emailSentAt).toLocaleDateString()}` : ''}` :
-                           report.emailStatus === 'failed' ? `✗ Email failed${report.emailError ? `: ${report.emailError}` : ''}` :
-                           '○ Email pending'}
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-start sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                        {isActive ? (
+                          <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-body font-semibold text-sm">
+                          {MONTH_NAMES[report.report_month]} {report.report_year}
                         </p>
-                      )}
+                        <p className="text-xs text-muted-foreground">
+                          {report.generated_at && `${new Date(report.generated_at).toLocaleDateString()}`}
+                          {isActive && 'Generating...'}
+                        </p>
+                        {report.emailStatus && (
+                          <p className={`text-xs mt-0.5 ${report.emailStatus === 'sent' ? 'text-accent' : report.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            {report.emailStatus === 'sent' ? '✓ Emailed' :
+                             report.emailStatus === 'failed' ? '✗ Failed' :
+                             '○ Pending'}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'} className="text-xs">
+                    <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'} className="text-xs shrink-0">
                       {isActive && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                       {STATUS_LABEL[report.status] ?? report.status}
                     </Badge>
-                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} title="Preview">
+                  </div>
+                  <div className="flex items-center gap-1 justify-end">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} aria-label="Preview">
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handleDownload(report)} title="Download">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!report.pdf_storage_path || isActive} onClick={() => handleDownload(report)} aria-label="Download">
                       <Download className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={isRegenerating || isActive} onClick={() => handleRegenerate(report)} title="Regenerate">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" disabled={isRegenerating || isActive} onClick={() => handleRegenerate(report)} aria-label="Regenerate">
                       {isRegenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || sendingIds.has(report.id) || isActive} onClick={() => handleSendEmail(report)} title="Send email">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!report.pdf_storage_path || sendingIds.has(report.id) || isActive} onClick={() => handleSendEmail(report)} aria-label="Send email">
                       {sendingIds.has(report.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                     </Button>
                   </div>

@@ -197,48 +197,50 @@ const Reports = () => {
     const isActive = report.status === 'pending' || report.status === 'running';
     return (
       <Card key={report.id}>
-        <CardContent className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
-              {isActive ? (
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-              ) : (
-                <FileText className="h-5 w-5 text-primary" />
-              )}
-            </div>
-            <div>
-              {showClientName && (
-                <p className="font-body font-semibold">{report.clients?.company_name ?? 'Unknown'}</p>
-              )}
-              <p className={`text-sm text-muted-foreground ${!showClientName ? 'font-semibold text-foreground' : ''}`}>
-                {MONTH_NAMES[report.report_month]} {report.report_year}
-                {report.generated_at && ` · Generated ${new Date(report.generated_at).toLocaleDateString()}`}
-                {isActive && ' · Generating...'}
-              </p>
-              {report.emailStatus && (
-                <p className={`text-xs mt-0.5 ${report.emailStatus === 'sent' ? 'text-accent' : report.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {report.emailStatus === 'sent' ? `✓ Emailed${report.emailSentAt ? ` on ${new Date(report.emailSentAt).toLocaleDateString()}` : ''}` :
-                   report.emailStatus === 'failed' ? `✗ Email failed${report.emailError ? `: ${report.emailError}` : ''}` :
-                   '○ Email pending'}
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-start sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                {isActive ? (
+                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                ) : (
+                  <FileText className="h-5 w-5 text-primary" />
+                )}
+              </div>
+              <div className="min-w-0">
+                {showClientName && (
+                  <p className="font-body font-semibold truncate">{report.clients?.company_name ?? 'Unknown'}</p>
+                )}
+                <p className={`text-sm text-muted-foreground truncate ${!showClientName ? 'font-semibold text-foreground' : ''}`}>
+                  {MONTH_NAMES[report.report_month]} {report.report_year}
+                  {report.generated_at && ` · ${new Date(report.generated_at).toLocaleDateString()}`}
+                  {isActive && ' · Generating...'}
                 </p>
-              )}
+                {report.emailStatus && (
+                  <p className={`text-xs mt-0.5 ${report.emailStatus === 'sent' ? 'text-accent' : report.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {report.emailStatus === 'sent' ? `✓ Emailed${report.emailSentAt ? ` on ${new Date(report.emailSentAt).toLocaleDateString()}` : ''}` :
+                     report.emailStatus === 'failed' ? `✗ Email failed` :
+                     '○ Email pending'}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'}>
+            <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'} className="shrink-0">
               {isActive && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
               {STATUS_LABEL[report.status] ?? report.status}
             </Badge>
-            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} title="Preview">
+          </div>
+          <div className="flex items-center gap-1 justify-end">
+            <Button size="icon" variant="ghost" className="h-9 w-9" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} aria-label="Preview report">
               <ExternalLink className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handleDownload(report)} title="Download">
+            <Button size="icon" variant="ghost" className="h-9 w-9" disabled={!report.pdf_storage_path || isActive} onClick={() => handleDownload(report)} aria-label="Download report">
               <Download className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" disabled={isRegenerating || isActive} onClick={() => handleRegenerate(report)} title="Regenerate">
+            <Button size="icon" variant="ghost" className="h-9 w-9" disabled={isRegenerating || isActive} onClick={() => handleRegenerate(report)} aria-label="Regenerate report">
               {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
             </Button>
-            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || sendingIds.has(report.id) || isActive} onClick={() => handleSendEmail(report)} title="Send email">
+            <Button size="icon" variant="ghost" className="h-9 w-9" disabled={!report.pdf_storage_path || sendingIds.has(report.id) || isActive} onClick={() => handleSendEmail(report)} aria-label="Send report email">
               {sendingIds.has(report.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
@@ -260,52 +262,55 @@ const Reports = () => {
 
         {/* Generate report bar */}
         <Card>
-          <CardContent className="flex flex-wrap items-center gap-3 p-4">
-            <span className="text-sm font-medium text-muted-foreground">Generate:</span>
-            <Select value={selectedClient} onValueChange={setSelectedClient}>
-              <SelectTrigger className="w-52">
-                <SelectValue placeholder="Select client" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map(c => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.company_name} {c.reportCount > 0 && `(${c.reportCount})`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(selectedMonth)} onValueChange={v => setSelectedMonth(Number(v))}>
-              <SelectTrigger className="w-28">
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent>
-                {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
-                  <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
-              <SelectTrigger className="w-20">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(yr => (
-                  <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleGenerateNew} disabled={isGeneratingNew || !selectedClient} className="gap-2">
-              {isGeneratingNew ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-              {isGeneratingNew ? 'Generating...' : 'Generate Report'}
-            </Button>
+          <CardContent className="p-4 space-y-3">
+            <span className="text-sm font-medium text-muted-foreground">Generate Report</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger className="col-span-2 sm:col-span-1">
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.company_name} {c.reportCount > 0 && `(${c.reportCount})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={String(selectedMonth)} onValueChange={v => setSelectedMonth(Number(v))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
+                    <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(yr => (
+                    <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleGenerateNew} disabled={isGeneratingNew || !selectedClient} className="gap-2 w-full">
+                {isGeneratingNew ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                <span className="hidden sm:inline">{isGeneratingNew ? 'Generating...' : 'Generate'}</span>
+                <span className="sm:hidden">{isGeneratingNew ? '...' : 'Go'}</span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
         {/* Filter bar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
           <Select value={filterClient} onValueChange={setFilterClient}>
-            <SelectTrigger className="w-52">
+            <SelectTrigger className="w-40 sm:w-52">
               <SelectValue placeholder="All clients" />
             </SelectTrigger>
             <SelectContent>

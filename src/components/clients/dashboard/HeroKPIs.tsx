@@ -126,7 +126,7 @@ const HeroKPICard = ({
           )}
         </div>
 
-        <p className="text-3xl font-bold font-body tabular-nums leading-none mb-2">
+        <p className="text-2xl sm:text-3xl font-bold font-body tabular-nums leading-none mb-2">
           {formatValue(animatedValue, isCost, currSymbol, kpi.isPercentage, kpi.isDecimal)}
         </p>
 
@@ -151,7 +151,7 @@ const HeroKPIs = ({ kpis, currSymbol, sparklineMap }: HeroKPIsProps) => {
   if (kpis.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {kpis.slice(0, 8).map((kpi) => (
         <HeroKPICard
           key={kpi.metricKey}

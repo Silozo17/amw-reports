@@ -397,7 +397,7 @@ const ClientDetail = () => {
               <p className="text-muted-foreground font-body mt-1 text-sm">{client.full_name}{client.position && ` · ${client.position}`}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 ml-12 sm:ml-0">
+          <div className="flex flex-wrap items-center gap-2 ml-0">
             <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">
               {client.is_active ? 'Active' : 'Inactive'}
             </Badge>
@@ -407,12 +407,11 @@ const ClientDetail = () => {
               <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={handleCancelDeletion} disabled={isDeleting}>
                 <Clock className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{countdown}</span>
-                <span className="text-xs">Cancel Delete</span>
+                <span className="text-xs">Cancel</span>
               </Button>
             ) : (
-              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
+              <Button variant="outline" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteDialogOpen(true)} aria-label="Delete client">
                 <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Delete</span>
               </Button>
             )}
             <DeleteClientDialog
@@ -423,7 +422,7 @@ const ClientDetail = () => {
               isLoading={isDeleting}
             />
             <Select value={reportMonth?.toString() ?? ''} onValueChange={v => setReportMonth(Number(v))}>
-              <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="Month" /></SelectTrigger>
+              <SelectTrigger className="w-24 sm:w-28 h-8 text-xs"><SelectValue placeholder="Month" /></SelectTrigger>
               <SelectContent>
                 {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
                   <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
@@ -450,13 +449,16 @@ const ClientDetail = () => {
         )}
 
         <Tabs defaultValue="dashboard">
-          <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
-            <TabsTrigger value="dashboard" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5 hidden sm:inline" />Dashboard</TabsTrigger>
-            <TabsTrigger value="connections">Connections</TabsTrigger>
-            <TabsTrigger value="upsells">Upsells</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
+          <div className="relative">
+            <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none z-10 sm:hidden" />
+            <TabsList className="w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
+              <TabsTrigger value="dashboard" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5 hidden sm:inline" />Dashboard</TabsTrigger>
+              <TabsTrigger value="connections">Connections</TabsTrigger>
+              <TabsTrigger value="upsells">Upsells</TabsTrigger>
+              <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="dashboard" className="mt-4">
             <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} />

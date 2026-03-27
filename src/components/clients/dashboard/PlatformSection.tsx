@@ -126,7 +126,7 @@ const MetricCard = ({
   return (
     <div className="rounded-lg border bg-card p-3 space-y-1">
       <div className="flex items-center gap-1">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider font-body truncate">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-body truncate">
           {label}
         </p>
         <MetricTooltip metricKey={metricKey} />
@@ -427,7 +427,7 @@ const PlatformSection = ({
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
               {socialPosts.length > 0 && (
-                <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-lg border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>

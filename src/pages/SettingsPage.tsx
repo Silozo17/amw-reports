@@ -58,11 +58,14 @@ const SettingsPage = () => {
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="flex w-full">
-            {tabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex-1">{tab.label}</TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="relative">
+            <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none z-10 sm:hidden" />
+            <TabsList className="flex w-full overflow-x-auto scrollbar-none">
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value} className="flex-1 min-w-[70px] whitespace-nowrap text-xs sm:text-sm">{tab.label}</TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           {canManageOrg && (
             <TabsContent value="organisation" className="space-y-6 mt-6">

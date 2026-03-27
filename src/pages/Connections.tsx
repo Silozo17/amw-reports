@@ -86,26 +86,26 @@ const Connections = () => {
           <div className="space-y-3">
             {connections.map(conn => (
               <Card key={conn.id}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`h-10 w-10 rounded-md flex items-center justify-center ${conn.is_connected ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                <CardContent className="flex items-center justify-between gap-3 p-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`h-10 w-10 rounded-md flex items-center justify-center shrink-0 ${conn.is_connected ? 'bg-success/10' : 'bg-destructive/10'}`}>
                       {conn.is_connected ? <CheckCircle className="h-5 w-5 text-success" /> : <AlertCircle className="h-5 w-5 text-destructive" />}
                     </div>
-                    <div>
-                      <p className="font-body font-semibold">{PLATFORM_LABELS[conn.platform]}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="font-body font-semibold truncate">{PLATFORM_LABELS[conn.platform]}</p>
+                      <p className="text-sm text-muted-foreground truncate">
                         {conn.clients?.company_name ?? 'Unknown client'}
                         {conn.account_name && ` · ${conn.account_name}`}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Badge variant={conn.is_connected ? 'default' : 'destructive'}>
                       {conn.is_connected ? 'Connected' : 'Disconnected'}
                     </Badge>
                     {conn.last_sync_at && (
-                      <span className="text-xs text-muted-foreground">
-                        Last sync: {new Date(conn.last_sync_at).toLocaleDateString()}
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                        {new Date(conn.last_sync_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>

@@ -252,7 +252,7 @@ const Dashboard = () => {
     <AppLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-display">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-display">Dashboard</h1>
           <p className="text-muted-foreground font-body mt-1">Overview of your reporting platform</p>
         </div>
 
