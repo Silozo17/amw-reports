@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, BarChart3, FileText, Mail, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import gaPlatform from '@/assets/screenshots/G4A.webp';
 
 const FEATURES = [
   { icon: BarChart3, title: 'One Dashboard for Everything', desc: 'See all your marketing performance — ads, social, SEO, website — in a single, easy-to-understand dashboard.' },
@@ -37,18 +38,25 @@ const ForSmbsPage = () => {
       <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">What You Get</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-                  <Icon className="h-5 w-5 text-primary" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {FEATURES.map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-body font-semibold mb-1">{title}</h3>
+                    <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-body font-semibold mb-1">{title}</h3>
-                  <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <img
+              src={gaPlatform}
+              alt="Google Analytics reporting card showing sessions, active users, page views, bounce rate, and traffic sources — simple analytics for small businesses"
+              className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
           </div>
         </div>
       </section>

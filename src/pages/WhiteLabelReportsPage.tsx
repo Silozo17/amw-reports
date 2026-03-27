@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Palette, Globe, Mail, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
 
 const CUSTOMISE_CARDS = [
   { icon: Palette, title: 'Logo & Brand Colours', desc: 'Upload your agency logo and set your exact brand colours. Every PDF report and client portal page will reflect your identity.' },
@@ -68,7 +69,7 @@ const WhiteLabelReportsPage = () => {
       <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">How White-Label Works</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             {STEPS.map(({ num, title, desc }) => (
               <div key={num} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
                 <span className="text-xs font-body text-amw-offwhite/30">{num}</span>
@@ -77,6 +78,13 @@ const WhiteLabelReportsPage = () => {
               </div>
             ))}
           </div>
+
+          {/* Dashboard Screenshot showing branding in context */}
+          <img
+            src={dashboardSnapshot}
+            alt="AMW Reports branded dashboard showing how your agency branding appears across the client portal with custom colours, logo, and metrics"
+            className="w-full max-w-5xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+          />
         </div>
       </section>
 

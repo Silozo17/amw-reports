@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import gscPlatform from '@/assets/screenshots/gsc.webp';
+import gaPlatform from '@/assets/screenshots/G4A.webp';
 
 const PLATFORMS = [
   { name: 'Google Search Console', metrics: ['Search Clicks', 'Search Impressions', 'Search CTR', 'Avg. Position', 'Top Queries', 'Top Pages'] },
@@ -41,24 +43,38 @@ const SeoReportingPage = () => {
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
             Track Google Search Console, Google Analytics, and Google Business Profile in one dashboard. Generate branded SEO reports automatically. Free plan available.
           </p>
-          <Button size="lg" asChild>
+          <Button size="lg" asChild className="mb-12">
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
+
+          {/* GSC Screenshot */}
+          <img
+            src={gscPlatform}
+            alt="Google Search Console reporting card showing search clicks, impressions, CTR, average position, top queries, and top pages"
+            className="w-full max-w-3xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+          />
         </div>
       </section>
 
       <section className="py-16 border-t border-sidebar-border/30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">SEO Platforms We Integrate With</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {PLATFORMS.map(({ name, metrics }) => (
-              <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
-                <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
-                <div className="flex flex-wrap gap-2">
-                  {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>)}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div className="grid grid-cols-1 gap-6">
+              {PLATFORMS.map(({ name, metrics }) => (
+                <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                  <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <img
+              src={gaPlatform}
+              alt="Google Analytics reporting card showing sessions, active users, new users, page views, bounce rate, and traffic sources"
+              className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
           </div>
         </div>
       </section>

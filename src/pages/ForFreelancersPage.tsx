@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import instagramPlatform from '@/assets/screenshots/instagram.webp';
 
 const WHY_POINTS = [
   { title: 'Save hours every month', desc: 'Stop manually pulling data from 10 platforms. AMW Reports does it automatically.' },
@@ -35,6 +36,18 @@ const ForFreelancersPage = () => {
           <Button size="lg" asChild>
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
+        </div>
+      </section>
+
+      {/* Instagram Screenshot - what freelancers deliver to clients */}
+      <section className="py-12 border-t border-sidebar-border/30">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body mb-6">What your clients see</p>
+          <img
+            src={instagramPlatform}
+            alt="Instagram analytics report showing follower growth, reach, impressions, engagement, likes, comments, saves, and profile visits — as delivered to clients"
+            className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+          />
         </div>
       </section>
 

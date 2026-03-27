@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import googleAdsPlatform from '@/assets/screenshots/Google_ads.webp';
+import metaAdsPlatform from '@/assets/screenshots/Meta_ads.webp';
 
 const PLATFORMS = [
   { name: 'Google Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'] },
@@ -41,24 +43,38 @@ const PpcReportingPage = () => {
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
             Track Google Ads, Meta Ads, and TikTok Ads in one dashboard. Automated branded PPC reports with spend, ROAS, conversions, and more. Free plan available.
           </p>
-          <Button size="lg" asChild>
+          <Button size="lg" asChild className="mb-12">
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
+
+          {/* Google Ads Screenshot */}
+          <img
+            src={googleAdsPlatform}
+            alt="Google Ads reporting card showing ad spend, impressions, clicks, CTR, conversions, conversion value, CPC, CPM, and ROAS"
+            className="w-full max-w-3xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+          />
         </div>
       </section>
 
       <section className="py-16 border-t border-sidebar-border/30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Ad Platforms We Integrate With</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {PLATFORMS.map(({ name, metrics }) => (
-              <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
-                <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
-                <div className="flex flex-wrap gap-2">
-                  {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>)}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div className="grid grid-cols-1 gap-6">
+              {PLATFORMS.map(({ name, metrics }) => (
+                <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                  <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <img
+              src={metaAdsPlatform}
+              alt="Meta Ads reporting card showing spend, impressions, reach, clicks, CTR, CPC, CPM, conversions, ROAS, frequency, and leads"
+              className="w-full rounded-xl border border-sidebar-border/30 shadow-2xl"
+            />
           </div>
         </div>
       </section>
