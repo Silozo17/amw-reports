@@ -32,9 +32,9 @@ const SettingsPage = () => {
     );
   }
 
-  const canManageOrg = isOwner || isPlatformAdmin;
-  const canManageMetrics = isOwner || isPlatformAdmin;
-  const canManageBilling = isOwner || isPlatformAdmin;
+  const canManageOrg = isOrgOwner || isPlatformAdmin;
+  const canManageMetrics = isOrgOwner || isPlatformAdmin;
+  const canManageBilling = isOrgOwner || isPlatformAdmin;
   const showWhitelabel = hasWhitelabel;
 
   // Build visible tabs
