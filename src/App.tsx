@@ -28,6 +28,7 @@ import AdminOrgDetail from "./pages/admin/AdminOrgDetail";
 import AdminActivityLog from "./pages/admin/AdminActivityLog";
 import AdminUserList from "./pages/admin/AdminUserList";
 import { usePlatformAdmin } from "./hooks/usePlatformAdmin";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +117,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <AuthProvider>
           <BrandingProvider>
             <AppRoutes />
