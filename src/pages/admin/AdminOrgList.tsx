@@ -1,14 +1,25 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { Settings, Plus, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const AdminOrgList = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [showCreate, setShowCreate] = useState(false);
+  const [newOrgName, setNewOrgName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: orgs = [], isLoading } = useQuery({
     queryKey: ['admin-orgs'],
@@ -27,7 +38,6 @@ const AdminOrgList = () => {
             supabase.from('org_subscriptions').select('*, subscription_plans(name, slug)').eq('org_id', org.id).maybeSingle(),
           ]);
 
-          // Count connections via clients belonging to this org
           const { data: orgClients } = await supabase.from('clients').select('id').eq('org_id', org.id);
           const clientIds = (orgClients ?? []).map(c => c.id);
           let connectionCount = 0;
@@ -53,12 +63,60 @@ const AdminOrgList = () => {
     },
   });
 
+  const handleCreateOrg = async () => {
+    const name = newOrgName.trim();
+    if (!name) return;
+    setIsCreating(true);
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    const { data: org, error } = await supabase
+      .from('organisations')
+      .insert({ name, slug })
+      .select('id')
+      .single();
+
+    if (error || !org) {
+      toast.error('Failed to create organisation');
+      console.error(error);
+      setIsCreating(false);
+      return;
+    }
+
+    // Auto-assign starter plan
+    const { data: starterPlan } = await supabase
+      .from('subscription_plans')
+      .select('id')
+      .eq('slug', 'starter')
+      .maybeSingle();
+
+    if (starterPlan) {
+      await supabase.from('org_subscriptions').insert({
+        org_id: org.id,
+        plan_id: starterPlan.id,
+        status: 'active',
+      });
+    }
+
+    toast.success('Organisation created');
+    queryClient.invalidateQueries({ queryKey: ['admin-orgs'] });
+    setNewOrgName('');
+    setShowCreate(false);
+    setIsCreating(false);
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-display">Organisations</h1>
-          <p className="text-muted-foreground font-body mt-1">Manage all platform organisations</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display">Organisations</h1>
+            <p className="text-muted-foreground font-body mt-1">Manage all platform organisations</p>
+          </div>
+          <Button onClick={() => setShowCreate(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Create Organisation
+          </Button>
         </div>
 
         {isLoading ? (
@@ -114,6 +172,35 @@ const AdminOrgList = () => {
           </div>
         )}
       </div>
+
+      {/* Create Organisation Dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Organisation</DialogTitle>
+            <DialogDescription>Add a new organisation to the platform</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Organisation Name</Label>
+              <Input
+                value={newOrgName}
+                onChange={(e) => setNewOrgName(e.target.value)}
+                placeholder="e.g. Acme Corp"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateOrg()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreateOrg} disabled={isCreating || !newOrgName.trim()}>
+              {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };

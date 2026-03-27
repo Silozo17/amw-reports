@@ -15,7 +15,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, Users, Plug, Trash2, Pencil, Save, Check, RefreshCw } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { ArrowLeft, Loader2, Users, Plug, Trash2, Pencil, Save, Check, RefreshCw, Plus, UserPlus } from 'lucide-react';
 import { SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -27,6 +31,7 @@ const AdminOrgDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const [bulkSyncProgress, setBulkSyncProgress] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Subscription state
   const [planId, setPlanId] = useState('');
@@ -47,6 +52,12 @@ const AdminOrgDetail = () => {
   const [editMemberEmail, setEditMemberEmail] = useState('');
   const [editMemberRole, setEditMemberRole] = useState('');
   const [isSavingMember, setIsSavingMember] = useState(false);
+
+  // Add member dialog
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [addMemberRole, setAddMemberRole] = useState('manager');
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   const { data: org } = useQuery({
     queryKey: ['admin-org', id],
@@ -191,6 +202,25 @@ const AdminOrgDetail = () => {
     setIsSavingName(false);
   };
 
+  const handleDeleteOrg = async () => {
+    setIsDeleting(true);
+    // Delete in order: org_members, org_subscriptions, then organisation
+    await supabase.from('org_members').delete().eq('org_id', id!);
+    await supabase.from('org_subscriptions').delete().eq('org_id', id!);
+    const { error } = await supabase.from('organisations').delete().eq('id', id!);
+
+    if (error) {
+      toast.error('Failed to delete organisation. It may still have clients or other linked data.');
+      console.error(error);
+      setIsDeleting(false);
+      return;
+    }
+
+    toast.success('Organisation deleted');
+    queryClient.invalidateQueries({ queryKey: ['admin-orgs'] });
+    navigate('/admin/organisations');
+  };
+
   const handleRemoveMember = async (memberId: string) => {
     const { error } = await supabase.from('org_members').delete().eq('id', memberId);
     if (error) { toast.error('Failed to remove member'); console.error(error); }
@@ -213,7 +243,6 @@ const AdminOrgDetail = () => {
     setIsSavingMember(true);
 
     try {
-      // Update role on org_members
       if (editMemberRole !== editMember.role) {
         const { error } = await supabase
           .from('org_members')
@@ -222,7 +251,6 @@ const AdminOrgDetail = () => {
         if (error) throw error;
       }
 
-      // Update profile if user exists
       if (editMember.user_id) {
         const { error } = await supabase
           .from('profiles')
@@ -243,6 +271,60 @@ const AdminOrgDetail = () => {
       toast.error('Failed to update member');
     } finally {
       setIsSavingMember(false);
+    }
+  };
+
+  const handleAddMember = async () => {
+    const email = addMemberEmail.trim().toLowerCase();
+    if (!email) return;
+    setIsAddingMember(true);
+
+    try {
+      // Check if user already exists in profiles
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingProfile) {
+        // Link existing user to this org
+        const { error } = await supabase.from('org_members').insert({
+          org_id: id!,
+          user_id: existingProfile.user_id,
+          role: addMemberRole,
+          accepted_at: new Date().toISOString(),
+        });
+        if (error) throw error;
+
+        // Update their profile org_id
+        await supabase
+          .from('profiles')
+          .update({ org_id: id! })
+          .eq('user_id', existingProfile.user_id);
+
+        toast.success('User linked to organisation');
+      } else {
+        // Create pending invite
+        const { error } = await supabase.from('org_members').insert({
+          org_id: id!,
+          invited_email: email,
+          role: addMemberRole,
+          invited_at: new Date().toISOString(),
+        });
+        if (error) throw error;
+        toast.success('Invite created — user will be linked on signup');
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['admin-org-members', id] });
+      setAddMemberEmail('');
+      setAddMemberRole('manager');
+      setShowAddMember(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to add member');
+    } finally {
+      setIsAddingMember(false);
     }
   };
 
@@ -279,6 +361,31 @@ const AdminOrgDetail = () => {
             )}
             <p className="text-muted-foreground font-body mt-1">Manage subscription, clients & team</p>
           </div>
+
+          {/* Delete Organisation */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="gap-2" disabled={isDeleting}>
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Delete Org
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Organisation</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete <strong>{org?.name}</strong>, its members, and subscription.
+                  Clients and their data will be orphaned. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteOrg} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Delete Organisation
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         <Tabs defaultValue="subscription">
@@ -500,10 +607,16 @@ const AdminOrgDetail = () => {
           <TabsContent value="members">
             <Card>
               <CardHeader>
-                <CardTitle className="font-display text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Team Members
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="font-display text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Team Members
+                  </CardTitle>
+                  <Button size="sm" className="gap-2" onClick={() => setShowAddMember(true)}>
+                    <UserPlus className="h-4 w-4" />
+                    Add Member
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {members.length === 0 ? (
@@ -600,6 +713,48 @@ const AdminOrgDetail = () => {
             <Button onClick={handleSaveMember} disabled={isSavingMember}>
               {isSavingMember ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Member Dialog */}
+      <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Member</DialogTitle>
+            <DialogDescription>
+              Link an existing user by email or create a pending invite for a new user.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Email Address</Label>
+              <Input
+                value={addMemberEmail}
+                onChange={(e) => setAddMemberEmail(e.target.value)}
+                type="email"
+                placeholder="user@example.com"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleAddMember()}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={addMemberRole} onValueChange={setAddMemberRole}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMember(false)}>Cancel</Button>
+            <Button onClick={handleAddMember} disabled={isAddingMember || !addMemberEmail.trim()}>
+              {isAddingMember ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Add Member
             </Button>
           </DialogFooter>
         </DialogContent>
