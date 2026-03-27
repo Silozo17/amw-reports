@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import amwLogo from '@/assets/AMW_Logo_White.png';
 
@@ -10,9 +10,37 @@ const NAV_LINKS = [
   { to: '/pricing', label: 'Pricing' },
 ];
 
+const SOLUTIONS_USECASES = [
+  { to: '/social-media-reporting', label: 'Social Media Reporting' },
+  { to: '/seo-reporting', label: 'SEO Reporting' },
+  { to: '/ppc-reporting', label: 'PPC & Ads Reporting' },
+  { to: '/white-label-reports', label: 'White-Label Reports' },
+];
+
+const SOLUTIONS_AUDIENCES = [
+  { to: '/for-agencies', label: 'For Agencies' },
+  { to: '/for-freelancers', label: 'For Freelancers' },
+  { to: '/for-smbs', label: 'For Small Businesses' },
+  { to: '/for-creators', label: 'For Creators' },
+];
+
 const PublicNavbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [solOpen, setSolOpen] = useState(false);
+  const solRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (solRef.current && !solRef.current.contains(e.target as Node)) setSolOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => { setMobileOpen(false); setSolOpen(false); }, [location.pathname]);
+
+  const isSolutionPage = [...SOLUTIONS_USECASES, ...SOLUTIONS_AUDIENCES].some(s => location.pathname === s.to);
 
   return (
     <nav className="sticky top-0 z-50 bg-amw-black/90 backdrop-blur-md border-b border-sidebar-border/50">
@@ -25,20 +53,48 @@ const PublicNavbar = () => {
           </Link>
 
           {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             {NAV_LINKS.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
                 className={`text-sm font-body font-medium transition-colors ${
-                  location.pathname === to
-                    ? 'text-primary'
-                    : 'text-amw-offwhite/70 hover:text-amw-offwhite'
+                  location.pathname === to ? 'text-primary' : 'text-amw-offwhite/70 hover:text-amw-offwhite'
                 }`}
               >
                 {label}
               </Link>
             ))}
+
+            {/* Solutions dropdown */}
+            <div ref={solRef} className="relative">
+              <button
+                onClick={() => setSolOpen(!solOpen)}
+                className={`text-sm font-body font-medium transition-colors flex items-center gap-1 ${
+                  isSolutionPage ? 'text-primary' : 'text-amw-offwhite/70 hover:text-amw-offwhite'
+                }`}
+              >
+                Solutions
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${solOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {solOpen && (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-amw-black border border-sidebar-border/50 rounded-xl shadow-xl py-2 z-50">
+                  <p className="px-4 py-1.5 text-[10px] uppercase tracking-wider text-amw-offwhite/30 font-body">Use Cases</p>
+                  {SOLUTIONS_USECASES.map(({ to, label }) => (
+                    <Link key={to} to={to} className="block px-4 py-2 text-sm font-body text-amw-offwhite/70 hover:text-amw-offwhite hover:bg-sidebar-accent/30 transition-colors">
+                      {label}
+                    </Link>
+                  ))}
+                  <div className="my-1.5 border-t border-sidebar-border/30" />
+                  <p className="px-4 py-1.5 text-[10px] uppercase tracking-wider text-amw-offwhite/30 font-body">Built For</p>
+                  {SOLUTIONS_AUDIENCES.map(({ to, label }) => (
+                    <Link key={to} to={to} className="block px-4 py-2 text-sm font-body text-amw-offwhite/70 hover:text-amw-offwhite hover:bg-sidebar-accent/30 transition-colors">
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Desktop CTA */}
@@ -64,25 +120,30 @@ const PublicNavbar = () => {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-amw-black border-t border-sidebar-border/50 px-4 pb-4 space-y-3">
+        <div className="md:hidden bg-amw-black border-t border-sidebar-border/50 px-4 pb-4 space-y-1 max-h-[80vh] overflow-y-auto">
           {NAV_LINKS.map(({ to, label }) => (
-            <Link
-              key={to}
-              to={to}
-              onClick={() => setMobileOpen(false)}
-              className={`block py-2 text-sm font-body font-medium ${
-                location.pathname === to ? 'text-primary' : 'text-amw-offwhite/70'
-              }`}
-            >
+            <Link key={to} to={to} className={`block py-2 text-sm font-body font-medium ${location.pathname === to ? 'text-primary' : 'text-amw-offwhite/70'}`}>
               {label}
             </Link>
           ))}
-          <div className="flex flex-col gap-2 pt-2">
+          <p className="pt-3 pb-1 text-[10px] uppercase tracking-wider text-amw-offwhite/30 font-body">Use Cases</p>
+          {SOLUTIONS_USECASES.map(({ to, label }) => (
+            <Link key={to} to={to} className={`block py-2 pl-2 text-sm font-body ${location.pathname === to ? 'text-primary' : 'text-amw-offwhite/70'}`}>
+              {label}
+            </Link>
+          ))}
+          <p className="pt-3 pb-1 text-[10px] uppercase tracking-wider text-amw-offwhite/30 font-body">Built For</p>
+          {SOLUTIONS_AUDIENCES.map(({ to, label }) => (
+            <Link key={to} to={to} className={`block py-2 pl-2 text-sm font-body ${location.pathname === to ? 'text-primary' : 'text-amw-offwhite/70'}`}>
+              {label}
+            </Link>
+          ))}
+          <div className="flex flex-col gap-2 pt-3">
             <Button variant="outline" asChild className="w-full border-sidebar-border text-amw-offwhite">
-              <Link to="/login" onClick={() => setMobileOpen(false)}>Log In</Link>
+              <Link to="/login">Log In</Link>
             </Button>
             <Button asChild className="w-full">
-              <Link to="/login?view=signup" onClick={() => setMobileOpen(false)}>Get Started Free</Link>
+              <Link to="/login?view=signup">Get Started Free</Link>
             </Button>
           </div>
         </div>

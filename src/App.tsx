@@ -10,6 +10,17 @@ import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import FeaturesPage from "./pages/FeaturesPage";
 import PricingPage from "./pages/PricingPage";
+import SocialMediaReportingPage from "./pages/SocialMediaReportingPage";
+import SeoReportingPage from "./pages/SeoReportingPage";
+import PpcReportingPage from "./pages/PpcReportingPage";
+import WhiteLabelReportsPage from "./pages/WhiteLabelReportsPage";
+import ForAgenciesPage from "./pages/ForAgenciesPage";
+import ForFreelancersPage from "./pages/ForFreelancersPage";
+import ForSmbsPage from "./pages/ForSmbsPage";
+import ForCreatorsPage from "./pages/ForCreatorsPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
+import HowItWorksPage from "./pages/HowItWorksPage";
+import AboutPage from "./pages/AboutPage";
 import PublicLayout from "./components/landing/PublicLayout";
 import Index from "./pages/Index";
 import ClientList from "./pages/clients/ClientList";
@@ -88,6 +99,17 @@ const AppRoutes = () => (
     <Route path="/" element={<PublicPageRoute><HomePage /></PublicPageRoute>} />
     <Route path="/features" element={<PublicPageRoute><FeaturesPage /></PublicPageRoute>} />
     <Route path="/pricing" element={<PublicPageRoute><PricingPage /></PublicPageRoute>} />
+    <Route path="/social-media-reporting" element={<PublicPageRoute><SocialMediaReportingPage /></PublicPageRoute>} />
+    <Route path="/seo-reporting" element={<PublicPageRoute><SeoReportingPage /></PublicPageRoute>} />
+    <Route path="/ppc-reporting" element={<PublicPageRoute><PpcReportingPage /></PublicPageRoute>} />
+    <Route path="/white-label-reports" element={<PublicPageRoute><WhiteLabelReportsPage /></PublicPageRoute>} />
+    <Route path="/for-agencies" element={<PublicPageRoute><ForAgenciesPage /></PublicPageRoute>} />
+    <Route path="/for-freelancers" element={<PublicPageRoute><ForFreelancersPage /></PublicPageRoute>} />
+    <Route path="/for-smbs" element={<PublicPageRoute><ForSmbsPage /></PublicPageRoute>} />
+    <Route path="/for-creators" element={<PublicPageRoute><ForCreatorsPage /></PublicPageRoute>} />
+    <Route path="/integrations" element={<PublicPageRoute><IntegrationsPage /></PublicPageRoute>} />
+    <Route path="/how-it-works" element={<PublicPageRoute><HowItWorksPage /></PublicPageRoute>} />
+    <Route path="/about" element={<PublicPageRoute><AboutPage /></PublicPageRoute>} />
     <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
     <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
