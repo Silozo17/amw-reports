@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
+import { sendBrandedEmail } from '@/lib/sendBrandedEmail';
 
 export interface PendingInvite {
   id: string;
