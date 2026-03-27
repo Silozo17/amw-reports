@@ -18,7 +18,7 @@ const STEPS = [
 
 const FAQS = [
   { q: 'What does white-label mean?', a: 'White-label means your clients see your brand everywhere — on PDF reports, in the client portal, on emails, and even on the URL if you use a custom domain. AMW Reports branding is completely hidden.' },
-  { q: 'Which plan includes white-label branding?', a: 'Full white-label branding (including custom fonts, domain, and email templates) is available on the Agency plan at £69.99/month. All plans include your logo on PDF reports.' },
+  { q: 'Which plan includes white-label branding?', a: 'Full white-label branding (including custom fonts, domain, and email templates) is available on the Agency plan at £49.99/month. All plans include your logo on PDF reports.' },
   { q: 'Can I use my own domain for the client portal?', a: 'Yes. On the Agency plan, you can set up a custom domain (e.g., reports.youragency.com) so clients access their dashboard under your URL.' },
   { q: 'Can I auto-import my branding from my website?', a: 'Yes! AMW Reports can analyse your website and automatically extract your brand colours, logo, and fonts — saving you time on setup.' },
   { q: 'Do all platforms support white-label?', a: 'Yes. White-label branding applies universally to all platforms, reports, and the client portal. It is not limited to specific integrations.' },

@@ -21,7 +21,7 @@ const FAQS = [
   { q: 'What SEO platforms does AMW Reports support?', a: 'We integrate with Google Search Console, Google Analytics (GA4), and Google Business Profile — the three core platforms for tracking organic search performance.' },
   { q: 'Can I include SEO and social media data in the same report?', a: 'Yes. AMW Reports consolidates data from all connected platforms into a single branded report. You can include SEO, social, and ads data together or configure each client to show only the relevant platforms.' },
   { q: 'Does AMW Reports track keyword rankings?', a: 'We pull top queries and average position data directly from Google Search Console. This shows you which keywords are driving traffic and how your rankings are trending month over month.' },
-  { q: 'How often is SEO data updated?', a: 'Freelance and Agency plans sync daily. The free Creator plan syncs monthly. Note that Google Search Console data itself has a 2-3 day delay from Google.' },
+  { q: 'How often is SEO data updated?', a: 'Agency plans sync daily. Freelance plans sync weekly (every Monday). The free Creator plan syncs monthly. Note that Google Search Console data itself has a 2-3 day delay from Google.' },
   { q: 'Can I white-label the SEO reports?', a: 'Yes. On the Agency plan, reports feature your logo, brand colours, fonts, and can be served from your own custom domain.' },
 ];
 

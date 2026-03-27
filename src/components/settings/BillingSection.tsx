@@ -18,15 +18,15 @@ const STRIPE_PLANS = {
   },
   freelance: {
     name: 'Freelance',
-    price: '£49.99/mo',
-    priceId: 'price_1TFHsVHCGP7kst5ZpWooaPlh',
-    features: ['5 clients', '25 connections', 'Branded reports', 'Email delivery'],
+    price: '£29.99/mo',
+    priceId: 'price_1TFh3oHCGP7kst5ZaXap6KMP',
+    features: ['5 clients', '25 connections', 'Weekly data sync', 'Branded reports', 'Email delivery'],
   },
   agency: {
     name: 'Agency',
-    price: '£69.99/mo',
-    priceId: 'price_1TFNmfHCGP7kst5ZS17zNsEQ',
-    features: ['5 clients', '25 connections', 'White-label branding', 'Custom domain', 'Email delivery'],
+    price: '£49.99/mo',
+    priceId: 'price_1TFh47HCGP7kst5ZT7IlOyvo',
+    features: ['5 clients', '25 connections', 'Daily data sync', 'White-label branding', 'Custom domain', 'Email delivery'],
   },
 };
 

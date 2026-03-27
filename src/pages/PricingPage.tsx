@@ -24,17 +24,17 @@ const PLANS = [
   },
   {
     name: 'Freelance',
-    price: '£49.99',
+    price: '£29.99',
     period: '/month',
     desc: 'For freelancers and small teams managing multiple clients.',
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: false,
-    features: ['5 clients included', '25 platform connections', 'Daily data sync', 'Branded PDF reports', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
+    features: ['5 clients included', '25 platform connections', 'Weekly data sync', 'Branded PDF reports', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
   },
   {
     name: 'Agency',
-    price: '£69.99',
+    price: '£49.99',
     period: '/month',
     desc: 'Full white-label branding and custom domain for your agency.',
     cta: 'Get Started',
@@ -54,7 +54,7 @@ const COMPARISON_ROWS = [
   { feature: 'Custom Domain', starter: false, freelance: false, agency: true },
   { feature: 'Additional Clients', starter: false, freelance: '£9.99/mo each', agency: '£9.99/mo each' },
   { feature: 'Additional Connections', starter: false, freelance: '£4.99/mo each', agency: '£4.99/mo each' },
-  { feature: 'Data Sync Frequency', starter: 'Monthly', freelance: 'Daily', agency: 'Daily' },
+  { feature: 'Data Sync Frequency', starter: 'Monthly', freelance: 'Weekly', agency: 'Daily' },
 ];
 
 const FAQS = [
@@ -67,7 +67,7 @@ const FAQS = [
   { q: 'Can I upgrade or downgrade anytime?', a: 'Yes. You can upgrade at any time and the change takes effect immediately. If you downgrade, it takes effect at the end of your current billing period.' },
   { q: 'Is there a contract or commitment?', a: 'No contracts. All plans are month-to-month and you can cancel at any time.' },
   { q: 'Do my clients need an account?', a: 'No. Clients can access their dashboard via a unique shareable link — no login required for them.' },
-  { q: 'How often is my data synced?', a: 'Creator plans sync data once per month on the 4th. Freelance and Agency plans benefit from daily automatic syncing to keep your dashboards up to date.' },
+  { q: 'How often is my data synced?', a: 'Creator plans sync data once per month on the 4th. Freelance plans sync weekly (every Monday). Agency plans benefit from daily automatic syncing to keep your dashboards always up to date.' },
   { q: 'How does AMW Reports compare to other reporting tools?', a: 'Unlike tools like DashThis or AgencyAnalytics that charge per dashboard or per user, AMW Reports offers a flat monthly price with no per-seat fees. You get full white-label branding, automated PDF generation, and a client portal — all included. Plus, we offer a genuinely free plan to get started.' },
   { q: 'What is white-label branding?', a: 'White-label branding lets you replace AMW Reports branding with your own. Upload your logo, set your brand colours and fonts, and even use a custom domain — your clients will see your brand throughout the platform and on PDF reports.' },
 ];

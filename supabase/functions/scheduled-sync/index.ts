@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
       error?: string;
     }> = [];
 
-    let skippedStarter = 0;
+    let skippedCount = 0;
 
     // Process connections sequentially to avoid rate limits
     for (const conn of connections) {
@@ -97,7 +97,13 @@ Deno.serve(async (req) => {
 
       // Creator/Starter plan: only sync on the 4th of the month
       if (planSlug === "starter" && dayOfMonth !== 4) {
-        skippedStarter++;
+        skippedCount++;
+        continue;
+      }
+
+      // Freelance plan: only sync on Mondays (weekly)
+      if (planSlug === "freelance" && now.getDay() !== 1) {
+        skippedCount++;
         continue;
       }
 
@@ -185,10 +191,10 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: `Scheduled sync complete: ${successCount} succeeded, ${failCount} failed, ${skippedStarter} skipped (Creator plan, not 4th)`,
+        message: `Scheduled sync complete: ${successCount} succeeded, ${failCount} failed, ${skippedCount} skipped (plan schedule)`,
         months_synced: monthsToSync,
         total_connections: connections.length,
-        skipped_starter: skippedStarter,
+        skipped_count: skippedCount,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
