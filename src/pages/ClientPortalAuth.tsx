@@ -182,15 +182,15 @@ const ClientPortalAuth = () => {
     }
   };
 
-  const handlePickerComplete = async (connectionId: string) => {
+  const handlePickerComplete = async () => {
     setPickerOpen(false);
+    const conn = pickerConnection;
     setPickerConnection(null);
-    if (!client) return;
+    if (!client || !conn) return;
 
-    const conn = connections.find(c => c.id === connectionId);
-    if (conn && SYNC_FUNCTION_MAP[conn.platform]) {
+    if (SYNC_FUNCTION_MAP[conn.platform]) {
       toast.info('Starting initial data sync...');
-      await triggerInitialSync(connectionId, conn.platform, client.id);
+      await triggerInitialSync(conn.id, conn.platform);
     }
     fetchData();
   };
