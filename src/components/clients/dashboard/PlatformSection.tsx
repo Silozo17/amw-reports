@@ -163,6 +163,7 @@ const PlatformSection = ({
   reportMonth,
   reportYear,
 }: PlatformSectionProps) => {
+  const CHART_COLORS = useChartColors();
   const [contentOpen, setContentOpen] = useState(false);
   const logo = PLATFORM_LOGOS[platform];
   const label = PLATFORM_LABELS[platform];

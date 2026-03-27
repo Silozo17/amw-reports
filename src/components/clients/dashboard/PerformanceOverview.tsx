@@ -48,6 +48,7 @@ const PerformanceOverview = ({
   trendPlatforms,
   gscTrendData,
 }: PerformanceOverviewProps) => {
+  const CHART_COLORS = useChartColors();
   const hasSpend = spendByPlatform.length > 1;
   const hasEngagement = engagementStackedData.length > 0;
   const hasImpressions = impressionsByPlatform.length > 0;
