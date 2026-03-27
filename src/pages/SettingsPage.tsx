@@ -48,7 +48,6 @@ const SettingsPage = () => {
   if (canManageBilling) tabs.push({ value: 'billing', label: 'Billing' });
 
   const defaultTab = tabs[0]?.value ?? 'account';
-  const tabGridClass = `grid-cols-${tabs.length}`;
 
   return (
     <AppLayout>
@@ -59,9 +58,9 @@ const SettingsPage = () => {
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className={`grid w-full ${tabGridClass}`}>
+          <TabsList className="flex w-full">
             {tabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+              <TabsTrigger key={tab.value} value={tab.value} className="flex-1">{tab.label}</TabsTrigger>
             ))}
           </TabsList>
 
