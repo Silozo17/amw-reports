@@ -29,8 +29,6 @@ const AdminOrgDetail = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
-  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
-  const [bulkSyncProgress, setBulkSyncProgress] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Subscription state
