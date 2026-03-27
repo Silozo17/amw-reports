@@ -1,64 +1,32 @@
 
 
-# Static SEO HTML for All Pages + Fix Flash
+# Add Quick Client Switcher to Client Detail Page
 
-## Two Problems to Solve
+## What
 
-### 1. Flash of static content on reload
-The current mechanism `#root:not(:empty) ~ #seo-static { display: none }` shows the static HTML until React renders. Users see a brief flash of unstyled/shifted content.
+Add a client selector dropdown next to the client name/back button on the client detail page, similar to the org switcher in the sidebar. Users can quickly swap between clients without navigating back to the client list.
 
-**Fix**: Hide `#seo-static` from users entirely using CSS, but keep it visible to crawlers:
-```css
-/* Hidden from visual users immediately — crawlers still read it */
-#seo-static {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-```
-This is the standard "visually hidden" / sr-only technique. Search engine crawlers parse the DOM regardless of CSS visibility, so all content remains indexable. No flash, no layout shift, no user-visible artifact.
+## How
 
-Remove the old `#root:not(:empty) ~ #seo-static { display: none }` rule and the inline page-switcher `<script>` (no longer needed since content is always visually hidden).
+### 1. Create `src/components/clients/ClientSwitcher.tsx`
+A Popover component that:
+- Shows a `ChevronsUpDown` icon button next to the client name area
+- Fetches all clients for the current org (`useOrg().orgId`)
+- Displays a scrollable list with client logos/initials, company names
+- Highlights the current client with a `Check` icon
+- Includes a search/filter input at the top for quick filtering
+- On click, navigates to `/clients/{selectedId}` via `useNavigate`
+- Styled consistently with the org switcher pattern (Popover + button list)
 
-### 2. Add static HTML for all 11 missing public pages
-
-Add `data-seo-page` blocks for each missing page. Each block contains:
-- Semantic navbar with links
-- Full page content (headings, paragraphs, lists, FAQs) matching the React component
-- Footer
-- Proper heading hierarchy (h1 → h2 → h3)
-- Alt tags on images, aria-labels on links
-
-#### Pages to add:
-| Route | Source component |
-|---|---|
-| `/social-media-reporting` | `SocialMediaReportingPage.tsx` |
-| `/seo-reporting` | `SeoReportingPage.tsx` |
-| `/ppc-reporting` | `PpcReportingPage.tsx` |
-| `/white-label-reports` | `WhiteLabelReportsPage.tsx` |
-| `/for-agencies` | `ForAgenciesPage.tsx` |
-| `/for-freelancers` | `ForFreelancersPage.tsx` |
-| `/for-smbs` | `ForSmbsPage.tsx` |
-| `/for-creators` | `ForCreatorsPage.tsx` |
-| `/integrations` | `IntegrationsPage.tsx` |
-| `/how-it-works` | `HowItWorksPage.tsx` |
-| `/about` | `AboutPage.tsx` |
-
-Each static block will replicate the full text content from its React component using the existing CSS classes (`.ss-section`, `.ss-container`, `.ss-section-title`, `.ss-faq-item`, `.ss-pill`, `.ss-metric-pill`, `.ss-feature-row`, `.ss-plan-card`, etc.).
+### 2. Modify `src/pages/clients/ClientDetail.tsx`
+- Import and render `<ClientSwitcher>` next to the client name (between the back button and client info, or after the client name)
+- Pass `currentClientId={id}` and `orgId` as props
+- The switcher replaces the need to click back → select new client
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `index.html` | (1) Replace hide rule with visually-hidden CSS, (2) remove page-switcher script, (3) add 11 new `data-seo-page` blocks with full semantic HTML |
-
-## Implementation Batches
-
-Due to the size of `index.html` (will grow significantly), implementation in 2 batches:
-1. **Batch 1**: Fix the flash (CSS change + remove script) + add 6 pages (social-media-reporting, seo-reporting, ppc-reporting, white-label-reports, integrations, how-it-works)
-2. **Batch 2**: Add 5 audience pages (for-agencies, for-freelancers, for-smbs, for-creators, about)
+| `src/components/clients/ClientSwitcher.tsx` | New component — Popover with searchable client list |
+| `src/pages/clients/ClientDetail.tsx` | Add `<ClientSwitcher>` next to client name in header |
 
