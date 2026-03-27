@@ -18,10 +18,429 @@
     <meta name="twitter:title" content="AMW Reports">
     <meta property="og:description" content="AMW Reports — Automated marketing reports for agencies. Connect 10+ platforms, generate branded PDF reports, and deliver insights to clients automatically.">
     <meta name="twitter:description" content="AMW Reports — Automated marketing reports for agencies. Connect 10+ platforms, generate branded PDF reports, and deliver insights to clients automatically.">
+
+    <!-- SEO static styles — scoped to #seo-static, hidden once React mounts -->
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@300;400;500;600;700&display=swap');
+      @font-face{font-family:'Slowdex';src:url('/fonts/Slowdex.otf') format('opentype');font-weight:400;font-style:normal;font-display:swap}
+
+      /* Hide static content the instant React renders anything into #root */
+      #root:not(:empty) ~ #seo-static { display: none }
+
+      /* ---------- Variables ---------- */
+      #seo-static {
+        --bg: hsl(340 7% 13%);
+        --fg: hsl(32 44% 92%);
+        --primary: hsl(295 60% 47%);
+        --secondary: hsl(212 64% 59%);
+        --accent: hsl(148 60% 57%);
+        --warning: hsl(27 84% 57%);
+        --muted: hsl(32 44% 92% / 0.6);
+        --muted2: hsl(32 44% 92% / 0.4);
+        --muted3: hsl(32 44% 92% / 0.7);
+        --muted5: hsl(32 44% 92% / 0.5);
+        --muted8: hsl(32 44% 92% / 0.8);
+        --muted9: hsl(32 44% 92% / 0.9);
+        --border: hsl(340 7% 20% / 0.5);
+        --border2: hsl(340 7% 20% / 0.3);
+        --card-bg: hsl(340 7% 18% / 0.3);
+        --card-bg2: hsl(340 7% 18% / 0.4);
+        --font-heading: 'Anton', sans-serif;
+        --font-body: 'Montserrat', sans-serif;
+        --font-accent: 'Slowdex', sans-serif;
+
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---------- Resets inside static ---------- */
+      #seo-static *, #seo-static *::before, #seo-static *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      #seo-static a { color: inherit; text-decoration: none; }
+      #seo-static ul { list-style: none; }
+      #seo-static img { max-width: 100%; height: auto; display: block; }
+
+      /* ---------- Layout ---------- */
+      .ss-container { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
+      @media(min-width:640px){ .ss-container { padding: 0 1.5rem; } }
+      @media(min-width:1024px){ .ss-container { padding: 0 2rem; } }
+      .ss-container-sm { max-width: 64rem; margin: 0 auto; padding: 0 1rem; }
+      @media(min-width:640px){ .ss-container-sm { padding: 0 1.5rem; } }
+      .ss-container-xs { max-width: 48rem; margin: 0 auto; padding: 0 1rem; }
+
+      /* ---------- Navbar ---------- */
+      .ss-nav { border-bottom: 1px solid var(--border); padding: 1rem 0; }
+      .ss-nav-inner { display: flex; align-items: center; justify-content: space-between; }
+      .ss-nav-brand { display: flex; align-items: center; gap: 0.5rem; }
+      .ss-nav-brand img { height: 2rem; width: auto; }
+      .ss-nav-brand span { font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted5); font-family: var(--font-body); }
+      .ss-nav-links { display: none; gap: 2rem; align-items: center; }
+      @media(min-width:768px){ .ss-nav-links { display: flex; } }
+      .ss-nav-links a { font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
+      .ss-nav-links a:hover { color: var(--primary); }
+      .ss-nav-actions { display: none; gap: 0.75rem; align-items: center; }
+      @media(min-width:768px){ .ss-nav-actions { display: flex; } }
+
+      /* ---------- Buttons ---------- */
+      .ss-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 600; font-family: var(--font-body); cursor: pointer; border: none; transition: opacity 0.2s; }
+      .ss-btn:hover { opacity: 0.9; }
+      .ss-btn-primary { background: var(--primary); color: #fff; }
+      .ss-btn-outline { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+      .ss-btn-lg { padding: 1rem 2rem; font-size: 1rem; }
+
+      /* ---------- Sections ---------- */
+      .ss-section { padding: 5rem 0; }
+      .ss-section-lg { padding: 7rem 0; }
+      .ss-section-border { border-top: 1px solid var(--border2); }
+
+      /* ---------- Hero ---------- */
+      .ss-hero { position: relative; overflow: hidden; padding: 5rem 0; }
+      @media(min-width:1024px){ .ss-hero { padding: 8rem 0; } }
+      .ss-hero-grid { display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: center; }
+      @media(min-width:1024px){ .ss-hero-grid { grid-template-columns: 1fr 1fr; } }
+      .ss-hero-content { display: flex; flex-direction: column; gap: 1.5rem; }
+      .ss-hero-logo img { height: 2.5rem; width: auto; }
+      .ss-hero-sub { font-size: 0.875rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted3); font-weight: 600; }
+      .ss-hero-accent { font-family: var(--font-accent); font-size: 1.5rem; color: var(--primary); }
+      @media(min-width:1024px){ .ss-hero-accent { font-size: 1.875rem; } }
+      .ss-hero h1 { font-family: var(--font-heading); font-size: 2.5rem; line-height: 0.95; text-transform: uppercase; letter-spacing: 0.06em; }
+      @media(min-width:1024px){ .ss-hero h1 { font-size: 3.75rem; } }
+      @media(min-width:1280px){ .ss-hero h1 { font-size: 4.5rem; } }
+      .ss-hero p.ss-hero-desc { font-size: 1.125rem; max-width: 28rem; line-height: 1.7; color: var(--muted3); }
+      .ss-hero-cta { display: flex; flex-wrap: wrap; gap: 0.75rem; padding-top: 0.5rem; }
+      .ss-hero-mascot { display: none; justify-content: center; }
+      @media(min-width:1024px){ .ss-hero-mascot { display: flex; } }
+      .ss-hero-mascot img { width: 26rem; object-fit: contain; }
+      @media(min-width:1280px){ .ss-hero-mascot img { width: 30rem; } }
+      .ss-text-gradient { background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+      /* ---------- Platforms strip ---------- */
+      .ss-platforms { padding: 3rem 0; border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); text-align: center; }
+      .ss-platforms-label { font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted2); margin-bottom: 1.5rem; }
+      .ss-platforms-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+      .ss-pill { padding: 0.5rem 1rem; border-radius: 9999px; background: var(--card-bg2); border: 1px solid var(--border); font-size: 0.75rem; color: var(--muted3); }
+
+      /* ---------- How it works ---------- */
+      .ss-steps-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+      @media(min-width:768px){ .ss-steps-grid { grid-template-columns: repeat(3, 1fr); } }
+      .ss-step { position: relative; padding: 1.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); }
+      .ss-step-num { position: absolute; top: 1rem; left: 1rem; font-size: 0.75rem; color: var(--muted2); }
+      .ss-step-icon { width: 3rem; height: 3rem; border-radius: 50%; background: hsl(295 60% 47% / 0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+      .ss-step-icon svg { width: 1.5rem; height: 1.5rem; color: var(--primary); stroke: var(--primary); fill: none; }
+      .ss-step h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; text-align: center; }
+      .ss-step p { font-size: 0.875rem; color: var(--muted); text-align: center; }
+      .ss-section-title { font-family: var(--font-heading); font-size: 1.875rem; text-transform: uppercase; text-align: center; margin-bottom: 1rem; letter-spacing: 0.06em; }
+      @media(min-width:1024px){ .ss-section-title { font-size: 3rem; } }
+      .ss-section-desc { color: var(--muted); text-align: center; max-width: 36rem; margin: 0 auto 3rem; }
+
+      /* ---------- Stats grid ---------- */
+      .ss-stats-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+      @media(min-width:640px){ .ss-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+      @media(min-width:1024px){ .ss-stats-grid { grid-template-columns: repeat(4, 1fr); } }
+      .ss-stat-card { padding: 1.25rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); text-align: left; }
+      .ss-stat-card h3 { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
+      .ss-stat-card ul { display: flex; flex-direction: column; gap: 0.375rem; }
+      .ss-stat-card li { font-size: 0.875rem; color: var(--muted); display: flex; align-items: center; gap: 0.5rem; }
+      .ss-stat-dot { width: 0.375rem; height: 0.375rem; border-radius: 50%; flex-shrink: 0; }
+      .ss-c-primary { color: var(--primary); }
+      .ss-c-secondary { color: var(--secondary); }
+      .ss-c-accent { color: var(--accent); }
+      .ss-c-warning { color: var(--warning); }
+      .ss-bg-primary { background: var(--primary); }
+      .ss-bg-secondary { background: var(--secondary); }
+      .ss-bg-accent { background: var(--accent); }
+      .ss-bg-warning { background: var(--warning); }
+
+      /* ---------- Why section ---------- */
+      .ss-why-grid { display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: center; }
+      @media(min-width:1024px){ .ss-why-grid { grid-template-columns: 1fr 1fr; } }
+      .ss-why-grid h2 { font-family: var(--font-heading); font-size: 1.875rem; text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 0.06em; }
+      @media(min-width:1024px){ .ss-why-grid h2 { font-size: 3rem; } }
+      .ss-why-grid > div:first-child p { color: var(--muted); margin-bottom: 2rem; }
+      .ss-check-list { display: flex; flex-direction: column; gap: 1rem; }
+      .ss-check-item { display: flex; gap: 0.75rem; align-items: flex-start; }
+      .ss-check-icon { width: 1.25rem; height: 1.25rem; border-radius: 50%; background: hsl(148 60% 57% / 0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 0.125rem; }
+      .ss-check-icon svg { width: 0.75rem; height: 0.75rem; stroke: var(--accent); fill: none; }
+      .ss-check-item span { font-size: 0.875rem; color: var(--muted8); }
+
+      /* ---------- Quote ---------- */
+      .ss-quote-icon { width: 2.5rem; height: 2.5rem; margin: 0 auto 1.5rem; color: hsl(295 60% 47% / 0.4); }
+      .ss-quote-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; }
+      .ss-blockquote { font-size: 1.25rem; font-style: italic; line-height: 1.7; color: var(--muted9); margin-bottom: 1.5rem; text-align: center; }
+      @media(min-width:1024px){ .ss-blockquote { font-size: 1.5rem; } }
+      .ss-attribution { display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+      .ss-avatar { width: 3rem; height: 3rem; border-radius: 50%; background: hsl(295 60% 47% / 0.2); display: flex; align-items: center; justify-content: center; color: var(--primary); font-family: var(--font-heading); font-size: 1.125rem; }
+      .ss-attribution-text p:first-child { font-size: 0.875rem; font-weight: 600; }
+      .ss-attribution-text p:last-child { font-size: 0.75rem; color: var(--muted5); }
+      .ss-attribution-text { text-align: left; }
+
+      /* ---------- CTA ---------- */
+      .ss-cta { text-align: center; background: linear-gradient(to bottom, transparent, hsl(295 60% 47% / 0.05)); }
+      .ss-cta h2 { font-family: var(--font-heading); font-size: 1.875rem; text-transform: uppercase; margin-bottom: 1rem; letter-spacing: 0.06em; }
+      @media(min-width:1024px){ .ss-cta h2 { font-size: 3rem; } }
+      .ss-cta p { color: var(--muted); margin-bottom: 1.5rem; }
+
+      /* ---------- Footer ---------- */
+      .ss-footer { background: var(--bg); border-top: 1px solid var(--border); padding: 3rem 0; }
+      .ss-footer-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+      @media(min-width:768px){ .ss-footer-grid { grid-template-columns: 2fr 1fr 1fr; } }
+      .ss-footer-brand { display: flex; flex-direction: column; gap: 0.75rem; }
+      .ss-footer-brand-row { display: flex; align-items: center; gap: 0.5rem; }
+      .ss-footer-brand-row img { height: 1.75rem; width: auto; }
+      .ss-footer-brand-row span { font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted5); }
+      .ss-footer-brand p { font-size: 0.875rem; line-height: 1.6; max-width: 24rem; color: var(--muted3); }
+      .ss-footer-brand .ss-footer-op { font-size: 0.75rem; color: var(--muted2); }
+      .ss-footer-brand .ss-footer-op a { color: var(--muted); text-decoration: underline; }
+      .ss-footer-brand .ss-footer-op a:hover { color: var(--primary); }
+      .ss-footer-col h4 { font-size: 0.875rem; font-weight: 600; color: var(--fg); margin-bottom: 0.75rem; }
+      .ss-footer-col a { display: block; font-size: 0.875rem; color: var(--muted3); margin-bottom: 0.5rem; transition: color 0.2s; }
+      .ss-footer-col a:hover { color: var(--primary); }
+      .ss-footer-copy { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border2); font-size: 0.75rem; color: var(--muted2); }
+
+      /* ---------- Arrow SVG inline ---------- */
+      .ss-arrow { width: 1rem; height: 1rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
   </head>
 
   <body>
     <div id="root"></div>
+
+    <!-- SEO-only static content — hidden instantly when React mounts -->
+    <div id="seo-static">
+
+      <!-- ══ NAVBAR ══ -->
+      <nav class="ss-nav">
+        <div class="ss-container ss-nav-inner">
+          <a href="/" class="ss-nav-brand">
+            <img src="/amw-logo-white.png" alt="AMW Reports" width="120" height="32">
+            <span>Reports</span>
+          </a>
+          <div class="ss-nav-links">
+            <a href="/">Home</a>
+            <a href="/features">Features</a>
+            <a href="/pricing">Pricing</a>
+          </div>
+          <div class="ss-nav-actions">
+            <a href="/login" class="ss-btn ss-btn-outline">Log In</a>
+            <a href="/login?view=signup" class="ss-btn ss-btn-primary">Get Started</a>
+          </div>
+        </div>
+      </nav>
+
+      <!-- ══ HERO ══ -->
+      <section class="ss-hero">
+        <div class="ss-container">
+          <div class="ss-hero-grid">
+            <div class="ss-hero-content">
+              <div class="ss-hero-logo">
+                <img src="/amw-logo-white.png" alt="AMW Reports" width="160" height="40">
+                <p class="ss-hero-sub">AMW Reports</p>
+              </div>
+              <p class="ss-hero-accent">We Are AMW Media</p>
+              <h1>Automated Marketing<br>Reports That<br><span class="ss-text-gradient">Elevate</span> Your Agency</h1>
+              <p class="ss-hero-desc">AMW Reports connects 10+ marketing platforms, generates stunning branded PDF reports, and delivers insights to your clients — automatically.</p>
+              <div class="ss-hero-cta">
+                <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free <svg class="ss-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+                <a href="/features" class="ss-btn ss-btn-outline ss-btn-lg">See Features</a>
+              </div>
+            </div>
+            <div class="ss-hero-mascot">
+              <img src="/mascot.svg" alt="AMW Media mascot" width="416" height="416">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ PLATFORMS ══ -->
+      <section class="ss-platforms">
+        <div class="ss-container" style="text-align:center">
+          <p class="ss-platforms-label">Trusted Integrations</p>
+          <div class="ss-platforms-list">
+            <span class="ss-pill">Google Ads</span>
+            <span class="ss-pill">Meta Ads</span>
+            <span class="ss-pill">Google Analytics</span>
+            <span class="ss-pill">Google Search Console</span>
+            <span class="ss-pill">YouTube</span>
+            <span class="ss-pill">Facebook</span>
+            <span class="ss-pill">Instagram</span>
+            <span class="ss-pill">LinkedIn</span>
+            <span class="ss-pill">TikTok</span>
+            <span class="ss-pill">Google Business Profile</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ HOW IT WORKS ══ -->
+      <section class="ss-section">
+        <div class="ss-container-sm" style="text-align:center">
+          <h2 class="ss-section-title">How It Works</h2>
+          <p class="ss-section-desc">Three simple steps to professional, branded reports your clients will love.</p>
+          <div class="ss-steps-grid">
+            <div class="ss-step">
+              <span class="ss-step-num">01</span>
+              <div class="ss-step-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m5.66 5.66 4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66 4.24-4.24"/></svg></div>
+              <h3>Connect</h3>
+              <p>Link your marketing platforms with one click — Google, Meta, TikTok, LinkedIn, and more.</p>
+            </div>
+            <div class="ss-step">
+              <span class="ss-step-num">02</span>
+              <div class="ss-step-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></div>
+              <h3>Sync</h3>
+              <p>We automatically pull 70+ metrics across all your connected platforms every month.</p>
+            </div>
+            <div class="ss-step">
+              <span class="ss-step-num">03</span>
+              <div class="ss-step-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></svg></div>
+              <h3>Report</h3>
+              <p>Beautiful, branded PDF reports are generated and emailed to your clients automatically.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 70+ METRICS ══ -->
+      <section class="ss-section ss-section-border">
+        <div class="ss-container" style="max-width:72rem;text-align:center">
+          <h2 class="ss-section-title">70+ Metrics Across 10 Platforms</h2>
+          <p class="ss-section-desc">From ad spend to follower growth, we track everything your clients care about.</p>
+          <div class="ss-stats-grid">
+            <div class="ss-stat-card">
+              <h3 class="ss-c-primary">Ads</h3>
+              <ul>
+                <li><span class="ss-stat-dot ss-bg-primary"></span>Spend</li>
+                <li><span class="ss-stat-dot ss-bg-primary"></span>ROAS</li>
+                <li><span class="ss-stat-dot ss-bg-primary"></span>CPC</li>
+                <li><span class="ss-stat-dot ss-bg-primary"></span>Conversions</li>
+                <li><span class="ss-stat-dot ss-bg-primary"></span>CTR</li>
+              </ul>
+            </div>
+            <div class="ss-stat-card">
+              <h3 class="ss-c-secondary">SEO</h3>
+              <ul>
+                <li><span class="ss-stat-dot ss-bg-secondary"></span>Clicks</li>
+                <li><span class="ss-stat-dot ss-bg-secondary"></span>Impressions</li>
+                <li><span class="ss-stat-dot ss-bg-secondary"></span>Position</li>
+                <li><span class="ss-stat-dot ss-bg-secondary"></span>Top Queries</li>
+              </ul>
+            </div>
+            <div class="ss-stat-card">
+              <h3 class="ss-c-accent">Social</h3>
+              <ul>
+                <li><span class="ss-stat-dot ss-bg-accent"></span>Followers</li>
+                <li><span class="ss-stat-dot ss-bg-accent"></span>Engagement</li>
+                <li><span class="ss-stat-dot ss-bg-accent"></span>Reach</li>
+                <li><span class="ss-stat-dot ss-bg-accent"></span>Video Views</li>
+              </ul>
+            </div>
+            <div class="ss-stat-card">
+              <h3 class="ss-c-warning">Web</h3>
+              <ul>
+                <li><span class="ss-stat-dot ss-bg-warning"></span>Sessions</li>
+                <li><span class="ss-stat-dot ss-bg-warning"></span>Bounce Rate</li>
+                <li><span class="ss-stat-dot ss-bg-warning"></span>Page Views</li>
+                <li><span class="ss-stat-dot ss-bg-warning"></span>Traffic Sources</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ WHY AMW REPORTS ══ -->
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-sm">
+          <div class="ss-why-grid">
+            <div>
+              <h2>Why AMW Reports?</h2>
+              <p>We're not just another reporting tool. We built this platform because we run an agency ourselves and know exactly what you need.</p>
+            </div>
+            <ul class="ss-check-list">
+              <li class="ss-check-item">
+                <div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <span>White-label everything — your brand, your logo, your colours</span>
+              </li>
+              <li class="ss-check-item">
+                <div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <span>Automated monthly email delivery to your clients</span>
+              </li>
+              <li class="ss-check-item">
+                <div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <span>10 platforms in one dashboard — no switching tools</span>
+              </li>
+              <li class="ss-check-item">
+                <div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <span>No per-seat pricing — your whole team for one price</span>
+              </li>
+              <li class="ss-check-item">
+                <div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <span>Built by marketers who run an agency themselves</span>
+              </li>
+              <li class="ss-check-item">
+                <div class="ss-check-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                <span>Client portal with shareable links for transparency</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ FOUNDER QUOTE ══ -->
+      <section class="ss-section ss-section-border">
+        <div class="ss-container-xs" style="text-align:center">
+          <div class="ss-quote-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21ZM15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1Z"/></svg></div>
+          <blockquote class="ss-blockquote">"We built AMW Reports because we were tired of spending hours manually compiling data from a dozen platforms. Our clients deserved better — and so did we. Now every agency can deliver professional, branded reports without the grind."</blockquote>
+          <div class="ss-attribution">
+            <div class="ss-avatar">A</div>
+            <div class="ss-attribution-text">
+              <p>Amir</p>
+              <p>Founder, AMW Media</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ CTA BANNER ══ -->
+      <section class="ss-section ss-section-border ss-cta">
+        <div class="ss-container-xs">
+          <h2>Ready to Elevate Your Reporting?</h2>
+          <p>Start for free. No credit card required.</p>
+          <a href="/login?view=signup" class="ss-btn ss-btn-primary ss-btn-lg">Get Started Free <svg class="ss-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+        </div>
+      </section>
+
+      <!-- ══ FOOTER ══ -->
+      <footer class="ss-footer">
+        <div class="ss-container">
+          <div class="ss-footer-grid">
+            <div class="ss-footer-brand">
+              <div class="ss-footer-brand-row">
+                <img src="/amw-logo-white.png" alt="AMW Reports" width="112" height="28">
+                <span>Reports</span>
+              </div>
+              <p>Automated marketing reports that elevate your agency. Built by marketers, for marketers.</p>
+              <p class="ss-footer-op">Operated by <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer">AMW Media</a></p>
+            </div>
+            <div class="ss-footer-col">
+              <h4>Product</h4>
+              <a href="/features">Features</a>
+              <a href="/pricing">Pricing</a>
+              <a href="/login">Log In</a>
+              <a href="/login?view=signup">Sign Up</a>
+            </div>
+            <div class="ss-footer-col">
+              <h4>Legal</h4>
+              <a href="https://amwmedia.co.uk/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+              <a href="https://amwmedia.co.uk/terms-and-conditions" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>
+              <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer">amwmedia.co.uk</a>
+            </div>
+          </div>
+          <div class="ss-footer-copy">© 2025 AMW Reports. All rights reserved.</div>
+        </div>
+      </footer>
+
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
