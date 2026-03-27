@@ -1093,7 +1093,7 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    const earlyReportId = runningReport?.id;
+    earlyReportId = runningReport?.id;
 
     const authHeader = req.headers.get("Authorization");
     if (authHeader && client.org_id) {
@@ -2146,14 +2146,14 @@ Deno.serve(async (req) => {
 
     // Try to mark the report as failed
     try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const sb = createClient(supabaseUrl, serviceRoleKey);
-      // We can't easily get earlyReportId here since it's in the try block scope,
-      // so update by client_id/month/year where status is 'running'
-      await sb.from("reports")
-        .update({ status: "failed" as const })
-        .eq("status", "running");
+      if (earlyReportId) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sb = createClient(supabaseUrl, serviceRoleKey);
+        await sb.from("reports")
+          .update({ status: "failed" as const })
+          .eq("id", earlyReportId);
+      }
     } catch (_) {
       // Best effort
     }
