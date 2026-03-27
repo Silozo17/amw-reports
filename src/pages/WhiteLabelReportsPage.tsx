@@ -21,7 +21,7 @@ const FAQS = [
   { q: 'Which plan includes white-label branding?', a: 'Full white-label branding (including custom fonts, domain, and email templates) is available on the Agency plan at £69.99/month. All plans include your logo on PDF reports.' },
   { q: 'Can I use my own domain for the client portal?', a: 'Yes. On the Agency plan, you can set up a custom domain (e.g., reports.youragency.com) so clients access their dashboard under your URL.' },
   { q: 'Can I auto-import my branding from my website?', a: 'Yes! AMW Reports can analyse your website and automatically extract your brand colours, logo, and fonts — saving you time on setup.' },
-  { q: 'Do all platforms support white-label?', a: 'Yes. White-label branding applies universally to all platforms, reports, and the client portal. It's not limited to specific integrations.' },
+  { q: 'Do all platforms support white-label?', a: 'Yes. White-label branding applies universally to all platforms, reports, and the client portal. It is not limited to specific integrations.' },
 ];
 
 const WhiteLabelReportsPage = () => {
