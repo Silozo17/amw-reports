@@ -163,7 +163,10 @@ const UpsellTab = ({ clientId }: UpsellTabProps) => {
       toast.error('Failed to load upsells');
       return;
     }
-    setUpsells((data ?? []) as Upsell[]);
+    setUpsells((data ?? []).map((d: Record<string, unknown>) => ({
+      ...d,
+      comparison_data: d.comparison_data as Upsell['comparison_data'],
+    })) as Upsell[]);
     setIsLoading(false);
   }, [clientId, orgId]);
 
@@ -218,7 +221,7 @@ const UpsellTab = ({ clientId }: UpsellTabProps) => {
       service_name: formServiceName.trim(),
       headline: formHeadline.trim(),
       body_content: formBody.trim(),
-      comparison_data: formIncludeComparison ? formComparison.filter(r => r.label.trim()) : null,
+      comparison_data: formIncludeComparison ? JSON.parse(JSON.stringify(formComparison.filter(r => r.label.trim()))) : null,
       is_active: true,
       created_by: user.id,
     };
