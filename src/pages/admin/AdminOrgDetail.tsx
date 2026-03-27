@@ -20,8 +20,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Loader2, Users, Plug, Trash2, Pencil, Save, Check, RefreshCw, Plus, UserPlus } from 'lucide-react';
-import { SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
 import { toast } from 'sonner';
+import AdminSyncDialog from '@/components/admin/AdminSyncDialog';
 import { format } from 'date-fns';
 
 const AdminOrgDetail = () => {
