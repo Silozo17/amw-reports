@@ -9,11 +9,13 @@ import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformConnection } from '@/types/database';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UsageBadge from '@/components/entitlements/UsageBadge';
+import { useOrg } from '@/hooks/useOrg';
 
 const META_PERMISSIONS_UPDATE_DATE = '2026-03-24';
 
 const Connections = () => {
   const { currentConnections, maxConnections } = useEntitlements();
+  const { orgId } = useOrg();
   const [connections, setConnections] = useState<(PlatformConnection & { clients?: { company_name: string } | null })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
@@ -30,7 +32,7 @@ const Connections = () => {
       setIsLoading(false);
     };
     fetchConnections();
-  }, []);
+  }, [orgId]);
 
   const handleDismissBanner = () => {
     setBannerDismissed(true);

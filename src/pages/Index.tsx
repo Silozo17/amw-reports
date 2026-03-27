@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrg } from '@/hooks/useOrg';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ interface ActivityItem {
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { orgId } = useOrg();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     activeClients: 0,
@@ -193,7 +195,7 @@ const Dashboard = () => {
     };
 
     fetchStats();
-  }, []);
+  }, [orgId]);
 
   const needsAttention = clientHealth.filter(c => c.failedSyncs > 0 || c.disconnected > 0);
 

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Download, RotateCw, Send, ExternalLink, Loader2 } from 'lucide-react';
 import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod, sendReportEmail } from '@/lib/reports';
 import { toast } from 'sonner';
+import { useOrg } from '@/hooks/useOrg';
 
 interface ReportWithClient {
   id: string;
@@ -39,6 +40,7 @@ interface ClientOption {
 }
 
 const Reports = () => {
+  const { orgId } = useOrg();
   const [reports, setReports] = useState<ReportWithClient[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +84,7 @@ const Reports = () => {
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [orgId]);
 
   const handleRegenerate = async (report: ReportWithClient) => {
     setGeneratingIds(prev => new Set(prev).add(report.id));

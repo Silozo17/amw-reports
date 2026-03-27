@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollText, RefreshCw, FileText, Mail } from 'lucide-react';
 import { PLATFORM_LABELS } from '@/types/database';
+import { useOrg } from '@/hooks/useOrg';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   success: 'default',
@@ -17,6 +18,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 const Logs = () => {
+  const { orgId } = useOrg();
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [reportLogs, setReportLogs] = useState<any[]>([]);
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
@@ -35,7 +37,7 @@ const Logs = () => {
       setIsLoading(false);
     };
     fetch();
-  }, []);
+  }, [orgId]);
 
   const EmptyState = ({ icon: Icon, message }: { icon: any; message: string }) => (
     <div className="py-12 text-center">
