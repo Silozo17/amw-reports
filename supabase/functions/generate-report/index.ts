@@ -1436,7 +1436,7 @@ Deno.serve(async (req) => {
     let estimatedPage = 3;
 
     for (const section of platformSections) {
-      if (y + 16 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+      if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
 
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
       const tocStatus = getPlatformStatus(section.platform, section.metrics, section.hasPrevSnapshot ? section.prevMetrics : null);
@@ -1465,21 +1465,21 @@ Deno.serve(async (req) => {
     }
 
     for (const label of noDataPlatforms) {
-      if (y + 12 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+      if (y + 12 > H - 16) { y = startNewPage(T.tableOfContents); }
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 10, 2, 2, "F");
       setF(C.lightGrey); doc.rect(M, y - 4, 3, 10, "F");
       doc.setFontSize(9); setC(C.grey);
-      doc.text(`${label} — ${SECTION_TITLES.noDataAvailable}`, M + 8, y + 2);
+      doc.text(`${label} — ${T.noDataAvailable}`, M + 8, y + 2);
       y += 14;
     }
 
-    if (y + 16 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+    if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
     setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
     setF(C.primary); doc.rect(M, y - 4, 3, 14, "F");
     doc.setFontSize(14); setC(C.primary);
     doc.text(String(tocIndex).padStart(2, "0"), M + 6, y + 4);
     doc.setFontSize(10); setC(C.black);
-    doc.text(SECTION_TITLES.monthlySummary, M + 20, y + 1);
+    doc.text(T.monthlySummary, M + 20, y + 1);
     doc.setFontSize(7); setC(C.grey);
     doc.text("Overall performance across all platforms with traffic light status", M + 20, y + 7);
     doc.setFontSize(8); setC(C.grey);
@@ -1488,13 +1488,13 @@ Deno.serve(async (req) => {
     tocIndex++;
 
     if (upsellData) {
-      if (y + 16 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+      if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
       setF(C.primary); doc.rect(M, y - 4, 3, 14, "F");
       doc.setFontSize(14); setC(C.primary);
       doc.text(String(tocIndex).padStart(2, "0"), M + 6, y + 4);
       doc.setFontSize(10); setC(C.black);
-      doc.text(SECTION_TITLES.noteFromAgency(orgName), M + 20, y + 1);
+      doc.text(`${T.noteFrom} ${orgName}`, M + 20, y + 1);
       doc.setFontSize(7); setC(C.grey);
       doc.text("A service recommendation based on your results", M + 20, y + 7);
       y += 18;
@@ -1596,7 +1596,7 @@ Deno.serve(async (req) => {
 
       const summaryText = platformSummaries[section.platform];
       if (summaryText && platformPageCount <= maxPlatformPages) {
-        y = drawSectionLabel(SECTION_TITLES.whatThisMeans, y);
+        y = drawSectionLabel(T.whatThisMeans, y);
 
         doc.setFontSize(8.5);
         const summaryLines = doc.splitTextToSize(summaryText, CW - 16);
@@ -1638,10 +1638,10 @@ Deno.serve(async (req) => {
         }
 
         if (platformPageCount <= maxPlatformPages) {
-          y = drawSectionLabel(SECTION_TITLES.comparison, y);
+          y = drawSectionLabel(T.monthOnMonth, y);
 
           const colWidths = [CW * 0.30, CW * 0.22, CW * 0.22, CW * 0.26];
-          const tableHeaders = ["Metric", SECTION_TITLES.thisMonth, SECTION_TITLES.lastMonth, SECTION_TITLES.change];
+          const tableHeaders = ["Metric", T.thisMonth, T.lastMonth, T.change];
 
           // Table header row — brand primary background
           setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
@@ -1731,7 +1731,7 @@ Deno.serve(async (req) => {
         }
 
         if (platformPageCount <= maxPlatformPages) {
-          y = drawSectionLabel(SECTION_TITLES.topContent, y);
+          y = drawSectionLabel(T.topContent, y);
 
           const topItems = section.topContent.slice(0, effectiveMaxPosts) as Record<string, unknown>[];
           for (let idx = 0; idx < topItems.length; idx++) {
@@ -1767,8 +1767,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    y = startNewPage(SECTION_TITLES.monthlySummary);
-    pageToc.push({ title: SECTION_TITLES.monthlySummary, page: pageCount });
+    y = startNewPage(T.monthlySummary);
+    pageToc.push({ title: T.monthlySummary, page: pageCount });
 
     setF(C.primaryLight); doc.roundedRect(M, y - 3, CW, 30, 3, 3, "F");
     setF(C.primary); doc.rect(M, y - 3, 3, 30, "F");
@@ -1781,7 +1781,7 @@ Deno.serve(async (req) => {
     }
     y += 34;
 
-    y = drawSectionLabel(SECTION_TITLES.platformStatusOverview, y);
+    y = drawSectionLabel(T.platformStatus, y);
 
     const summaryColWidths = [CW * 0.28, CW * 0.15, CW * 0.57];
     setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
@@ -1792,7 +1792,7 @@ Deno.serve(async (req) => {
     y += 8;
 
     for (let i = 0; i < platformSections.length; i++) {
-      if (y + 9 > H - 16) y = startNewPage(SECTION_TITLES.monthlySummary);
+      if (y + 9 > H - 16) y = startNewPage(T.monthlySummary);
       const section = platformSections[i];
       const status = getPlatformStatus(section.platform, section.metrics, section.hasPrevSnapshot ? section.prevMetrics : null);
 
@@ -1819,10 +1819,10 @@ Deno.serve(async (req) => {
     y += 8;
 
     if (keyWins.length > 0) {
-      y = drawSectionLabel(SECTION_TITLES.keyWins, y);
+      y = drawSectionLabel(T.keyWins, y);
 
       for (const win of keyWins) {
-        if (y + 12 > H - 16) { y = startNewPage(SECTION_TITLES.monthlySummary); }
+        if (y + 12 > H - 16) { y = startNewPage(T.monthlySummary); }
         setF(C.greenLight); doc.roundedRect(M, y - 3, CW, 9, 2, 2, "F");
         setF(C.green); doc.rect(M, y - 3, 2.5, 9, "F");
         doc.setFontSize(8); setC(C.black);
@@ -1831,7 +1831,7 @@ Deno.serve(async (req) => {
         y += 12;
       }
     } else {
-      y = drawSectionLabel(SECTION_TITLES.keyWins, y);
+      y = drawSectionLabel(T.keyWins, y);
       doc.setFontSize(8); setC(C.grey);
       doc.text("This is your first reporting month — we'll track improvements from here.", M + 6, y);
       y += 10;
@@ -1842,11 +1842,11 @@ Deno.serve(async (req) => {
       const worthWatchingHeight = worthWatching.length * 12 + 10;
       if (y + worthWatchingHeight > H - 16) {
         if (y + worthWatchingHeight > H - 6) {
-          y = startNewPage(SECTION_TITLES.monthlySummary);
+          y = startNewPage(T.monthlySummary);
         }
       }
 
-      y = drawSectionLabel(SECTION_TITLES.worthWatching, y);
+      y = drawSectionLabel(T.worthWatching, y);
 
       for (const item of worthWatching) {
         setF(C.amberLight); doc.roundedRect(M, y - 3, CW, 9, 2, 2, "F");
@@ -1859,8 +1859,8 @@ Deno.serve(async (req) => {
     }
 
     if (upsellData) {
-      y = startNewPage(SECTION_TITLES.noteFromAgency(orgName));
-      pageToc.push({ title: SECTION_TITLES.noteFromAgency(orgName), page: pageCount });
+      y = startNewPage(`${T.noteFrom} ${orgName}`);
+      pageToc.push({ title: `${T.noteFrom} ${orgName}`, page: pageCount });
 
       setF(C.primary); doc.rect(M, y - 2, 40, 1.5, "F"); y += 6;
 
@@ -1889,7 +1889,7 @@ Deno.serve(async (req) => {
           y += 8;
 
           for (let i = 0; i < compData.length; i++) {
-            if (y + 7 > H - 16) y = startNewPage(SECTION_TITLES.noteFromAgency(orgName));
+            if (y + 7 > H - 16) y = startNewPage(`${T.noteFrom} ${orgName}`);
             if (i % 2 === 0) { setF(C.tableAltRow); doc.rect(M, y - 3, CW, 7, "F"); }
             doc.setFontSize(7.5); setC(C.black);
             doc.text(compData[i].label, M + 4, y + 1);
@@ -1907,7 +1907,7 @@ Deno.serve(async (req) => {
       doc.setFontSize(9); setC(C.primary);
       const ctaText = orgPhone
         ? `Interested? Reply to this email or call us at ${orgPhone}.`
-        : SECTION_TITLES.interestedCTA;
+        : T.interested;
       doc.text(ctaText, M + 8, y + 4);
     }
 
@@ -1929,7 +1929,7 @@ Deno.serve(async (req) => {
     // "READY TO GROW?" label in brand colour
     setC(C.primary);
     doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-    doc.text(SECTION_TITLES.readyToGrow.toUpperCase(), 14, 35);
+    doc.text(T.readyToGrow, 14, 35);
 
     // "THANK YOU,"
     doc.setFontSize(28); doc.setFont('helvetica', 'bold');
