@@ -189,8 +189,6 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(SELECTED_ORG_KEY, newOrgId);
     setIsLoading(true);
     fetchOrg(newOrgId);
-    // Redirect to clients list so stale client/dashboard data never shows
-    window.location.href = '/clients';
   }, [fetchOrg]);
 
   useEffect(() => {

@@ -100,6 +100,7 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
                   onClick={() => {
                     switchOrg(m.org_id);
                     setOrgPopoverOpen(false);
+                    navigate('/clients');
                   }}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors hover:bg-accent',
