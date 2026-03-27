@@ -23,10 +23,12 @@ const Connections = () => {
   });
 
   useEffect(() => {
+    if (!orgId) return;
     const fetchConnections = async () => {
       const { data } = await supabase
         .from('platform_connections')
-        .select('*, clients(company_name)')
+        .select('*, clients!inner(company_name, org_id)')
+        .eq('clients.org_id', orgId)
         .order('created_at', { ascending: false });
       setConnections(data as any[] ?? []);
       setIsLoading(false);

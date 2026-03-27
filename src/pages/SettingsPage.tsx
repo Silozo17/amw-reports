@@ -1,6 +1,7 @@
 import AppLayout from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { useOrg } from '@/hooks/useOrg';
 import { Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AccountSection from '@/components/settings/AccountSection';
@@ -12,10 +13,13 @@ import MetricsDefaultsSection from '@/components/settings/MetricsDefaultsSection
 import BillingSection from '@/components/settings/BillingSection';
 
 const SettingsPage = () => {
-  const { isOwner, isPlatformAdmin, isManager } = useAuth();
+  const { isPlatformAdmin } = useAuth();
+  const { orgRole } = useOrg();
   const { hasWhitelabel } = useEntitlements();
 
-  const canAccessSettings = isOwner || isPlatformAdmin || isManager;
+  const isOrgOwner = orgRole === 'owner';
+  const isOrgManager = orgRole === 'manager';
+  const canAccessSettings = isOrgOwner || isPlatformAdmin || isOrgManager;
 
   if (!canAccessSettings) {
     return (
@@ -28,9 +32,9 @@ const SettingsPage = () => {
     );
   }
 
-  const canManageOrg = isOwner || isPlatformAdmin;
-  const canManageMetrics = isOwner || isPlatformAdmin;
-  const canManageBilling = isOwner || isPlatformAdmin;
+  const canManageOrg = isOrgOwner || isPlatformAdmin;
+  const canManageMetrics = isOrgOwner || isPlatformAdmin;
+  const canManageBilling = isOrgOwner || isPlatformAdmin;
   const showWhitelabel = hasWhitelabel;
 
   // Build visible tabs

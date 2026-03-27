@@ -127,19 +127,20 @@ const Dashboard = () => {
   }, [user, navigate]);
 
   useEffect(() => {
+    if (!orgId) return;
     const fetchStats = async () => {
       const [clientsRes, reportsRes, syncsRes, emailsRes, connectionsRes, allClientsRes, allConnectionsRes, allSyncLogsRes, recentSyncsRes, recentReportsRes, recentEmailsRes] = await Promise.all([
-        supabase.from('clients').select('id', { count: 'exact' }).eq('is_active', true),
-        supabase.from('reports').select('id, status', { count: 'exact' }),
-        supabase.from('sync_logs').select('id', { count: 'exact' }).eq('status', 'failed'),
-        supabase.from('email_logs').select('id', { count: 'exact' }).eq('status', 'failed'),
-        supabase.from('platform_connections').select('id', { count: 'exact' }).eq('is_connected', false),
-        supabase.from('clients').select('id, company_name, logo_url, is_active').eq('is_active', true).order('company_name'),
+        supabase.from('clients').select('id', { count: 'exact' }).eq('is_active', true).eq('org_id', orgId),
+        supabase.from('reports').select('id, status', { count: 'exact' }).eq('org_id', orgId),
+        supabase.from('sync_logs').select('id', { count: 'exact' }).eq('status', 'failed').eq('org_id', orgId),
+        supabase.from('email_logs').select('id', { count: 'exact' }).eq('status', 'failed').eq('org_id', orgId),
+        supabase.from('platform_connections').select('id, client_id', { count: 'exact' }).eq('is_connected', false),
+        supabase.from('clients').select('id, company_name, logo_url, is_active').eq('is_active', true).eq('org_id', orgId).order('company_name'),
         supabase.from('platform_connections').select('client_id, is_connected, last_sync_at, platform'),
-        supabase.from('sync_logs').select('client_id, status').eq('status', 'failed'),
-        supabase.from('sync_logs').select('id, client_id, platform, status, started_at').order('started_at', { ascending: false }).limit(5),
-        supabase.from('reports').select('id, client_id, status, created_at').order('created_at', { ascending: false }).limit(5),
-        supabase.from('email_logs').select('id, client_id, status, created_at, recipient_email').order('created_at', { ascending: false }).limit(5),
+        supabase.from('sync_logs').select('client_id, status').eq('status', 'failed').eq('org_id', orgId),
+        supabase.from('sync_logs').select('id, client_id, platform, status, started_at').eq('org_id', orgId).order('started_at', { ascending: false }).limit(5),
+        supabase.from('reports').select('id, client_id, status, created_at').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('email_logs').select('id, client_id, status, created_at, recipient_email').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
       ]);
 
       setStats({

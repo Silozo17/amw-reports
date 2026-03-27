@@ -25,11 +25,12 @@ const Logs = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!orgId) return;
     const fetch = async () => {
       const [s, r, e] = await Promise.all([
-        supabase.from('sync_logs').select('*, clients(company_name)').order('started_at', { ascending: false }).limit(50),
-        supabase.from('report_logs').select('*, clients(company_name)').order('created_at', { ascending: false }).limit(50),
-        supabase.from('email_logs').select('*, clients(company_name)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('sync_logs').select('*, clients(company_name)').eq('org_id', orgId).order('started_at', { ascending: false }).limit(50),
+        supabase.from('report_logs').select('*, clients(company_name)').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('email_logs').select('*, clients(company_name)').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
       ]);
       setSyncLogs(s.data ?? []);
       setReportLogs(r.data ?? []);
