@@ -128,7 +128,7 @@ const HomePage = () => {
       </section>
 
       {/* ── PROBLEM / SOLUTION ── */}
-      <section className="py-20 lg:py-28">
+      <section className="py-20 lg:py-28 bg-white/[0.03]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl lg:text-5xl font-heading uppercase text-center mb-4">
             Stop Copy-Pasting Data.<br />Start Impressing Clients.

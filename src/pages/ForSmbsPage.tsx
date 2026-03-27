@@ -35,7 +35,7 @@ const ForSmbsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">What You Get</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
@@ -72,7 +72,7 @@ const ForSmbsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Free Plan for Small Businesses</h2>
           <p className="text-amw-offwhite/60 font-body mb-8">

@@ -40,7 +40,7 @@ const ForFreelancersPage = () => {
       </section>
 
       {/* Instagram Screenshot - what freelancers deliver to clients */}
-      <section className="py-12 border-t border-sidebar-border/30">
+      <section className="py-12 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body mb-6">What your clients see</p>
           <img

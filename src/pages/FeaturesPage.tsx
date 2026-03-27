@@ -74,7 +74,7 @@ const FeaturesPage = () => {
       </section>
 
       {/* Platform Deep Dives */}
-      <section className="py-16 border-t border-sidebar-border/30">
+      <section className="py-16 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">10+ Platform Integrations, One Dashboard</h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-12">
@@ -87,7 +87,7 @@ const FeaturesPage = () => {
                 <p className="text-sm text-amw-offwhite/50 font-body mb-4">{desc}</p>
                 <div className="flex flex-wrap gap-2">
                   {metrics.map((m) => (
-                    <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>
+                    <span key={m} className="px-2.5 py-1 rounded-full bg-amw-orange/15 text-amw-orange text-xs font-body">{m}</span>
                   ))}
                 </div>
               </div>
@@ -183,7 +183,7 @@ const FeaturesPage = () => {
       </section>
 
       {/* Agency Tools */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Agency Management Tools</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

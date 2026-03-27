@@ -61,7 +61,7 @@ const SocialMediaReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-16 border-t border-sidebar-border/30">
+      <section className="py-16 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">All Your Social Platforms in One Place</h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-12">Connect once, and we pull the metrics that matter for every social channel your clients use.</p>
@@ -70,7 +70,7 @@ const SocialMediaReportingPage = () => {
               <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
                 <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
                 <div className="flex flex-wrap gap-2">
-                  {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>)}
+                  {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-amw-orange/15 text-amw-orange text-xs font-body">{m}</span>)}
                 </div>
               </div>
             ))}

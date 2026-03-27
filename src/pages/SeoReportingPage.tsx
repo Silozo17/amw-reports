@@ -56,7 +56,7 @@ const SeoReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-16 border-t border-sidebar-border/30">
+      <section className="py-16 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">SEO Platforms We Integrate With</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -65,7 +65,7 @@ const SeoReportingPage = () => {
                 <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
                   <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
                   <div className="flex flex-wrap gap-2">
-                    {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>)}
+                    {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-amw-orange/15 text-amw-orange text-xs font-body">{m}</span>)}
                   </div>
                 </div>
               ))}
@@ -92,7 +92,7 @@ const SeoReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">Who It's For</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
