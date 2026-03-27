@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -28,85 +28,137 @@ export interface OrgMembership {
   created_at: string;
 }
 
+const SELECTED_ORG_KEY = 'amw_selected_org_id';
+
 export function useOrg() {
   const { user } = useAuth();
   const [org, setOrg] = useState<Organisation | null>(null);
   const [orgRole, setOrgRole] = useState<'owner' | 'manager' | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [allMemberships, setAllMemberships] = useState<{ org_id: string; role: string; org_name: string; org_logo: string | null }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchOrg = async () => {
+  const fetchOrg = useCallback(async (overrideOrgId?: string) => {
     if (!user) return;
 
     try {
-      let { data: membership, error: membershipError } = await supabase
+      // Fetch ALL memberships for this user
+      const { data: memberships, error: membershipsError } = await supabase
         .from('org_members')
         .select('org_id, role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single();
+        .eq('user_id', user.id);
 
-      if (membershipError || !membership) {
-        // Recovery: auto-create org for users who have none
-        const orgName =
-          user.user_metadata?.company_name ||
-          user.user_metadata?.full_name ||
-          user.email ||
-          'My Workspace';
+      let activeMemberships = memberships ?? [];
 
-        const { data: newOrg, error: orgError } = await supabase
-          .from('organisations')
-          .insert({
-            name: orgName,
-            slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-            created_by: user.id,
-          })
-          .select('id')
-          .single();
-
-        if (orgError || !newOrg) {
-          console.error('Failed to recover org:', orgError);
-          return;
-        }
-
-        await supabase.from('org_members').insert({
-          org_id: newOrg.id,
-          user_id: user.id,
-          role: 'owner',
-          accepted_at: new Date().toISOString(),
-        });
-
-        await supabase
+      // Recovery: if no memberships exist, try to link to profile.org_id or create new org
+      if (membershipsError || activeMemberships.length === 0) {
+        // Check if profile has an org_id already set
+        const { data: profile } = await supabase
           .from('profiles')
-          .update({ org_id: newOrg.id })
-          .eq('user_id', user.id);
-
-        // Assign starter plan
-        const { data: starterPlan } = await supabase
-          .from('subscription_plans')
-          .select('id')
-          .eq('slug', 'starter')
+          .select('org_id')
+          .eq('user_id', user.id)
           .single();
 
-        if (starterPlan) {
-          await supabase.from('org_subscriptions').insert({
-            org_id: newOrg.id,
-            plan_id: starterPlan.id,
-            status: 'active',
+        if (profile?.org_id) {
+          // Link user to existing org as manager
+          await supabase.from('org_members').insert({
+            org_id: profile.org_id,
+            user_id: user.id,
+            role: 'manager',
+            accepted_at: new Date().toISOString(),
           });
-        }
+          activeMemberships = [{ org_id: profile.org_id, role: 'manager' }];
+          console.log('Recovered: linked user to existing org from profile', profile.org_id);
+        } else {
+          // No profile org_id — create a brand new org
+          const orgName =
+            user.user_metadata?.company_name ||
+            user.user_metadata?.full_name ||
+            user.email ||
+            'My Workspace';
 
-        membership = { org_id: newOrg.id, role: 'owner' };
-        console.log('Recovered org for user', user.id);
+          const { data: newOrg, error: orgError } = await supabase
+            .from('organisations')
+            .insert({
+              name: orgName,
+              slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+              created_by: user.id,
+            })
+            .select('id')
+            .single();
+
+          if (orgError || !newOrg) {
+            console.error('Failed to recover org:', orgError);
+            return;
+          }
+
+          await supabase.from('org_members').insert({
+            org_id: newOrg.id,
+            user_id: user.id,
+            role: 'owner',
+            accepted_at: new Date().toISOString(),
+          });
+
+          await supabase
+            .from('profiles')
+            .update({ org_id: newOrg.id })
+            .eq('user_id', user.id);
+
+          // Assign starter plan
+          const { data: starterPlan } = await supabase
+            .from('subscription_plans')
+            .select('id')
+            .eq('slug', 'starter')
+            .single();
+
+          if (starterPlan) {
+            await supabase.from('org_subscriptions').insert({
+              org_id: newOrg.id,
+              plan_id: starterPlan.id,
+              status: 'active',
+            });
+          }
+
+          activeMemberships = [{ org_id: newOrg.id, role: 'owner' }];
+          console.log('Recovered: created new org for user', user.id);
+        }
       }
 
-      setOrgId(membership.org_id);
-      setOrgRole(membership.role as 'owner' | 'manager');
+      // Fetch org details for all memberships
+      const orgIds = activeMemberships.map(m => m.org_id);
+      const { data: orgsData } = await supabase
+        .from('organisations')
+        .select('id, name, logo_url')
+        .in('id', orgIds);
 
+      const membershipList = activeMemberships.map(m => {
+        const orgInfo = orgsData?.find(o => o.id === m.org_id);
+        return {
+          org_id: m.org_id,
+          role: m.role,
+          org_name: orgInfo?.name ?? 'Unknown',
+          org_logo: orgInfo?.logo_url ?? null,
+        };
+      });
+      setAllMemberships(membershipList);
+
+      // Determine which org to select
+      const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
+      const targetOrgId =
+        overrideOrgId ??
+        (savedOrgId && orgIds.includes(savedOrgId) ? savedOrgId : orgIds[0]);
+
+      const selectedMembership = activeMemberships.find(m => m.org_id === targetOrgId) ?? activeMemberships[0];
+
+      setOrgId(selectedMembership.org_id);
+      setOrgRole(selectedMembership.role as 'owner' | 'manager');
+      localStorage.setItem(SELECTED_ORG_KEY, selectedMembership.org_id);
+
+      // Fetch full org data for the selected org
       const { data: orgData, error: orgError } = await supabase
         .from('organisations')
         .select('*')
-        .eq('id', membership.org_id)
+        .eq('id', selectedMembership.org_id)
         .single();
 
       if (orgError) {
@@ -118,19 +170,35 @@ export function useOrg() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  const switchOrg = useCallback((newOrgId: string) => {
+    localStorage.setItem(SELECTED_ORG_KEY, newOrgId);
+    setIsLoading(true);
+    fetchOrg(newOrgId);
+  }, [fetchOrg]);
 
   useEffect(() => {
     if (!user) {
       setOrg(null);
       setOrgRole(null);
       setOrgId(null);
+      setAllMemberships([]);
       setIsLoading(false);
       return;
     }
 
     fetchOrg();
-  }, [user]);
+  }, [user, fetchOrg]);
 
-  return { org, orgId, orgRole, isOrgOwner: orgRole === 'owner', isLoading, refetchOrg: fetchOrg };
+  return {
+    org,
+    orgId,
+    orgRole,
+    isOrgOwner: orgRole === 'owner',
+    isLoading,
+    refetchOrg: fetchOrg,
+    allMemberships,
+    switchOrg,
+  };
 }
