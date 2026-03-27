@@ -46,6 +46,7 @@ const JsonViewer = ({ data, label }: { data: unknown; label: string }) => {
 };
 
 const DebugConsole = () => {
+  const { isPlatformAdmin } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
