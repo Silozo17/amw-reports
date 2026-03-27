@@ -236,6 +236,9 @@ Deno.serve(async (req) => {
     const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
     const showLogo = reportSettings.show_logo !== false;
     const reportAccentColor = (reportSettings.report_accent_color as string) || null;
+    const reportLanguage = (reportSettings.report_language as string) || "English";
+    const isNonEnglish = reportLanguage !== "English";
+    const langInstruction = isNonEnglish ? `\nIMPORTANT: Write the ENTIRE response in ${reportLanguage}.\n` : "";
 
     const primaryColor = parseColorToRgb(reportAccentColor || org?.primary_color, [60, 60, 140]);
     const secondaryColor = parseColorToRgb(org?.secondary_color, [80, 120, 180]);
