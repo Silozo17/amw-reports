@@ -209,7 +209,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
       setPrevSnapshots((data.prevSnapshots ?? []) as SnapshotData[]);
       setTrendData((data.trendData ?? []) as SnapshotData[]);
 
-      const platforms: PlatformType[] = [...new Set((data.connections ?? []).map((c: any) => c.platform as PlatformType))];
+      const platforms = (data.connections ?? []).map((c: any) => c.platform as PlatformType).filter((v: PlatformType, i: number, a: PlatformType[]) => a.indexOf(v) === i);
       setAvailablePlatforms(platforms);
 
       autoDetectPeriod(currentSnapshots, data.trendData ?? []);
