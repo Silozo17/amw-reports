@@ -375,6 +375,67 @@ const BrandingSection = () => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-1 ml-6">Extract colours and fonts from your website automatically</p>
+
+          {extractError && (
+            <p className="text-sm text-destructive mt-2 ml-6">{extractError}</p>
+          )}
+
+          {extractedResult && (
+            <div className="mt-3 ml-6 rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+              <p className="text-sm font-medium">Extracted — review and apply</p>
+              <div className="flex flex-wrap gap-4">
+                {extractedResult.primary_color && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="h-5 w-5 rounded border" style={{ backgroundColor: extractedResult.primary_color }} />
+                    <span className="text-muted-foreground">Primary:</span>
+                    <span className="font-mono text-xs">{extractedResult.primary_color}</span>
+                  </div>
+                )}
+                {extractedResult.secondary_color && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="h-5 w-5 rounded border" style={{ backgroundColor: extractedResult.secondary_color }} />
+                    <span className="text-muted-foreground">Secondary:</span>
+                    <span className="font-mono text-xs">{extractedResult.secondary_color}</span>
+                  </div>
+                )}
+                {extractedResult.accent_color && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="h-5 w-5 rounded border" style={{ backgroundColor: extractedResult.accent_color }} />
+                    <span className="text-muted-foreground">Accent:</span>
+                    <span className="font-mono text-xs">{extractedResult.accent_color}</span>
+                  </div>
+                )}
+                {extractedResult.heading_font && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Heading font:</span>
+                    <span className="font-medium">{extractedResult.heading_font}</span>
+                    {!FONT_OPTIONS.includes(extractedResult.heading_font) && (
+                      <span className="text-xs text-muted-foreground italic">(not in font list)</span>
+                    )}
+                  </div>
+                )}
+                {extractedResult.body_font && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Body font:</span>
+                    <span className="font-medium">{extractedResult.body_font}</span>
+                    {!FONT_OPTIONS.includes(extractedResult.body_font) && (
+                      <span className="text-xs text-muted-foreground italic">(not in font list)</span>
+                    )}
+                  </div>
+                )}
+                {extractedResult.logo_url && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Logo found</span>
+                    <span className="text-xs text-muted-foreground italic">(upload manually for best quality)</span>
+                  </div>
+                )}
+              </div>
+              <Button size="sm" onClick={applyExtractedBranding} className="gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                Apply extracted branding
+              </Button>
+            </div>
+          )}
         </div>
 
         <Separator />
