@@ -26,6 +26,7 @@ interface ClientDashboardProps {
   clientId: string;
   clientName: string;
   currencyCode?: string;
+  portalToken?: string;
 }
 
 interface TopContentItem {
@@ -136,7 +137,8 @@ const DashboardSkeleton = () => (
 );
 
 // ─── Main Dashboard ────────────────────────────────────────────
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken }: ClientDashboardProps) => {
+  const isPortal = !!portalToken;
   const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
   const defaultMonth = now.getMonth() === 0 ? 12 : now.getMonth();
@@ -170,6 +172,52 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     setIsLoading(true);
     const { month, year, type, startDate, endDate } = selectedPeriod;
 
+    if (isPortal) {
+      // Portal mode: fetch via edge function
+      const { data, error: fnErr } = await supabase.functions.invoke("portal-data", {
+        body: {
+          token: portalToken,
+          month,
+          year,
+          type,
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+        },
+      });
+
+      if (fnErr || data?.error) {
+        console.error("Portal data error:", fnErr || data?.error);
+        setIsLoading(false);
+        return;
+      }
+
+      const configMap = new Map<string, PlatformConfigData>();
+      for (const c of (data.configs ?? []) as PlatformConfigData[]) configMap.set(c.platform, c);
+      setPlatformConfigs(configMap);
+      setConnections((data.connections ?? []) as ConnectionData[]);
+
+      let currentSnapshots = (data.snapshots ?? []) as SnapshotData[];
+      const isMultiMonth = type !== "monthly" && type !== "weekly";
+
+      if (isMultiMonth && currentSnapshots.length > 0) {
+        currentSnapshots = aggregateMultiMonth(currentSnapshots, month, year);
+      }
+
+      const collectedPosts = collectPosts(data.snapshots ?? []);
+      setAllPosts(collectedPosts);
+      setSnapshots(currentSnapshots);
+      setPrevSnapshots((data.prevSnapshots ?? []) as SnapshotData[]);
+      setTrendData((data.trendData ?? []) as SnapshotData[]);
+
+      const platforms = [...new Set((data.connections ?? []).map((c: any) => c.platform as PlatformType))];
+      setAvailablePlatforms(platforms);
+
+      autoDetectPeriod(currentSnapshots, data.trendData ?? []);
+      setIsLoading(false);
+      return;
+    }
+
+    // Authenticated mode: direct Supabase queries
     let query = supabase.from("monthly_snapshots").select("platform, metrics_data, top_content, report_month, report_year").eq("client_id", clientId);
     let isMultiMonth = false;
 
@@ -226,36 +274,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
 
     let currentSnapshots = (currentRes.data ?? []) as SnapshotData[];
     if (isMultiMonth && currentSnapshots.length > 0) {
-      const grouped = new Map<PlatformType, Record<string, number>>();
-      for (const s of currentSnapshots) {
-        const existing = grouped.get(s.platform) || {};
-        for (const [k, v] of Object.entries(s.metrics_data)) {
-          if (typeof v === "number") {
-            if (k === "total_followers") existing[k] = Math.max(existing[k] || 0, v);
-            else existing[k] = (existing[k] || 0) + v;
-          }
-        }
-        grouped.set(s.platform, existing);
-      }
-      currentSnapshots = Array.from(grouped.entries()).map(([platform, metrics]) => {
-        const a = { ...metrics };
-        if (a.spend && a.clicks) a.cpc = a.spend / a.clicks;
-        if (a.spend && a.conversions) a.cost_per_conversion = a.spend / a.conversions;
-        if (a.spend && a.leads) a.cost_per_lead = a.spend / a.leads;
-        if (a.clicks && a.impressions) a.ctr = (a.clicks / a.impressions) * 100;
-        if (a.engagement && a.impressions) a.engagement_rate = (a.engagement / a.impressions) * 100;
-        return { platform, metrics_data: a, report_month: month, report_year: year };
-      });
+      currentSnapshots = aggregateMultiMonth(currentSnapshots, month, year);
     }
 
-    const rawSnapshots = (currentRes.data ?? []) as SnapshotData[];
-    const collectedPosts: (TopContentItem & { platform: PlatformType })[] = [];
-    for (const s of rawSnapshots) {
-      if (Array.isArray(s.top_content) && s.top_content.length > 0) {
-        for (const post of s.top_content) collectedPosts.push({ ...post, platform: s.platform });
-      }
-    }
-    collectedPosts.sort((a, b) => (b.total_engagement ?? 0) - (a.total_engagement ?? 0));
+    const collectedPosts = collectPosts((currentRes.data ?? []) as SnapshotData[]);
     setAllPosts(collectedPosts);
 
     setSnapshots(currentSnapshots);
@@ -265,14 +287,55 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     const platforms = [...new Set((connectionsRes.data ?? []).map((c: any) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
 
+    autoDetectPeriod(currentSnapshots, (trendRes.data ?? []) as SnapshotData[]);
+    setIsLoading(false);
+  }, [clientId, selectedPeriod, hasAutoDetected, isPortal, portalToken]);
+
+  // Helper: aggregate multi-month snapshots
+  const aggregateMultiMonth = (snapshots: SnapshotData[], month: number, year: number): SnapshotData[] => {
+    const grouped = new Map<PlatformType, Record<string, number>>();
+    for (const s of snapshots) {
+      const existing = grouped.get(s.platform) || {};
+      for (const [k, v] of Object.entries(s.metrics_data)) {
+        if (typeof v === "number") {
+          if (k === "total_followers") existing[k] = Math.max(existing[k] || 0, v);
+          else existing[k] = (existing[k] || 0) + v;
+        }
+      }
+      grouped.set(s.platform, existing);
+    }
+    return Array.from(grouped.entries()).map(([platform, metrics]) => {
+      const a = { ...metrics };
+      if (a.spend && a.clicks) a.cpc = a.spend / a.clicks;
+      if (a.spend && a.conversions) a.cost_per_conversion = a.spend / a.conversions;
+      if (a.spend && a.leads) a.cost_per_lead = a.spend / a.leads;
+      if (a.clicks && a.impressions) a.ctr = (a.clicks / a.impressions) * 100;
+      if (a.engagement && a.impressions) a.engagement_rate = (a.engagement / a.impressions) * 100;
+      return { platform, metrics_data: a, report_month: month, report_year: year };
+    });
+  };
+
+  // Helper: collect top content posts
+  const collectPosts = (rawSnapshots: SnapshotData[]): (TopContentItem & { platform: PlatformType })[] => {
+    const collectedPosts: (TopContentItem & { platform: PlatformType })[] = [];
+    for (const s of rawSnapshots) {
+      if (Array.isArray(s.top_content) && s.top_content.length > 0) {
+        for (const post of s.top_content) collectedPosts.push({ ...post, platform: s.platform });
+      }
+    }
+    collectedPosts.sort((a, b) => (b.total_engagement ?? 0) - (a.total_engagement ?? 0));
+    return collectedPosts;
+  };
+
+  // Helper: auto-detect best period with data
+  const autoDetectPeriod = (currentSnapshots: SnapshotData[], allTrendData: SnapshotData[]) => {
     const hasRealData = currentSnapshots.some((snapshot) =>
       Object.entries(snapshot.metrics_data).some(([key, v]) => typeof v === "number" && v > 0 && !HIDDEN_METRICS.has(key)),
     );
 
-    if (!hasAutoDetected && !hasRealData && (trendRes.data ?? []).length > 0) {
-      const allSnaps = (trendRes.data ?? []) as SnapshotData[];
+    if (!hasAutoDetected && !hasRealData && allTrendData.length > 0) {
       const monthsWithData = new Map<string, { m: number; y: number; total: number }>();
-      for (const s of allSnaps) {
+      for (const s of allTrendData) {
         const key = `${s.report_year}-${s.report_month}`;
         const existing = monthsWithData.get(key) || { m: s.report_month, y: s.report_year, total: 0 };
         existing.total += Object.entries(s.metrics_data).filter(([k]) => !HIDDEN_METRICS.has(k)).reduce((sum, [, v]) => sum + (typeof v === "number" ? Math.abs(v) : 0), 0);
@@ -282,9 +345,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       if (sorted.length > 0) setSelectedPeriod(prev => ({ ...prev, month: sorted[0].m, year: sorted[0].y }));
       setHasAutoDetected(true);
     } else if (!hasAutoDetected) { setHasAutoDetected(true); }
-
-    setIsLoading(false);
-  }, [clientId, selectedPeriod, hasAutoDetected]);
+  };
 
   useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
 
@@ -419,8 +480,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
       existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
       monthMap.set(key, existing);
     }
-    // Also aggregate GSC sparkline metrics (re-iterate to add to existing monthMap)
-    // Also aggregate GSC sparkline metrics
     for (const s of relevantTrend) {
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
       const existing = monthMap.get(key) || {};
@@ -465,20 +524,17 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     for (const s of trendData) {
       const existing = map.get(s.platform) || [];
       const key = `${s.report_year}-${String(s.report_month).padStart(2, "0")}`;
-      // Find or create entry for this month
       let entry = existing.find(e => (e as any)._key === key);
       if (!entry) {
         const [y, m] = key.split("-");
         entry = { name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}`, _key: key } as any;
         existing.push(entry);
       }
-      // Add all metric values
       for (const [mk, mv] of Object.entries(s.metrics_data)) {
         if (typeof mv === 'number') (entry as any)[mk] = ((entry as any)[mk] || 0) + mv;
       }
       map.set(s.platform, existing);
     }
-    // Sort each platform's trend data
     for (const [platform, data] of map) {
       data.sort((a, b) => ((a as any)._key as string).localeCompare((b as any)._key as string));
       map.set(platform, data.slice(-6));
@@ -486,7 +542,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
     return map;
   }, [trendData]);
 
-  // GSC trend data for Search Performance Trend chart
+  // GSC trend data
   const gscTrendData = useMemo(() => {
     const gscSnapshots = trendData.filter(s => s.platform === 'google_search_console');
     if (gscSnapshots.length === 0) return [];
@@ -537,28 +593,31 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           onPeriodChange={setSelectedPeriod}
           availablePlatforms={availablePlatforms}
         />
-        <div className="flex items-center gap-2">
-          {lastSyncedAt && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
-            </div>
-          )}
-          <Button
-            size="sm"
-            variant={aiAnalysis ? "outline" : "default"}
-            onClick={handleAnalyse}
-            disabled={isAnalysing || cooldownRemaining > 0}
-            className="gap-2"
-          >
-            {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            {isAnalysing ? "Analysing..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? "Refresh Analysis" : "AI Analysis"}
-          </Button>
-        </div>
+        {/* Hide admin controls in portal mode */}
+        {!isPortal && (
+          <div className="flex items-center gap-2">
+            {lastSyncedAt && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                <span>Synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
+              </div>
+            )}
+            <Button
+              size="sm"
+              variant={aiAnalysis ? "outline" : "default"}
+              onClick={handleAnalyse}
+              disabled={isAnalysing || cooldownRemaining > 0}
+              className="gap-2"
+            >
+              {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {isAnalysing ? "Analysing..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? "Refresh Analysis" : "AI Analysis"}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* AI Analysis Card */}
-      {aiAnalysis && aiAnalysisDate && (
+      {/* AI Analysis Card — hidden in portal */}
+      {!isPortal && aiAnalysis && aiAnalysisDate && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="flex items-center gap-2">
@@ -576,20 +635,22 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
         </Card>
       )}
 
-      {/* AI Analysis Dialog */}
-      <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              AI Performance Analysis
-            </DialogTitle>
-          </DialogHeader>
-          <div className="prose prose-sm max-w-none text-foreground [&_strong]:font-bold [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
-            <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* AI Analysis Dialog — hidden in portal */}
+      {!isPortal && (
+        <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                AI Performance Analysis
+              </DialogTitle>
+            </DialogHeader>
+            <div className="prose prose-sm max-w-none text-foreground [&_strong]:font-bold [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
+              <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Main Content */}
       {isLoading ? (
@@ -599,7 +660,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           <CardContent className="py-16 text-center space-y-3">
             <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground font-medium">No performance data available</p>
-            <p className="text-sm text-muted-foreground/70">Sync platform data for this period to see your dashboard.</p>
+            <p className="text-sm text-muted-foreground/70">
+              {isPortal ? "No data available for this period." : "Sync platform data for this period to see your dashboard."}
+            </p>
           </CardContent>
         </Card>
       ) : !hasFilteredData ? (
@@ -607,7 +670,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           <CardContent className="py-16 text-center space-y-3">
             <PieChartIcon className="h-12 w-12 mx-auto text-muted-foreground/40" />
             <p className="text-muted-foreground font-medium">No data for this platform</p>
-            <p className="text-sm text-muted-foreground/70">Try selecting "All Platforms" or sync data for this platform.</p>
+            <p className="text-sm text-muted-foreground/70">Try selecting "All Platforms" or a different period.</p>
           </CardContent>
         </Card>
       ) : allZeros ? (
@@ -615,7 +678,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
           <CardContent className="py-12 text-center space-y-3">
             <AlertCircle className="h-10 w-10 mx-auto text-amber-500" />
             <p className="text-muted-foreground font-medium">No activity recorded for this period</p>
-            <p className="text-sm text-muted-foreground/70">Try selecting a different period or sync historical data.</p>
+            <p className="text-sm text-muted-foreground/70">Try selecting a different period.</p>
           </CardContent>
         </Card>
       ) : (
@@ -640,7 +703,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP" }: ClientD
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider font-body">Platform Breakdown</h2>
             {filtered.map(snapshot => {
               const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
-              const connection = connections.find(c => c.platform === snapshot.platform);
+              const connection = isPortal ? undefined : connections.find(c => c.platform === snapshot.platform);
               const config = platformConfigs.get(snapshot.platform);
               const platformPosts = allPosts.filter(p => p.platform === snapshot.platform);
               const platformTrend = platformTrendMap.get(snapshot.platform);
