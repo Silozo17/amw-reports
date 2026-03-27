@@ -785,6 +785,73 @@ export type Database = {
           },
         ]
       }
+      report_upsells: {
+        Row: {
+          body_content: string
+          client_id: string
+          comparison_data: Json | null
+          created_at: string
+          created_by: string | null
+          headline: string
+          id: string
+          is_active: boolean
+          org_id: string
+          report_month: number
+          report_year: number
+          service_name: string
+        }
+        Insert: {
+          body_content: string
+          client_id: string
+          comparison_data?: Json | null
+          created_at?: string
+          created_by?: string | null
+          headline: string
+          id?: string
+          is_active?: boolean
+          org_id: string
+          report_month: number
+          report_year: number
+          service_name: string
+        }
+        Update: {
+          body_content?: string
+          client_id?: string
+          comparison_data?: Json | null
+          created_at?: string
+          created_by?: string | null
+          headline?: string
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          report_month?: number
+          report_year?: number
+          service_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_upsells_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_upsells_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "report_upsells_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           ai_executive_summary: string | null

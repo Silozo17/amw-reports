@@ -18,8 +18,90 @@ const PLATFORM_LABELS: Record<string, string> = {
   google_ads: "Google Ads", meta_ads: "Meta Ads", facebook: "Facebook",
   instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn",
   google_search_console: "Google Search Console", google_analytics: "Google Analytics",
-  google_business_profile: "Google Business Profile", youtube: "YouTube",
+  google_business_profile: "Google Business Profile", youtube: "YouTube", pinterest: "Pinterest",
 };
+
+const PLATFORM_DESCRIPTIONS: Record<string, string> = {
+  google_ads: "your paid advertising on Google, showing how many people saw your ads, how much it cost, and what actions they took.",
+  meta_ads: "your paid advertising on Meta (Facebook & Instagram), covering ad reach, spend, and the results they generated.",
+  facebook: "your organic Facebook presence — how many people see your posts, engage with your content, and follow your page.",
+  instagram: "your organic Instagram activity — follower growth, post engagement, and how people interact with your profile.",
+  tiktok: "your TikTok presence — video views, follower growth, and how your short-form content performs.",
+  linkedin: "your LinkedIn company page — professional audience growth, post engagement, and business networking reach.",
+  google_search_console: "how your website appears in Google search results — what people search to find you and how often they click.",
+  google_analytics: "your website traffic — how many people visit, where they come from, and what they do on your site.",
+  google_business_profile: "your Google Business listing — how people find your business on Google Maps and Search, and the actions they take.",
+  youtube: "your YouTube channel — video views, subscriber growth, and how long people watch your content.",
+  pinterest: "your Pinterest presence — how your pins perform, how many people save them, and the traffic they drive.",
+};
+
+const METRIC_PLAIN_ENGLISH: Record<string, string> = {
+  spend: "total amount spent on advertising",
+  impressions: "number of times your content was displayed",
+  paid_impressions: "number of times your paid ads were displayed",
+  clicks: "number of times people clicked on your content",
+  link_clicks: "clicks on links in your ads",
+  organic_clicks: "clicks from unpaid search results",
+  ctr: "Click-Through Rate — percentage of people who saw your content and clicked",
+  conversions: "actions people took after seeing your ad (purchases, sign-ups, etc.)",
+  conversions_value: "monetary value of all conversions",
+  conversion_rate: "percentage of clicks that turned into conversions",
+  cpc: "Cost Per Click — average price you paid for each click",
+  cpm: "Cost Per 1,000 Impressions — price to show your ad a thousand times",
+  cost_per_conversion: "average cost for each conversion",
+  cost_per_lead: "average cost for each new lead",
+  roas: "Return On Ad Spend — revenue earned per pound spent",
+  reach: "number of unique people who saw your content",
+  frequency: "average number of times each person saw your ad",
+  search_impression_share: "percentage of available search ad slots you appeared in",
+  leads: "number of new potential customers captured",
+  total_followers: "total number of followers",
+  follower_growth: "net new followers gained this month",
+  follower_removes: "people who unfollowed",
+  audience_growth_rate: "percentage your audience grew",
+  page_likes: "total page likes",
+  page_views: "people who viewed your page",
+  profile_visits: "people who visited your profile",
+  engagement: "total interactions (likes, comments, shares combined)",
+  engagement_rate: "percentage of people who interacted with your content",
+  likes: "number of likes received",
+  comments: "number of comments received",
+  shares: "number of times your content was shared",
+  saves: "number of times people saved your content",
+  reactions: "total reactions on your posts",
+  video_views: "number of times your videos were watched",
+  posts_published: "number of posts you published",
+  search_clicks: "clicks from Google search results to your website",
+  search_impressions: "times your site appeared in search results",
+  search_ctr: "Search Click-Through Rate — percentage of search appearances that got clicks",
+  search_position: "average position in search results (lower is better)",
+  sessions: "number of visits to your website",
+  active_users: "people who actively used your website",
+  new_users: "first-time visitors to your website",
+  ga_page_views: "total pages viewed on your website",
+  bounce_rate: "percentage of visitors who left after one page",
+  avg_session_duration: "average time each visitor spent on your site",
+  pages_per_session: "average pages each visitor looked at",
+  gbp_views: "people who viewed your Google Business profile",
+  gbp_searches: "times your business appeared in Google Search or Maps",
+  gbp_calls: "phone calls made from your listing",
+  gbp_direction_requests: "people who asked for directions to your business",
+  gbp_website_clicks: "clicks to your website from your Google listing",
+  gbp_reviews_count: "total number of reviews",
+  gbp_average_rating: "your average star rating",
+  subscribers: "net new YouTube subscribers",
+  views: "total video views",
+  watch_time: "total minutes people watched your videos",
+  videos_published: "videos uploaded this month",
+  avg_view_duration: "average seconds each viewer watched",
+  pin_clicks: "clicks on your pins",
+  outbound_clicks: "clicks from your pins to your website",
+  total_pins: "total number of pins",
+  total_boards: "total number of boards",
+};
+
+/** Metrics where a decrease is positive */
+const LOWER_IS_BETTER = new Set(["spend", "cpc", "cpm", "cost_per_conversion", "cost_per_lead", "bounce_rate", "search_position"]);
 
 const METRIC_LABELS: Record<string, string> = {
   spend: "Spend", impressions: "Impressions", clicks: "Clicks",
@@ -31,7 +113,24 @@ const METRIC_LABELS: Record<string, string> = {
   cost_per_conversion: "Cost/Conv", conversion_rate: "Conv. Rate",
   leads: "Leads", saves: "Saves", profile_visits: "Profile Visits",
   page_likes: "Page Likes", page_views: "Page Views", link_clicks: "Link Clicks",
-  audience_growth_rate: "Audience Growth",
+  audience_growth_rate: "Audience Growth", search_clicks: "Search Clicks",
+  search_impressions: "Search Impressions", search_ctr: "Search CTR",
+  search_position: "Avg. Position", sessions: "Sessions",
+  active_users: "Active Users", new_users: "New Users",
+  ga_page_views: "Page Views", bounce_rate: "Bounce Rate",
+  avg_session_duration: "Avg. Session Duration", pages_per_session: "Pages/Session",
+  gbp_views: "Profile Views", gbp_searches: "Search Appearances",
+  gbp_calls: "Phone Calls", gbp_direction_requests: "Direction Requests",
+  gbp_website_clicks: "Website Clicks", gbp_reviews_count: "Reviews",
+  gbp_average_rating: "Avg. Rating", subscribers: "Subscribers",
+  views: "Views", watch_time: "Watch Time (min)", videos_published: "Videos Published",
+  avg_view_duration: "Avg. View Duration", reactions: "Reactions",
+  frequency: "Frequency", paid_impressions: "Paid Impressions",
+  organic_clicks: "Organic Clicks", conversions_value: "Conv. Value",
+  cost_per_lead: "Cost/Lead", search_impression_share: "Search Imp. Share",
+  follower_removes: "Unfollows", pin_clicks: "Pin Clicks",
+  outbound_clicks: "Outbound Clicks", total_pins: "Total Pins",
+  total_boards: "Total Boards",
 };
 
 /** Convert hex (#RRGGBB) to [r, g, b] tuple */
@@ -69,20 +168,18 @@ const hslToHex = (hsl: string): string => {
 const parseColorToRgb = (color: string | null, fallback: [number, number, number]): [number, number, number] => {
   if (!color) return fallback;
   if (color.startsWith("#")) return hexToRgb(color);
-  // Try HSL format "H S% L%"
   try { return hexToRgb(hslToHex(color)); } catch { return fallback; }
 };
 
-// Default fallback colors
 const DEFAULTS = {
-  offWhite: [244, 237, 227] as [number, number, number],
-  black: [36, 31, 33] as [number, number, number],
+  offWhite: [248, 248, 248] as [number, number, number],
+  black: [36, 36, 40] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
   grey: [120, 120, 120] as [number, number, number],
-  lightGrey: [200, 200, 200] as [number, number, number],
-  green: [78, 214, 142] as [number, number, number],
-  orange: [238, 135, 51] as [number, number, number],
-  blue: [83, 155, 219] as [number, number, number],
+  lightGrey: [220, 220, 220] as [number, number, number],
+  green: [34, 160, 80] as [number, number, number],
+  amber: [210, 150, 30] as [number, number, number],
+  red: [200, 50, 50] as [number, number, number],
 };
 
 Deno.serve(async (req) => {
@@ -103,16 +200,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch all required data including organisation
-    const [clientRes, snapshotsRes, configRes, prevSnapshotsRes, yoySnapshotsRes] = await Promise.all([
+    // Fetch all data
+    const [clientRes, snapshotsRes, configRes, prevSnapshotsRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year),
       supabase.from("client_platform_config").select("*").eq("client_id", client_id).eq("is_enabled", true),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id)
         .eq("report_month", report_month === 1 ? 12 : report_month - 1)
         .eq("report_year", report_month === 1 ? report_year - 1 : report_year),
-      supabase.from("monthly_snapshots").select("*").eq("client_id", client_id)
-        .eq("report_month", report_month).eq("report_year", report_year - 1),
     ]);
 
     const client = clientRes.data;
@@ -140,23 +235,19 @@ Deno.serve(async (req) => {
     const orgName = org?.name ?? "Your Agency";
     const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
     const showLogo = reportSettings.show_logo !== false;
-    const showAiInsights = reportSettings.show_ai_insights !== false;
     const reportAccentColor = (reportSettings.report_accent_color as string) || null;
 
-    // Resolve brand colors from org settings
-    const primaryColor = parseColorToRgb(reportAccentColor || org?.primary_color, [179, 47, 191]);
-    const secondaryColor = parseColorToRgb(org?.secondary_color, DEFAULTS.blue);
-    const accentColor = parseColorToRgb(org?.accent_color, DEFAULTS.green);
+    const primaryColor = parseColorToRgb(reportAccentColor || org?.primary_color, [60, 60, 140]);
+    const secondaryColor = parseColorToRgb(org?.secondary_color, [80, 120, 180]);
 
-    // Build color palette using org branding
     const C = {
       offWhite: DEFAULTS.offWhite,
       black: DEFAULTS.black,
       primary: primaryColor,
       secondary: secondaryColor,
-      accent: accentColor,
       green: DEFAULTS.green,
-      orange: DEFAULTS.orange,
+      amber: DEFAULTS.amber,
+      red: DEFAULTS.red,
       white: DEFAULTS.white,
       grey: DEFAULTS.grey,
       lightGrey: DEFAULTS.lightGrey,
@@ -164,24 +255,69 @@ Deno.serve(async (req) => {
 
     const snapshots = snapshotsRes.data ?? [];
     const prevSnapshots = prevSnapshotsRes.data ?? [];
-    const yoySnapshots = yoySnapshotsRes.data ?? [];
     const configs = configRes.data ?? [];
 
     const CURRENCY_SYMBOLS: Record<string, string> = {
       GBP: "£", EUR: "€", USD: "$", PLN: "zł", CAD: "C$", AUD: "A$", NZD: "NZ$",
+      AED: "د.إ", BRL: "R$", CHF: "CHF", CZK: "Kč", DKK: "kr", HKD: "HK$",
+      HUF: "Ft", IDR: "Rp", ILS: "₪", INR: "₹", JPY: "¥", KRW: "₩", MXN: "MX$",
+      MYR: "RM", NOK: "kr", PHP: "₱", RON: "lei", SEK: "kr", SGD: "S$",
+      THB: "฿", TRY: "₺", TWD: "NT$", ZAR: "R",
     };
     const currSymbol = CURRENCY_SYMBOLS[client.preferred_currency ?? "GBP"] ?? "£";
 
     if (snapshots.length === 0) {
-      return new Response(JSON.stringify({ 
-        error: "No data snapshots found for this period. Please sync platform data before generating a report." 
+      return new Response(JSON.stringify({
+        error: "No data snapshots found for this period. Please sync platform data before generating a report."
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Generate AI insights
+    // Fetch upsell for this month
+    const { data: upsellData } = await supabase.from("report_upsells")
+      .select("*")
+      .eq("client_id", client_id)
+      .eq("report_month", report_month)
+      .eq("report_year", report_year)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    // Build platform data structures
+    interface PlatformData {
+      platform: string;
+      label: string;
+      description: string;
+      metrics: Record<string, number>;
+      prevMetrics: Record<string, number>;
+      enabledMetrics: string[];
+      topContent: unknown[];
+    }
+
+    const platformSections: PlatformData[] = [];
+    for (const snapshot of snapshots) {
+      const config = configs.find((c: Record<string, unknown>) => c.platform === snapshot.platform);
+      const metrics = snapshot.metrics_data as Record<string, number>;
+      const enabledMetrics: string[] = config?.enabled_metrics?.length > 0
+        ? (config.enabled_metrics as string[])
+        : Object.keys(metrics).filter(k => typeof metrics[k] === "number" && !k.startsWith("top_") && k !== "traffic_sources");
+      const prevSnapshot = prevSnapshots.find((s: Record<string, unknown>) => s.platform === snapshot.platform);
+      const prevMetrics = (prevSnapshot?.metrics_data ?? {}) as Record<string, number>;
+      const topContent = Array.isArray(snapshot.top_content) ? snapshot.top_content : [];
+
+      platformSections.push({
+        platform: snapshot.platform as string,
+        label: PLATFORM_LABELS[snapshot.platform as string] ?? (snapshot.platform as string),
+        description: PLATFORM_DESCRIPTIONS[snapshot.platform as string] ?? "performance data for this platform.",
+        metrics,
+        prevMetrics,
+        enabledMetrics,
+        topContent,
+      });
+    }
+
+    // ── AI GENERATION ──
     let aiSummary = "";
-    let aiInsights = "";
-    let aiUpsell = "";
+    let aiPlatformInsights: Record<string, string> = {};
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (lovableApiKey && snapshots.length > 0) {
@@ -190,108 +326,145 @@ Deno.serve(async (req) => {
           client_name: client.company_name,
           month: MONTH_NAMES[report_month],
           year: report_year,
-          current: snapshots.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
-          previous: prevSnapshots.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
-          yoy: yoySnapshots.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
+          current: platformSections.map(p => ({ platform: p.label, metrics: p.metrics })),
+          previous: platformSections.map(p => ({ platform: p.label, metrics: p.prevMetrics })),
         });
 
-        const aiCall = async (prompt: string, maxTokens: number) => {
+        const aiCall = async (prompt: string, maxTokens: number): Promise<string> => {
           const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${lovableApiKey}` },
             body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens }),
           });
-          if (!res.ok) { console.error("AI call failed:", res.status, await res.text()); return ""; }
+          if (!res.ok) { console.error("AI call failed:", res.status); return ""; }
           const json = await res.json();
           return json.choices?.[0]?.message?.content ?? "";
         };
 
+        // Executive summary
         aiSummary = await aiCall(
-          `Write a monthly marketing performance executive summary for ${client.company_name} for ${MONTH_NAMES[report_month]} ${report_year}. 3-4 sentences, plain English, non-technical. Highlight best results, biggest changes, areas needing attention. Professional and clear. Data: ${dataContext}. If data is empty, note that data collection is in progress.`,
-          500
+          `Write a 4-5 sentence monthly marketing performance summary for ${client.company_name} for ${MONTH_NAMES[report_month]} ${report_year}.
+Rules:
+- Write as if speaking to a non-technical business owner face to face
+- Lead with the single best result
+- Mention any significant declines honestly but constructively
+- Never use jargon or acronyms without explaining them
+- End with a forward-looking sentence
+- Do NOT use markdown formatting, headers, or bullet points — just flowing prose
+Data: ${dataContext}`,
+          600
         );
 
-        if (showAiInsights) {
-          aiInsights = await aiCall(
-            `Write platform-by-platform insights for ${client.company_name}'s marketing report for ${MONTH_NAMES[report_month]} ${report_year}. For each platform, 2-3 sentences explaining what happened. Simple language. Data: ${dataContext}. If no data, note it will be included once platforms are active.`,
-            800
-          );
-        }
-
-        if (client.enable_upsell) {
-          aiUpsell = await aiCall(
-            `Based on marketing data for ${client.company_name}, suggest 2-3 ${orgName} services that could help. ${orgName} offers: SEO, content production, web dev, CRM/automations, social media management, paid campaigns, email marketing, branding. Currently subscribed: ${(client.services_subscribed ?? []).join(", ") || "unknown"}. Helpful, not pushy. 1-2 sentences each. Data: ${dataContext}`,
+        // Per-platform insights
+        for (const section of platformSections) {
+          const platformContext = JSON.stringify({
+            platform: section.label,
+            current: section.metrics,
+            previous: section.prevMetrics,
+          });
+          const insight = await aiCall(
+            `Write a 3-5 sentence plain-English summary for ${client.company_name}'s ${section.label} performance in ${MONTH_NAMES[report_month]} ${report_year}.
+Rules:
+- Start with the overall picture in one sentence
+- Highlight the single best metric
+- If anything dropped, explain it simply and say whether it needs attention
+- Include one honest, actionable observation (not a sales pitch)
+- Do NOT use markdown, headers, or bullet points — flowing prose only
+- Never use acronyms without explaining them first (e.g. CTR = Click-Through Rate)
+Data: ${platformContext}`,
             400
           );
+          aiPlatformInsights[section.platform] = insight;
         }
       } catch (aiError) {
         console.error("AI generation error:", aiError);
         aiSummary = `This report covers ${client.company_name}'s marketing performance for ${MONTH_NAMES[report_month]} ${report_year}.`;
       }
     } else {
-      aiSummary = `This report covers ${client.company_name}'s marketing performance for ${MONTH_NAMES[report_month]} ${report_year}. Connect platforms and sync data to enable AI insights.`;
+      aiSummary = `This report covers ${client.company_name}'s marketing performance for ${MONTH_NAMES[report_month]} ${report_year}.`;
     }
 
-    // ───────── GENERATE PDF ─────────
+    // ───────── GENERATE PDF — LANDSCAPE A4 ─────────
     const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const W = 210, H = 297, M = 18;
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = 297, H = 210, M = 16;
     const CW = W - M * 2;
 
     const setC = (c: number[]) => doc.setTextColor(c[0], c[1], c[2]);
     const setF = (c: number[]) => doc.setFillColor(c[0], c[1], c[2]);
+    const setD = (c: number[]) => doc.setDrawColor(c[0], c[1], c[2]);
 
     const stripMarkdown = (text: string): string =>
-      text
-        .replace(/#{1,6}\s+/g, '')
-        .replace(/\*\*(.+?)\*\*/g, '$1')
-        .replace(/\*(.+?)\*/g, '$1')
-        .replace(/`(.+?)`/g, '$1')
-        .replace(/^[-*]\s+/gm, '• ');
+      text.replace(/#{1,6}\s+/g, "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1").replace(/`(.+?)`/g, "$1").replace(/^[-*]\s+/gm, "- ");
+
+    let pageCount = 0;
+    const pageToc: { title: string; page: number }[] = [];
+
+    const formatMetricValue = (key: string, val: number): string => {
+      if (key === "spend" || key === "cpc" || key === "cost_per_conversion" || key === "cost_per_lead" || key === "conversions_value") return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (key === "ctr" || key === "engagement_rate" || key === "conversion_rate" || key === "audience_growth_rate" || key === "search_ctr" || key === "bounce_rate" || key === "search_impression_share" || key === "completion_rate") return `${val.toFixed(2)}%`;
+      if (key === "search_position" || key === "gbp_average_rating") return val.toFixed(1);
+      if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+      if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
+      return val % 1 !== 0 ? val.toFixed(2) : val.toLocaleString();
+    };
+
+    const calcChange = (curr: number, prev: number): { pct: number; abs: number; dir: string } => {
+      if (prev === 0) return { pct: 0, abs: curr, dir: "new" };
+      const pct = ((curr - prev) / prev) * 100;
+      return { pct, abs: curr - prev, dir: pct > 0 ? "up" : pct < 0 ? "down" : "flat" };
+    };
+
+    const getChangeColor = (key: string, dir: string): number[] => {
+      if (dir === "flat" || dir === "new") return C.grey;
+      const lowerBetter = LOWER_IS_BETTER.has(key);
+      if (dir === "up") return lowerBetter ? C.red : C.green;
+      return lowerBetter ? C.green : C.red;
+    };
+
+    const getTrafficLight = (key: string, pct: number): { color: number[]; label: string } => {
+      const lowerBetter = LOWER_IS_BETTER.has(key);
+      const adjustedPct = lowerBetter ? -pct : pct;
+      if (adjustedPct >= 5) return { color: C.green, label: "Good" };
+      if (adjustedPct >= -5) return { color: C.amber, label: "Steady" };
+      return { color: C.red, label: "Needs attention" };
+    };
+
+    const addPageFooter = () => {
+      doc.setFontSize(7); setC(C.grey);
+      doc.text(`${orgName} | Confidential`, M, H - 6);
+      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, H - 6, { align: "center" });
+      doc.text(`Page ${pageCount}`, W - M, H - 6, { align: "right" });
+    };
+
+    const startNewPage = (): number => {
+      if (pageCount > 0) doc.addPage();
+      pageCount++;
+      setF(C.white); doc.rect(0, 0, W, H, "F");
+      // Top accent bar
+      setF(C.primary); doc.rect(0, 0, W, 3, "F");
+      addPageFooter();
+      return M + 6;
+    };
 
     const wrapText = (text: string, x: number, y: number, maxW: number, lh: number): number => {
       const clean = stripMarkdown(text);
       const lines = doc.splitTextToSize(clean, maxW);
       for (const line of lines) {
-        if (y > H - 30) { doc.addPage(); y = newPageHeader(); }
+        if (y > H - 20) { y = startNewPage(); }
         doc.text(line, x, y);
         y += lh;
       }
       return y;
     };
 
-    const newPageHeader = (): number => {
-      setF(C.offWhite); doc.rect(0, 0, W, H, "F");
-      setF(C.primary); doc.rect(0, 0, W, 8, "F");
-      // Footer
-      doc.setFontSize(7); setC(C.grey);
-      doc.text(`${orgName} | Confidential`, W / 2, H - 8, { align: "center" });
-      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, H - 4, { align: "center" });
-      return M + 8;
-    };
-
-    const sectionTitle = (title: string, y: number): number => {
-      if (y > H - 60) { doc.addPage(); y = newPageHeader(); }
-      doc.setFontSize(20); setC(C.black); doc.text(title, M, y);
-      setF(C.primary); doc.rect(M, y + 4, 50, 2, "F");
-      return y + 16;
-    };
-
-    const formatMetricValue = (key: string, val: number): string => {
-      if (key === "spend" || key === "cpc" || key === "cost_per_conversion") return `${currSymbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      if (key === "ctr" || key === "engagement_rate" || key === "conversion_rate" || key === "audience_growth_rate") return `${val.toFixed(2)}%`;
-      if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
-      if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
-      return val % 1 !== 0 ? val.toFixed(2) : val.toLocaleString();
-    };
-
     // ═══════ PAGE 1: COVER ═══════
-    setF(C.black); doc.rect(0, 0, W, H, "F");
+    pageCount++;
+    setF(C.white); doc.rect(0, 0, W, H, "F");
+    // Large accent block on left
+    setF(C.primary); doc.rect(0, 0, 90, H, "F");
 
-    // Decorative elements
-    setF(C.primary); doc.rect(0, 0, 6, H, "F");
-
-    // Org logo or name
+    // Org logo on left panel
     if (showLogo && org?.logo_url) {
       try {
         const logoRes = await fetch(org.logo_url);
@@ -299,359 +472,593 @@ Deno.serve(async (req) => {
           const logoBlob = await logoRes.arrayBuffer();
           const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBlob)));
           const ext = org.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
-          doc.addImage(`data:image/${ext.toLowerCase()};base64,${logoBase64}`, ext, W / 2 - 25, 55, 50, 50);
-        } else {
-          doc.setFontSize(72); setC(C.primary); doc.text(orgName, W / 2, 80, { align: "center" });
+          doc.addImage(`data:image/${ext.toLowerCase()};base64,${logoBase64}`, ext, 20, 25, 50, 50);
         }
-      } catch {
-        doc.setFontSize(72); setC(C.primary); doc.text(orgName, W / 2, 80, { align: "center" });
+      } catch { /* skip logo */ }
+    }
+
+    // Left panel text
+    setC(C.white);
+    doc.setFontSize(11);
+    doc.text(`Prepared by`, 20, 100);
+    doc.setFontSize(16);
+    doc.text(orgName, 20, 112);
+
+    doc.setFontSize(11);
+    doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, 20, 135);
+
+    // Right panel - report title
+    doc.setFontSize(14); setC(C.grey);
+    doc.text("Performance Report", 110, 50);
+
+    doc.setFontSize(36); setC(C.black);
+    const companyLines = doc.splitTextToSize(client.company_name, 170);
+    let coverY = 65;
+    for (const line of companyLines) {
+      doc.text(line, 110, coverY);
+      coverY += 14;
+    }
+
+    coverY += 5;
+    doc.setFontSize(13); setC(C.grey);
+    doc.text(`Prepared for: ${client.full_name}`, 110, coverY);
+
+    // 3 headline KPIs at bottom right
+    const allMetrics: Record<string, number> = {};
+    const allPrevMetrics: Record<string, number> = {};
+    for (const s of platformSections) {
+      for (const [k, v] of Object.entries(s.metrics)) {
+        if (typeof v === "number") allMetrics[k] = (allMetrics[k] ?? 0) + v;
       }
-    } else {
-      doc.setFontSize(72); setC(C.primary); doc.text(orgName, W / 2, 80, { align: "center" });
+      for (const [k, v] of Object.entries(s.prevMetrics)) {
+        if (typeof v === "number") allPrevMetrics[k] = (allPrevMetrics[k] ?? 0) + v;
+      }
     }
 
-    setF(C.primary); doc.rect(W / 2 - 30, 115, 60, 1.5, "F");
-
-    doc.setFontSize(28); setC(C.white); doc.text("Monthly Marketing", W / 2, 145, { align: "center" });
-    doc.text("Performance Report", W / 2, 158, { align: "center" });
-
-    doc.setFontSize(20); setC(C.primary); doc.text(client.company_name, W / 2, 188, { align: "center" });
-    doc.setFontSize(14); setC(C.grey); doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, W / 2, 203, { align: "center" });
-
-    // Client logo if available
-    if (client.logo_url) {
-      try {
-        const clientLogoRes = await fetch(client.logo_url);
-        if (clientLogoRes.ok) {
-          const clientLogoBlob = await clientLogoRes.arrayBuffer();
-          const clientLogoBase64 = btoa(String.fromCharCode(...new Uint8Array(clientLogoBlob)));
-          const cExt = client.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
-          doc.addImage(`data:image/${cExt.toLowerCase()};base64,${clientLogoBase64}`, cExt, W / 2 - 15, 215, 30, 30);
-        }
-      } catch { /* skip client logo on error */ }
-    }
-
-    // Decorative bottom bar
-    setF(C.primary); doc.rect(M, H - 40, CW, 0.5, "F");
-    doc.setFontSize(9); setC(C.grey);
-    doc.text(`Prepared by ${orgName}`, W / 2, H - 28, { align: "center" });
-    doc.text("Confidential", W / 2, H - 22, { align: "center" });
-
-    // ═══════ PAGE 2: EXECUTIVE SUMMARY ═══════
-    doc.addPage();
-    let y = newPageHeader();
-    y = sectionTitle("Executive Summary", y);
-
-    doc.setFontSize(11); setC(C.black);
-    y = wrapText(aiSummary || "Report data will be available once platform connections are active.", M, y, CW, 6);
-
-    // ═══════ KPI HERO CARDS ═══════
-    y += 8;
-    y = sectionTitle("Key Performance Indicators", y);
-
-    const totalSpend = snapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.spend || 0), 0);
-    const totalImpressions = snapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.impressions || 0), 0);
-    const totalClicks = snapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.clicks || 0), 0);
-    const totalEngagement = snapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.engagement || 0) + (sn.metrics_data?.likes || 0) + (sn.metrics_data?.comments || 0) + (sn.metrics_data?.shares || 0), 0);
-
-    const prevTotalSpend = prevSnapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.spend || 0), 0);
-    const prevTotalImpressions = prevSnapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.impressions || 0), 0);
-    const prevTotalClicks = prevSnapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.clicks || 0), 0);
-    const prevTotalEngagement = prevSnapshots.reduce((s: number, sn: any) => s + (sn.metrics_data?.engagement || 0) + (sn.metrics_data?.likes || 0) + (sn.metrics_data?.comments || 0) + (sn.metrics_data?.shares || 0), 0);
-
-    const kpiCards = [
-      { label: "TOTAL SPEND", value: `${currSymbol}${totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, prev: prevTotalSpend, curr: totalSpend, isCost: true },
-      { label: "IMPRESSIONS", value: totalImpressions >= 1000 ? `${(totalImpressions / 1000).toFixed(1)}K` : String(totalImpressions), prev: prevTotalImpressions, curr: totalImpressions },
-      { label: "CLICKS", value: totalClicks >= 1000 ? `${(totalClicks / 1000).toFixed(1)}K` : String(totalClicks), prev: prevTotalClicks, curr: totalClicks },
-      { label: "ENGAGEMENT", value: totalEngagement >= 1000 ? `${(totalEngagement / 1000).toFixed(1)}K` : String(totalEngagement), prev: prevTotalEngagement, curr: totalEngagement },
+    // Pick 3 most impressive metrics
+    const heroMetricCandidates = [
+      { key: "reach", label: "People Reached" },
+      { key: "impressions", label: "Total Impressions" },
+      { key: "engagement", label: "Engagements" },
+      { key: "clicks", label: "Total Clicks" },
+      { key: "search_clicks", label: "Search Clicks" },
+      { key: "views", label: "Video Views" },
+      { key: "sessions", label: "Website Sessions" },
+      { key: "total_followers", label: "Total Followers" },
+      { key: "conversions", label: "Conversions" },
+      { key: "leads", label: "Leads" },
     ];
+    const heroMetrics = heroMetricCandidates
+      .filter(h => (allMetrics[h.key] ?? 0) > 0)
+      .sort((a, b) => (allMetrics[b.key] ?? 0) - (allMetrics[a.key] ?? 0))
+      .slice(0, 3);
 
-    const kpiW = (CW - 15) / 4;
-    const kpiH = 32;
-    let kpiX = M;
+    const kpiStartX = 110;
+    const kpiWidth = 55;
+    const kpiY = H - 55;
+    heroMetrics.forEach((hero, i) => {
+      const x = kpiStartX + i * (kpiWidth + 5);
+      setF(C.offWhite); doc.roundedRect(x, kpiY, kpiWidth, 35, 3, 3, "F");
+      setF(C.primary); doc.rect(x, kpiY, kpiWidth, 2.5, "F");
+      doc.setFontSize(20); setC(C.black);
+      doc.text(formatMetricValue(hero.key, allMetrics[hero.key]), x + 5, kpiY + 18);
+      doc.setFontSize(8); setC(C.grey);
+      doc.text(hero.label, x + 5, kpiY + 27);
+    });
 
-    if (y + kpiH > H - 30) { doc.addPage(); y = newPageHeader(); }
+    // Cover footer
+    doc.setFontSize(7); setC(C.grey);
+    doc.text(`${orgName} | Confidential`, W / 2, H - 6, { align: "center" });
 
-    for (const kpi of kpiCards) {
-      setF(C.white); doc.roundedRect(kpiX, y, kpiW, kpiH, 3, 3, "F");
-      setF(C.primary); doc.rect(kpiX, y, kpiW, 2, "F");
+    // ═══════ PAGE 2: TABLE OF CONTENTS ═══════
+    let y = startNewPage();
+    const tocPageNum = pageCount;
+    doc.setFontSize(22); setC(C.black);
+    doc.text("Table of Contents", M, y); y += 14;
 
-      doc.setFontSize(6.5); setC(C.grey);
-      doc.text(kpi.label, kpiX + 5, y + 9);
+    setF(C.primary); doc.rect(M, y - 5, 50, 1.5, "F"); y += 8;
 
-      doc.setFontSize(16); setC(C.black);
-      doc.text(kpi.value, kpiX + 5, y + 20);
+    // Determine start pages for each section
+    const prevMonth = report_month === 1 ? 12 : report_month - 1;
+    const prevYear = report_month === 1 ? report_year - 1 : report_year;
+    const prevMonthName = MONTH_NAMES[prevMonth];
+    const daysInMonth = new Date(report_year, report_month, 0).getDate();
 
-      if (kpi.prev > 0) {
-        const change = ((kpi.curr - kpi.prev) / kpi.prev) * 100;
-        const isGood = kpi.isCost ? change < 0 : change > 0;
-        doc.setFontSize(7); setC(isGood ? C.green : C.orange);
-        const arrow = change >= 0 ? "▲" : "▼";
-        doc.text(`${arrow} ${Math.abs(change).toFixed(1)}% MoM`, kpiX + 5, y + 27);
-      }
+    doc.setFontSize(10); setC(C.grey);
+    y = wrapText(
+      `This report covers performance from 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. All figures compared to 1 ${prevMonthName} ${prevYear} to ${new Date(prevYear, prevMonth, 0).getDate()} ${prevMonthName} ${prevYear} unless stated.`,
+      M, y, CW, 5
+    );
+    y += 10;
 
-      kpiX += kpiW + 5;
+    // We'll fill TOC page numbers later — for now record positions
+    const tocEntries: { label: string; desc: string; yPos: number }[] = [];
+    let estimatedPage = pageCount + 1; // Next page after TOC
+
+    for (const section of platformSections) {
+      tocEntries.push({
+        label: section.label,
+        desc: `Performance metrics, month-on-month comparison, and analysis`,
+        yPos: y,
+      });
+      doc.setFontSize(12); setC(C.black);
+      doc.text(section.label, M + 4, y);
+      doc.setFontSize(8); setC(C.grey);
+      doc.text(`Performance metrics, comparison, and analysis`, M + 4, y + 5);
+      y += 14;
     }
-    y += kpiH + 12;
 
-    // ═══════ PLATFORM SECTIONS ═══════
-    for (const snapshot of snapshots) {
-      doc.addPage();
-      y = newPageHeader();
+    // Monthly summary entry
+    doc.setFontSize(12); setC(C.black);
+    doc.text("Monthly Summary", M + 4, y);
+    doc.setFontSize(8); setC(C.grey);
+    doc.text("Overall performance across all platforms with traffic light status", M + 4, y + 5);
+    y += 14;
 
-      const platformName = PLATFORM_LABELS[snapshot.platform] ?? snapshot.platform;
-      const config = configs.find((c: any) => c.platform === snapshot.platform);
-      const enabledMetrics: string[] = config?.enabled_metrics?.length > 0 ? config.enabled_metrics : Object.keys(snapshot.metrics_data as Record<string, unknown>);
-      const prevSnapshot = prevSnapshots.find((s: any) => s.platform === snapshot.platform);
-      const yoySnapshot = yoySnapshots.find((s: any) => s.platform === snapshot.platform);
+    if (upsellData) {
+      doc.setFontSize(12); setC(C.black);
+      doc.text(`A Note from ${orgName}`, M + 4, y);
+      doc.setFontSize(8); setC(C.grey);
+      doc.text("A service recommendation based on your results", M + 4, y + 5);
+      y += 14;
+    }
 
-      doc.setFontSize(22); setC(C.primary); doc.text(platformName, M, y);
-      setF(C.primary); doc.rect(M, y + 5, 40, 1.5, "F");
-      y += 18;
+    // ═══════ PLATFORM PAGES ═══════
+    for (const section of platformSections) {
+      y = startNewPage();
+      pageToc.push({ title: section.label, page: pageCount });
 
-      const metrics = snapshot.metrics_data as Record<string, number>;
-      const prevMetrics = (prevSnapshot?.metrics_data ?? {}) as Record<string, number>;
-      const yoyMetrics = (yoySnapshot?.metrics_data ?? {}) as Record<string, number>;
+      // Section header
+      doc.setFontSize(22); setC(C.primary);
+      doc.text(section.label, M, y);
+      y += 6;
+      doc.setFontSize(9); setC(C.grey);
+      const descLines = doc.splitTextToSize(`${section.label} — ${section.description}`, CW);
+      doc.text(descLines, M, y);
+      y += descLines.length * 4.5 + 4;
+      setF(C.primary); doc.rect(M, y, 50, 1.2, "F"); y += 8;
 
-      const cardW = (CW - 16) / 3;
-      const cardH = 30;
+      const hasPrev = Object.keys(section.prevMetrics).length > 0;
+
+      // ── METRICS GRID ──
+      const gridMetrics = section.enabledMetrics.filter(k => typeof section.metrics[k] === "number");
+      const colCount = 4;
+      const cardW = (CW - (colCount - 1) * 4) / colCount;
+      const cardH = hasPrev ? 32 : 24;
       let cardX = M;
       let cardsInRow = 0;
 
-      for (const metricKey of enabledMetrics) {
-        if (!(metricKey in metrics)) continue;
-
-        if (y + cardH > H - 30) {
-          doc.addPage(); y = newPageHeader();
+      for (const key of gridMetrics) {
+        if (y + cardH > H - 20) {
+          y = startNewPage();
           cardX = M; cardsInRow = 0;
         }
 
-        setF(C.white); doc.roundedRect(cardX, y, cardW, cardH, 2, 2, "F");
-        setF(C.primary); doc.rect(cardX, y + 3, 1.5, cardH - 6, "F");
+        const val = section.metrics[key];
+        const prevVal = section.prevMetrics[key];
 
+        // Card background
+        setF(C.offWhite); doc.roundedRect(cardX, y, cardW, cardH, 2, 2, "F");
+
+        // Metric label
         doc.setFontSize(7); setC(C.grey);
-        const label = METRIC_LABELS[metricKey] ?? metricKey;
-        doc.text(label.toUpperCase(), cardX + 6, y + 8);
+        doc.text((METRIC_LABELS[key] ?? key).toUpperCase(), cardX + 4, y + 7);
 
-        doc.setFontSize(15); setC(C.black);
-        const fmtVal = formatMetricValue(metricKey, metrics[metricKey]);
-        doc.text(fmtVal, cardX + 6, y + 18);
+        // Value
+        doc.setFontSize(14); setC(C.black);
+        doc.text(formatMetricValue(key, val), cardX + 4, y + 16);
 
-        if (client.enable_mom_comparison && prevMetrics[metricKey] !== undefined && prevMetrics[metricKey] !== 0) {
-          const change = ((metrics[metricKey] - prevMetrics[metricKey]) / prevMetrics[metricKey]) * 100;
-          const isCost = metricKey === "spend" || metricKey === "cpc" || metricKey === "cost_per_conversion";
-          const isGood = isCost ? change < 0 : change > 0;
-          doc.setFontSize(6.5); setC(isGood ? C.green : C.orange);
-          const arrow = change >= 0 ? "▲" : "▼";
-          doc.text(`${arrow} ${Math.abs(change).toFixed(1)}% MoM`, cardX + 6, y + 24);
+        // Plain English label
+        const plainDesc = METRIC_PLAIN_ENGLISH[key];
+        if (plainDesc) {
+          doc.setFontSize(5.5); setC(C.grey);
+          const truncated = plainDesc.length > 50 ? plainDesc.substring(0, 48) + "..." : plainDesc;
+          doc.text(truncated, cardX + 4, y + 21);
         }
 
-        if (client.enable_yoy_comparison && yoyMetrics[metricKey] !== undefined && yoyMetrics[metricKey] !== 0) {
-          const yoyChange = ((metrics[metricKey] - yoyMetrics[metricKey]) / yoyMetrics[metricKey]) * 100;
-          doc.setFontSize(5.5); setC(C.secondary);
-          doc.text(`YoY: ${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(1)}%`, cardX + 6, y + 28);
+        // MoM comparison
+        if (hasPrev && prevVal !== undefined && prevVal !== 0) {
+          const change = calcChange(val, prevVal);
+          const color = getChangeColor(key, change.dir);
+          doc.setFontSize(6.5); setC(color);
+          const arrow = change.dir === "up" ? "▲" : change.dir === "down" ? "▼" : "—";
+          doc.text(`${arrow} ${Math.abs(change.pct).toFixed(1)}% vs last month`, cardX + 4, y + 28);
+        } else if (hasPrev) {
+          doc.setFontSize(6.5); setC(C.grey);
+          doc.text("New this month", cardX + 4, y + 28);
         }
 
-        cardX += cardW + 8;
+        cardX += cardW + 4;
         cardsInRow++;
-        if (cardsInRow >= 3) {
-          cardX = M; y += cardH + 6; cardsInRow = 0;
+        if (cardsInRow >= colCount) {
+          cardX = M; y += cardH + 4; cardsInRow = 0;
         }
       }
-      if (cardsInRow > 0) y += cardH + 6;
+      if (cardsInRow > 0) y += cardH + 4;
 
-      // ── SIMULATED BAR CHART ──
-      y += 6;
-      if (y + 50 < H - 30) {
-        doc.setFontSize(10); setC(C.black); doc.text("Performance Breakdown", M, y);
-        y += 8;
+      // ── PLAIN ENGLISH SUMMARY BOX ──
+      const platformInsight = aiPlatformInsights[section.platform];
+      if (platformInsight) {
+        y += 2;
+        if (y + 30 > H - 20) y = startNewPage();
 
-        const chartMetrics = ["impressions", "clicks", "engagement", "reach"].filter(k => metrics[k] > 0);
-        if (chartMetrics.length > 0) {
-          const maxVal = Math.max(...chartMetrics.map(k => metrics[k]));
-          const barMaxW = CW - 40;
+        // Highlighted box
+        setF([primaryColor[0], primaryColor[1], primaryColor[2]]); doc.rect(M, y, 3, 0.01, "F"); // Will size after
+        const boxTop = y;
+        setF(C.offWhite); doc.roundedRect(M, y, CW, 4, 2, 2, "F"); // Placeholder, will size
 
-          for (const key of chartMetrics) {
-            if (y + 10 > H - 30) { doc.addPage(); y = newPageHeader(); }
-            const val = metrics[key];
-            const barW = (val / maxVal) * barMaxW;
+        doc.setFontSize(10); setC(C.primary);
+        doc.text("What This Means", M + 6, y + 6);
+        y += 10;
+        doc.setFontSize(9); setC(C.black);
+        const insightY = wrapText(platformInsight, M + 6, y, CW - 12, 4.5);
 
-            doc.setFontSize(7); setC(C.grey);
-            doc.text((METRIC_LABELS[key] || key).toUpperCase(), M, y);
+        // Draw the actual box now that we know height
+        const boxH = insightY - boxTop + 4;
+        setF(C.offWhite); doc.roundedRect(M, boxTop, CW, boxH, 2, 2, "F");
+        setF(C.primary); doc.rect(M, boxTop, 3, boxH, "F");
+        // Re-render text inside the box
+        doc.setFontSize(10); setC(C.primary);
+        doc.text("What This Means", M + 6, boxTop + 6);
+        doc.setFontSize(9); setC(C.black);
+        wrapText(platformInsight, M + 6, boxTop + 10, CW - 12, 4.5);
 
-            setF(C.lightGrey); doc.roundedRect(M, y + 2, barMaxW, 5, 2, 2, "F");
-            setF(C.primary); doc.roundedRect(M, y + 2, Math.max(barW, 4), 5, 2, 2, "F");
+        y = insightY + 6;
+      }
 
-            doc.setFontSize(7); setC(C.black);
-            doc.text(formatMetricValue(key, val), M + barMaxW + 3, y + 6);
+      // ── MONTH-ON-MONTH COMPARISON TABLE ──
+      if (hasPrev && gridMetrics.length > 0) {
+        if (y + 20 > H - 20) y = startNewPage();
+        doc.setFontSize(11); setC(C.black);
+        doc.text("Month-on-Month Comparison", M, y); y += 7;
 
-            y += 14;
+        // Table header
+        const colWidths = [CW * 0.30, CW * 0.22, CW * 0.22, CW * 0.26];
+        const tableHeaders = ["Metric", "This Month", "Last Month", "Change"];
+        setF(C.primary);
+        doc.rect(M, y - 3, CW, 7, "F");
+        doc.setFontSize(7.5); setC(C.white);
+        let hx = M;
+        for (let i = 0; i < tableHeaders.length; i++) {
+          doc.text(tableHeaders[i], hx + 3, y + 1);
+          hx += colWidths[i];
+        }
+        y += 7;
+
+        // Table rows
+        let rowIdx = 0;
+        for (const key of gridMetrics) {
+          if (y + 7 > H - 20) {
+            y = startNewPage();
+            // Re-render header
+            setF(C.primary); doc.rect(M, y - 3, CW, 7, "F");
+            doc.setFontSize(7.5); setC(C.white);
+            hx = M;
+            for (let i = 0; i < tableHeaders.length; i++) {
+              doc.text(tableHeaders[i], hx + 3, y + 1);
+              hx += colWidths[i];
+            }
+            y += 7; rowIdx = 0;
           }
+
+          const val = section.metrics[key];
+          const prevVal = section.prevMetrics[key];
+
+          if (rowIdx % 2 === 0) {
+            setF(C.offWhite); doc.rect(M, y - 3, CW, 7, "F");
+          }
+
+          doc.setFontSize(7.5);
+          let rx = M;
+          // Metric name
+          setC(C.black); doc.text(METRIC_LABELS[key] ?? key, rx + 3, y + 1);
+          rx += colWidths[0];
+          // This month
+          doc.text(formatMetricValue(key, val), rx + 3, y + 1);
+          rx += colWidths[1];
+          // Last month
+          if (prevVal !== undefined) {
+            doc.text(formatMetricValue(key, prevVal), rx + 3, y + 1);
+          } else {
+            setC(C.grey); doc.text("—", rx + 3, y + 1);
+          }
+          rx += colWidths[2];
+          // Change
+          if (prevVal !== undefined && prevVal !== 0) {
+            const change = calcChange(val, prevVal);
+            const color = getChangeColor(key, change.dir);
+            setC(color);
+            const arrow = change.dir === "up" ? "▲" : change.dir === "down" ? "▼" : "—";
+            doc.text(`${arrow} ${Math.abs(change.pct).toFixed(1)}%`, rx + 3, y + 1);
+          } else {
+            setC(C.grey); doc.text("New", rx + 3, y + 1);
+          }
+
+          y += 7; rowIdx++;
         }
-      }
-    }
-
-    // ═══════ ENGAGEMENT BREAKDOWN PAGE ═══════
-    const totalEng = snapshots.reduce((s: number, sn: any) => {
-      const m = sn.metrics_data as Record<string, number>;
-      return s + (m.engagement || 0) + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
-    }, 0);
-
-    if (totalEng > 0) {
-      doc.addPage();
-      y = newPageHeader();
-      y = sectionTitle("Engagement Distribution", y);
-
-      const engByPlatform = snapshots.map((sn: any) => {
-        const m = sn.metrics_data as Record<string, number>;
-        return { name: PLATFORM_LABELS[sn.platform] || sn.platform, value: (m.engagement || 0) + (m.likes || 0) + (m.comments || 0) + (m.shares || 0) };
-      }).filter(e => e.value > 0).sort((a, b) => b.value - a.value);
-
-      const pieColors = [C.primary, C.secondary, C.accent, C.orange, C.grey, [200, 60, 60] as [number, number, number]];
-      const maxEng = Math.max(...engByPlatform.map(e => e.value));
-      const barMaxW = CW * 0.6;
-
-      for (let i = 0; i < engByPlatform.length; i++) {
-        if (y + 18 > H - 30) { doc.addPage(); y = newPageHeader(); }
-        const item = engByPlatform[i];
-        const barW = (item.value / maxEng) * barMaxW;
-        const pct = ((item.value / totalEng) * 100).toFixed(1);
-        const color = pieColors[i % pieColors.length];
-
-        doc.setFontSize(9); setC(C.black); doc.text(item.name, M, y);
-        setF(C.lightGrey); doc.roundedRect(M, y + 3, barMaxW, 7, 3, 3, "F");
-        setF(color); doc.roundedRect(M, y + 3, Math.max(barW, 4), 7, 3, 3, "F");
-
-        doc.setFontSize(8); setC(C.black);
-        doc.text(`${item.value.toLocaleString()} (${pct}%)`, M + barMaxW + 4, y + 9);
-
-        y += 18;
-      }
-    }
-
-    // ═══════ TOP CONTENT PAGE ═══════
-    const hasTopContent = snapshots.some((sn: any) => sn.top_content && Array.isArray(sn.top_content) && sn.top_content.length > 0);
-    if (hasTopContent) {
-      doc.addPage();
-      y = newPageHeader();
-      y = sectionTitle("Top Performing Content", y);
-
-      for (const snapshot of snapshots) {
-        const topContent = (snapshot as any).top_content;
-        if (!topContent || !Array.isArray(topContent) || topContent.length === 0) continue;
-
-        doc.setFontSize(12); setC(C.primary);
-        doc.text(PLATFORM_LABELS[snapshot.platform] || snapshot.platform, M, y);
+        y += 4;
+      } else if (!hasPrev) {
+        if (y + 10 > H - 20) y = startNewPage();
+        doc.setFontSize(9); setC(C.grey);
+        doc.text("No previous month data available for comparison — this is your first month tracked.", M, y);
         y += 8;
+      }
 
-        for (const item of topContent.slice(0, 5)) {
-          if (y + 12 > H - 30) { doc.addPage(); y = newPageHeader(); }
+      // ── TOP CONTENT TABLE (social platforms) ──
+      if (section.topContent.length > 0) {
+        if (y + 20 > H - 20) y = startNewPage();
+        doc.setFontSize(11); setC(C.black);
+        doc.text("Top Performing Content", M, y); y += 7;
+
+        const topItems = section.topContent.slice(0, 5) as Record<string, unknown>[];
+        for (const item of topItems) {
+          if (y + 10 > H - 20) y = startNewPage();
           doc.setFontSize(8); setC(C.black);
-          const name = (item.name || item.campaign_name || item.title || "—").substring(0, 60);
-          doc.text(`• ${name}`, M + 4, y);
+          const name = String(item.name || item.campaign_name || item.title || "—").substring(0, 80);
+          doc.text(`•  ${name}`, M + 2, y);
           y += 5;
-          if (item.spend !== undefined || item.clicks !== undefined || item.impressions !== undefined) {
+          const details: string[] = [];
+          if (item.spend !== undefined) details.push(`Spend: ${currSymbol}${Number(item.spend).toFixed(2)}`);
+          if (item.impressions !== undefined) details.push(`Impressions: ${Number(item.impressions).toLocaleString()}`);
+          if (item.clicks !== undefined) details.push(`Clicks: ${Number(item.clicks).toLocaleString()}`);
+          if (item.engagement !== undefined) details.push(`Engagement: ${Number(item.engagement).toLocaleString()}`);
+          if (item.views !== undefined) details.push(`Views: ${Number(item.views).toLocaleString()}`);
+          if (details.length > 0) {
             doc.setFontSize(7); setC(C.grey);
-            const details = [];
-            if (item.spend !== undefined) details.push(`Spend: ${currSymbol}${Number(item.spend).toFixed(2)}`);
-            if (item.impressions !== undefined) details.push(`Imp: ${Number(item.impressions).toLocaleString()}`);
-            if (item.clicks !== undefined) details.push(`Clicks: ${Number(item.clicks).toLocaleString()}`);
             doc.text(details.join("  |  "), M + 8, y);
-            y += 6;
+            y += 5;
           }
           y += 2;
         }
-        y += 6;
+        y += 4;
+      }
+
+      // ── WHAT THIS MEANS FOR YOU ──
+      if (platformInsight) {
+        if (y + 20 > H - 20) y = startNewPage();
+        doc.setFontSize(10); setC(C.primary);
+        doc.text("What This Means for You", M, y); y += 6;
+
+        // Generate simple bullet points from the metrics
+        const bullets: string[] = [];
+        const totalReach = section.metrics.reach ?? section.metrics.impressions ?? 0;
+        const totalEng = section.metrics.engagement ?? ((section.metrics.likes ?? 0) + (section.metrics.comments ?? 0) + (section.metrics.shares ?? 0));
+
+        if (totalReach > 0) {
+          const perDay = Math.round(totalReach / daysInMonth);
+          bullets.push(`Your content reached ${totalReach.toLocaleString()} people this month — that's roughly ${perDay.toLocaleString()} people per day discovering your business.`);
+        }
+        if (totalEng > 0) {
+          bullets.push(`${totalEng.toLocaleString()} people actively engaged with your content — each interaction helps spread your message further.`);
+        }
+        if (section.metrics.follower_growth && section.metrics.follower_growth > 0) {
+          bullets.push(`You gained ${section.metrics.follower_growth.toLocaleString()} new followers — your audience is growing steadily.`);
+        }
+
+        doc.setFontSize(8.5); setC(C.black);
+        for (const bullet of bullets.slice(0, 3)) {
+          if (y + 8 > H - 20) y = startNewPage();
+          y = wrapText(`•  ${bullet}`, M + 2, y, CW - 8, 4.5);
+          y += 2;
+        }
       }
     }
 
-    // ═══════ DEMOGRAPHICS PLACEHOLDER ═══════
-    doc.addPage();
-    y = newPageHeader();
-    y = sectionTitle("Audience & Demographics", y);
+    // ═══════ MONTHLY SUMMARY PAGE ═══════
+    y = startNewPage();
+    pageToc.push({ title: "Monthly Summary", page: pageCount });
 
-    const placeholders = [
-      { title: "Age Distribution", desc: "Age group breakdown will appear here once demographic data is synced." },
-      { title: "Gender Split", desc: "Male/female audience split will be displayed in future reports." },
-      { title: "Geographic Reach", desc: "Top countries and cities data will be shown when available." },
-      { title: "Device Breakdown", desc: "Mobile vs desktop vs tablet usage breakdown coming soon." },
-    ];
+    doc.setFontSize(22); setC(C.black);
+    doc.text("Monthly Summary", M, y); y += 6;
+    setF(C.primary); doc.rect(M, y, 50, 1.2, "F"); y += 10;
 
-    const phW = (CW - 8) / 2;
-    const phH = 35;
+    // Executive summary paragraph
+    doc.setFontSize(10); setC(C.black);
+    y = wrapText(aiSummary, M, y, CW, 5);
+    y += 8;
 
-    for (let i = 0; i < placeholders.length; i++) {
-      const px = M + (i % 2) * (phW + 8);
-      const py = y + Math.floor(i / 2) * (phH + 8);
+    // Traffic light table
+    doc.setFontSize(12); setC(C.black);
+    doc.text("Platform Status Overview", M, y); y += 7;
 
-      setF(C.white); doc.roundedRect(px, py, phW, phH, 3, 3, "F");
-      setF(C.lightGrey); doc.rect(px + 2, py + 2, phW - 4, 1, "F");
+    const summaryColWidths = [CW * 0.25, CW * 0.12, CW * 0.63];
+    setF(C.primary); doc.rect(M, y - 3, CW, 7, "F");
+    doc.setFontSize(7.5); setC(C.white);
+    doc.text("Platform", M + 3, y + 1);
+    doc.text("Status", M + summaryColWidths[0] + 3, y + 1);
+    doc.text("Verdict", M + summaryColWidths[0] + summaryColWidths[1] + 3, y + 1);
+    y += 7;
 
-      doc.setFontSize(9); setC(C.black); doc.text(placeholders[i].title, px + 6, py + 12);
-      doc.setFontSize(7); setC(C.grey);
-      const descLines = doc.splitTextToSize(placeholders[i].desc, phW - 12);
-      doc.text(descLines, px + 6, py + 19);
-    }
+    for (let i = 0; i < platformSections.length; i++) {
+      if (y + 8 > H - 20) y = startNewPage();
+      const section = platformSections[i];
+      if (i % 2 === 0) {
+        setF(C.offWhite); doc.rect(M, y - 3, CW, 8, "F");
+      }
 
-    y += Math.ceil(placeholders.length / 2) * (phH + 8) + 8;
-    doc.setFontSize(9); setC(C.grey);
-    doc.text("Demographic insights will be available in future reports as platforms provide this data.", M, y);
+      // Determine traffic light — use primary metric
+      const primaryMetric = Object.keys(section.metrics).find(k => typeof section.metrics[k] === "number" && section.prevMetrics[k] !== undefined && section.prevMetrics[k] !== 0);
+      let tl = { color: C.amber, label: "Steady" };
+      if (primaryMetric) {
+        const change = calcChange(section.metrics[primaryMetric], section.prevMetrics[primaryMetric]);
+        tl = getTrafficLight(primaryMetric, change.pct);
+      } else if (Object.keys(section.prevMetrics).length === 0) {
+        tl = { color: C.green, label: "First month" };
+      }
 
-    // ═══════ AI INSIGHTS PAGE ═══════
-    if (showAiInsights && aiInsights) {
-      doc.addPage();
-      y = newPageHeader();
-      y = sectionTitle("Insights & Analysis", y);
-      doc.setFontSize(11); setC(C.black);
-      wrapText(aiInsights, M, y, CW, 6);
-    }
+      // Platform name
+      doc.setFontSize(8); setC(C.black);
+      doc.text(section.label, M + 3, y + 2);
 
-    // ═══════ UPSELL PAGE ═══════
-    if (client.enable_upsell && aiUpsell) {
-      doc.addPage();
-      y = newPageHeader();
-      y = sectionTitle("Recommendations", y);
-      doc.setFontSize(10); setC(C.grey);
-      doc.text("Based on your current marketing performance:", M, y);
+      // Traffic light dot + label
+      setF(tl.color); doc.circle(M + summaryColWidths[0] + 8, y + 0.5, 2.5, "F");
+      doc.setFontSize(7); setC(C.black);
+      doc.text(tl.label, M + summaryColWidths[0] + 14, y + 2);
+
+      // One-sentence verdict
+      const insight = aiPlatformInsights[section.platform];
+      if (insight) {
+        const firstSentence = insight.split(/[.!?]/)[0] + ".";
+        doc.setFontSize(7); setC(C.grey);
+        const vLines = doc.splitTextToSize(firstSentence.substring(0, 120), summaryColWidths[2] - 6);
+        doc.text(vLines[0], M + summaryColWidths[0] + summaryColWidths[1] + 3, y + 2);
+      }
+
       y += 8;
-      doc.setFontSize(11); setC(C.black);
-      wrapText(aiUpsell, M, y, CW, 6);
+    }
+    y += 8;
+
+    // Key wins
+    doc.setFontSize(11); setC(C.primary);
+    doc.text("Key Wins This Month", M, y); y += 7;
+    doc.setFontSize(9); setC(C.black);
+
+    // Find top 3 improving metrics
+    const improvements: { label: string; pct: number }[] = [];
+    for (const section of platformSections) {
+      for (const key of section.enabledMetrics) {
+        const val = section.metrics[key];
+        const prevVal = section.prevMetrics[key];
+        if (typeof val === "number" && typeof prevVal === "number" && prevVal > 0) {
+          const change = calcChange(val, prevVal);
+          const isPositive = LOWER_IS_BETTER.has(key) ? change.dir === "down" : change.dir === "up";
+          if (isPositive) {
+            improvements.push({ label: `${section.label}: ${METRIC_LABELS[key] ?? key} ${change.dir === "up" ? "up" : "improved"} ${Math.abs(change.pct).toFixed(1)}%`, pct: Math.abs(change.pct) });
+          }
+        }
+      }
+    }
+    improvements.sort((a, b) => b.pct - a.pct);
+    for (const win of improvements.slice(0, 3)) {
+      y = wrapText(`•  ${win.label}`, M + 2, y, CW - 8, 4.5);
+      y += 2;
+    }
+    if (improvements.length === 0) {
+      y = wrapText("•  This is your first reporting month — we'll track improvements from here.", M + 2, y, CW - 8, 4.5);
+      y += 2;
+    }
+    y += 6;
+
+    // Worth keeping an eye on
+    const declines: { label: string; pct: number }[] = [];
+    for (const section of platformSections) {
+      for (const key of section.enabledMetrics) {
+        const val = section.metrics[key];
+        const prevVal = section.prevMetrics[key];
+        if (typeof val === "number" && typeof prevVal === "number" && prevVal > 0) {
+          const change = calcChange(val, prevVal);
+          const isNegative = LOWER_IS_BETTER.has(key) ? change.dir === "up" : change.dir === "down";
+          if (isNegative && Math.abs(change.pct) > 5) {
+            declines.push({ label: `${section.label}: ${METRIC_LABELS[key] ?? key} ${change.dir === "down" ? "decreased" : "increased"} ${Math.abs(change.pct).toFixed(1)}% — worth monitoring next month`, pct: Math.abs(change.pct) });
+          }
+        }
+      }
+    }
+    if (declines.length > 0) {
+      doc.setFontSize(11); setC(C.amber);
+      doc.text("Worth Keeping an Eye On", M, y); y += 7;
+      doc.setFontSize(9); setC(C.black);
+      declines.sort((a, b) => b.pct - a.pct);
+      for (const d of declines.slice(0, 2)) {
+        y = wrapText(`•  ${d.label}`, M + 2, y, CW - 8, 4.5);
+        y += 2;
+      }
     }
 
-    // ═══════ CLOSING PAGE ═══════
-    doc.addPage();
-    setF(C.black); doc.rect(0, 0, W, H, "F");
-    setF(C.primary); doc.rect(0, 0, 6, H, "F");
+    // ═══════ UPSELL PAGE (if scheduled) ═══════
+    if (upsellData) {
+      y = startNewPage();
+      pageToc.push({ title: `A Note from ${orgName}`, page: pageCount });
 
+      doc.setFontSize(22); setC(C.primary);
+      doc.text(`A Note from ${orgName}`, M, y); y += 6;
+      setF(C.primary); doc.rect(M, y, 50, 1.2, "F"); y += 12;
+
+      // Headline
+      doc.setFontSize(16); setC(C.black);
+      const headlineLines = doc.splitTextToSize(upsellData.headline, CW);
+      for (const line of headlineLines) {
+        doc.text(line, M, y); y += 7;
+      }
+      y += 6;
+
+      // Body content
+      doc.setFontSize(10); setC(C.black);
+      y = wrapText(upsellData.body_content, M, y, CW, 5);
+      y += 8;
+
+      // Comparison table if provided
+      if (upsellData.comparison_data && Array.isArray(upsellData.comparison_data)) {
+        const compData = upsellData.comparison_data as { label: string; option_a: string; option_b: string }[];
+        if (compData.length > 0) {
+          const compColW = [CW * 0.34, CW * 0.33, CW * 0.33];
+          // Header
+          setF(C.primary); doc.rect(M, y - 3, CW, 7, "F");
+          doc.setFontSize(8); setC(C.white);
+          doc.text("Feature", M + 3, y + 1);
+          doc.text(compData[0]?.option_a ? "Option A" : "", M + compColW[0] + 3, y + 1);
+          doc.text(compData[0]?.option_b ? "Option B" : "", M + compColW[0] + compColW[1] + 3, y + 1);
+          y += 7;
+
+          for (let i = 0; i < compData.length; i++) {
+            if (y + 7 > H - 20) y = startNewPage();
+            if (i % 2 === 0) { setF(C.offWhite); doc.rect(M, y - 3, CW, 7, "F"); }
+            doc.setFontSize(7.5); setC(C.black);
+            doc.text(compData[i].label, M + 3, y + 1);
+            doc.text(compData[i].option_a ?? "", M + compColW[0] + 3, y + 1);
+            doc.text(compData[i].option_b ?? "", M + compColW[0] + compColW[1] + 3, y + 1);
+            y += 7;
+          }
+          y += 6;
+        }
+      }
+
+      // CTA
+      doc.setFontSize(10); setC(C.primary);
+      doc.text("Interested? Reply to this email or get in touch directly.", M, y);
+    }
+
+    // ═══════ END PAGE ═══════
+    y = startNewPage();
+    setF(C.primary); doc.rect(0, 0, W, H, "F");
+
+    // Logo
     if (showLogo && org?.logo_url) {
       try {
-        const closingLogoRes = await fetch(org.logo_url);
-        if (closingLogoRes.ok) {
-          const closingLogoBlob = await closingLogoRes.arrayBuffer();
-          const closingLogoBase64 = btoa(String.fromCharCode(...new Uint8Array(closingLogoBlob)));
+        const logoRes = await fetch(org.logo_url);
+        if (logoRes.ok) {
+          const logoBlob = await logoRes.arrayBuffer();
+          const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBlob)));
           const ext = org.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
-          doc.addImage(`data:image/${ext.toLowerCase()};base64,${closingLogoBase64}`, ext, W / 2 - 20, 75, 40, 40);
-        } else {
-          doc.setFontSize(48); setC(C.primary); doc.text(orgName, W / 2, 100, { align: "center" });
+          doc.addImage(`data:image/${ext.toLowerCase()};base64,${logoBase64}`, ext, W / 2 - 25, 35, 50, 50);
         }
-      } catch {
-        doc.setFontSize(48); setC(C.primary); doc.text(orgName, W / 2, 100, { align: "center" });
-      }
-    } else {
-      doc.setFontSize(48); setC(C.primary); doc.text(orgName, W / 2, 100, { align: "center" });
+      } catch { /* skip */ }
     }
 
-    setF(C.primary); doc.rect(W / 2 - 25, 125, 50, 1, "F");
+    const firstName = client.full_name.split(" ")[0];
+    doc.setFontSize(28); setC(C.white);
+    doc.text(`Thank you, ${firstName}.`, W / 2, 110, { align: "center" });
 
-    doc.setFontSize(18); setC(C.white); doc.text("Thank you", W / 2, 148, { align: "center" });
+    doc.setFontSize(11); setC(C.white);
+    const closingText = `This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We're looking forward to building on this next month.`;
+    const closingLines = doc.splitTextToSize(closingText, CW * 0.7);
+    let closingY = 130;
+    for (const line of closingLines) {
+      doc.text(line, W / 2, closingY, { align: "center" });
+      closingY += 6;
+    }
 
-    doc.setFontSize(11); setC(C.grey);
-    doc.text("For questions about this report, please contact", W / 2, 170, { align: "center" });
-    doc.text(`your ${orgName} account manager.`, W / 2, 178, { align: "center" });
+    closingY += 15;
+    doc.setFontSize(10); setC(C.white);
+    doc.text(`Prepared by ${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, closingY, { align: "center" });
 
     if (org?.slug) {
-      doc.setFontSize(10); setC(C.primary); doc.text(org.slug, W / 2, 200, { align: "center" });
+      doc.text(org.slug, W / 2, closingY + 8, { align: "center" });
     }
+
+    // Footer
+    doc.setFontSize(7); setC(C.white);
+    doc.text(`${orgName} | Confidential`, W / 2, H - 8, { align: "center" });
 
     // ───────── UPLOAD & SAVE ─────────
     const pdfBuffer = doc.output("arraybuffer");
@@ -676,8 +1083,8 @@ Deno.serve(async (req) => {
       status: "success" as const,
       pdf_storage_path: storagePath,
       ai_executive_summary: aiSummary,
-      ai_insights: aiInsights,
-      ai_upsell_recommendations: aiUpsell || null,
+      ai_insights: JSON.stringify(aiPlatformInsights),
+      ai_upsell_recommendations: upsellData ? upsellData.body_content : null,
       generated_at: new Date().toISOString(),
     };
 
