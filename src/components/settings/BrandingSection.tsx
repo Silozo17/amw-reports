@@ -150,6 +150,16 @@ const BrandingSection = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
+  const [extractedResult, setExtractedResult] = useState<{
+    primary_color: string | null;
+    secondary_color: string | null;
+    accent_color: string | null;
+    heading_font: string | null;
+    body_font: string | null;
+    logo_url: string | null;
+    org_name: string | null;
+  } | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
   useEffect(() => {
     if (org) {
