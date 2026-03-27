@@ -72,7 +72,7 @@ const AdminActivityLog = () => {
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 100);
 
   return (
-    <AdminLayout>
+    <div className="space-y-6">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-display">Activity Log</h1>
@@ -128,7 +128,7 @@ const AdminActivityLog = () => {
           </CardContent>
         </Card>
       </div>
-    </AdminLayout>
+    </div>
   );
 };
 
