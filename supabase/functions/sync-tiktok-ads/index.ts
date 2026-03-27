@@ -79,17 +79,24 @@ Deno.serve(async (req) => {
     // ── Fetch videos for the period ──
     const allVideos = await fetchVideosForPeriod(accessToken, month, year);
 
-    // ── Map videos to enriched format (no insights scope available yet) ──
+    // ── Fetch video insights (avg_time_watched) in batches ──
+    const insightsMap = await fetchVideoInsights(accessToken, allVideos.map(v => v.id));
+
+    // ── Map videos to enriched format ──
     const enrichedVideos: EnrichedVideo[] = allVideos.map((v) => {
       const views = Number(v.view_count || 0);
       const likes = Number(v.like_count || 0);
       const comments = Number(v.comment_count || 0);
       const shares = Number(v.share_count || 0);
+      const duration = v.duration || 0;
+      const insight = insightsMap.get(v.id);
+      const avgTimeWatched = insight?.avg_time_watched ?? 0;
+      const completionRate = duration > 0 && avgTimeWatched > 0 ? (avgTimeWatched / duration) * 100 : 0;
       return {
         id: v.id,
         title: v.title || v.video_description?.substring(0, 80) || "Untitled",
         description: v.video_description || "",
-        duration: v.duration || 0,
+        duration,
         cover_image_url: v.cover_image_url || "",
         permalink_url: v.share_url || "",
         views,
@@ -99,8 +106,8 @@ Deno.serve(async (req) => {
         shares,
         total_engagement: likes + comments + shares,
         create_time: v.create_time,
-        avg_time_watched: 0,
-        completion_rate: 0,
+        avg_time_watched: avgTimeWatched,
+        completion_rate: completionRate,
       };
     });
 
@@ -265,6 +272,42 @@ interface EnrichedVideo {
   create_time: number;
   avg_time_watched: number;
   completion_rate: number;
+}
+
+interface VideoInsight {
+  avg_time_watched: number;
+}
+
+async function fetchVideoInsights(accessToken: string, videoIds: string[]): Promise<Map<string, VideoInsight>> {
+  const result = new Map<string, VideoInsight>();
+  if (videoIds.length === 0) return result;
+
+  try {
+    // Batch in groups of 20
+    for (let i = 0; i < videoIds.length; i += 20) {
+      const batch = videoIds.slice(i, i + 20);
+      const res = await fetch(
+        "https://open.tiktokapis.com/v2/video/query/?fields=id,duration,avg_time_watched",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ filters: { video_ids: batch } }),
+        }
+      );
+      const data = await res.json();
+      const videos = data.data?.videos || [];
+      for (const v of videos) {
+        if (v.id) {
+          result.set(v.id, { avg_time_watched: Number(v.avg_time_watched || 0) });
+        }
+      }
+    }
+    console.log(`Fetched insights for ${result.size}/${videoIds.length} videos`);
+  } catch (e) {
+    console.warn("Could not fetch TikTok video insights (scope may not be granted):", e);
+  }
+
+  return result;
 }
 
 async function fetchVideosForPeriod(accessToken: string, month: number, year: number): Promise<RawVideo[]> {
