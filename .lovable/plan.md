@@ -1,73 +1,111 @@
 
 
-# Sidebar Navigation Restructure + Password UX Improvements
+# Add Platform Screenshots Across the Entire Marketing Website
 
-## Changes
+## Overview
 
-### 1. Restructure AppSidebar Navigation
+Copy 10 uploaded screenshots into `src/assets/screenshots/` and place them strategically across all public marketing pages to showcase the platform. The Facebook screenshot gets a CSS gradient fade at the bottom. All images get descriptive alt tags. Images are imported as ES modules for proper bundling.
 
-**Current**: Settings, Logs, Debug, Platform Admin are in the user avatar dropdown menu.
-**New**: 
-- **Settings** becomes a direct nav item in the sidebar (after Connections)
-- **Platform Admin** becomes a collapsible section (only visible to platform admins) with a chevron arrow that expands to show sub-items:
-  - Overview → `/admin`
-  - Organisations → `/admin/organisations`
-  - Users → `/admin/users`
-  - Activity Log → `/admin/activity`
-  - Debug → `/debug`
-  - Logs → `/logs`
-- The dropdown menu keeps only **Sign Out**
+## Image Inventory
 
-**Implementation in `src/components/layout/AppSidebar.tsx`**:
-- Add `Settings` to `NAV_ITEMS` array with `/settings` route and `Settings` icon
-- Add a collapsible `Platform Admin` section using `Collapsible` from radix (already available at `@/components/ui/collapsible`)
-- The collapsible trigger shows `Shield` icon + "Platform Admin" + `ChevronDown`/`ChevronRight` arrow
-- Sub-items render as indented nav links with smaller text
-- Only rendered when `isPlatformAdmin` is true
-- Auto-expand when current route starts with `/admin`, `/debug`, or `/logs`
-- Remove Settings, Logs, Debug, Platform Admin from the dropdown menu — keep only Sign Out
+| File | Asset name | Strategic use |
+|---|---|---|
+| `Dashboard_Snapshot.webp` | `dashboardSnapshot` | HomePage hero area, FeaturesPage, ForAgenciesPage |
+| `Performance_Overview.webp` | `perfOverview` | HomePage (features section), FeaturesPage |
+| `facebook.webp` | `facebookPlatform` | SocialMediaReportingPage, ForCreatorsPage |
+| `instagram.webp` | `instagramPlatform` | SocialMediaReportingPage, ForCreatorsPage, ForFreelancersPage |
+| `Google_ads.webp` | `googleAdsPlatform` | PpcReportingPage, ForAgenciesPage |
+| `Meta_ads.webp` | `metaAdsPlatform` | PpcReportingPage |
+| `G4A.webp` | `gaPlatform` | SeoReportingPage, ForSmbsPage |
+| `gsc.webp` | `gscPlatform` | SeoReportingPage |
+| `tiktok.webp` | `tiktokPlatform` | SocialMediaReportingPage |
+| `YouTube.webp` | `youtubePlatform` | SocialMediaReportingPage, ForCreatorsPage |
 
-### 2. Remove AdminLayout from Admin Pages
+## Facebook Gradient Fade
 
-Since admin pages now live inside the main AppLayout sidebar, the separate `AdminLayout` with its own sidebar is no longer needed.
+Wrap the Facebook image in a container with a CSS pseudo-element or a div overlay gradient from transparent to background colour at the bottom ~20% of the image, since the screenshot was cut off.
 
-**Files to update**:
-- `src/pages/admin/AdminDashboard.tsx` — replace `AdminLayout` with `AppLayout`
-- `src/pages/admin/AdminOrgList.tsx` — replace `AdminLayout` with `AppLayout`
-- `src/pages/admin/AdminOrgDetail.tsx` — replace `AdminLayout` with `AppLayout` (check import)
-- `src/pages/admin/AdminUserList.tsx` — replace `AdminLayout` with `AppLayout`
-- `src/pages/admin/AdminActivityLog.tsx` — replace `AdminLayout` with `AppLayout`
+```css
+.screenshot-fade-bottom {
+  position: relative;
+}
+.screenshot-fade-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 25%;
+  background: linear-gradient(to bottom, transparent, hsl(var(--background)));
+}
+```
 
-### 3. Login Page — Password Eye Toggle
+## Strategic Placement Per Page
 
-Add a show/hide password button (Eye/EyeOff icon) to the password field on the Login page, same pattern as AccountSection.
+### 1. HomePage (`src/pages/HomePage.tsx`)
+- **Hero section**: Replace mascot on desktop with `dashboardSnapshot` — full-width showcase of the actual product (much more impactful than a mascot illustration)
+- **"How it Works" section**: Add `perfOverview` below the 3 steps to show what the output looks like
 
-**File**: `src/pages/Login.tsx`
-- Add `showPassword` state
-- Wrap password Input in a relative div
-- Add eye toggle button positioned absolutely on the right
-- Change `type` to `showPassword ? 'text' : 'password'`
+### 2. FeaturesPage (`src/pages/FeaturesPage.tsx`)
+- **Hero section**: Add `dashboardSnapshot` below the hero text as a large centred showcase
+- **Reporting Features section**: Add `perfOverview` alongside the reporting features cards
 
-### 4. Password Strength Indicator (AccountSection)
+### 3. SocialMediaReportingPage (`src/pages/SocialMediaReportingPage.tsx`)
+- **Hero section**: Add `instagramPlatform` below hero CTA
+- **Platform cards section**: Add `facebookPlatform` (with fade), `tiktokPlatform`, `youtubePlatform` interspersed between or after the platform cards
 
-Add a visual password strength meter below the "New Password" field in the change password section.
+### 4. SeoReportingPage (`src/pages/SeoReportingPage.tsx`)
+- **Hero section**: Add `gscPlatform` below hero CTA
+- **Platform section**: Add `gaPlatform` alongside the platform detail cards
 
-**File**: `src/components/settings/AccountSection.tsx`
-- Add a `getPasswordStrength` function that evaluates: length ≥ 8, uppercase, lowercase, number, special char
-- Returns a score 0–4 with label (Weak / Fair / Good / Strong)
-- Render a colored bar (red → orange → yellow → green) + label below the new password field
-- Only shows when `newPassword` is not empty
+### 5. PpcReportingPage (`src/pages/PpcReportingPage.tsx`)
+- **Hero section**: Add `googleAdsPlatform` below hero CTA
+- **Platform section**: Add `metaAdsPlatform` alongside ad platform cards
+
+### 6. WhiteLabelReportsPage (`src/pages/WhiteLabelReportsPage.tsx`)
+- **"How it works" section**: Add `dashboardSnapshot` to show the branding in context
+
+### 7. ForAgenciesPage (`src/pages/ForAgenciesPage.tsx`)
+- **Hero or solution section**: Add `dashboardSnapshot` showing multi-platform overview
+- **Features section**: Add `googleAdsPlatform` to show per-platform depth
+
+### 8. ForFreelancersPage (`src/pages/ForFreelancersPage.tsx`)
+- **Hero section**: Add `instagramPlatform` to show what a freelancer's client sees
+
+### 9. ForSmbsPage (`src/pages/ForSmbsPage.tsx`)
+- **Features section**: Add `gaPlatform` to show simple analytics view
+
+### 10. ForCreatorsPage (`src/pages/ForCreatorsPage.tsx`)
+- **Hero section**: Add `youtubePlatform` to show creator-relevant metrics
+- **Metrics section**: Add `instagramPlatform`
+
+## Image Styling
+
+All screenshots will be styled consistently:
+- `rounded-xl border border-sidebar-border/30 shadow-2xl` for card-like appearance
+- Max-width constrained to `max-w-5xl` for larger showcases, `max-w-3xl` for inline
+- On dark backgrounds, they'll pop naturally since they have transparent backgrounds — add `bg-background/50 backdrop-blur-sm` to give them a subtle backing
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `src/components/layout/AppSidebar.tsx` | Add Settings nav item, add collapsible Platform Admin with 6 sub-items, simplify dropdown to Sign Out only |
-| `src/pages/admin/AdminDashboard.tsx` | Replace `AdminLayout` → `AppLayout` |
-| `src/pages/admin/AdminOrgList.tsx` | Replace `AdminLayout` → `AppLayout` |
-| `src/pages/admin/AdminOrgDetail.tsx` | Replace `AdminLayout` → `AppLayout` |
-| `src/pages/admin/AdminUserList.tsx` | Replace `AdminLayout` → `AppLayout` |
-| `src/pages/admin/AdminActivityLog.tsx` | Replace `AdminLayout` → `AppLayout` |
-| `src/pages/Login.tsx` | Add password show/hide eye toggle |
-| `src/components/settings/AccountSection.tsx` | Add password strength indicator bar |
+| `src/assets/screenshots/` | Copy all 10 `.webp` files |
+| `src/index.css` | Add `.screenshot-fade-bottom` utility class |
+| `src/pages/HomePage.tsx` | Replace mascot with dashboard screenshot, add perfOverview |
+| `src/pages/FeaturesPage.tsx` | Add dashboard + perfOverview screenshots |
+| `src/pages/SocialMediaReportingPage.tsx` | Add instagram, facebook (faded), tiktok, youtube |
+| `src/pages/SeoReportingPage.tsx` | Add gsc + ga screenshots |
+| `src/pages/PpcReportingPage.tsx` | Add google ads + meta ads screenshots |
+| `src/pages/WhiteLabelReportsPage.tsx` | Add dashboard screenshot |
+| `src/pages/ForAgenciesPage.tsx` | Add dashboard + google ads screenshots |
+| `src/pages/ForFreelancersPage.tsx` | Add instagram screenshot |
+| `src/pages/ForSmbsPage.tsx` | Add ga screenshot |
+| `src/pages/ForCreatorsPage.tsx` | Add youtube + instagram screenshots |
+
+## Implementation Batches
+
+1. **Batch 1**: Copy all images, add CSS utility, update HomePage + FeaturesPage + ForAgenciesPage
+2. **Batch 2**: Update all reporting pages (Social, SEO, PPC, White-Label)
+3. **Batch 3**: Update audience pages (Freelancers, SMBs, Creators)
 
