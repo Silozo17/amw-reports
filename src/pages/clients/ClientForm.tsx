@@ -72,10 +72,10 @@ const ClientForm = () => {
       if (data?.error) { toast.error(data.error); return; }
       setSearchResults(data.results || []);
       setSearchOpen(true);
-      if ((data.results || []).length === 0) toast.info('No results found');
+      if ((data.results || []).length === 0) toast.info('No Google listing found — no problem, just fill in the details manually');
     } catch (e) {
       console.error('Google search error:', e);
-      toast.error('Failed to search Google');
+      toast.error('Google lookup unavailable — enter details manually below');
     } finally {
       setIsSearching(false);
     }
@@ -228,7 +228,7 @@ const ClientForm = () => {
                   <Input value={form.company_name} onChange={e => handleChange('company_name', e.target.value)} required className="flex-1" />
                   <Popover open={searchOpen} onOpenChange={setSearchOpen}>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" size="icon" onClick={handleGoogleSearch} disabled={isSearching} title="Search Google for business details">
+                      <Button type="button" variant="outline" size="icon" onClick={handleGoogleSearch} disabled={isSearching} title="Optional: Auto-fill from Google">
                         {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                       </Button>
                     </PopoverTrigger>
@@ -253,6 +253,7 @@ const ClientForm = () => {
                     </PopoverContent>
                   </Popover>
                 </div>
+                <p className="text-xs text-muted-foreground">Type the name manually, or use the search icon to auto-fill from Google</p>
               </div>
               <div className="space-y-2">
                 <Label>Position</Label>
