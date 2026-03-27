@@ -1,42 +1,27 @@
 
+# Fix: Search Performance Trend Showing for Unrelated Platforms
 
-# Fix Org Assignment + Reorder Pricing Plans
+## Problem
+The GSC (Google Search Console) "Search Performance Trend" card in the Performance Overview section always renders regardless of which platform is selected. Selecting "Facebook" or "Google Ads" still shows the GSC chart.
 
-## Issues
+## Root Cause
+In `ClientDashboard.tsx` line 698, `gscTrendData` is passed unconditionally to `PerformanceOverview` — it's never filtered by the current `selectedPlatform`.
 
-### 1. Org assignment doesn't stick for users
-**Root cause**: Two RLS policy gaps prevent platform admins from completing org assignments:
-- `profiles` table: UPDATE policy only allows `user_id = auth.uid()` — admins can't update another user's `org_id`
-- `org_members` table: The INSERT policy `Users can insert own membership` requires `user_id = auth.uid()`, which blocks pending invites (where `user_id` is NULL) from being inserted by admins. The platform admin `ALL` policy should cover inserts, but the `profiles.update` still fails silently.
+## Fix
+One line change in `src/components/clients/ClientDashboard.tsx`:
 
-**Fix**: Add a new RLS policy on `profiles` allowing platform admins to UPDATE any profile.
-
-### 2. Pricing plans not ordered smallest to biggest
-The `PLANS` array and `COMPARISON_ROWS` already go Creator → Freelance → Agency (correct order). The subscription settings dropdown in the admin panel (screenshot) shows plans out of order — this comes from the DB query order.
-
-## Changes
-
-### DB Migration
-```sql
--- Allow platform admins to update any profile
-CREATE POLICY "Platform admins can update all profiles"
-ON public.profiles FOR UPDATE TO authenticated
-USING (is_platform_admin(auth.uid()))
-WITH CHECK (is_platform_admin(auth.uid()));
+Pass `gscTrendData` only when the platform filter includes GSC:
+```tsx
+gscTrendData={
+  (selectedPlatform === "all" || matchesPlatformFilter(selectedPlatform, "google_search_console"))
+    ? gscTrendData as unknown as Array<Record<string, unknown>>
+    : []
+}
 ```
 
-### `src/pages/admin/AdminOrgDetail.tsx`
-- Sort the subscription plans query results by `base_price` ascending so the dropdown goes Starter → Freelance → Agency
-
-### `src/pages/admin/AdminUserList.tsx`
-- Add error handling for the `org_members` insert and `profiles` update (currently silently fails)
-- Sort orgs dropdown alphabetically for consistency
+This follows the exact same pattern already used for `trendChartData` and `trendPlatforms` filtering.
 
 ## Files
-
 | File | Change |
 |---|---|
-| DB Migration | Add platform admin UPDATE policy on `profiles` |
-| `src/pages/admin/AdminOrgDetail.tsx` | Sort plans by `base_price` ascending in dropdown |
-| `src/pages/admin/AdminUserList.tsx` | Add error checking on org membership insert/profile update |
-
+| `src/components/clients/ClientDashboard.tsx` | Conditionally pass `gscTrendData` based on platform filter |
