@@ -1,74 +1,63 @@
 
 
-# Fix Org Switching — Data Isolation per Selected Org
+# Fix Org Switching: 3 Issues
 
-## Problem
-Two issues prevent org switching from working:
+## Issues Identified
 
-1. **RLS blocks multi-org access**: The `user_org_id()` function returns only the FIRST org a user belongs to. So if a user is in Org A and Org B, and `user_org_id()` returns Org A, all RLS policies block access to Org B's data entirely — even when the user selects Org B in the UI.
+### 1. Dashboard still shows AMW clients after switching to ReDigital
+**Root cause**: The Dashboard (`Index.tsx`) queries don't filter by `orgId`. RLS uses `user_belongs_to_org()` which returns `true` for ALL orgs the user belongs to. So if you're a member of both AMW and ReDigital, RLS allows data from both — and there's no `.eq('org_id', orgId)` filter on the queries.
 
-2. **Pages don't filter by selected org or re-fetch on switch**: Most pages (`ClientList`, `Dashboard`, `Reports`, `Connections`, `Logs`) run their queries once on mount with no `orgId` filter and no dependency on the selected org.
+The previous fix only added `orgId` as a useEffect dependency (to re-fetch), but never added an actual query filter. Since RLS now allows access to multiple orgs, the queries return data from ALL orgs.
 
-## Fix
+**Fix**: Add explicit `.eq('org_id', orgId)` filters to all dashboard queries in `Index.tsx`. Same issue exists for `Reports.tsx`, `Connections.tsx`, and `Logs.tsx` — queries on tables with `org_id` columns need the filter.
 
-### 1. Database: Allow access to ALL orgs a user belongs to
+### 2. White Label tab not showing for ReDigital (Agency plan)
+**Root cause**: `useEntitlements` fetches the subscription for the **current `orgId`** (from `useOrg`), but `useAuth` determines `isOwner` by fetching the **first** `org_members` row (`LIMIT 1`). If the user's first membership is for AMW (where they may be a manager), `isOwner` is `false` even though they're an owner of ReDigital.
 
-Create a new security definer function and update RLS policies on all tenant-scoped tables.
+Additionally, `hasWhitelabel` depends on the subscription of the selected org — if the query isn't returning the right subscription for ReDigital, the tab won't show.
 
-```sql
-CREATE OR REPLACE FUNCTION public.user_belongs_to_org(_user_id uuid, _org_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.org_members
-    WHERE user_id = _user_id AND org_id = _org_id
-  )
-$$;
-```
+**Fix**: `useAuth` should get the role for the **currently selected org**, not just `LIMIT 1`. Import `orgId` from a shared source or accept it. Since `useAuth` is a context provider that loads before `useOrg`, we need to either:
+- Have `useAuth`'s `fetchProfile` accept an `orgId` and re-run when org switches, OR
+- Move role determination into `useOrg` (which already knows the selected org's role via `orgRole`)
 
-Update RLS on these tables to replace `org_id = user_org_id(auth.uid())` with `user_belongs_to_org(auth.uid(), org_id)` (and for joined tables, the equivalent):
-- `clients` (SELECT, INSERT, UPDATE, DELETE)
-- `client_share_tokens` (ALL)
-- `email_logs` (ALL, SELECT)
-- `org_members` (SELECT, ALL for owners)
-- `org_subscriptions` (SELECT, INSERT)
-- `organisations` (SELECT, UPDATE)
-- `report_logs` (INSERT, SELECT)
-- `reports` (ALL, SELECT)
-- `sync_logs` (DELETE, INSERT, SELECT)
-- `custom_domains` (SELECT, ALL)
+The simplest fix: `SettingsPage` should use `orgRole` from `useOrg()` instead of `isOwner`/`isManager` from `useAuth()` for org-context-sensitive checks.
 
-Tables using client joins (`client_platform_config`, `client_recipients`, `monthly_snapshots`, `platform_connections`) already resolve through the `clients` table, so fixing `clients` RLS cascades to them.
+### 3. Agency plan with unlimited clients not reflecting
+This is likely working correctly at the DB level but the UI doesn't re-fetch `useEntitlements` when switching orgs. Since `useEntitlements` already uses `orgId` in its query key, this should work — but the dashboard/settings pages may be caching stale data. Need to verify the subscription query returns correct data for ReDigital.
 
-Also update `is_org_owner` to accept an org_id parameter (or create `is_org_owner_of`) since an owner of Org A shouldn't have owner privileges on Org B.
+## Changes
 
-### 2. Client-side: Filter by `orgId` and re-fetch on switch
+### `src/pages/Index.tsx`
+- Add `.eq('org_id', orgId)` to all queries on org-scoped tables: `clients`, `reports`, `sync_logs`, `email_logs`, `platform_connections`
+- Guard the fetch behind `if (!orgId) return`
 
-**Pages to update** (add `orgId` from `useOrg()` as a filter + useEffect dependency):
+### `src/pages/clients/ClientList.tsx`
+- Add `.eq('org_id', orgId!)` to the clients query
 
-| Page | Change |
-|---|---|
-| `src/pages/Index.tsx` (Dashboard) | Add `orgId` dep to stats fetch, no query filter needed (RLS handles it, but re-fetch is needed) |
-| `src/pages/clients/ClientList.tsx` | Import `useOrg`, add `orgId` to useEffect dep array to re-fetch |
-| `src/pages/Reports.tsx` | Import `useOrg`, add `orgId` to useEffect dep array to re-fetch |
-| `src/pages/Connections.tsx` | Import `useOrg`, add `orgId` to useEffect dep array to re-fetch |
-| `src/pages/Logs.tsx` | Import `useOrg`, add `orgId` to useEffect dep array to re-fetch |
+### `src/pages/Reports.tsx`
+- Add `.eq('org_id', orgId!)` to the reports query
 
-Since RLS already filters by org membership, the main fix on the client side is simply **re-fetching when `orgId` changes**. The queries don't necessarily need explicit `.eq('org_id', orgId)` filters (RLS handles it), but adding them is good practice for clarity and performance.
+### `src/pages/Connections.tsx`
+- Add org filtering (connections go through clients, so filter clients by org_id first or join)
 
-### 3. `useOrg` — force page refresh on switch
+### `src/pages/Logs.tsx`
+- Add `.eq('org_id', orgId!)` to sync_logs and report_logs queries
 
-The `switchOrg` function currently calls `fetchOrg(newOrgId)` which updates state. Pages need to react to the `orgId` change. This already works if pages include `orgId` in their useEffect dependency arrays.
+### `src/pages/SettingsPage.tsx`
+- Use `orgRole` from `useOrg()` for `isOwner`/`isManager` checks instead of `useAuth()` (which only returns the role for the first org)
+- This ensures White Label tab shows when the selected org has an Agency plan and the user is an owner of that org
+
+### `src/hooks/useAuth.tsx`
+- No changes needed — `isOwner`/`isManager` from useAuth can remain as a "global" role indicator, but org-specific pages should use `useOrg().orgRole`
 
 ## Files
 
 | File | Change |
 |---|---|
-| DB Migration | Create `user_belongs_to_org` function; update RLS on ~10 tables |
-| `src/pages/Index.tsx` | Add `useOrg` import, `orgId` as useEffect dependency |
-| `src/pages/clients/ClientList.tsx` | Add `useOrg` import, `orgId` as useEffect dependency |
-| `src/pages/Reports.tsx` | Add `useOrg` import, `orgId` as useEffect dependency |
-| `src/pages/Connections.tsx` | Add `useOrg` import, `orgId` as useEffect dependency |
-| `src/pages/Logs.tsx` | Add `useOrg` import, `orgId` as useEffect dependency |
+| `src/pages/Index.tsx` | Add `orgId` filter to all queries, guard with `if (!orgId)` |
+| `src/pages/clients/ClientList.tsx` | Add `.eq('org_id', orgId!)` to clients query |
+| `src/pages/Reports.tsx` | Add `.eq('org_id', orgId!)` to reports query |
+| `src/pages/Connections.tsx` | Add org_id filtering |
+| `src/pages/Logs.tsx` | Add `.eq('org_id', orgId!)` to log queries |
+| `src/pages/SettingsPage.tsx` | Use `useOrg().orgRole` for role checks instead of `useAuth()` |
 
