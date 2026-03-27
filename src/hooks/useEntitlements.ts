@@ -86,8 +86,9 @@ export function useEntitlements(): Entitlements {
     queryFn: async () => {
       const { count, error } = await supabase
         .from('platform_connections')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_connected', true);
+        .select('id, clients!inner(org_id)', { count: 'exact', head: true })
+        .eq('is_connected', true)
+        .eq('clients.org_id', orgId!);
       if (error) return 0;
       return count ?? 0;
     },

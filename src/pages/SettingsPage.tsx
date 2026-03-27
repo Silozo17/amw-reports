@@ -46,7 +46,14 @@ const SettingsPage = () => {
   if (canManageBilling) tabs.push({ value: 'billing', label: 'Billing' });
 
   const defaultTab = tabs[0]?.value ?? 'account';
-  const tabGridClass = `grid-cols-${tabs.length}`;
+  const GRID_COLS: Record<number, string> = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
+    4: 'grid-cols-4',
+    5: 'grid-cols-5',
+  };
+  const tabGridClass = GRID_COLS[tabs.length] ?? 'grid-cols-3';
 
   return (
     <AppLayout>

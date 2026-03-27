@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import BrandingProvider from "@/components/BrandingProvider";
 import { OrgProvider } from "@/hooks/useOrg";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import FeaturesPage from "./pages/FeaturesPage";
@@ -122,7 +123,9 @@ const App = () => (
         <AuthProvider>
           <OrgProvider>
             <BrandingProvider>
-              <AppRoutes />
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
             </BrandingProvider>
           </OrgProvider>
         </AuthProvider>

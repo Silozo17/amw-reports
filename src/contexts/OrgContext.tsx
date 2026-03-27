@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface Organisation {
   id: string;
@@ -45,6 +46,7 @@ const SELECTED_ORG_KEY = 'amw_selected_org_id';
 
 export function OrgProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [org, setOrg] = useState<Organisation | null>(null);
   const [orgRole, setOrgRole] = useState<'owner' | 'manager' | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -177,8 +179,13 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const switchOrg = useCallback((newOrgId: string) => {
     localStorage.setItem(SELECTED_ORG_KEY, newOrgId);
     setIsLoading(true);
-    fetchOrg(newOrgId);
-  }, [fetchOrg]);
+    fetchOrg(newOrgId).then(() => {
+      // Invalidate all org-scoped queries so they refetch with the new orgId
+      queryClient.invalidateQueries({ queryKey: ['org-subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['client-count'] });
+      queryClient.invalidateQueries({ queryKey: ['connection-count'] });
+    });
+  }, [fetchOrg, queryClient]);
 
   useEffect(() => {
     if (!user) {
