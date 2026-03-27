@@ -1084,6 +1084,10 @@ Deno.serve(async (req) => {
     const maxTopPosts = detailLevel === 'summary' ? 0 : detailLevel === 'detailed' ? 10 : 5;
     const showComparisonTable = detailLevel !== 'summary';
 
+    const reportLanguage = (client.report_language as string) ?? 'en';
+    const T = TRANSLATIONS[reportLanguage] ?? TRANSLATIONS['en'];
+    console.log('Report language:', reportLanguage);
+
     if (snapshots.length === 0) {
       return new Response(JSON.stringify({
         error: "No data snapshots found for this period. Please sync platform data before generating a report."
