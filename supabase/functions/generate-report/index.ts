@@ -45,7 +45,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     noteFrom: 'A Note from',
     interested: 'Interested? Reply to this email or call us.',
     readyToGrow: 'READY TO GROW?',
-    thankYou: 'THANK YOU,',
+    thankYou: T.thankYou,
     closingLine: 'This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We look forward to building on this next month.',
     confidential: 'Confidential',
     newThisMonth: 'New',
@@ -1580,7 +1580,7 @@ Deno.serve(async (req) => {
             doc.setTextColor(0, 0, 0);
           } else {
             doc.setFontSize(7.5); setC(C.grey);
-            doc.text("New this month", cardX + 6, y + 24);
+            doc.text(T.newThisMonth, cardX + 6, y + 24);
           }
         }
 
@@ -1786,9 +1786,9 @@ Deno.serve(async (req) => {
     const summaryColWidths = [CW * 0.28, CW * 0.15, CW * 0.57];
     setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
     doc.setFontSize(7); setC(C.white);
-    doc.text("PLATFORM", M + 4, y + 1.5);
-    doc.text("STATUS", M + summaryColWidths[0] + 4, y + 1.5);
-    doc.text("VERDICT", M + summaryColWidths[0] + summaryColWidths[1] + 4, y + 1.5);
+    doc.text(T.platform, M + 4, y + 1.5);
+    doc.text(T.status, M + summaryColWidths[0] + 4, y + 1.5);
+    doc.text(T.verdict, M + summaryColWidths[0] + summaryColWidths[1] + 4, y + 1.5);
     y += 8;
 
     for (let i = 0; i < platformSections.length; i++) {
@@ -1934,7 +1934,7 @@ Deno.serve(async (req) => {
     // "THANK YOU,"
     doc.setFontSize(28); doc.setFont('helvetica', 'bold');
     setC(C.white);
-    doc.text('THANK YOU,', 14, 52);
+    doc.text(T.thankYou, 14, 52);
 
     // Client first name in brand colour
     setC(C.primary);
