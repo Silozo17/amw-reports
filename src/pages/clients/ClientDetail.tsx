@@ -633,6 +633,67 @@ const ClientDetail = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Client Self-Service Access */}
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="font-display text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5" /> Client Access
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Invite your client to log in and manage their own platform connections via magic link.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="client@company.com"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleInviteClient} disabled={isInviting || !inviteEmail.trim()} size="sm">
+                    {isInviting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserPlus className="h-4 w-4 mr-1" />}
+                    Invite
+                  </Button>
+                </div>
+                {clientUsers.length > 0 && (
+                  <div className="space-y-2 border-t pt-3">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Invited Users</p>
+                    {clientUsers.map(cu => (
+                      <div key={cu.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                        <div>
+                          <p className="text-sm font-body">{cu.invited_email}</p>
+                          <p className="text-xs text-muted-foreground">Invited {new Date(cu.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-7 w-7">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Revoke access?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will remove {cu.invited_email}'s ability to log in and manage connections for this client.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRevokeClientUser(cu.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Revoke
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
