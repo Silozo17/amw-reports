@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN scheduled_deletion_at timestamptz DEFAULT NULL;
