@@ -986,6 +986,7 @@ export type Database = {
       }
       is_org_owner: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      user_email: { Args: { _user_id: string }; Returns: string }
       user_org_id: { Args: { _user_id: string }; Returns: string }
       validate_share_token: {
         Args: { _token: string }
