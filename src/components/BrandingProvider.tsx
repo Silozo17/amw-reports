@@ -74,28 +74,26 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     // ── Button colours ──
-    const buttonColor = (org as Record<string, unknown>).button_color as string | null ?? org.primary_color;
+    const buttonColor = org.button_color ?? org.primary_color;
     if (buttonColor) {
       root.style.setProperty('--button-primary', buttonColor);
       root.style.setProperty('--button-primary-foreground',
-        ((org as Record<string, unknown>).button_text_color as string | null) ?? computeForeground(buttonColor));
+        org.button_text_color ?? computeForeground(buttonColor));
     }
 
     // ── Text colours ──
-    const textOnDark = (org as Record<string, unknown>).text_on_dark as string | null;
-    if (textOnDark) {
-      root.style.setProperty('--text-on-primary', textOnDark);
+    if (org.text_on_dark) {
+      root.style.setProperty('--text-on-primary', org.text_on_dark);
     }
-    const textOnLight = (org as Record<string, unknown>).text_on_light as string | null;
-    if (textOnLight) {
-      root.style.setProperty('--text-body', textOnLight);
+    if (org.text_on_light) {
+      root.style.setProperty('--text-body', org.text_on_light);
     }
 
     // ── Chart colours ──
-    const c1 = ((org as Record<string, unknown>).chart_color_1 as string | null) ?? org.primary_color;
-    const c2 = ((org as Record<string, unknown>).chart_color_2 as string | null) ?? org.secondary_color;
-    const c3 = ((org as Record<string, unknown>).chart_color_3 as string | null) ?? org.accent_color;
-    const c4 = (org as Record<string, unknown>).chart_color_4 as string | null;
+    const c1 = org.chart_color_1 ?? org.primary_color;
+    const c2 = org.chart_color_2 ?? org.secondary_color;
+    const c3 = org.chart_color_3 ?? org.accent_color;
+    const c4 = org.chart_color_4;
     if (c1) root.style.setProperty('--chart-1', c1);
     if (c2) root.style.setProperty('--chart-2', c2);
     if (c3) root.style.setProperty('--chart-3', c3);
