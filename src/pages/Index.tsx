@@ -367,6 +367,43 @@ const Dashboard = () => {
           </Card>
         )}
 
+        {/* Pending Deletion */}
+        {pendingDeletion.length > 0 && (
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold font-body flex items-center gap-2">
+                <Trash2 className="h-4 w-4 text-destructive" />
+                Pending Deletion ({pendingDeletion.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {pendingDeletion.map(client => (
+                <div
+                  key={client.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-background/80 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => navigate(`/clients/${client.id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center text-xs font-bold font-body text-destructive">
+                      {client.company_name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium font-body">{client.company_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Deleting in {formatCountdown(client.scheduled_deletion_at)} — click to cancel
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="destructive" className="text-xs gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatCountdown(client.scheduled_deletion_at)}
+                  </Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Client Overview */}
           <Card>
