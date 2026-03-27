@@ -12,8 +12,9 @@ interface UpgradePromptProps {
 
 const UpgradePrompt = ({ open, onOpenChange, type, current, max }: UpgradePromptProps) => {
   const isUnlimited = !isFinite(max);
-  const price = type === 'client' ? '£9.99' : '£4.99';
+  const price = type === 'client' ? '£9.99' : '£9.99';
   const noun = type === 'client' ? 'clients' : 'connections';
+  const unit = type === 'client' ? 'each' : 'per 5 pack';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -26,7 +27,7 @@ const UpgradePrompt = ({ open, onOpenChange, type, current, max }: UpgradePrompt
         </DialogHeader>
         <div className="space-y-3 pt-2">
           <p className="text-sm text-muted-foreground">
-            To add more {noun}, upgrade your plan or add individual {noun} at {price}/month each.
+            To add more {noun}, upgrade your plan or add {type === 'connection' ? 'packs of 5' : 'individual'} {noun} at {price}/month {unit}.
           </p>
           <div className="flex gap-2">
             <Button className="flex-1 gap-2" onClick={() => {
