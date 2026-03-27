@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -28,9 +28,22 @@ export interface OrgMembership {
   created_at: string;
 }
 
+interface OrgContextValue {
+  org: Organisation | null;
+  orgId: string | null;
+  orgRole: 'owner' | 'manager' | null;
+  isOrgOwner: boolean;
+  isLoading: boolean;
+  refetchOrg: (overrideOrgId?: string) => Promise<void>;
+  allMemberships: { org_id: string; role: string; org_name: string; org_logo: string | null }[];
+  switchOrg: (newOrgId: string) => void;
+}
+
+const OrgContext = createContext<OrgContextValue | null>(null);
+
 const SELECTED_ORG_KEY = 'amw_selected_org_id';
 
-export function useOrg() {
+export function OrgProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [org, setOrg] = useState<Organisation | null>(null);
   const [orgRole, setOrgRole] = useState<'owner' | 'manager' | null>(null);
@@ -42,7 +55,6 @@ export function useOrg() {
     if (!user) return;
 
     try {
-      // Fetch ALL memberships for this user
       const { data: memberships, error: membershipsError } = await supabase
         .from('org_members')
         .select('org_id, role')
@@ -50,9 +62,7 @@ export function useOrg() {
 
       let activeMemberships = memberships ?? [];
 
-      // Recovery: if no memberships exist, try to link to profile.org_id or create new org
       if (membershipsError || activeMemberships.length === 0) {
-        // Check if profile has an org_id already set
         const { data: profile } = await supabase
           .from('profiles')
           .select('org_id')
@@ -60,7 +70,6 @@ export function useOrg() {
           .single();
 
         if (profile?.org_id) {
-          // Link user to existing org as manager
           await supabase.from('org_members').insert({
             org_id: profile.org_id,
             user_id: user.id,
@@ -68,9 +77,7 @@ export function useOrg() {
             accepted_at: new Date().toISOString(),
           });
           activeMemberships = [{ org_id: profile.org_id, role: 'manager' }];
-          console.log('Recovered: linked user to existing org from profile', profile.org_id);
         } else {
-          // No profile org_id — create a brand new org
           const orgName =
             user.user_metadata?.company_name ||
             user.user_metadata?.full_name ||
@@ -104,7 +111,6 @@ export function useOrg() {
             .update({ org_id: newOrg.id })
             .eq('user_id', user.id);
 
-          // Assign starter plan
           const { data: starterPlan } = await supabase
             .from('subscription_plans')
             .select('id')
@@ -120,11 +126,9 @@ export function useOrg() {
           }
 
           activeMemberships = [{ org_id: newOrg.id, role: 'owner' }];
-          console.log('Recovered: created new org for user', user.id);
         }
       }
 
-      // Fetch org details for all memberships
       const orgIds = activeMemberships.map(m => m.org_id);
       const { data: orgsData } = await supabase
         .from('organisations')
@@ -142,7 +146,6 @@ export function useOrg() {
       });
       setAllMemberships(membershipList);
 
-      // Determine which org to select
       const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
       const targetOrgId =
         overrideOrgId ??
@@ -154,7 +157,6 @@ export function useOrg() {
       setOrgRole(selectedMembership.role as 'owner' | 'manager');
       localStorage.setItem(SELECTED_ORG_KEY, selectedMembership.org_id);
 
-      // Fetch full org data for the selected org
       const { data: orgData, error: orgError } = await supabase
         .from('organisations')
         .select('*')
@@ -191,7 +193,7 @@ export function useOrg() {
     fetchOrg();
   }, [user, fetchOrg]);
 
-  return {
+  const value: OrgContextValue = {
     org,
     orgId,
     orgRole,
@@ -201,4 +203,14 @@ export function useOrg() {
     allMemberships,
     switchOrg,
   };
+
+  return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;
+}
+
+export function useOrg() {
+  const ctx = useContext(OrgContext);
+  if (!ctx) {
+    throw new Error('useOrg must be used within an OrgProvider');
+  }
+  return ctx;
 }
