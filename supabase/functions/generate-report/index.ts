@@ -387,6 +387,53 @@ Data: ${platformContext}`,
       aiSummary = `This report covers ${client.company_name}'s marketing performance for ${MONTH_NAMES[report_month]} ${report_year}.`;
     }
 
+    // Static label translations for non-English reports
+    const defaultLabels = {
+      performanceReport: "Performance Report",
+      preparedFor: "Prepared for",
+      preparedBy: "Prepared by",
+      date: "Date",
+      tableOfContents: "Table of Contents",
+      thisMonth: "This Month",
+      lastMonth: "Last Month",
+      change: "Change",
+      monthlySummary: "Monthly Summary",
+      keyWins: "Key wins this month",
+      watchList: "Worth keeping an eye on",
+      thankYou: "Thank you",
+      noComparisonNote: "No previous month data available for comparison — this is your first month tracked.",
+      whatThisMeans: "What this means for you",
+      topPosts: "Top Posts",
+      aNoteFrom: "A Note from",
+      interestedCTA: "Interested? Reply to this email or call us.",
+    };
+    let labels = { ...defaultLabels };
+
+    if (isNonEnglish && lovableApiKey) {
+      try {
+        const aiCall = async (prompt: string, maxTokens: number): Promise<string> => {
+          const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${lovableApiKey}` },
+            body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens }),
+          });
+          if (!res.ok) return "";
+          const json = await res.json();
+          return json.choices?.[0]?.message?.content ?? "";
+        };
+        const translationResult = await aiCall(
+          `Translate these UI labels to ${reportLanguage}. Return ONLY a valid JSON object with the same keys. No markdown, no explanation.
+${JSON.stringify(defaultLabels)}`,
+          500
+        );
+        const cleaned = translationResult.replace(/```json\s*/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        labels = { ...defaultLabels, ...parsed };
+      } catch (e) {
+        console.error("Label translation failed, using English:", e);
+      }
+    }
+
     // ───────── GENERATE PDF — LANDSCAPE A4 ─────────
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
