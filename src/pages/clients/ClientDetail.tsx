@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Mail, Phone, Globe, Building2, MapPin, FileText, Loader2, BarChart3, CalendarIcon, Trash2, Share2, Clock, XCircle, AlertTriangle } from 'lucide-react';
 import DeleteClientDialog from '@/components/clients/DeleteClientDialog';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
@@ -37,6 +38,8 @@ const ClientDetail = () => {
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [countdown, setCountdown] = useState('');
 
   // Account picker state
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
@@ -154,17 +157,56 @@ const ClientDetail = () => {
     setPickerOpen(true);
   };
 
-  const handleDeleteClient = async () => {
+  const scheduledAt = client?.scheduled_deletion_at ? new Date(client.scheduled_deletion_at) : null;
+  const isDeletionPending = scheduledAt && scheduledAt > new Date();
+
+  // Countdown timer
+  useEffect(() => {
+    if (!isDeletionPending || !scheduledAt) return;
+    const update = () => {
+      const diff = scheduledAt.getTime() - Date.now();
+      if (diff <= 0) { setCountdown('Deleting…'); return; }
+      const h = Math.floor(diff / 3_600_000);
+      const m = Math.floor((diff % 3_600_000) / 60_000);
+      setCountdown(`${h}h ${m}m`);
+    };
+    update();
+    const iv = setInterval(update, 60_000);
+    return () => clearInterval(iv);
+  }, [isDeletionPending, scheduledAt]);
+
+  const handleScheduleDeletion = async () => {
     if (!client) return;
     setIsDeleting(true);
-    const { error } = await supabase.from('clients').delete().eq('id', client.id);
+    const deletionTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase
+      .from('clients')
+      .update({ scheduled_deletion_at: deletionTime } as any)
+      .eq('id', client.id);
     if (error) {
-      toast.error('Failed to delete client');
-      setIsDeleting(false);
+      toast.error('Failed to schedule deletion');
     } else {
-      toast.success('Client deleted');
-      navigate('/clients');
+      toast.success('Client scheduled for deletion in 24 hours');
+      setClient(prev => prev ? { ...prev, scheduled_deletion_at: deletionTime } as any : null);
     }
+    setIsDeleting(false);
+    setDeleteDialogOpen(false);
+  };
+
+  const handleCancelDeletion = async () => {
+    if (!client) return;
+    setIsDeleting(true);
+    const { error } = await supabase
+      .from('clients')
+      .update({ scheduled_deletion_at: null } as any)
+      .eq('id', client.id);
+    if (error) {
+      toast.error('Failed to cancel deletion');
+    } else {
+      toast.success('Deletion cancelled');
+      setClient(prev => prev ? { ...prev, scheduled_deletion_at: null } as any : null);
+    }
+    setIsDeleting(false);
   };
 
   // Auto-sync historical data after picker completes
