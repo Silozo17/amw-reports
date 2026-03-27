@@ -12,7 +12,7 @@ const PLANS = [
     cta: 'Get Started Free',
     href: '/login?view=signup',
     highlight: false,
-    features: ['1 client', '5 platform connections', 'Branded PDF reports', 'Client portal', 'Monthly sync'],
+    features: ['1 client', '5 platform connections', 'Branded PDF reports', 'Client portal', 'Monthly sync (4th of each month)'],
   },
   {
     name: 'Freelance',
@@ -22,7 +22,7 @@ const PLANS = [
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: false,
-    features: ['5 clients included', '25 platform connections', 'Branded PDF reports', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
+    features: ['5 clients included', '25 platform connections', 'Daily data sync', 'Branded PDF reports', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
   },
   {
     name: 'Agency',
@@ -32,7 +32,7 @@ const PLANS = [
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: true,
-    features: ['5 clients included', '25 platform connections', 'Full white-label branding', 'Custom domain support', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
+    features: ['5 clients included', '25 platform connections', 'Daily data sync', 'Full white-label branding', 'Custom domain support', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
   },
 ];
 
@@ -46,6 +46,7 @@ const COMPARISON_ROWS = [
   { feature: 'Custom Domain', starter: false, freelance: false, agency: true },
   { feature: 'Additional Clients', starter: false, freelance: '£9.99/mo each', agency: '£9.99/mo each' },
   { feature: 'Additional Connections', starter: false, freelance: '£4.99/mo each', agency: '£4.99/mo each' },
+  { feature: 'Data Sync Frequency', starter: 'Monthly', freelance: 'Daily', agency: 'Daily' },
 ];
 
 const FAQS = [
@@ -56,6 +57,7 @@ const FAQS = [
   { q: 'Is there a contract or commitment?', a: 'No contracts. All plans are month-to-month and you can cancel at any time.' },
   { q: 'What platforms are supported?', a: 'We currently support Google Ads, Meta Ads, Google Analytics, Google Search Console, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, Pinterest, and Google Business Profile.' },
   { q: 'Do my clients need an account?', a: 'No. Clients can access their dashboard via a unique shareable link — no login required for them.' },
+  { q: 'How often is my data synced?', a: 'Creator plans sync data once per month on the 4th. Freelance and Agency plans benefit from daily automatic syncing to keep your dashboards up to date.' },
 ];
 
 const CellValue = ({ value }: { value: boolean | string }) => {
