@@ -45,7 +45,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     noteFrom: 'A Note from',
     interested: 'Interested? Reply to this email or call us.',
     readyToGrow: 'READY TO GROW?',
-    thankYou: T.thankYou,
+    thankYou: 'THANK YOU,',
     closingLine: 'This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We look forward to building on this next month.',
     confidential: 'Confidential',
     newThisMonth: 'New',
