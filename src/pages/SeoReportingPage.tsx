@@ -79,7 +79,7 @@ const SeoReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">What's in an SEO Report</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">

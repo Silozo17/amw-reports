@@ -124,7 +124,7 @@ const FeaturesPage = () => {
       </section>
 
       {/* How Reports Work */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">How Report Generation Works</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">

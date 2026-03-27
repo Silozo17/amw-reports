@@ -191,7 +191,7 @@ const HomePage = () => {
       </section>
 
       {/* ── BUILT FOR ── */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">Built for Marketing Professionals</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
@@ -233,7 +233,7 @@ const HomePage = () => {
       </section>
 
       {/* ── METRICS AT A GLANCE ── */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 10 Platforms</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
@@ -282,7 +282,7 @@ const HomePage = () => {
       </section>
 
       {/* ── FOUNDER QUOTE ── */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <Quote className="h-10 w-10 text-primary/40 mx-auto mb-6" aria-hidden="true" />
           <blockquote className="text-xl lg:text-2xl font-body italic leading-relaxed text-amw-offwhite/90 mb-6">

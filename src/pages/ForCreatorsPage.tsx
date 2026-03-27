@@ -80,7 +80,7 @@ const ForCreatorsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">Generate Reports for Brand Deals</h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-8">
@@ -89,7 +89,7 @@ const ForCreatorsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Free Plan for Creators</h2>
           <p className="text-amw-offwhite/60 font-body mb-8">
