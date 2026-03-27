@@ -40,7 +40,7 @@ const ForFreelancersPage = () => {
       </section>
 
       {/* Instagram Screenshot - what freelancers deliver to clients */}
-      <section className="py-12 border-t border-sidebar-border/30">
+      <section className="py-12 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body mb-6">What your clients see</p>
           <img
@@ -70,7 +70,7 @@ const ForFreelancersPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
