@@ -1,53 +1,64 @@
 
 
-# Change Connection Add-On Pricing: Pack of 5 for £9.99
+# Static SEO HTML for All Pages + Fix Flash
 
-## What's Changing
+## Two Problems to Solve
 
-Currently: additional connections cost £4.99/mo **each** (1 connection).
-New: additional connections cost £9.99/mo per **pack of 5**, usable across any clients.
+### 1. Flash of static content on reload
+The current mechanism `#root:not(:empty) ~ #seo-static { display: none }` shows the static HTML until React renders. Users see a brief flash of unstyled/shifted content.
 
-## Changes Required
+**Fix**: Hide `#seo-static` from users entirely using CSS, but keep it visible to crawlers:
+```css
+/* Hidden from visual users immediately — crawlers still read it */
+#seo-static {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+```
+This is the standard "visually hidden" / sr-only technique. Search engine crawlers parse the DOM regardless of CSS visibility, so all content remains indexable. No flash, no layout shift, no user-visible artifact.
 
-### 1. Database — Update `subscription_plans` table
-Use the insert tool to update `additional_connection_price` from 4.99 to 9.99 for both freelance and agency plans.
+Remove the old `#root:not(:empty) ~ #seo-static { display: none }` rule and the inline page-switcher `<script>` (no longer needed since content is always visually hidden).
 
-### 2. `src/hooks/useEntitlements.ts`
-- Remove the old `LOCKED_CONNECTIONS_PER_CLIENT = 3` logic entirely — connections are now fully flexible
-- Change `maxConnections` calculation: each `additional_connections` unit now represents 5 connections, so multiply by 5:
-  ```ts
-  : (plan?.included_connections ?? 5) + ((subscription?.additional_connections ?? 0) * 5);
-  ```
-- Remove `canAddConnectionForClient`, `flexiblePoolRemaining`, and the locked-slot logic — all additional connections are freely assignable
-- Simplify to just `canAddConnection: currentConnections < maxConnections`
+### 2. Add static HTML for all 11 missing public pages
 
-### 3. `src/components/entitlements/UpgradePrompt.tsx`
-- Change connection price from `£4.99` to `£9.99`
-- Update copy: "add packs of 5 connections at £9.99/month" instead of "individual connections at £4.99/month"
+Add `data-seo-page` blocks for each missing page. Each block contains:
+- Semantic navbar with links
+- Full page content (headings, paragraphs, lists, FAQs) matching the React component
+- Footer
+- Proper heading hierarchy (h1 → h2 → h3)
+- Alt tags on images, aria-labels on links
 
-### 4. `src/components/clients/ConnectionDialog.tsx`
-- Replace `canAddConnectionForClient(clientConnectionCount)` with just `canAddConnection` (no per-client locking)
+#### Pages to add:
+| Route | Source component |
+|---|---|
+| `/social-media-reporting` | `SocialMediaReportingPage.tsx` |
+| `/seo-reporting` | `SeoReportingPage.tsx` |
+| `/ppc-reporting` | `PpcReportingPage.tsx` |
+| `/white-label-reports` | `WhiteLabelReportsPage.tsx` |
+| `/for-agencies` | `ForAgenciesPage.tsx` |
+| `/for-freelancers` | `ForFreelancersPage.tsx` |
+| `/for-smbs` | `ForSmbsPage.tsx` |
+| `/for-creators` | `ForCreatorsPage.tsx` |
+| `/integrations` | `IntegrationsPage.tsx` |
+| `/how-it-works` | `HowItWorksPage.tsx` |
+| `/about` | `AboutPage.tsx` |
 
-### 5. `src/pages/PricingPage.tsx`
-- Change "Add-on connections £4.99/mo each" → "Add-on connections £9.99/mo (5 pack)"
-- Update comparison table row: "£4.99/mo each" → "£9.99/mo (5 pack)"
+Each static block will replicate the full text content from its React component using the existing CSS classes (`.ss-section`, `.ss-container`, `.ss-section-title`, `.ss-faq-item`, `.ss-pill`, `.ss-metric-pill`, `.ss-feature-row`, `.ss-plan-card`, etc.).
 
-### 6. `src/components/settings/BillingSection.tsx`
-- No price references to connections here, but the usage display remains the same
-
-### 7. `index.html` — Static SEO HTML
-- Update all 3 occurrences of "£4.99/mo each" → "£9.99/mo (5 pack)" in pricing cards and comparison table
-
-### 8. Other pages referencing connection pricing
-- `src/pages/ForFreelancersPage.tsx`, `src/pages/WhiteLabelReportsPage.tsx` — search and update any "£4.99" connection references
+## Files Modified
 
 | File | Change |
 |---|---|
-| DB: `subscription_plans` | Update `additional_connection_price` to 9.99 |
-| `src/hooks/useEntitlements.ts` | Multiply additional_connections by 5, remove locked-slot logic |
-| `src/components/entitlements/UpgradePrompt.tsx` | £4.99 → £9.99, update copy for 5-pack |
-| `src/components/clients/ConnectionDialog.tsx` | Remove per-client check, use simple `canAddConnection` |
-| `src/pages/PricingPage.tsx` | Update pricing text and comparison table |
-| `index.html` | Update static HTML pricing references |
-| Audience pages | Update any £4.99 connection references |
+| `index.html` | (1) Replace hide rule with visually-hidden CSS, (2) remove page-switcher script, (3) add 11 new `data-seo-page` blocks with full semantic HTML |
+
+## Implementation Batches
+
+Due to the size of `index.html` (will grow significantly), implementation in 2 batches:
+1. **Batch 1**: Fix the flash (CSS change + remove script) + add 6 pages (social-media-reporting, seo-reporting, ppc-reporting, white-label-reports, integrations, how-it-works)
+2. **Batch 2**: Add 5 audience pages (for-agencies, for-freelancers, for-smbs, for-creators, about)
 
