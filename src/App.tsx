@@ -30,6 +30,7 @@ import AdminActivityLog from "./pages/admin/AdminActivityLog";
 import AdminUserList from "./pages/admin/AdminUserList";
 import { usePlatformAdmin } from "./hooks/usePlatformAdmin";
 import ScrollToTop from "./components/ScrollToTop";
+import LoadingScreen from "./components/LoadingScreen";
 
 const queryClient = new QueryClient();
 
@@ -37,14 +38,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-2xl font-display text-primary">AMW</h1>
-          <p className="text-sm text-muted-foreground mt-2">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!user) {
@@ -59,11 +53,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
 
   if (authLoading || adminLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!user || !isPlatformAdmin) {
