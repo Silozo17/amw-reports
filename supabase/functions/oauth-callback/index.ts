@@ -312,17 +312,19 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
 
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Discover ad accounts only
+  // Discover ad accounts only (with pagination)
   const adAccounts: Array<{ id: string; name: string }> = [];
   try {
-    const acctRes = await fetch(
-      `https://graph.facebook.com/v25.0/me/adaccounts?fields=id,name,account_status&access_token=${accessToken}`
-    );
-    const acctData = await acctRes.json();
-    if (acctData.data?.length > 0) {
-      for (const a of acctData.data) {
-        adAccounts.push({ id: a.id, name: a.name || a.id });
+    let nextUrl: string | null = `https://graph.facebook.com/v25.0/me/adaccounts?fields=id,name,account_status&limit=100&access_token=${accessToken}`;
+    while (nextUrl) {
+      const acctRes = await fetch(nextUrl);
+      const acctData = await acctRes.json();
+      if (acctData.data?.length > 0) {
+        for (const a of acctData.data) {
+          adAccounts.push({ id: a.id, name: a.name || a.id });
+        }
       }
+      nextUrl = acctData.paging?.next || null;
     }
   } catch (e) {
     console.warn("Could not discover ad accounts:", e);
@@ -377,18 +379,20 @@ async function handleFacebook(supabase: any, code: string, connectionId: string,
 
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Discover pages with page-level access tokens
+  // Discover pages with page-level access tokens (with pagination)
   const pages: Array<{ id: string; name: string; access_token?: string }> = [];
   try {
-    const pagesRes = await fetch(
-      `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&access_token=${accessToken}`
-    );
-    const pagesData = await pagesRes.json();
-    console.log("Facebook pages discovery:", JSON.stringify(pagesData));
-    if (pagesData.data?.length > 0) {
-      for (const page of pagesData.data) {
-        pages.push({ id: page.id, name: page.name || page.id, access_token: page.access_token });
+    let nextUrl: string | null = `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&limit=100&access_token=${accessToken}`;
+    while (nextUrl) {
+      const pagesRes = await fetch(nextUrl);
+      const pagesData = await pagesRes.json();
+      console.log("Facebook pages discovery:", JSON.stringify(pagesData));
+      if (pagesData.data?.length > 0) {
+        for (const page of pagesData.data) {
+          pages.push({ id: page.id, name: page.name || page.id, access_token: page.access_token });
+        }
       }
+      nextUrl = pagesData.paging?.next || null;
     }
   } catch (e) {
     console.warn("Could not discover pages:", e);
@@ -443,26 +447,28 @@ async function handleInstagram(supabase: any, code: string, connectionId: string
 
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Discover pages with linked Instagram Business accounts
+  // Discover pages with linked Instagram Business accounts (with pagination)
   const igAccounts: Array<{ id: string; username: string; page_id: string; page_name: string; page_token: string }> = [];
   try {
-    const pagesRes = await fetch(
-      `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&access_token=${accessToken}`
-    );
-    const pagesData = await pagesRes.json();
-    console.log("Instagram discovery via pages:", JSON.stringify(pagesData));
-    if (pagesData.data?.length > 0) {
-      for (const page of pagesData.data) {
-        if (page.instagram_business_account) {
-          igAccounts.push({
-            id: page.instagram_business_account.id,
-            username: page.instagram_business_account.username || "",
-            page_id: page.id,
-            page_name: page.name || page.id,
-            page_token: page.access_token,
-          });
+    let nextUrl: string | null = `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&limit=100&access_token=${accessToken}`;
+    while (nextUrl) {
+      const pagesRes = await fetch(nextUrl);
+      const pagesData = await pagesRes.json();
+      console.log("Instagram discovery via pages:", JSON.stringify(pagesData));
+      if (pagesData.data?.length > 0) {
+        for (const page of pagesData.data) {
+          if (page.instagram_business_account) {
+            igAccounts.push({
+              id: page.instagram_business_account.id,
+              username: page.instagram_business_account.username || "",
+              page_id: page.id,
+              page_name: page.name || page.id,
+              page_token: page.access_token,
+            });
+          }
         }
       }
+      nextUrl = pagesData.paging?.next || null;
     }
   } catch (e) {
     console.warn("Could not discover Instagram accounts:", e);
