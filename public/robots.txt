@@ -12,3 +12,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://reports.amwmedia.co.uk/sitemap.xml
