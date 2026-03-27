@@ -201,6 +201,62 @@
 
       /* ---------- Arrow SVG inline ---------- */
       .ss-arrow { width: 1rem; height: 1rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+      /* ---------- Platform grid (Features page) ---------- */
+      .ss-platform-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+      @media(min-width:768px){ .ss-platform-grid { grid-template-columns: repeat(2, 1fr); } }
+      .ss-platform-card { padding: 1.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); }
+      .ss-platform-card h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
+      .ss-platform-card .ss-platform-desc { font-size: 0.875rem; color: var(--muted5); margin-bottom: 1rem; }
+      .ss-metric-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      .ss-metric-pill { padding: 0.25rem 0.625rem; border-radius: 9999px; background: hsl(295 60% 47% / 0.1); color: var(--primary); font-size: 0.75rem; }
+      .ss-feature-row { display: flex; gap: 1rem; padding: 1.25rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); }
+      .ss-feature-icon { width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; background: hsl(295 60% 47% / 0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .ss-feature-icon svg { width: 1.25rem; height: 1.25rem; stroke: var(--primary); fill: none; }
+      .ss-feature-row h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; }
+      .ss-feature-row p { font-size: 0.875rem; color: var(--muted); }
+      .ss-agency-card { padding: 1.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); text-align: center; }
+      .ss-agency-icon { width: 3rem; height: 3rem; border-radius: 50%; background: hsl(295 60% 47% / 0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+      .ss-agency-icon svg { width: 1.5rem; height: 1.5rem; stroke: var(--primary); fill: none; }
+      .ss-agency-card h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; }
+      .ss-agency-card p { font-size: 0.875rem; color: var(--muted); }
+
+      /* ---------- Plan grid (Pricing page) ---------- */
+      .ss-plan-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+      @media(min-width:768px){ .ss-plan-grid { grid-template-columns: repeat(3, 1fr); } }
+      .ss-plan-card { position: relative; padding: 1.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); display: flex; flex-direction: column; }
+      .ss-plan-card--highlight { border-color: var(--primary); background: hsl(295 60% 47% / 0.05); box-shadow: 0 0 0 1px hsl(295 60% 47% / 0.3); }
+      .ss-plan-badge { position: absolute; top: -0.75rem; left: 50%; transform: translateX(-50%); padding: 0.125rem 0.75rem; border-radius: 9999px; background: var(--primary); color: #fff; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+      .ss-plan-card h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
+      .ss-plan-price { font-family: var(--font-heading); font-size: 1.875rem; }
+      .ss-plan-period { font-size: 0.875rem; color: var(--muted5); }
+      .ss-plan-desc { font-size: 0.875rem; color: var(--muted5); margin: 0.5rem 0 1.5rem; }
+      .ss-plan-features { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; flex: 1; }
+      .ss-plan-features li { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; color: var(--muted8); }
+      .ss-plan-features .ss-check-sm { width: 1rem; height: 1rem; flex-shrink: 0; margin-top: 0.125rem; }
+      .ss-plan-features .ss-check-sm svg { width: 100%; height: 100%; stroke: var(--accent); fill: none; }
+
+      /* ---------- Compare table ---------- */
+      .ss-compare-table { width: 100%; text-align: left; border-collapse: collapse; }
+      .ss-compare-table th, .ss-compare-table td { padding: 0.75rem 1rem; font-size: 0.875rem; border-bottom: 1px solid var(--border2); }
+      .ss-compare-table th { font-weight: 600; color: var(--muted8); }
+      .ss-compare-table td { color: var(--muted3); }
+      .ss-compare-table .ss-col-highlight { color: var(--primary); }
+      .ss-text-center { text-align: center; }
+
+      /* ---------- FAQ (Pricing page) ---------- */
+      .ss-faq-item { border: 1px solid var(--card-bg2); border-radius: 0.75rem; overflow: hidden; margin-bottom: 0.75rem; }
+      .ss-faq-item summary { padding: 1rem; font-size: 0.875rem; font-weight: 600; color: var(--muted9); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+      .ss-faq-item summary::-webkit-details-marker { display: none; }
+      .ss-faq-item summary::after { content: '▾'; font-size: 0.75rem; color: var(--muted2); transition: transform 0.2s; }
+      .ss-faq-item[open] summary::after { transform: rotate(180deg); }
+      .ss-faq-item .ss-faq-body { padding: 0 1rem 1rem; font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+
+      /* ---------- Login page ---------- */
+      .ss-login-card { max-width: 28rem; margin: 0 auto; padding: 2.5rem; border-radius: 0.75rem; background: var(--card-bg); border: 1px solid var(--card-bg2); text-align: center; }
+      .ss-login-card h1 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 0.75rem; }
+      .ss-login-card p { font-size: 0.875rem; color: var(--muted); margin-bottom: 1.5rem; }
+      .ss-login-links { display: flex; flex-direction: column; gap: 0.75rem; }
     </style>
   </head>
 
