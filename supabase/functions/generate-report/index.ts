@@ -530,7 +530,7 @@ ${JSON.stringify(defaultLabels)}`,
     // Left panel text
     setC(C.white);
     doc.setFontSize(11);
-    doc.text(`Prepared by`, 20, 100);
+    doc.text(labels.preparedBy, 20, 100);
     doc.setFontSize(16);
     doc.text(orgName, 20, 112);
 
@@ -539,7 +539,7 @@ ${JSON.stringify(defaultLabels)}`,
 
     // Right panel - report title
     doc.setFontSize(14); setC(C.grey);
-    doc.text("Performance Report", 110, 50);
+    doc.text(labels.performanceReport, 110, 50);
 
     doc.setFontSize(36); setC(C.black);
     const companyLines = doc.splitTextToSize(client.company_name, 170);
@@ -551,7 +551,7 @@ ${JSON.stringify(defaultLabels)}`,
 
     coverY += 5;
     doc.setFontSize(13); setC(C.grey);
-    doc.text(`Prepared for: ${client.full_name}`, 110, coverY);
+    doc.text(`${labels.preparedFor}: ${client.full_name}`, 110, coverY);
 
     // 3 headline KPIs at bottom right
     const allMetrics: Record<string, number> = {};
@@ -604,7 +604,7 @@ ${JSON.stringify(defaultLabels)}`,
     let y = startNewPage();
     const tocPageNum = pageCount;
     doc.setFontSize(22); setC(C.black);
-    doc.text("Table of Contents", M, y); y += 14;
+    doc.text(labels.tableOfContents, M, y); y += 14;
 
     setF(C.primary); doc.rect(M, y - 5, 50, 1.5, "F"); y += 8;
 
@@ -640,14 +640,14 @@ ${JSON.stringify(defaultLabels)}`,
 
     // Monthly summary entry
     doc.setFontSize(12); setC(C.black);
-    doc.text("Monthly Summary", M + 4, y);
+    doc.text(labels.monthlySummary, M + 4, y);
     doc.setFontSize(8); setC(C.grey);
     doc.text("Overall performance across all platforms with traffic light status", M + 4, y + 5);
     y += 14;
 
     if (upsellData) {
       doc.setFontSize(12); setC(C.black);
-      doc.text(`A Note from ${orgName}`, M + 4, y);
+      doc.text(`${labels.aNoteFrom} ${orgName}`, M + 4, y);
       doc.setFontSize(8); setC(C.grey);
       doc.text("A service recommendation based on your results", M + 4, y + 5);
       y += 14;
@@ -899,7 +899,7 @@ ${JSON.stringify(defaultLabels)}`,
     pageToc.push({ title: "Monthly Summary", page: pageCount });
 
     doc.setFontSize(22); setC(C.black);
-    doc.text("Monthly Summary", M, y); y += 6;
+    doc.text(labels.monthlySummary, M, y); y += 6;
     setF(C.primary); doc.rect(M, y, 50, 1.2, "F"); y += 10;
 
     // Executive summary paragraph
@@ -960,7 +960,7 @@ ${JSON.stringify(defaultLabels)}`,
 
     // Key wins
     doc.setFontSize(11); setC(C.primary);
-    doc.text("Key Wins This Month", M, y); y += 7;
+    doc.text(labels.keyWins, M, y); y += 7;
     doc.setFontSize(9); setC(C.black);
 
     // Find top 3 improving metrics
@@ -1006,7 +1006,7 @@ ${JSON.stringify(defaultLabels)}`,
     }
     if (declines.length > 0) {
       doc.setFontSize(11); setC(C.amber);
-      doc.text("Worth Keeping an Eye On", M, y); y += 7;
+      doc.text(labels.watchList, M, y); y += 7;
       doc.setFontSize(9); setC(C.black);
       declines.sort((a, b) => b.pct - a.pct);
       for (const d of declines.slice(0, 2)) {
@@ -1018,10 +1018,10 @@ ${JSON.stringify(defaultLabels)}`,
     // ═══════ UPSELL PAGE (if scheduled) ═══════
     if (upsellData) {
       y = startNewPage();
-      pageToc.push({ title: `A Note from ${orgName}`, page: pageCount });
+      pageToc.push({ title: `${labels.aNoteFrom} ${orgName}`, page: pageCount });
 
       doc.setFontSize(22); setC(C.primary);
-      doc.text(`A Note from ${orgName}`, M, y); y += 6;
+      doc.text(`${labels.aNoteFrom} ${orgName}`, M, y); y += 6;
       setF(C.primary); doc.rect(M, y, 50, 1.2, "F"); y += 12;
 
       // Headline
@@ -1065,7 +1065,7 @@ ${JSON.stringify(defaultLabels)}`,
 
       // CTA
       doc.setFontSize(10); setC(C.primary);
-      doc.text("Interested? Reply to this email or get in touch directly.", M, y);
+      doc.text(labels.interestedCTA, M, y);
     }
 
     // ═══════ END PAGE ═══════
@@ -1087,7 +1087,7 @@ ${JSON.stringify(defaultLabels)}`,
 
     const firstName = client.full_name.split(" ")[0];
     doc.setFontSize(28); setC(C.white);
-    doc.text(`Thank you, ${firstName}.`, W / 2, 110, { align: "center" });
+    doc.text(`${labels.thankYou}, ${firstName}.`, W / 2, 110, { align: "center" });
 
     doc.setFontSize(11); setC(C.white);
     const closingText = `This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We're looking forward to building on this next month.`;
@@ -1100,7 +1100,7 @@ ${JSON.stringify(defaultLabels)}`,
 
     closingY += 15;
     doc.setFontSize(10); setC(C.white);
-    doc.text(`Prepared by ${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, closingY, { align: "center" });
+    doc.text(`${labels.preparedBy} ${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, closingY, { align: "center" });
 
     if (org?.slug) {
       doc.text(org.slug, W / 2, closingY + 8, { align: "center" });
