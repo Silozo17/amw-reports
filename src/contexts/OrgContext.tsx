@@ -225,7 +225,17 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 export function useOrg() {
   const context = useContext(OrgContext);
   if (!context) {
-    throw new Error('useOrg must be used within an OrgProvider');
+    // Return safe defaults during HMR or when rendered outside provider
+    return {
+      org: null,
+      orgId: null,
+      orgRole: null,
+      isOrgOwner: false,
+      isLoading: true,
+      refetchOrg: async () => {},
+      allMemberships: [],
+      switchOrg: () => {},
+    } as OrgContextValue;
   }
   return context;
 }
