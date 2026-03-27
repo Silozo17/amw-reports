@@ -1,61 +1,69 @@
 
 
-# In-Platform Organisation Invites
+# Admin: Full Org & User Management
 
-## Problem
-Existing users cannot see or act on org invites inside the app — invites only work via the `handle_new_user` trigger on signup.
+## Current State
+
+The admin panel already supports:
+- Viewing all orgs and users
+- Editing org names, subscriptions, member roles
+- Editing user profiles, changing org assignment, resetting passwords, deactivating/deleting users
+
+**What's missing:**
+1. **Create Organisation** — no button on the org list page
+2. **Delete Organisation** — no option on the org detail page
+3. **Add Member to Org** — no way to link an existing user or invite someone directly from the org detail members tab
+4. **RLS gaps** — platform admins cannot INSERT or DELETE on `org_members` for other orgs, and cannot INSERT or DELETE on `organisations`
 
 ## Plan
 
-### 1. DB Migration — RLS policies on `org_members` for invite recipients
-
-Add 3 new policies using a security definer function to avoid recursion:
+### 1. DB Migration — Add platform admin RLS policies
 
 ```sql
--- Security definer function to get current user's email
-CREATE OR REPLACE FUNCTION public.user_email(_user_id uuid)
-RETURNS text
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT email FROM public.profiles WHERE user_id = _user_id LIMIT 1
-$$;
+-- Platform admins can fully manage org_members
+CREATE POLICY "Platform admins can manage all members"
+ON public.org_members FOR ALL TO authenticated
+USING (is_platform_admin(auth.uid()))
+WITH CHECK (is_platform_admin(auth.uid()));
 
--- SELECT: see invites addressed to you
-CREATE POLICY "Users can view own invites" ON org_members
-FOR SELECT TO authenticated
-USING (invited_email = user_email(auth.uid()) AND accepted_at IS NULL AND user_id IS NULL);
+-- Platform admins can create organisations
+CREATE POLICY "Platform admins can create orgs"
+ON public.organisations FOR INSERT TO authenticated
+WITH CHECK (is_platform_admin(auth.uid()));
 
--- UPDATE: accept invite
-CREATE POLICY "Users can accept own invites" ON org_members
-FOR UPDATE TO authenticated
-USING (invited_email = user_email(auth.uid()) AND accepted_at IS NULL AND user_id IS NULL);
-
--- DELETE: decline invite
-CREATE POLICY "Users can decline own invites" ON org_members
-FOR DELETE TO authenticated
-USING (invited_email = user_email(auth.uid()) AND accepted_at IS NULL AND user_id IS NULL);
+-- Platform admins can delete organisations
+CREATE POLICY "Platform admins can delete orgs"
+ON public.organisations FOR DELETE TO authenticated
+USING (is_platform_admin(auth.uid()));
 ```
 
-### 2. New hook — `src/hooks/useInvites.ts`
+### 2. AdminOrgList — Add "Create Organisation" button
 
-- Query `org_members` where `invited_email` matches current user email, `accepted_at IS NULL`, `user_id IS NULL`
-- Join with `organisations` to get org name/logo for display
-- `acceptInvite(id)`: update row → set `user_id = auth.uid()`, `accepted_at = now()`; then call `refetchOrg()`
-- `declineInvite(id)`: delete the row
+- Dialog with name field
+- On submit: insert into `organisations`, then optionally create a starter subscription
+- Refresh the list after creation
 
-### 3. UI — Bell icon in `src/components/layout/AppSidebar.tsx`
+### 3. AdminOrgDetail — Add "Delete Organisation" and "Add Member"
 
-- Add a `Bell` icon with badge count near the user menu area (above the user dropdown)
-- Clicking opens a `Popover` listing pending invites showing org name, role, and Accept/Decline buttons
-- On accept, trigger `refetchOrg()` so the org switcher updates immediately
-- Hide bell entirely when no pending invites exist
+**Delete Org:**
+- Destructive action with confirmation dialog
+- Deletes org_members, org_subscriptions, then the organisation itself
+- Redirects back to org list
+
+**Add Member (Members tab):**
+- Button next to "Members" tab header
+- Dialog with: email input (to search existing users or invite), role selector
+- If a user with that email exists in profiles → create `org_members` row linking them + update their `profiles.org_id`
+- If no user found → create a pending invite row (like the existing invite flow)
+
+### 4. AdminUserList — No changes needed
+The edit dialog already supports changing a user's org and role, which covers "link users to organisations".
 
 ## Files
 
 | File | Change |
 |---|---|
-| DB Migration | Add `user_email()` function + 3 RLS policies on `org_members` |
-| `src/hooks/useInvites.ts` | New hook: fetch pending invites, accept, decline |
-| `src/components/layout/AppSidebar.tsx` | Add bell icon with invite notification popover |
+| DB Migration | 3 new RLS policies for platform admin management |
+| `src/pages/admin/AdminOrgList.tsx` | Add "Create Organisation" dialog |
+| `src/pages/admin/AdminOrgDetail.tsx` | Add "Delete Organisation" button + "Add Member" dialog in members tab |
 
