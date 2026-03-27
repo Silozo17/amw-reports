@@ -12,9 +12,11 @@ import {
   Shield,
   ChevronsUpDown,
   Check,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/hooks/useOrg';
+import { useInvites } from '@/hooks/useInvites';
 import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
