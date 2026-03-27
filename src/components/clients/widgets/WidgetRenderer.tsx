@@ -49,7 +49,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
-const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
+import { useChartColors } from '@/hooks/useChartColors';
 
 // ─── Animated Counter ──────────────────────────────────────────
 function useAnimatedCounter(target: number, duration = 700): number {

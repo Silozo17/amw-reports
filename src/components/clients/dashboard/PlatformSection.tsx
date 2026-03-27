@@ -23,7 +23,7 @@ import { useState } from 'react';
 import MetricTooltip from '@/components/clients/MetricTooltip';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-const CHART_COLORS = ['#b32fbf', '#539BDB', '#4ED68E', '#EE8733', '#241f21', '#8b5cf6'];
+import { useChartColors } from '@/hooks/useChartColors';
 
 interface TopContentItem {
   page_name?: string;
