@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN report_language text NOT NULL DEFAULT 'en';
