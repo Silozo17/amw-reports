@@ -30,6 +30,7 @@ import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
 import UpsellTab from '@/components/clients/UpsellTab';
 import ClientReportsTab from '@/components/clients/ClientReportsTab';
+import ClientSwitcher from '@/components/clients/ClientSwitcher';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
