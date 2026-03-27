@@ -194,12 +194,17 @@ const Reports = () => {
 
   const renderReportRow = (report: ReportWithClient, showClientName = true) => {
     const isRegenerating = generatingIds.has(report.id);
+    const isActive = report.status === 'pending' || report.status === 'running';
     return (
       <Card key={report.id}>
         <CardContent className="flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
             <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-primary" />
+              {isActive ? (
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              ) : (
+                <FileText className="h-5 w-5 text-primary" />
+              )}
             </div>
             <div>
               {showClientName && (
@@ -208,6 +213,7 @@ const Reports = () => {
               <p className={`text-sm text-muted-foreground ${!showClientName ? 'font-semibold text-foreground' : ''}`}>
                 {MONTH_NAMES[report.report_month]} {report.report_year}
                 {report.generated_at && ` · Generated ${new Date(report.generated_at).toLocaleDateString()}`}
+                {isActive && ' · Generating...'}
               </p>
               {report.emailStatus && (
                 <p className={`text-xs mt-0.5 ${report.emailStatus === 'sent' ? 'text-accent' : report.emailStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
@@ -219,17 +225,20 @@ const Reports = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'}>{report.status}</Badge>
-            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path} onClick={() => handlePreview(report)} title="Preview">
+            <Badge variant={STATUS_VARIANT[report.status] ?? 'secondary'}>
+              {isActive && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+              {STATUS_LABEL[report.status] ?? report.status}
+            </Badge>
+            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} title="Preview">
               <ExternalLink className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path} onClick={() => handleDownload(report)} title="Download">
+            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || isActive} onClick={() => handleDownload(report)} title="Download">
               <Download className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" disabled={isRegenerating} onClick={() => handleRegenerate(report)} title="Regenerate">
+            <Button size="sm" variant="ghost" disabled={isRegenerating || isActive} onClick={() => handleRegenerate(report)} title="Regenerate">
               {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
             </Button>
-            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || sendingIds.has(report.id)} onClick={() => handleSendEmail(report)} title="Send email">
+            <Button size="sm" variant="ghost" disabled={!report.pdf_storage_path || sendingIds.has(report.id) || isActive} onClick={() => handleSendEmail(report)} title="Send email">
               {sendingIds.has(report.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
