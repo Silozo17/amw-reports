@@ -262,10 +262,10 @@ const PerformanceOverview = ({
         {/* GSC Search Performance Trend */}
         {hasGscTrend && (() => {
           const gscKeys = [
-            { key: 'search_impressions', name: 'Impressions', color: '#b32fbf', format: (v: number) => fmtNum(v) },
-            { key: 'search_clicks', name: 'Clicks', color: '#539BDB', format: (v: number) => fmtNum(v) },
-            { key: 'search_ctr', name: 'CTR', color: '#4ED68E', format: (v: number) => `${v.toFixed(1)}%` },
-            { key: 'search_position', name: 'Avg. Position', color: '#EE8733', format: (v: number) => v.toFixed(1) },
+            { key: 'search_impressions', name: 'Impressions', color: CHART_COLORS[0], format: (v: number) => fmtNum(v) },
+            { key: 'search_clicks', name: 'Clicks', color: CHART_COLORS[1], format: (v: number) => fmtNum(v) },
+            { key: 'search_ctr', name: 'CTR', color: CHART_COLORS[2], format: (v: number) => `${v.toFixed(1)}%` },
+            { key: 'search_position', name: 'Avg. Position', color: CHART_COLORS[3], format: (v: number) => v.toFixed(1) },
           ].filter(tk => gscTrendData!.some(d => (d as Record<string, number>)[tk.key] > 0));
 
           if (gscKeys.length === 0) return null;
