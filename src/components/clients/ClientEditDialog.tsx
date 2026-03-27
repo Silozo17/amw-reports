@@ -44,6 +44,7 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
     enable_yoy_comparison: client.enable_yoy_comparison,
     enable_explanations: client.enable_explanations,
     report_detail_level: client.report_detail_level,
+    report_language: client.report_language ?? 'en',
   });
 
   useEffect(() => {
@@ -66,6 +67,7 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
         enable_yoy_comparison: client.enable_yoy_comparison,
         enable_explanations: client.enable_explanations,
         report_detail_level: client.report_detail_level,
+        report_language: client.report_language ?? 'en',
       });
       setLogoFile(null);
       setLogoPreview(client.logo_url ?? null);

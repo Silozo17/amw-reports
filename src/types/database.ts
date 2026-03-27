@@ -75,6 +75,7 @@ export interface Client {
   reporting_start_date: string | null;
   account_manager: string | null;
   report_detail_level: string;
+  report_language: string;
   enable_upsell: boolean;
   enable_mom_comparison: boolean;
   enable_yoy_comparison: boolean;
