@@ -23,8 +23,7 @@ interface TeamMember {
 }
 
 const OrganisationSection = () => {
-  const { role } = useAuth();
-  const { org, orgId } = useOrg();
+  const { org, orgId, orgRole } = useOrg();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

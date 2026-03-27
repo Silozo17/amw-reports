@@ -21,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -32,14 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', userId)
       .single();
     setProfile(profileData as Profile | null);
-
-    const { data: memberData } = await supabase
-      .from('org_members')
-      .select('role')
-      .eq('user_id', userId)
-      .limit(1)
-      .single();
-    setRole((memberData?.role as AppRole) ?? null);
 
     const { data: adminData } = await supabase
       .from('platform_admins')
@@ -104,11 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         profile,
-        role,
         isLoading,
-        isOwner: role === 'owner',
         isPlatformAdmin,
-        isManager: role === 'manager',
         signIn,
         signUp,
         signOut,
