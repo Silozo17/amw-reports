@@ -175,12 +175,37 @@ const ClientDetail = () => {
   };
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reportMonth, setReportMonth] = useState<number | null>(null);
+  const [reportYear, setReportYear] = useState<number | null>(null);
+  const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
+
+  // Load most recent snapshot month to default the picker
+  useEffect(() => {
+    if (!id || reportPickerLoaded) return;
+    (async () => {
+      const { data } = await supabase
+        .from('monthly_snapshots')
+        .select('report_month, report_year')
+        .eq('client_id', id)
+        .order('report_year', { ascending: false })
+        .order('report_month', { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        setReportMonth(data[0].report_month);
+        setReportYear(data[0].report_year);
+      } else {
+        const { month, year } = getCurrentReportPeriod();
+        setReportMonth(month);
+        setReportYear(year);
+      }
+      setReportPickerLoaded(true);
+    })();
+  }, [id, reportPickerLoaded]);
 
   const handleGenerateReport = async () => {
-    if (!client) return;
+    if (!client || !reportMonth || !reportYear) return;
     setIsGenerating(true);
-    const { month, year } = getCurrentReportPeriod();
-    await generateReport(client.id, month, year);
+    await generateReport(client.id, reportMonth, reportYear);
     setIsGenerating(false);
   };
 
@@ -381,7 +406,23 @@ const ClientDetail = () => {
               onConfirm={handleScheduleDeletion}
               isLoading={isDeleting}
             />
-            <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating}>
+            <Select value={reportMonth?.toString() ?? ''} onValueChange={v => setReportMonth(Number(v))}>
+              <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="Month" /></SelectTrigger>
+              <SelectContent>
+                {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
+                  <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={reportYear?.toString() ?? ''} onValueChange={v => setReportYear(Number(v))}>
+              <SelectTrigger className="w-20 h-8 text-xs"><SelectValue placeholder="Year" /></SelectTrigger>
+              <SelectContent>
+                {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(yr => (
+                  <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" className="gap-2" onClick={handleGenerateReport} disabled={isGenerating || !reportMonth || !reportYear}>
               {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{isGenerating ? 'Generating...' : 'Report'}</span>
             </Button>
