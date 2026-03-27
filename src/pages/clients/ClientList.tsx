@@ -21,10 +21,12 @@ const ClientList = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!orgId) return;
     const fetchClients = async () => {
       const { data } = await supabase
         .from('clients')
         .select('*')
+        .eq('org_id', orgId)
         .order('company_name');
       setClients((data as Client[]) ?? []);
       setIsLoading(false);

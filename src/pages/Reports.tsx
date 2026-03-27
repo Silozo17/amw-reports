@@ -50,14 +50,16 @@ const Reports = () => {
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
 
   const fetchReports = async () => {
+    if (!orgId) return;
     const [reportsRes, clientsRes, emailLogsRes] = await Promise.all([
       supabase
         .from('reports')
         .select('*, clients(company_name, full_name)')
+        .eq('org_id', orgId)
         .order('report_year', { ascending: false })
         .order('report_month', { ascending: false }),
-      supabase.from('clients').select('id, company_name').eq('is_active', true).order('company_name'),
-      supabase.from('email_logs').select('report_id, status, sent_at, error_message').order('created_at', { ascending: false }),
+      supabase.from('clients').select('id, company_name').eq('is_active', true).eq('org_id', orgId).order('company_name'),
+      supabase.from('email_logs').select('report_id, status, sent_at, error_message').eq('org_id', orgId).order('created_at', { ascending: false }),
     ]);
 
     const emailMap = new Map<string, { status: string; sent_at: string | null; error_message: string | null }>();
