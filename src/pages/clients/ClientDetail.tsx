@@ -609,6 +609,18 @@ const ClientDetail = () => {
             <UpsellTab clientId={client.id} />
           </TabsContent>
 
+          <TabsContent value="reports" className="mt-4">
+            <ClientReportsTab
+              clientId={client.id}
+              clientName={client.company_name}
+              orgId={client.org_id}
+              reportMonth={reportMonth}
+              reportYear={reportYear}
+              setReportMonth={setReportMonth}
+              setReportYear={setReportYear}
+            />
+          </TabsContent>
+
           <TabsContent value="settings" className="mt-4">
             <Card>
               <CardHeader><CardTitle className="font-display text-lg">Report Configuration</CardTitle></CardHeader>
