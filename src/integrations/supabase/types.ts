@@ -607,6 +607,12 @@ export type Database = {
         Row: {
           accent_color: string | null
           body_font: string | null
+          button_color: string | null
+          button_text_color: string | null
+          chart_color_1: string | null
+          chart_color_2: string | null
+          chart_color_3: string | null
+          chart_color_4: string | null
           created_at: string
           created_by: string | null
           heading_font: string | null
@@ -616,12 +622,21 @@ export type Database = {
           primary_color: string | null
           report_settings: Json | null
           secondary_color: string | null
+          show_org_name: boolean | null
           slug: string | null
+          text_on_dark: string | null
+          text_on_light: string | null
           updated_at: string
         }
         Insert: {
           accent_color?: string | null
           body_font?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
+          chart_color_1?: string | null
+          chart_color_2?: string | null
+          chart_color_3?: string | null
+          chart_color_4?: string | null
           created_at?: string
           created_by?: string | null
           heading_font?: string | null
@@ -631,12 +646,21 @@ export type Database = {
           primary_color?: string | null
           report_settings?: Json | null
           secondary_color?: string | null
+          show_org_name?: boolean | null
           slug?: string | null
+          text_on_dark?: string | null
+          text_on_light?: string | null
           updated_at?: string
         }
         Update: {
           accent_color?: string | null
           body_font?: string | null
+          button_color?: string | null
+          button_text_color?: string | null
+          chart_color_1?: string | null
+          chart_color_2?: string | null
+          chart_color_3?: string | null
+          chart_color_4?: string | null
           created_at?: string
           created_by?: string | null
           heading_font?: string | null
@@ -646,7 +670,10 @@ export type Database = {
           primary_color?: string | null
           report_settings?: Json | null
           secondary_color?: string | null
+          show_org_name?: boolean | null
           slug?: string | null
+          text_on_dark?: string | null
+          text_on_light?: string | null
           updated_at?: string
         }
         Relationships: []
