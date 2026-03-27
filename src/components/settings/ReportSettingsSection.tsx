@@ -64,7 +64,7 @@ const ReportSettingsSection = () => {
 
     const { error } = await supabase
       .from('organisations')
-      .update({ report_settings: settings as unknown as Record<string, unknown> })
+      .update({ report_settings: settings as unknown as Record<string, never> })
       .eq('id', org.id);
 
     if (error) {
