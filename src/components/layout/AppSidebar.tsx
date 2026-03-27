@@ -49,9 +49,11 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const { signOut, profile, role, isOwner } = useAuth();
   const { org, orgId, allMemberships, switchOrg } = useOrg();
   const { isPlatformAdmin } = usePlatformAdmin();
+  const { pendingInvites, acceptInvite, declineInvite } = useInvites();
   const location = useLocation();
   const navigate = useNavigate();
   const [orgPopoverOpen, setOrgPopoverOpen] = useState(false);
+  const [invitePopoverOpen, setInvitePopoverOpen] = useState(false);
 
   const handleNavClick = () => {
     onNavigate?.();
