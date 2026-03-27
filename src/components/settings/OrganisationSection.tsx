@@ -153,6 +153,17 @@ const InviteDialog = ({ orgId, onInvite }: { orgId: string; onInvite: () => void
     if (error) {
       toast.error(error.message.includes('unique') ? 'This email has already been invited' : 'Failed to send invite');
     } else {
+      // Send team_invitation email (fire-and-forget)
+      sendBrandedEmail({
+        templateName: 'team_invitation',
+        recipientEmail: email.trim().toLowerCase(),
+        orgId,
+        data: {
+          invited_email: email.trim().toLowerCase(),
+          role: inviteRole,
+        },
+      }).catch(err => console.error('Failed to send invite email:', err));
+
       toast.success(`Invite sent to ${email}`);
       setEmail('');
       setOpen(false);
