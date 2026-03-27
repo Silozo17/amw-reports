@@ -13,6 +13,15 @@ export interface Organisation {
   heading_font: string | null;
   body_font: string | null;
   report_settings: { show_logo: boolean; show_ai_insights: boolean; report_accent_color: string | null } | null;
+  button_color: string | null;
+  button_text_color: string | null;
+  text_on_dark: string | null;
+  text_on_light: string | null;
+  show_org_name: boolean;
+  chart_color_1: string | null;
+  chart_color_2: string | null;
+  chart_color_3: string | null;
+  chart_color_4: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -179,7 +188,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setOrg(orgData as Organisation | null);
+      setOrg(orgData as unknown as Organisation | null);
     } finally {
       setIsLoading(false);
     }
