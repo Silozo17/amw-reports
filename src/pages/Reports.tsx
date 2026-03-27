@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,6 +32,14 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   running: 'secondary',
   failed: 'destructive',
   partial: 'outline',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'QUEUED',
+  running: 'GENERATING',
+  success: 'SUCCESS',
+  failed: 'FAILED',
+  partial: 'PARTIAL',
 };
 
 interface ClientOption {
