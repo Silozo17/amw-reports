@@ -1,42 +1,77 @@
 
 
-## Granular Sync Controls for Admin Org Detail
+## Client Self-Service Login (Magic Link + Connections Management)
 
-### What changes
+### Overview
 
-Replace the single "Sync All (12 months)" button with a flexible sync dialog that lets admins choose the scope of their sync.
+Allow end-clients to log in via magic link, view their dashboard, and manage their own platform connections — without needing access to the agency's full app.
 
-**New `SyncDialog` component** with 4 sync scope options:
+### Architecture
 
-1. **Single Channel** — Pick a client, then pick one of its connected channels → sync only that connection for 12 months
-2. **Single Client** — Pick a client → sync all its active connections for 12 months
-3. **Whole Organisation** — Sync all active connections across all clients (current behaviour)
-4. **Whole Platform** — Pick a platform (e.g. "Google Ads") → sync only that platform's connections across all clients
+**New `client_users` table** — maps auth users to specific client records:
 
-**UI flow:**
-- Admin clicks "Sync (12 months)" button → Dialog opens
-- Step 1: Select scope via radio group (Channel / Client / Organisation / Platform)
-- Step 2: Depending on scope, show a filtered dropdown/select:
-  - Channel: Client select → Channel select (filtered to selected client's active connections)
-  - Client: Client select
-  - Organisation: No further selection needed
-  - Platform: Platform select (populated from distinct platforms in active connections)
-- Step 3: Confirm button starts the sync with progress display
+```
+client_users
+├── id (uuid, PK)
+├── user_id (uuid, references auth.users, NOT NULL)
+├── client_id (uuid, NOT NULL)
+├── org_id (uuid, NOT NULL)
+├── invited_by (uuid, nullable)
+├── invited_at (timestamptz)
+├── created_at (timestamptz)
+```
 
-The existing inline bulk sync logic moves into the dialog's confirm handler, filtered by scope.
+RLS policies:
+- Client users can SELECT their own row
+- Org owners/managers can INSERT/DELETE (invite/revoke)
+- Platform admins can manage all
+
+**Database migration** also needs:
+- RLS policy on `platform_connections` allowing client_users to manage connections for their client
+- RLS SELECT policy on `clients` for client_users to view their own client record
+- A `is_client_user` security definer function to check if a user is a client_user for a given client
+
+### New Edge Function: `invite-client-user`
+
+Accepts `{ client_id, email }` from an org member. Inserts into `client_users` (with `user_id` null initially), then calls `supabase.auth.admin.generateLink({ type: 'magiclink', email })` to send a magic link. On auth, a trigger or the edge function associates the `user_id`.
+
+### Frontend Changes
+
+**1. Client Detail page (`ClientDetail.tsx`) — "Invite Client" button**
+- New section in the Settings tab to invite a client user by email
+- Shows list of existing client_users with ability to revoke access
+
+**2. New route: `/client-portal` (authenticated client view)**
+- Similar to existing `/portal/:token` but requires auth
+- Detects if logged-in user is a `client_user` → redirects here after login
+- Shows: branded dashboard (reuses `ClientDashboard`) + connection management (reuses `ConnectionDialog` logic)
+- Hides: admin controls, AI analysis, metric config, other clients
+
+**3. Auth flow updates (`useAuth.tsx`)**
+- After login, check `client_users` table for the user
+- If found → redirect to `/client-portal` instead of `/dashboard`
+- Add `clientUser` to auth context (client_id, org_id)
+
+**4. Login page (`LandingPage.tsx`)**
+- Add a "Client Login" tab/section with magic link input (email only, no password)
+- Calls `supabase.auth.signInWithOtp({ email })` for magic link
 
 ### Files to create/edit
 
 | File | Action |
 |---|---|
-| `src/components/admin/AdminSyncDialog.tsx` | New component with scope selection + filtered sync execution |
-| `src/pages/admin/AdminOrgDetail.tsx` | Replace inline sync button/logic with `<AdminSyncDialog>` trigger |
+| Migration | Create `client_users` table, `is_client_user` function, RLS policies |
+| `supabase/functions/invite-client-user/index.ts` | New edge function to invite client users |
+| `src/pages/ClientPortalAuth.tsx` | New authenticated client portal page |
+| `src/pages/clients/ClientDetail.tsx` | Add "Invite Client" section in settings tab |
+| `src/hooks/useAuth.tsx` | Check `client_users` on login, expose `clientUser` state |
+| `src/App.tsx` | Add `/client-portal` route, redirect logic |
+| `src/pages/LandingPage.tsx` | Add magic link login tab for clients |
 
-### Technical details
+### Security considerations
 
-- Props: `clients`, `connections`, `onComplete` callback (to invalidate queries)
-- Reuses `SYNC_FUNCTION_MAP` from `@/lib/triggerSync`
-- Scope filtering logic determines which subset of `connections` to iterate over
-- Progress string updates per-month as before
-- Uses existing `Select`, `RadioGroup`, `Dialog`, `Button` UI components
+- Client users can ONLY access their own client record — enforced at DB level via RLS
+- Client users cannot see other clients, org settings, billing, or admin features
+- Connection management respects existing entitlement limits
+- Magic links expire after standard timeout (default 1 hour)
 
