@@ -48,10 +48,10 @@ Deno.serve(async (req) => {
       monthsToSync.push({ month: prevMonth, year: prevYear });
     }
 
-    // Fetch all active connections
+    // Fetch all active connections with their org's plan slug
     const { data: connections, error: connError } = await supabase
       .from("platform_connections")
-      .select("id, platform, client_id")
+      .select("id, platform, client_id, clients!inner(org_id)")
       .eq("is_connected", true)
       .not("account_id", "is", null);
 
@@ -63,6 +63,22 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Gather unique org IDs and fetch their plan slugs
+    const orgIds = [...new Set(connections.map((c: any) => c.clients.org_id))];
+    const { data: subscriptions, error: subError } = await supabase
+      .from("org_subscriptions")
+      .select("org_id, subscription_plans!inner(slug)")
+      .in("org_id", orgIds)
+      .eq("status", "active");
+
+    if (subError) throw subError;
+
+    // Build org_id → plan_slug map
+    const orgPlanMap: Record<string, string> = {};
+    for (const sub of subscriptions || []) {
+      orgPlanMap[(sub as any).org_id] = (sub as any).subscription_plans.slug;
+    }
+
     const results: Array<{
       connection_id: string;
       platform: string;
@@ -72,8 +88,19 @@ Deno.serve(async (req) => {
       error?: string;
     }> = [];
 
+    let skippedStarter = 0;
+
     // Process connections sequentially to avoid rate limits
     for (const conn of connections) {
+      const orgId = (conn as any).clients.org_id;
+      const planSlug = orgPlanMap[orgId] || "starter";
+
+      // Creator/Starter plan: only sync on the 4th of the month
+      if (planSlug === "starter" && dayOfMonth !== 4) {
+        skippedStarter++;
+        continue;
+      }
+
       const fnName = SYNC_FUNCTION_MAP[conn.platform];
       if (!fnName) continue;
 
@@ -111,9 +138,10 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: `Scheduled sync complete: ${successCount} succeeded, ${failCount} failed`,
+        message: `Scheduled sync complete: ${successCount} succeeded, ${failCount} failed, ${skippedStarter} skipped (Creator plan, not 4th)`,
         months_synced: monthsToSync,
         total_connections: connections.length,
+        skipped_starter: skippedStarter,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
