@@ -13,7 +13,501 @@ interface ReportRequest {
 }
 
 // ══════════════════════════════════════════════════════════════
-// SECTION TITLE CONSTANTS — hardcoded, never overridden
+// TRANSLATIONS — per-client language for PDF text
+// ══════════════════════════════════════════════════════════════
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    performanceReport: 'PERFORMANCE REPORT',
+    preparedFor: 'Prepared for',
+    preparedBy: 'Prepared by',
+    tableOfContents: 'Table of Contents',
+    reportCovers: 'This report covers performance from',
+    allFigures: 'All figures compared to',
+    unlessStated: 'unless stated otherwise',
+    noDataAvailable: 'No data available for this period',
+    whatThisMeans: 'WHAT THIS MEANS FOR YOU',
+    monthOnMonth: 'Month-on-Month Comparison',
+    topContent: 'TOP PERFORMING CONTENT',
+    metric: 'METRIC',
+    thisMonth: 'THIS MONTH',
+    lastMonth: 'LAST MONTH',
+    change: 'CHANGE',
+    monthlySummary: 'Monthly Summary',
+    platformStatus: 'Platform Status Overview',
+    platform: 'PLATFORM',
+    status: 'STATUS',
+    verdict: 'VERDICT',
+    keyWins: 'Key Wins This Month',
+    worthWatching: 'Worth Watching',
+    strong: 'Strong',
+    steady: 'Steady',
+    needsAttention: 'Needs Attention',
+    noteFrom: 'A Note from',
+    interested: 'Interested? Reply to this email or call us.',
+    readyToGrow: 'READY TO GROW?',
+    thankYou: T.thankYou,
+    closingLine: 'This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We look forward to building on this next month.',
+    confidential: 'Confidential',
+    newThisMonth: 'New',
+    noChange: 'No change',
+    vsLastMonth: 'vs last month',
+    firstMonthNote: 'This is the first month of tracked data. No previous month comparison is available yet.',
+    standoutResult: 'The standout result this month was',
+    whichReached: 'which reached',
+    upFrom: 'up',
+    fromLastMonth: 'from last month',
+    engagementRate: 'Your engagement rate is',
+    strongEngagement: '— your audience is actively responding to your content.',
+    solidBaseline: '— a solid baseline, with room to grow through more interactive content.',
+    lowEngagement: '— consider experimenting with different content formats to encourage more interaction.',
+    gained: 'You gained',
+    newFollowers: 'new followers this month, bringing your total to',
+    heldSteady: 'Your follower count held steady at',
+    postPublished: 'Post published on',
+    page: 'Page',
+    performanceMetrics: 'Performance Metrics',
+    firstMonthTracked: 'This is your first month tracked for this platform — no comparison data available yet.',
+    noPreviousData: 'No previous month data available for comparison.',
+    firstReportingMonth: 'This is your first reporting month — we\'ll track improvements from here.',
+    overallPerformance: 'Overall performance across all platforms with traffic light status',
+    serviceRecommendation: 'A service recommendation based on your results',
+    comparison: 'Comparison',
+    feature: 'FEATURE',
+    optionA: 'OPTION A',
+    optionB: 'OPTION B',
+    interestedCall: 'Interested? Reply to this email or call us at',
+  },
+  fr: {
+    performanceReport: 'RAPPORT DE PERFORMANCE',
+    preparedFor: 'Préparé pour',
+    preparedBy: 'Préparé par',
+    tableOfContents: 'Table des matières',
+    reportCovers: 'Ce rapport couvre les performances du',
+    allFigures: 'Tous les chiffres sont comparés à',
+    unlessStated: 'sauf indication contraire',
+    noDataAvailable: 'Aucune donnée disponible pour cette période',
+    whatThisMeans: 'CE QUE CELA SIGNIFIE POUR VOUS',
+    monthOnMonth: 'Comparaison mois par mois',
+    topContent: 'CONTENU LE PLUS PERFORMANT',
+    metric: 'MÉTRIQUE',
+    thisMonth: 'CE MOIS',
+    lastMonth: 'MOIS DERNIER',
+    change: 'VARIATION',
+    monthlySummary: 'Résumé mensuel',
+    platformStatus: 'Vue d\'ensemble des plateformes',
+    platform: 'PLATEFORME',
+    status: 'STATUT',
+    verdict: 'VERDICT',
+    keyWins: 'Points forts ce mois',
+    worthWatching: 'À surveiller',
+    strong: 'Fort',
+    steady: 'Stable',
+    needsAttention: 'Attention requise',
+    noteFrom: 'Un message de',
+    interested: 'Intéressé ? Répondez à cet e-mail ou appelez-nous.',
+    readyToGrow: 'PRÊT À GRANDIR ?',
+    thankYou: 'MERCI,',
+    closingLine: 'Ce rapport vous donne une image claire de la situation. Chaque chiffre représente de vraies personnes qui découvrent votre entreprise. Nous avons hâte de continuer sur cette lancée le mois prochain.',
+    confidential: 'Confidentiel',
+    newThisMonth: 'Nouveau',
+    noChange: 'Pas de changement',
+    vsLastMonth: 'vs mois dernier',
+    firstMonthNote: 'C\'est le premier mois de données suivies. Aucune comparaison avec le mois précédent n\'est encore disponible.',
+    standoutResult: 'Le meilleur résultat ce mois-ci était',
+    whichReached: 'qui a atteint',
+    upFrom: 'en hausse de',
+    fromLastMonth: 'par rapport au mois dernier',
+    engagementRate: 'Votre taux d\'engagement est de',
+    strongEngagement: '— votre audience répond activement à votre contenu.',
+    solidBaseline: '— une bonne base, avec de la marge pour progresser.',
+    lowEngagement: '— essayez différents formats de contenu pour encourager plus d\'interactions.',
+    gained: 'Vous avez gagné',
+    newFollowers: 'nouveaux abonnés ce mois-ci, portant votre total à',
+    heldSteady: 'Votre nombre d\'abonnés est resté stable à',
+    postPublished: 'Publication du',
+    page: 'Page',
+    performanceMetrics: 'Métriques de performance',
+    firstMonthTracked: 'C\'est votre premier mois suivi pour cette plateforme — aucune donnée de comparaison disponible.',
+    noPreviousData: 'Aucune donnée du mois précédent disponible pour comparaison.',
+    firstReportingMonth: 'C\'est votre premier mois de reporting — nous suivrons les améliorations à partir d\'ici.',
+    overallPerformance: 'Performance globale sur toutes les plateformes avec indicateur de statut',
+    serviceRecommendation: 'Une recommandation de service basée sur vos résultats',
+    comparison: 'Comparaison',
+    feature: 'FONCTIONNALITÉ',
+    optionA: 'OPTION A',
+    optionB: 'OPTION B',
+    interestedCall: 'Intéressé ? Répondez à cet e-mail ou appelez-nous au',
+  },
+  de: {
+    performanceReport: 'LEISTUNGSBERICHT',
+    preparedFor: 'Erstellt für',
+    preparedBy: 'Erstellt von',
+    tableOfContents: 'Inhaltsverzeichnis',
+    reportCovers: 'Dieser Bericht deckt die Leistung vom',
+    allFigures: 'Alle Zahlen im Vergleich zu',
+    unlessStated: 'sofern nicht anders angegeben',
+    noDataAvailable: 'Keine Daten für diesen Zeitraum verfügbar',
+    whatThisMeans: 'WAS DAS FÜR SIE BEDEUTET',
+    monthOnMonth: 'Monatsvergleich',
+    topContent: 'TOP-INHALTE',
+    metric: 'KENNZAHL',
+    thisMonth: 'DIESEN MONAT',
+    lastMonth: 'LETZTEN MONAT',
+    change: 'ÄNDERUNG',
+    monthlySummary: 'Monatszusammenfassung',
+    platformStatus: 'Plattformübersicht',
+    platform: 'PLATTFORM',
+    status: 'STATUS',
+    verdict: 'BEWERTUNG',
+    keyWins: 'Highlights dieses Monats',
+    worthWatching: 'Zu beobachten',
+    strong: 'Stark',
+    steady: 'Stabil',
+    needsAttention: 'Aufmerksamkeit erforderlich',
+    noteFrom: 'Eine Nachricht von',
+    interested: 'Interessiert? Antworten Sie auf diese E-Mail oder rufen Sie uns an.',
+    readyToGrow: 'BEREIT ZU WACHSEN?',
+    thankYou: 'VIELEN DANK,',
+    closingLine: 'Dieser Bericht gibt Ihnen ein klares Bild der aktuellen Lage. Jede Zahl steht für echte Menschen, die Ihr Unternehmen entdecken. Wir freuen uns darauf, im nächsten Monat daran anzuknüpfen.',
+    confidential: 'Vertraulich',
+    newThisMonth: 'Neu',
+    noChange: 'Keine Änderung',
+    vsLastMonth: 'vs. letzter Monat',
+    firstMonthNote: 'Dies ist der erste Monat mit erfassten Daten. Noch kein Vormonatsvergleich verfügbar.',
+    standoutResult: 'Das herausragende Ergebnis diesen Monat war',
+    whichReached: 'das erreichte',
+    upFrom: 'gestiegen um',
+    fromLastMonth: 'im Vergleich zum Vormonat',
+    engagementRate: 'Ihre Engagement-Rate beträgt',
+    strongEngagement: '— Ihr Publikum reagiert aktiv auf Ihre Inhalte.',
+    solidBaseline: '— eine solide Basis, mit Potenzial zum Wachstum.',
+    lowEngagement: '— probieren Sie verschiedene Inhaltsformate aus, um mehr Interaktionen zu fördern.',
+    gained: 'Sie haben',
+    newFollowers: 'neue Follower diesen Monat gewonnen, Ihr Gesamtstand beträgt jetzt',
+    heldSteady: 'Ihre Follower-Anzahl blieb stabil bei',
+    postPublished: 'Veröffentlicht am',
+    page: 'Seite',
+    performanceMetrics: 'Leistungskennzahlen',
+    firstMonthTracked: 'Dies ist Ihr erster erfasster Monat für diese Plattform — noch keine Vergleichsdaten verfügbar.',
+    noPreviousData: 'Keine Vormonatsdaten zum Vergleich verfügbar.',
+    firstReportingMonth: 'Dies ist Ihr erster Berichtsmonat — wir verfolgen die Verbesserungen ab hier.',
+    overallPerformance: 'Gesamtleistung über alle Plattformen mit Statusampel',
+    serviceRecommendation: 'Eine Serviceempfehlung basierend auf Ihren Ergebnissen',
+    comparison: 'Vergleich',
+    feature: 'MERKMAL',
+    optionA: 'OPTION A',
+    optionB: 'OPTION B',
+    interestedCall: 'Interessiert? Antworten Sie auf diese E-Mail oder rufen Sie uns an unter',
+  },
+  es: {
+    performanceReport: 'INFORME DE RENDIMIENTO',
+    preparedFor: 'Preparado para',
+    preparedBy: 'Preparado por',
+    tableOfContents: 'Tabla de contenidos',
+    reportCovers: 'Este informe cubre el rendimiento del',
+    allFigures: 'Todas las cifras comparadas con',
+    unlessStated: 'salvo indicación contraria',
+    noDataAvailable: 'No hay datos disponibles para este período',
+    whatThisMeans: 'LO QUE ESTO SIGNIFICA PARA USTED',
+    monthOnMonth: 'Comparación mes a mes',
+    topContent: 'CONTENIDO MÁS DESTACADO',
+    metric: 'MÉTRICA',
+    thisMonth: 'ESTE MES',
+    lastMonth: 'MES PASADO',
+    change: 'CAMBIO',
+    monthlySummary: 'Resumen mensual',
+    platformStatus: 'Resumen de plataformas',
+    platform: 'PLATAFORMA',
+    status: 'ESTADO',
+    verdict: 'VEREDICTO',
+    keyWins: 'Logros de este mes',
+    worthWatching: 'Vale la pena vigilar',
+    strong: 'Fuerte',
+    steady: 'Estable',
+    needsAttention: 'Requiere atención',
+    noteFrom: 'Un mensaje de',
+    interested: '¿Interesado? Responda a este correo o llámenos.',
+    readyToGrow: '¿LISTO PARA CRECER?',
+    thankYou: 'GRACIAS,',
+    closingLine: 'Este informe le da una imagen clara de dónde están las cosas. Cada número representa personas reales que descubren su negocio. Esperamos seguir avanzando el próximo mes.',
+    confidential: 'Confidencial',
+    newThisMonth: 'Nuevo',
+    noChange: 'Sin cambios',
+    vsLastMonth: 'vs mes anterior',
+    firstMonthNote: 'Este es el primer mes de datos registrados. Aún no hay comparación con el mes anterior disponible.',
+    standoutResult: 'El resultado destacado de este mes fue',
+    whichReached: 'que alcanzó',
+    upFrom: 'subió',
+    fromLastMonth: 'respecto al mes pasado',
+    engagementRate: 'Su tasa de participación es del',
+    strongEngagement: '— su audiencia responde activamente a su contenido.',
+    solidBaseline: '— una buena base, con margen para crecer.',
+    lowEngagement: '— considere experimentar con diferentes formatos de contenido.',
+    gained: 'Ganó',
+    newFollowers: 'nuevos seguidores este mes, llevando su total a',
+    heldSteady: 'Su número de seguidores se mantuvo estable en',
+    postPublished: 'Publicado el',
+    page: 'Página',
+    performanceMetrics: 'Métricas de rendimiento',
+    firstMonthTracked: 'Este es su primer mes registrado para esta plataforma — sin datos de comparación disponibles.',
+    noPreviousData: 'Sin datos del mes anterior disponibles para comparación.',
+    firstReportingMonth: 'Este es su primer mes de informes — seguiremos las mejoras a partir de aquí.',
+    overallPerformance: 'Rendimiento general en todas las plataformas con indicador de estado',
+    serviceRecommendation: 'Una recomendación de servicio basada en sus resultados',
+    comparison: 'Comparación',
+    feature: 'CARACTERÍSTICA',
+    optionA: 'OPCIÓN A',
+    optionB: 'OPCIÓN B',
+    interestedCall: '¿Interesado? Responda a este correo o llámenos al',
+  },
+  it: {
+    performanceReport: 'REPORT DI PERFORMANCE',
+    preparedFor: 'Preparato per',
+    preparedBy: 'Preparato da',
+    tableOfContents: 'Indice',
+    reportCovers: 'Questo report copre le performance dal',
+    allFigures: 'Tutti i dati confrontati con',
+    unlessStated: 'salvo diversa indicazione',
+    noDataAvailable: 'Nessun dato disponibile per questo periodo',
+    whatThisMeans: 'COSA SIGNIFICA PER TE',
+    monthOnMonth: 'Confronto mese su mese',
+    topContent: 'CONTENUTI TOP',
+    metric: 'METRICA',
+    thisMonth: 'QUESTO MESE',
+    lastMonth: 'MESE SCORSO',
+    change: 'VARIAZIONE',
+    monthlySummary: 'Riepilogo mensile',
+    platformStatus: 'Panoramica piattaforme',
+    platform: 'PIATTAFORMA',
+    status: 'STATO',
+    verdict: 'VALUTAZIONE',
+    keyWins: 'Risultati chiave del mese',
+    worthWatching: 'Da monitorare',
+    strong: 'Forte',
+    steady: 'Stabile',
+    needsAttention: 'Richiede attenzione',
+    noteFrom: 'Un messaggio da',
+    interested: 'Interessato? Rispondi a questa email o chiamaci.',
+    readyToGrow: 'PRONTO A CRESCERE?',
+    thankYou: 'GRAZIE,',
+    closingLine: 'Questo report ti dà un quadro chiaro della situazione. Ogni numero rappresenta persone reali che scoprono la tua attività. Non vediamo l\'ora di costruire su questi risultati il prossimo mese.',
+    confidential: 'Riservato',
+    newThisMonth: 'Nuovo',
+    noChange: 'Nessun cambiamento',
+    vsLastMonth: 'vs mese precedente',
+    firstMonthNote: 'Questo è il primo mese di dati tracciati. Nessun confronto con il mese precedente ancora disponibile.',
+    standoutResult: 'Il risultato di spicco di questo mese è stato',
+    whichReached: 'che ha raggiunto',
+    upFrom: 'in aumento del',
+    fromLastMonth: 'rispetto al mese scorso',
+    engagementRate: 'Il tuo tasso di coinvolgimento è del',
+    strongEngagement: '— il tuo pubblico risponde attivamente ai tuoi contenuti.',
+    solidBaseline: '— una buona base, con margine di crescita.',
+    lowEngagement: '— considera di sperimentare diversi formati di contenuto.',
+    gained: 'Hai guadagnato',
+    newFollowers: 'nuovi follower questo mese, portando il totale a',
+    heldSteady: 'Il numero di follower è rimasto stabile a',
+    postPublished: 'Pubblicato il',
+    page: 'Pagina',
+    performanceMetrics: 'Metriche di performance',
+    firstMonthTracked: 'Questo è il tuo primo mese tracciato per questa piattaforma — nessun dato di confronto disponibile.',
+    noPreviousData: 'Nessun dato del mese precedente disponibile per il confronto.',
+    firstReportingMonth: 'Questo è il tuo primo mese di reporting — monitoreremo i miglioramenti da qui.',
+    overallPerformance: 'Performance complessiva su tutte le piattaforme con indicatore di stato',
+    serviceRecommendation: 'Una raccomandazione di servizio basata sui tuoi risultati',
+    comparison: 'Confronto',
+    feature: 'CARATTERISTICA',
+    optionA: 'OPZIONE A',
+    optionB: 'OPZIONE B',
+    interestedCall: 'Interessato? Rispondi a questa email o chiamaci al',
+  },
+  nl: {
+    performanceReport: 'PRESTATIERAPPORT',
+    preparedFor: 'Opgesteld voor',
+    preparedBy: 'Opgesteld door',
+    tableOfContents: 'Inhoudsopgave',
+    reportCovers: 'Dit rapport dekt de prestaties van',
+    allFigures: 'Alle cijfers vergeleken met',
+    unlessStated: 'tenzij anders vermeld',
+    noDataAvailable: 'Geen gegevens beschikbaar voor deze periode',
+    whatThisMeans: 'WAT DIT VOOR U BETEKENT',
+    monthOnMonth: 'Maand-op-maand vergelijking',
+    topContent: 'BEST PRESTERENDE CONTENT',
+    metric: 'MAATSTAF',
+    thisMonth: 'DEZE MAAND',
+    lastMonth: 'VORIGE MAAND',
+    change: 'WIJZIGING',
+    monthlySummary: 'Maandoverzicht',
+    platformStatus: 'Platform overzicht',
+    platform: 'PLATFORM',
+    status: 'STATUS',
+    verdict: 'OORDEEL',
+    keyWins: 'Hoogtepunten deze maand',
+    worthWatching: 'Aandachtspunten',
+    strong: 'Sterk',
+    steady: 'Stabiel',
+    needsAttention: 'Aandacht vereist',
+    noteFrom: 'Een bericht van',
+    interested: 'Geïnteresseerd? Antwoord op deze e-mail of bel ons.',
+    readyToGrow: 'KLAAR OM TE GROEIEN?',
+    thankYou: 'BEDANKT,',
+    closingLine: 'Dit rapport geeft u een duidelijk beeld van de situatie. Elk getal vertegenwoordigt echte mensen die uw bedrijf ontdekken. We kijken ernaar uit om hier volgend maand op voort te bouwen.',
+    confidential: 'Vertrouwelijk',
+    newThisMonth: 'Nieuw',
+    noChange: 'Geen wijziging',
+    vsLastMonth: 'vs vorige maand',
+    firstMonthNote: 'Dit is de eerste maand met bijgehouden gegevens. Nog geen vergelijking met vorige maand beschikbaar.',
+    standoutResult: 'Het uitstekende resultaat deze maand was',
+    whichReached: 'dat bereikte',
+    upFrom: 'gestegen met',
+    fromLastMonth: 'ten opzichte van vorige maand',
+    engagementRate: 'Uw engagementpercentage is',
+    strongEngagement: '— uw publiek reageert actief op uw content.',
+    solidBaseline: '— een solide basis, met ruimte voor groei.',
+    lowEngagement: '— overweeg andere contentformaten om meer interactie te stimuleren.',
+    gained: 'U won',
+    newFollowers: 'nieuwe volgers deze maand, waarmee uw totaal komt op',
+    heldSteady: 'Uw aantal volgers bleef stabiel op',
+    postPublished: 'Gepubliceerd op',
+    page: 'Pagina',
+    performanceMetrics: 'Prestatiecijfers',
+    firstMonthTracked: 'Dit is uw eerste bijgehouden maand voor dit platform — nog geen vergelijkingsgegevens beschikbaar.',
+    noPreviousData: 'Geen gegevens van vorige maand beschikbaar voor vergelijking.',
+    firstReportingMonth: 'Dit is uw eerste rapportagemaand — we volgen de verbeteringen vanaf hier.',
+    overallPerformance: 'Algemene prestaties op alle platforms met statusindicator',
+    serviceRecommendation: 'Een serviceaanbeveling gebaseerd op uw resultaten',
+    comparison: 'Vergelijking',
+    feature: 'KENMERK',
+    optionA: 'OPTIE A',
+    optionB: 'OPTIE B',
+    interestedCall: 'Geïnteresseerd? Antwoord op deze e-mail of bel ons op',
+  },
+  pt: {
+    performanceReport: 'RELATÓRIO DE DESEMPENHO',
+    preparedFor: 'Preparado para',
+    preparedBy: 'Preparado por',
+    tableOfContents: 'Índice',
+    reportCovers: 'Este relatório cobre o desempenho de',
+    allFigures: 'Todos os números comparados com',
+    unlessStated: 'salvo indicação em contrário',
+    noDataAvailable: 'Sem dados disponíveis para este período',
+    whatThisMeans: 'O QUE ISSO SIGNIFICA PARA VOCÊ',
+    monthOnMonth: 'Comparação mês a mês',
+    topContent: 'CONTEÚDO DE MELHOR DESEMPENHO',
+    metric: 'MÉTRICA',
+    thisMonth: 'ESTE MÊS',
+    lastMonth: 'MÊS PASSADO',
+    change: 'VARIAÇÃO',
+    monthlySummary: 'Resumo mensal',
+    platformStatus: 'Visão geral das plataformas',
+    platform: 'PLATAFORMA',
+    status: 'STATUS',
+    verdict: 'VEREDICTO',
+    keyWins: 'Destaques do mês',
+    worthWatching: 'Vale monitorar',
+    strong: 'Forte',
+    steady: 'Estável',
+    needsAttention: 'Requer atenção',
+    noteFrom: 'Uma mensagem de',
+    interested: 'Interessado? Responda a este e-mail ou ligue para nós.',
+    readyToGrow: 'PRONTO PARA CRESCER?',
+    thankYou: 'OBRIGADO,',
+    closingLine: 'Este relatório fornece uma visão clara de onde as coisas estão. Cada número representa pessoas reais descobrindo seu negócio. Aguardamos construir sobre esses resultados no próximo mês.',
+    confidential: 'Confidencial',
+    newThisMonth: 'Novo',
+    noChange: 'Sem alteração',
+    vsLastMonth: 'vs mês anterior',
+    firstMonthNote: 'Este é o primeiro mês de dados rastreados. Ainda não há comparação com o mês anterior disponível.',
+    standoutResult: 'O resultado de destaque deste mês foi',
+    whichReached: 'que atingiu',
+    upFrom: 'aumentou',
+    fromLastMonth: 'em relação ao mês anterior',
+    engagementRate: 'Sua taxa de engajamento é de',
+    strongEngagement: '— seu público responde ativamente ao seu conteúdo.',
+    solidBaseline: '— uma boa base, com espaço para crescer.',
+    lowEngagement: '— considere experimentar diferentes formatos de conteúdo.',
+    gained: 'Você ganhou',
+    newFollowers: 'novos seguidores este mês, levando seu total para',
+    heldSteady: 'Seu número de seguidores permaneceu estável em',
+    postPublished: 'Publicado em',
+    page: 'Página',
+    performanceMetrics: 'Métricas de desempenho',
+    firstMonthTracked: 'Este é seu primeiro mês rastreado para esta plataforma — sem dados de comparação disponíveis.',
+    noPreviousData: 'Sem dados do mês anterior disponíveis para comparação.',
+    firstReportingMonth: 'Este é seu primeiro mês de relatório — acompanharemos as melhorias a partir daqui.',
+    overallPerformance: 'Desempenho geral em todas as plataformas com indicador de status',
+    serviceRecommendation: 'Uma recomendação de serviço baseada em seus resultados',
+    comparison: 'Comparação',
+    feature: 'RECURSO',
+    optionA: 'OPÇÃO A',
+    optionB: 'OPÇÃO B',
+    interestedCall: 'Interessado? Responda a este e-mail ou ligue para nós no',
+  },
+  pl: {
+    performanceReport: 'RAPORT WYNIKÓW',
+    preparedFor: 'Przygotowano dla',
+    preparedBy: 'Przygotowano przez',
+    tableOfContents: 'Spis treści',
+    reportCovers: 'Raport obejmuje wyniki od',
+    allFigures: 'Wszystkie liczby porównane z',
+    unlessStated: 'chyba że zaznaczono inaczej',
+    noDataAvailable: 'Brak danych za ten okres',
+    whatThisMeans: 'CO TO OZNACZA DLA CIEBIE',
+    monthOnMonth: 'Porównanie miesiąc do miesiąca',
+    topContent: 'NAJLEPSZE TREŚCI',
+    metric: 'WSKAŹNIK',
+    thisMonth: 'TEN MIESIĄC',
+    lastMonth: 'POPRZEDNI MIESIĄC',
+    change: 'ZMIANA',
+    monthlySummary: 'Podsumowanie miesięczne',
+    platformStatus: 'Przegląd platform',
+    platform: 'PLATFORMA',
+    status: 'STATUS',
+    verdict: 'OCENA',
+    keyWins: 'Sukcesy tego miesiąca',
+    worthWatching: 'Warto obserwować',
+    strong: 'Mocny',
+    steady: 'Stabilny',
+    needsAttention: 'Wymaga uwagi',
+    noteFrom: 'Wiadomość od',
+    interested: 'Zainteresowany? Odpowiedz na tego maila lub zadzwoń do nas.',
+    readyToGrow: 'GOTOWY NA ROZWÓJ?',
+    thankYou: 'DZIĘKUJEMY,',
+    closingLine: 'Ten raport daje Ci jasny obraz sytuacji. Każda liczba reprezentuje prawdziwych ludzi odkrywających Twój biznes. Z niecierpliwością czekamy na budowanie na tych wynikach w przyszłym miesiącu.',
+    confidential: 'Poufne',
+    newThisMonth: 'Nowy',
+    noChange: 'Bez zmian',
+    vsLastMonth: 'vs poprzedni miesiąc',
+    firstMonthNote: 'To pierwszy miesiąc śledzonych danych. Porównanie z poprzednim miesiącem nie jest jeszcze dostępne.',
+    standoutResult: 'Wyróżniającym wynikiem w tym miesiącu był',
+    whichReached: 'który osiągnął',
+    upFrom: 'wzrost o',
+    fromLastMonth: 'w porównaniu z poprzednim miesiącem',
+    engagementRate: 'Twój wskaźnik zaangażowania wynosi',
+    strongEngagement: '— Twoi odbiorcy aktywnie reagują na Twoje treści.',
+    solidBaseline: '— solidna baza z miejscem na rozwój.',
+    lowEngagement: '— rozważ eksperymentowanie z różnymi formatami treści.',
+    gained: 'Zyskałeś',
+    newFollowers: 'nowych obserwujących w tym miesiącu, całkowita liczba wynosi teraz',
+    heldSteady: 'Liczba obserwujących pozostała stabilna na poziomie',
+    postPublished: 'Opublikowano',
+    page: 'Strona',
+    performanceMetrics: 'Wskaźniki wydajności',
+    firstMonthTracked: 'To Twój pierwszy miesiąc śledzony dla tej platformy — brak danych porównawczych.',
+    noPreviousData: 'Brak danych z poprzedniego miesiąca do porównania.',
+    firstReportingMonth: 'To Twój pierwszy miesiąc raportowania — będziemy śledzić postępy od teraz.',
+    overallPerformance: 'Ogólna wydajność na wszystkich platformach ze wskaźnikiem statusu',
+    serviceRecommendation: 'Rekomendacja usługi na podstawie Twoich wyników',
+    comparison: 'Porównanie',
+    feature: 'CECHA',
+    optionA: 'OPCJA A',
+    optionB: 'OPCJA B',
+    interestedCall: 'Zainteresowany? Odpowiedz na tego maila lub zadzwoń do nas pod numer',
+  },
+};
+
+// ══════════════════════════════════════════════════════════════
+// SECTION TITLE CONSTANTS — kept for internal reference, overridden by T
 // ══════════════════════════════════════════════════════════════
 const SECTION_TITLES = {
   performanceReport: "Performance Report",
@@ -590,6 +1084,10 @@ Deno.serve(async (req) => {
     const maxTopPosts = detailLevel === 'summary' ? 0 : detailLevel === 'detailed' ? 10 : 5;
     const showComparisonTable = detailLevel !== 'summary';
 
+    const reportLanguage = (client.report_language as string) ?? 'en';
+    const T = TRANSLATIONS[reportLanguage] ?? TRANSLATIONS['en'];
+    console.log('Report language:', reportLanguage);
+
     if (snapshots.length === 0) {
       return new Response(JSON.stringify({
         error: "No data snapshots found for this period. Please sync platform data before generating a report."
@@ -774,7 +1272,7 @@ Deno.serve(async (req) => {
       }
 
       doc.setFontSize(6.5); setC(C.grey);
-      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year} | Page ${pageCount}`, W - M, 9, { align: "right" });
+      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year} | ${T.page} ${pageCount}`, W - M, 9, { align: "right" });
 
       // Brand colour line under header
       setF(C.primary); doc.rect(0, 14, W, 0.5, 'F');
@@ -784,7 +1282,7 @@ Deno.serve(async (req) => {
       setD(C.lightGrey); doc.setLineWidth(0.3);
       doc.line(M, H - 10, W - M, H - 10);
       doc.setFontSize(6.5); setC(C.grey);
-      doc.text(`${orgName} | Confidential`, M, H - 6);
+      doc.text(`${orgName} | ${T.confidential}`, M, H - 6);
       const footerRight = orgEmail || orgWebsite;
       if (footerRight) {
         doc.text(footerRight, W - M, H - 6, { align: "right" });
@@ -845,7 +1343,7 @@ Deno.serve(async (req) => {
 
     // "PERFORMANCE REPORT" label
     doc.setFontSize(10); setC(C.grey);
-    doc.text(SECTION_TITLES.performanceReport.toUpperCase(), 14, 50);
+    doc.text(T.performanceReport, 14, 50);
 
     // Company name — large white text
     doc.setFontSize(34); setC(C.white);
@@ -864,9 +1362,9 @@ Deno.serve(async (req) => {
 
     // Prepared for
     doc.setFontSize(9); setC(C.grey);
-    doc.text(`${SECTION_TITLES.preparedFor}: ${client.full_name}`, 14, coverY);
+    doc.text(`${T.preparedFor}: ${client.full_name}`, 14, coverY);
     coverY += 5;
-    doc.text(`Prepared by: ${orgName}`, 14, coverY);
+    doc.text(`${T.preparedBy}: ${orgName}`, 14, coverY);
 
     // Hero KPIs on the right panel
     const allMetrics: Record<string, number> = {};
@@ -917,9 +1415,9 @@ Deno.serve(async (req) => {
     if (coverFooterParts.length > 0) {
       doc.text(coverFooterParts.join(" | "), W / 2, H - 10, { align: "center" });
     }
-    doc.text(`${orgName} | Confidential`, W / 2, H - 5, { align: "center" });
+    doc.text(`${orgName} | ${T.confidential}`, W / 2, H - 5, { align: "center" });
 
-    let y = startNewPage(SECTION_TITLES.tableOfContents);
+    let y = startNewPage(T.tableOfContents);
     y += 2;
 
     const prevMonth = report_month === 1 ? 12 : report_month - 1;
@@ -929,7 +1427,7 @@ Deno.serve(async (req) => {
 
     doc.setFontSize(9); setC(C.grey);
     y = wrapText(
-      `This report covers performance from 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. All figures compared to ${prevMonthName} ${prevYear} unless stated otherwise.`,
+      `${T.reportCovers} 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. ${T.allFigures} ${prevMonthName} ${prevYear} ${T.unlessStated}.`,
       M, y, CW, 5
     );
     y += 8;
@@ -938,7 +1436,7 @@ Deno.serve(async (req) => {
     let estimatedPage = 3;
 
     for (const section of platformSections) {
-      if (y + 16 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+      if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
 
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
       const tocStatus = getPlatformStatus(section.platform, section.metrics, section.hasPrevSnapshot ? section.prevMetrics : null);
@@ -967,21 +1465,21 @@ Deno.serve(async (req) => {
     }
 
     for (const label of noDataPlatforms) {
-      if (y + 12 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+      if (y + 12 > H - 16) { y = startNewPage(T.tableOfContents); }
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 10, 2, 2, "F");
       setF(C.lightGrey); doc.rect(M, y - 4, 3, 10, "F");
       doc.setFontSize(9); setC(C.grey);
-      doc.text(`${label} — ${SECTION_TITLES.noDataAvailable}`, M + 8, y + 2);
+      doc.text(`${label} — ${T.noDataAvailable}`, M + 8, y + 2);
       y += 14;
     }
 
-    if (y + 16 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+    if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
     setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
     setF(C.primary); doc.rect(M, y - 4, 3, 14, "F");
     doc.setFontSize(14); setC(C.primary);
     doc.text(String(tocIndex).padStart(2, "0"), M + 6, y + 4);
     doc.setFontSize(10); setC(C.black);
-    doc.text(SECTION_TITLES.monthlySummary, M + 20, y + 1);
+    doc.text(T.monthlySummary, M + 20, y + 1);
     doc.setFontSize(7); setC(C.grey);
     doc.text("Overall performance across all platforms with traffic light status", M + 20, y + 7);
     doc.setFontSize(8); setC(C.grey);
@@ -990,13 +1488,13 @@ Deno.serve(async (req) => {
     tocIndex++;
 
     if (upsellData) {
-      if (y + 16 > H - 16) { y = startNewPage(SECTION_TITLES.tableOfContents); }
+      if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
       setF(C.primary); doc.rect(M, y - 4, 3, 14, "F");
       doc.setFontSize(14); setC(C.primary);
       doc.text(String(tocIndex).padStart(2, "0"), M + 6, y + 4);
       doc.setFontSize(10); setC(C.black);
-      doc.text(SECTION_TITLES.noteFromAgency(orgName), M + 20, y + 1);
+      doc.text(`${T.noteFrom} ${orgName}`, M + 20, y + 1);
       doc.setFontSize(7); setC(C.grey);
       doc.text("A service recommendation based on your results", M + 20, y + 7);
       y += 18;
@@ -1027,7 +1525,7 @@ Deno.serve(async (req) => {
         y += 12;
       }
 
-      y = drawSectionLabel("Performance Metrics", y);
+      y = drawSectionLabel(T.performanceMetrics, y);
 
       const gridMetrics = section.enabledMetrics.filter(k => typeof section.metrics[k] === "number" && METRIC_LABELS[k]).slice(0, maxMetricCards);
       const colCount = 3;
@@ -1082,7 +1580,7 @@ Deno.serve(async (req) => {
             doc.setTextColor(0, 0, 0);
           } else {
             doc.setFontSize(7.5); setC(C.grey);
-            doc.text("New this month", cardX + 6, y + 24);
+            doc.text(T.newThisMonth, cardX + 6, y + 24);
           }
         }
 
@@ -1098,7 +1596,7 @@ Deno.serve(async (req) => {
 
       const summaryText = platformSummaries[section.platform];
       if (summaryText && platformPageCount <= maxPlatformPages) {
-        y = drawSectionLabel(SECTION_TITLES.whatThisMeans, y);
+        y = drawSectionLabel(T.whatThisMeans, y);
 
         doc.setFontSize(8.5);
         const summaryLines = doc.splitTextToSize(summaryText, CW - 16);
@@ -1140,10 +1638,10 @@ Deno.serve(async (req) => {
         }
 
         if (platformPageCount <= maxPlatformPages) {
-          y = drawSectionLabel(SECTION_TITLES.comparison, y);
+          y = drawSectionLabel(T.monthOnMonth, y);
 
           const colWidths = [CW * 0.30, CW * 0.22, CW * 0.22, CW * 0.26];
-          const tableHeaders = ["Metric", SECTION_TITLES.thisMonth, SECTION_TITLES.lastMonth, SECTION_TITLES.change];
+          const tableHeaders = ["Metric", T.thisMonth, T.lastMonth, T.change];
 
           // Table header row — brand primary background
           setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
@@ -1233,7 +1731,7 @@ Deno.serve(async (req) => {
         }
 
         if (platformPageCount <= maxPlatformPages) {
-          y = drawSectionLabel(SECTION_TITLES.topContent, y);
+          y = drawSectionLabel(T.topContent, y);
 
           const topItems = section.topContent.slice(0, effectiveMaxPosts) as Record<string, unknown>[];
           for (let idx = 0; idx < topItems.length; idx++) {
@@ -1269,8 +1767,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    y = startNewPage(SECTION_TITLES.monthlySummary);
-    pageToc.push({ title: SECTION_TITLES.monthlySummary, page: pageCount });
+    y = startNewPage(T.monthlySummary);
+    pageToc.push({ title: T.monthlySummary, page: pageCount });
 
     setF(C.primaryLight); doc.roundedRect(M, y - 3, CW, 30, 3, 3, "F");
     setF(C.primary); doc.rect(M, y - 3, 3, 30, "F");
@@ -1283,18 +1781,18 @@ Deno.serve(async (req) => {
     }
     y += 34;
 
-    y = drawSectionLabel(SECTION_TITLES.platformStatusOverview, y);
+    y = drawSectionLabel(T.platformStatus, y);
 
     const summaryColWidths = [CW * 0.28, CW * 0.15, CW * 0.57];
     setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
     doc.setFontSize(7); setC(C.white);
-    doc.text("PLATFORM", M + 4, y + 1.5);
-    doc.text("STATUS", M + summaryColWidths[0] + 4, y + 1.5);
-    doc.text("VERDICT", M + summaryColWidths[0] + summaryColWidths[1] + 4, y + 1.5);
+    doc.text(T.platform, M + 4, y + 1.5);
+    doc.text(T.status, M + summaryColWidths[0] + 4, y + 1.5);
+    doc.text(T.verdict, M + summaryColWidths[0] + summaryColWidths[1] + 4, y + 1.5);
     y += 8;
 
     for (let i = 0; i < platformSections.length; i++) {
-      if (y + 9 > H - 16) y = startNewPage(SECTION_TITLES.monthlySummary);
+      if (y + 9 > H - 16) y = startNewPage(T.monthlySummary);
       const section = platformSections[i];
       const status = getPlatformStatus(section.platform, section.metrics, section.hasPrevSnapshot ? section.prevMetrics : null);
 
@@ -1321,10 +1819,10 @@ Deno.serve(async (req) => {
     y += 8;
 
     if (keyWins.length > 0) {
-      y = drawSectionLabel(SECTION_TITLES.keyWins, y);
+      y = drawSectionLabel(T.keyWins, y);
 
       for (const win of keyWins) {
-        if (y + 12 > H - 16) { y = startNewPage(SECTION_TITLES.monthlySummary); }
+        if (y + 12 > H - 16) { y = startNewPage(T.monthlySummary); }
         setF(C.greenLight); doc.roundedRect(M, y - 3, CW, 9, 2, 2, "F");
         setF(C.green); doc.rect(M, y - 3, 2.5, 9, "F");
         doc.setFontSize(8); setC(C.black);
@@ -1333,7 +1831,7 @@ Deno.serve(async (req) => {
         y += 12;
       }
     } else {
-      y = drawSectionLabel(SECTION_TITLES.keyWins, y);
+      y = drawSectionLabel(T.keyWins, y);
       doc.setFontSize(8); setC(C.grey);
       doc.text("This is your first reporting month — we'll track improvements from here.", M + 6, y);
       y += 10;
@@ -1344,11 +1842,11 @@ Deno.serve(async (req) => {
       const worthWatchingHeight = worthWatching.length * 12 + 10;
       if (y + worthWatchingHeight > H - 16) {
         if (y + worthWatchingHeight > H - 6) {
-          y = startNewPage(SECTION_TITLES.monthlySummary);
+          y = startNewPage(T.monthlySummary);
         }
       }
 
-      y = drawSectionLabel(SECTION_TITLES.worthWatching, y);
+      y = drawSectionLabel(T.worthWatching, y);
 
       for (const item of worthWatching) {
         setF(C.amberLight); doc.roundedRect(M, y - 3, CW, 9, 2, 2, "F");
@@ -1361,8 +1859,8 @@ Deno.serve(async (req) => {
     }
 
     if (upsellData) {
-      y = startNewPage(SECTION_TITLES.noteFromAgency(orgName));
-      pageToc.push({ title: SECTION_TITLES.noteFromAgency(orgName), page: pageCount });
+      y = startNewPage(`${T.noteFrom} ${orgName}`);
+      pageToc.push({ title: `${T.noteFrom} ${orgName}`, page: pageCount });
 
       setF(C.primary); doc.rect(M, y - 2, 40, 1.5, "F"); y += 6;
 
@@ -1391,7 +1889,7 @@ Deno.serve(async (req) => {
           y += 8;
 
           for (let i = 0; i < compData.length; i++) {
-            if (y + 7 > H - 16) y = startNewPage(SECTION_TITLES.noteFromAgency(orgName));
+            if (y + 7 > H - 16) y = startNewPage(`${T.noteFrom} ${orgName}`);
             if (i % 2 === 0) { setF(C.tableAltRow); doc.rect(M, y - 3, CW, 7, "F"); }
             doc.setFontSize(7.5); setC(C.black);
             doc.text(compData[i].label, M + 4, y + 1);
@@ -1409,7 +1907,7 @@ Deno.serve(async (req) => {
       doc.setFontSize(9); setC(C.primary);
       const ctaText = orgPhone
         ? `Interested? Reply to this email or call us at ${orgPhone}.`
-        : SECTION_TITLES.interestedCTA;
+        : T.interested;
       doc.text(ctaText, M + 8, y + 4);
     }
 
@@ -1431,12 +1929,12 @@ Deno.serve(async (req) => {
     // "READY TO GROW?" label in brand colour
     setC(C.primary);
     doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-    doc.text(SECTION_TITLES.readyToGrow.toUpperCase(), 14, 35);
+    doc.text(T.readyToGrow, 14, 35);
 
     // "THANK YOU,"
     doc.setFontSize(28); doc.setFont('helvetica', 'bold');
     setC(C.white);
-    doc.text('THANK YOU,', 14, 52);
+    doc.text(T.thankYou, 14, 52);
 
     // Client first name in brand colour
     setC(C.primary);
@@ -1446,7 +1944,7 @@ Deno.serve(async (req) => {
     // Body text
     doc.setTextColor(180, 180, 180);
     doc.setFontSize(8.5);
-    const endText = 'This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We look forward to building on this next month.';
+    const endText = T.closingLine;
     const endLines = doc.splitTextToSize(endText, 110);
     doc.text(endLines, 14, 85);
 

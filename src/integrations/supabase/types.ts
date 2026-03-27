@@ -209,6 +209,7 @@ export type Database = {
           preferred_currency: string | null
           preferred_timezone: string | null
           report_detail_level: string | null
+          report_language: string
           reporting_start_date: string | null
           scheduled_deletion_at: string | null
           services_subscribed: string[] | null
@@ -238,6 +239,7 @@ export type Database = {
           preferred_currency?: string | null
           preferred_timezone?: string | null
           report_detail_level?: string | null
+          report_language?: string
           reporting_start_date?: string | null
           scheduled_deletion_at?: string | null
           services_subscribed?: string[] | null
@@ -267,6 +269,7 @@ export type Database = {
           preferred_currency?: string | null
           preferred_timezone?: string | null
           report_detail_level?: string | null
+          report_language?: string
           reporting_start_date?: string | null
           scheduled_deletion_at?: string | null
           services_subscribed?: string[] | null

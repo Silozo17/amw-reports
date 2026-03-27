@@ -48,6 +48,9 @@ const Reports = () => {
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [isGeneratingNew, setIsGeneratingNew] = useState(false);
+  const { month: defaultMonth, year: defaultYear } = getCurrentReportPeriod();
+  const [selectedMonth, setSelectedMonth] = useState<number>(defaultMonth);
+  const [selectedYear, setSelectedYear] = useState<number>(defaultYear);
 
   const fetchReports = async () => {
     if (!orgId) return;
@@ -123,8 +126,7 @@ const Reports = () => {
       return;
     }
     setIsGeneratingNew(true);
-    const { month, year } = getCurrentReportPeriod();
-    await generateReport(selectedClient, month, year);
+    await generateReport(selectedClient, selectedMonth, selectedYear);
     await fetchReports();
     setIsGeneratingNew(false);
   };
@@ -145,6 +147,26 @@ const Reports = () => {
               <SelectContent>
                 {clients.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(selectedMonth)} onValueChange={v => setSelectedMonth(Number(v))}>
+              <SelectTrigger className="w-28">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
+                  <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
+              <SelectTrigger className="w-20">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(yr => (
+                  <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -44,6 +44,7 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
     enable_yoy_comparison: client.enable_yoy_comparison,
     enable_explanations: client.enable_explanations,
     report_detail_level: client.report_detail_level,
+    report_language: client.report_language ?? 'en',
   });
 
   useEffect(() => {
@@ -66,6 +67,7 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
         enable_yoy_comparison: client.enable_yoy_comparison,
         enable_explanations: client.enable_explanations,
         report_detail_level: client.report_detail_level,
+        report_language: client.report_language ?? 'en',
       });
       setLogoFile(null);
       setLogoPreview(client.logo_url ?? null);
@@ -256,6 +258,25 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
                 />
               </div>
             ))}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-body">Report Language</p>
+                <p className="text-xs text-muted-foreground">Language for report text</p>
+              </div>
+              <Select value={form.report_language} onValueChange={v => handleChange('report_language', v)}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="fr">French</SelectItem>
+                  <SelectItem value="de">German</SelectItem>
+                  <SelectItem value="es">Spanish</SelectItem>
+                  <SelectItem value="it">Italian</SelectItem>
+                  <SelectItem value="nl">Dutch</SelectItem>
+                  <SelectItem value="pt">Portuguese</SelectItem>
+                  <SelectItem value="pl">Polish</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">
