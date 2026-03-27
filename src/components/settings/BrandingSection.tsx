@@ -265,44 +265,39 @@ const BrandingSection = () => {
   const handleExtractBranding = async () => {
     if (!websiteUrl.trim()) return;
     setIsExtracting(true);
+    setExtractError(null);
+    setExtractedResult(null);
     try {
       const { data, error } = await supabase.functions.invoke('extract-branding', {
         body: { url: websiteUrl.trim() },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      if (data?.success && data.branding) {
-        const b = data.branding;
-        if (b.colors?.primary) setPrimaryColor(b.colors.primary);
-        if (b.colors?.secondary) setSecondaryColor(b.colors.secondary);
-        if (b.colors?.accent) setAccentColor(b.colors.accent);
-        if (b.colors?.background && b.colors.background !== '#FFFFFF' && b.colors.background !== '#ffffff') {
-          // Only set text colors if they're interesting
-          if (b.colors.textPrimary) setTextOnLight(b.colors.textPrimary);
-        }
-        if (b.typography?.fontFamilies?.heading) {
-          const hf = b.typography.fontFamilies.heading;
-          if (FONT_OPTIONS.includes(hf)) setHeadingFont(hf);
-        }
-        if (b.typography?.fontFamilies?.primary) {
-          const bf = b.typography.fontFamilies.primary;
-          if (FONT_OPTIONS.includes(bf)) setBodyFont(bf);
-        }
-        if (b.images?.logo || b.logo) {
-          // Don't auto-set logo — just notify
-          toast.info('Logo found — upload it manually to ensure quality');
-        }
-        toast.success('Branding extracted — review and save');
-      } else {
-        toast.error(data?.error || 'Could not extract branding from this website');
-      }
+      // data is the flat object: { primary_color, secondary_color, ... }
+      setExtractedResult(data);
     } catch (err) {
       console.error('Branding extraction error:', err);
-      toast.error('Failed to extract branding. Make sure the URL is valid.');
+      setExtractError(err instanceof Error ? err.message : 'Failed to extract branding. Make sure the URL is valid.');
     } finally {
       setIsExtracting(false);
     }
+  };
+
+  const applyExtractedBranding = () => {
+    if (!extractedResult) return;
+    if (extractedResult.primary_color) setPrimaryColor(extractedResult.primary_color);
+    if (extractedResult.secondary_color) setSecondaryColor(extractedResult.secondary_color);
+    if (extractedResult.accent_color) setAccentColor(extractedResult.accent_color);
+    if (extractedResult.heading_font && FONT_OPTIONS.includes(extractedResult.heading_font)) {
+      setHeadingFont(extractedResult.heading_font);
+    }
+    if (extractedResult.body_font && FONT_OPTIONS.includes(extractedResult.body_font)) {
+      setBodyFont(extractedResult.body_font);
+    }
+    setExtractedResult(null);
+    toast.success('Branding applied — click Save to confirm');
   };
 
   const effectiveButtonBg = buttonColor || primaryColor;
