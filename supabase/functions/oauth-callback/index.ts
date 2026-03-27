@@ -173,33 +173,90 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
     );
     const customerData = await customerRes.json();
     console.log("Google Ads customer discovery:", JSON.stringify(customerData));
+
     if (customerData.resourceNames?.length > 0) {
-      // Fetch descriptive names for each customer
-      for (const rn of customerData.resourceNames) {
-        const custId = rn.replace("customers/", "");
-        let descriptiveName = `Google Ads (${custId})`;
+      const allCustIds = customerData.resourceNames.map((rn: string) => rn.replace("customers/", ""));
+
+      // Step 1: Find manager accounts by trying to query customer_client from each
+      // A manager account can list its sub-accounts via GAQL
+      const managerIds: string[] = [];
+      const resolvedNames = new Map<string, string>();
+
+      for (const custId of allCustIds) {
         try {
-          const nameRes = await fetch(
-            `https://googleads.googleapis.com/v20/customers/${custId}`,
+          const gaqlRes = await fetch(
+            `https://googleads.googleapis.com/v20/customers/${custId}/googleAds:searchStream`,
             {
+              method: "POST",
               headers: {
                 Authorization: `Bearer ${tokenData.access_token}`,
                 "developer-token": devToken || "",
                 "login-customer-id": custId,
+                "Content-Type": "application/json",
               },
+              body: JSON.stringify({
+                query: "SELECT customer_client.client_customer, customer_client.descriptive_name, customer_client.manager, customer_client.level FROM customer_client WHERE customer_client.level <= 1",
+              }),
             }
           );
-          if (nameRes.ok) {
-            const nameData = await nameRes.json();
-            if (nameData.descriptiveName) {
-              descriptiveName = nameData.descriptiveName;
+
+          if (gaqlRes.ok) {
+            const gaqlData = await gaqlRes.json();
+            // This is a manager account
+            managerIds.push(custId);
+
+            // Extract names for all sub-accounts (and the manager itself at level 0)
+            if (Array.isArray(gaqlData) && gaqlData.length > 0) {
+              for (const batch of gaqlData) {
+                if (batch.results) {
+                  for (const row of batch.results) {
+                    const cc = row.customerClient;
+                    if (cc?.clientCustomer) {
+                      const subId = cc.clientCustomer.replace("customers/", "");
+                      if (cc.descriptiveName) {
+                        resolvedNames.set(subId, cc.descriptiveName);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            // Not a manager — try direct fetch for its own name
+            try {
+              const directRes = await fetch(
+                `https://googleads.googleapis.com/v20/customers/${custId}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${tokenData.access_token}`,
+                    "developer-token": devToken || "",
+                    "login-customer-id": custId,
+                  },
+                }
+              );
+              if (directRes.ok) {
+                const directData = await directRes.json();
+                if (directData.descriptiveName) {
+                  resolvedNames.set(custId, directData.descriptiveName);
+                }
+              }
+            } catch (e) {
+              console.warn(`Direct fetch failed for ${custId}:`, e);
             }
           }
         } catch (e) {
-          console.warn(`Could not fetch name for customer ${custId}:`, e);
+          console.warn(`GAQL query failed for ${custId}:`, e);
         }
-        customers.push({ id: custId, name: descriptiveName });
       }
+
+      // Build the final list — skip manager accounts, show only leaf/client accounts
+      for (const custId of allCustIds) {
+        // If this ID was identified as a manager, still include it but mark it
+        const name = resolvedNames.get(custId) || `Google Ads (${custId})`;
+        customers.push({ id: custId, name });
+      }
+
+      console.log("Resolved Google Ads customers:", JSON.stringify(customers));
     }
   } catch (e) {
     console.error("Could not fetch customer info:", e);
