@@ -11,6 +11,7 @@ import ReportSettingsSection from '@/components/settings/ReportSettingsSection';
 import CustomDomainSection from '@/components/settings/CustomDomainSection';
 import MetricsDefaultsSection from '@/components/settings/MetricsDefaultsSection';
 import BillingSection from '@/components/settings/BillingSection';
+import UpsellsOverviewSection from '@/components/settings/UpsellsOverviewSection';
 
 const SettingsPage = () => {
   const { isPlatformAdmin } = useAuth();
@@ -43,6 +44,7 @@ const SettingsPage = () => {
   tabs.push({ value: 'account', label: 'Account' });
   if (showWhitelabel) tabs.push({ value: 'whitelabel', label: 'White Label' });
   if (canManageMetrics) tabs.push({ value: 'metrics', label: 'Metrics' });
+  tabs.push({ value: 'upsells', label: 'Upsells' });
   if (canManageBilling) tabs.push({ value: 'billing', label: 'Billing' });
 
   const defaultTab = tabs[0]?.value ?? 'account';
@@ -86,6 +88,10 @@ const SettingsPage = () => {
               <MetricsDefaultsSection />
             </TabsContent>
           )}
+
+          <TabsContent value="upsells" className="space-y-6 mt-6">
+            <UpsellsOverviewSection />
+          </TabsContent>
 
           {canManageBilling && (
             <TabsContent value="billing" className="space-y-6 mt-6">
