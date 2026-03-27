@@ -146,21 +146,19 @@ const HIDDEN_METRICS = new Set(["campaign_count", "pages_count", "unfollows", "p
 const ONE_PAGE_PLATFORMS = new Set(["google_search_console", "google_business_profile", "youtube"]);
 
 // ══════════════════════════════════════════════════════════════
-// FIX 1 — ARROW HELPERS
+// FIX 1 — ASCII-SAFE CHANGE INDICATORS (no Unicode arrows)
 // ══════════════════════════════════════════════════════════════
-function getChangeArrow(change: number): string {
-  if (change > 0) return '↑';
-  if (change < 0) return '↓';
-  return '—';
-}
-
-function formatChangePct(change: number | null, isInverted = false): { text: string; isGood: boolean; isNeutral: boolean } {
-  if (change === null || change === undefined) return { text: '—', isGood: false, isNeutral: true };
-  if (change === 0) return { text: '— 0.0%', isGood: false, isNeutral: true };
-  const arrow = getChangeArrow(change);
-  const pct = Math.abs(change).toFixed(1);
+function formatChangeIndicator(change: number | null, isInverted = false): { symbol: string; label: string; isPositive: boolean | null } {
+  if (change === null || change === undefined || isNaN(change)) {
+    return { symbol: '-', label: 'No change', isPositive: null };
+  }
+  if (Math.abs(change) < 0.1) {
+    return { symbol: '-', label: '0.0%', isPositive: null };
+  }
   const isGood = isInverted ? change < 0 : change > 0;
-  return { text: `${arrow} ${pct}%`, isGood, isNeutral: false };
+  const symbol = change > 0 ? '+' : '-';
+  const label = `${symbol}${Math.abs(change).toFixed(1)}%`;
+  return { symbol, label, isPositive: isGood };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -470,7 +468,9 @@ function getPostCaption(item: Record<string, unknown>): string {
     const postDate = item.created_time || item.date || item.published_at || item.timestamp || "";
     caption = postDate ? `Post published on ${String(postDate).substring(0, 10)}` : "Post published this month";
   }
-  if (caption.length > 80) caption = caption.substring(0, 77) + "...";
+  // Remove newlines — they cause layout breaks in jsPDF
+  caption = caption.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  if (caption.length > 65) caption = caption.substring(0, 62) + "...";
   return caption;
 }
 
@@ -585,6 +585,11 @@ Deno.serve(async (req) => {
     };
     const currSymbol = CURRENCY_SYMBOLS[client.preferred_currency ?? "GBP"] ?? "\u00A3";
 
+    const detailLevel = (client.report_detail_level as string) ?? 'standard';
+    const maxMetricCards = detailLevel === 'summary' ? 5 : detailLevel === 'detailed' ? 15 : 9;
+    const maxTopPosts = detailLevel === 'summary' ? 0 : detailLevel === 'detailed' ? 10 : 5;
+    const showComparisonTable = detailLevel !== 'summary';
+
     if (snapshots.length === 0) {
       return new Response(JSON.stringify({
         error: "No data snapshots found for this period. Please sync platform data before generating a report."
@@ -695,23 +700,49 @@ Deno.serve(async (req) => {
     let logoExt: "PNG" | "JPEG" = "PNG";
     if (showLogo && org?.logo_url) {
       try {
-        const logoRes = await fetch(org.logo_url);
+        const logoRes = await fetch(org.logo_url, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         if (logoRes.ok) {
+          const contentType = logoRes.headers.get('content-type') ?? '';
+          logoExt = contentType.includes('jpeg') || contentType.includes('jpg') ||
+                    org.logo_url.toLowerCase().includes('.jpg') || org.logo_url.toLowerCase().includes('.jpeg') ? "JPEG" : "PNG";
           const logoBlob = await logoRes.arrayBuffer();
-          logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBlob)));
-          logoExt = org.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
+          const uint8 = new Uint8Array(logoBlob);
+          // Convert to base64 in chunks to avoid stack overflow on large images
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8.length; i += chunkSize) {
+            binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+          }
+          logoBase64 = btoa(binary);
+          console.log(`Logo loaded: ${logoExt}, size: ${uint8.length} bytes`);
+        } else {
+          console.error(`Logo fetch failed: ${logoRes.status} ${logoRes.statusText} for ${org.logo_url}`);
         }
-      } catch { }
+      } catch (err) {
+        console.error(`Logo fetch exception:`, err instanceof Error ? err.message : err);
+      }
     }
 
-    const drawStatusBadge = (x: number, y: number, status: string, w = 30) => {
-      const bgColor = status === "Strong" ? C.statusStrongBg : status === "Needs Attention" ? C.statusNeedsBg : C.statusSteadyBg;
-      const textColor = status === "Strong" ? C.statusStrongText : status === "Needs Attention" ? C.statusNeedsText : C.statusSteadyText;
-      const borderColor = status === "Strong" ? C.statusStrongBorder : status === "Needs Attention" ? C.statusNeedsBorder : C.statusSteadyBorder;
-      setF(bgColor); doc.roundedRect(x, y - 3, w, 7, 2, 2, "F");
-      setD(borderColor); doc.setLineWidth(0.3); doc.roundedRect(x, y - 3, w, 7, 2, 2, "S");
-      doc.setFontSize(6.5); setC(textColor);
-      doc.text(status, x + w / 2, y + 1, { align: "center" });
+    const drawStatusBadge = (x: number, y: number, status: string, _w = 30) => {
+      const colors: Record<string, { bg: number[]; text: number[] }> = {
+        'Strong':          { bg: C.statusStrongBg, text: C.statusStrongText },
+        'Steady':          { bg: C.statusSteadyBg, text: C.statusSteadyText },
+        'Needs Attention': { bg: C.statusNeedsBg,  text: C.statusNeedsText },
+      };
+      const c = colors[status] ?? colors['Steady'];
+      const label = status;
+      doc.setFontSize(6.5);
+      const textWidth = doc.getTextWidth(label);
+      const padH = 2.5;
+      const padV = 1.2;
+      const badgeW = textWidth + padH * 2;
+      const badgeH = 4.5;
+      setF(c.bg); doc.roundedRect(x, y - badgeH + padV, badgeW, badgeH, 1, 1, 'F');
+      setC(c.text); doc.setFont('helvetica', 'bold');
+      doc.text(label, x + padH, y);
+      setC(C.black); doc.setFont('helvetica', 'normal');
     };
 
     const drawSectionLabel = (label: string, yPos: number): number => {
@@ -734,7 +765,7 @@ Deno.serve(async (req) => {
         } catch { }
       }
 
-      doc.setFontSize(10); setC(C.black);
+      doc.setFontSize(10); setC(C.primary);
       doc.text(sectionTitle, headerX, 9);
 
       if (status) {
@@ -745,8 +776,8 @@ Deno.serve(async (req) => {
       doc.setFontSize(6.5); setC(C.grey);
       doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year} | Page ${pageCount}`, W - M, 9, { align: "right" });
 
-      setD(C.lightGrey); doc.setLineWidth(0.3);
-      doc.line(M, 14, W - M, 14);
+      // Brand colour line under header
+      setF(C.primary); doc.rect(0, 14, W, 0.5, 'F');
     };
 
     const addPageFooter = () => {
@@ -783,41 +814,61 @@ Deno.serve(async (req) => {
     };
 
     pageCount++;
-    const coverSplitX = W * 0.38;
-    setF(C.primary); doc.rect(0, 0, coverSplitX, H, "F");
-    setF(C.coverDark); doc.rect(coverSplitX, 0, W - coverSplitX, H, "F");
+    console.log('Cover: C.primary =', C.primary, 'logoBase64 length =', logoBase64?.length ?? 0);
 
+    // Cover — dark background full page
+    setF(C.coverDark); doc.rect(0, 0, W, H, 'F');
+
+    // Brand colour accent bar — top of page, full width, 4mm tall
+    setF(C.primary); doc.rect(0, 0, W, 4, 'F');
+
+    // Right panel — darker shade of brand primary
+    const panelX = W * 0.62;
+    const panelWidth = W - panelX;
+    const darkerPrimary = C.primary.map((v: number) => Math.max(0, v - 30)) as [number, number, number];
+    setF(darkerPrimary); doc.rect(panelX, 0, panelWidth, H, 'F');
+
+    // Logo in top-left
     if (logoBase64) {
       try {
-        doc.addImage(`data:image/${logoExt.toLowerCase()};base64,${logoBase64}`, logoExt, 16, 24, 50, 50);
-      } catch { }
+        doc.addImage(`data:image/${logoExt.toLowerCase()};base64,${logoBase64}`, logoExt, 14, 10, 50, 16, undefined, 'FAST');
+      } catch (imgErr) {
+        console.error('Logo addImage failed:', imgErr instanceof Error ? imgErr.message : imgErr);
+        doc.setFontSize(12); setC(C.white); doc.setFont('helvetica', 'bold');
+        doc.text(orgName, 14, 18);
+        doc.setFont('helvetica', 'normal');
+      }
     } else {
       doc.setFontSize(20); setC(C.white);
-      doc.text(orgName, coverSplitX / 2, 50, { align: "center" });
+      doc.text(orgName, 14, 30);
     }
 
-    const rightX = coverSplitX + 20;
+    // "PERFORMANCE REPORT" label
     doc.setFontSize(10); setC(C.grey);
-    doc.text(SECTION_TITLES.performanceReport.toUpperCase(), rightX, 36);
+    doc.text(SECTION_TITLES.performanceReport.toUpperCase(), 14, 50);
 
+    // Company name — large white text
     doc.setFontSize(34); setC(C.white);
-    const companyLines = doc.splitTextToSize(client.company_name, W - coverSplitX - 40);
-    let coverY = 54;
+    const companyLines = doc.splitTextToSize(client.company_name, panelX - 30);
+    let coverY = 68;
     for (const line of companyLines) {
-      doc.text(line, rightX, coverY);
+      doc.text(line, 14, coverY);
       coverY += 14;
     }
 
+    // Month/year in lighter brand colour
     coverY += 6;
     doc.setFontSize(14); setC(lighten(C.primary, 0.4));
-    doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, rightX, coverY);
+    doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, 14, coverY);
     coverY += 12;
 
+    // Prepared for
     doc.setFontSize(9); setC(C.grey);
-    doc.text(`${SECTION_TITLES.preparedFor}: ${client.full_name}`, rightX, coverY);
+    doc.text(`${SECTION_TITLES.preparedFor}: ${client.full_name}`, 14, coverY);
     coverY += 5;
-    doc.text(`Prepared by: ${orgName}`, rightX, coverY);
+    doc.text(`Prepared by: ${orgName}`, 14, coverY);
 
+    // Hero KPIs on the right panel
     const allMetrics: Record<string, number> = {};
     for (const s of platformSections) {
       for (const [k, v] of Object.entries(s.metrics)) {
@@ -843,8 +894,8 @@ Deno.serve(async (req) => {
       .slice(0, 3);
 
     const kpiStartY = H - 70;
-    const kpiRightX = coverSplitX + 16;
-    const kpiW = (W - coverSplitX - 36);
+    const kpiRightX = panelX + 16;
+    const kpiW = panelWidth - 32;
     heroMetrics.forEach((hero, i) => {
       const ky = kpiStartY + i * 20;
       const isLast = i === heroMetrics.length - 1;
@@ -858,6 +909,7 @@ Deno.serve(async (req) => {
       }
     });
 
+    // Cover footer
     doc.setFontSize(6.5); setC(C.grey);
     const coverFooterParts: string[] = [];
     if (orgEmail) coverFooterParts.push(orgEmail);
@@ -977,7 +1029,7 @@ Deno.serve(async (req) => {
 
       y = drawSectionLabel("Performance Metrics", y);
 
-      const gridMetrics = section.enabledMetrics.filter(k => typeof section.metrics[k] === "number" && METRIC_LABELS[k]);
+      const gridMetrics = section.enabledMetrics.filter(k => typeof section.metrics[k] === "number" && METRIC_LABELS[k]).slice(0, maxMetricCards);
       const colCount = 3;
       const cardW = (CW - (colCount - 1) * 4) / colCount;
       const cardH = hasPrev ? 28 : 22;
@@ -993,11 +1045,14 @@ Deno.serve(async (req) => {
         }
 
         const val = section.metrics[key];
-        const prevVal = section.prevMetrics[key];
 
+        // Card background
+        setF(C.cardBg); doc.roundedRect(cardX, y, cardW, cardH, 2, 2, "F");
+        // Brand colour top border
+        setF(C.primary); doc.rect(cardX, y, cardW, 0.7, "F");
+        // Subtle card border
         setD(C.cardBorder); doc.setLineWidth(0.3);
-        setF(C.cardBg); doc.roundedRect(cardX, y, cardW, cardH, 2, 2, "FD");
-        setF(C.primary); doc.rect(cardX + 1, y, cardW - 2, 1.5, "F");
+        doc.roundedRect(cardX, y, cardW, cardH, 2, 2, "S");
 
         doc.setFontSize(6.5); setC(C.metricLabel);
         const labelText = (METRIC_LABELS[key] ?? key).toUpperCase();
@@ -1011,18 +1066,20 @@ Deno.serve(async (req) => {
         doc.text(formatVal(key, val), cardX + 6, y + 18);
 
         if (hasPrev) {
+          const prevVal = section.prevMetrics[key];
           if (prevVal !== undefined && key in section.prevMetrics) {
-            if (prevVal === 0) {
-              doc.setFontSize(7.5); setC(C.grey);
-              doc.text("— 0.0%", cardX + 6, y + 24);
+            const change = calcChange(val, prevVal);
+            const indicator = formatChangeIndicator(change.pct, INVERTED_METRICS.has(key));
+            if (indicator.isPositive === true) {
+              doc.setTextColor(22, 163, 74);
+            } else if (indicator.isPositive === false) {
+              doc.setTextColor(220, 38, 38);
             } else {
-              const change = calcChange(val, prevVal);
-              const isInverted = INVERTED_METRICS.has(key);
-              const { text: changeText } = formatChangePct(change.pct, isInverted);
-              const color = getChangeColor(key, change.dir);
-              doc.setFontSize(7.5); setC(color);
-              doc.text(changeText, cardX + 6, y + 24);
+              doc.setTextColor(150, 150, 150);
             }
+            doc.setFontSize(7.5);
+            doc.text(indicator.label, cardX + 6, y + 24);
+            doc.setTextColor(0, 0, 0);
           } else {
             doc.setFontSize(7.5); setC(C.grey);
             doc.text("New this month", cardX + 6, y + 24);
@@ -1071,7 +1128,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (hasPrev && gridMetrics.length > 0 && platformPageCount <= maxPlatformPages) {
+      if (showComparisonTable && hasPrev && gridMetrics.length > 0 && platformPageCount <= maxPlatformPages) {
         const pageUsedPct = (y - 14) / (H - 30);
         const needsNewPage = pageUsedPct > 0.55 && platformPageCount < maxPlatformPages;
 
@@ -1088,6 +1145,7 @@ Deno.serve(async (req) => {
           const colWidths = [CW * 0.30, CW * 0.22, CW * 0.22, CW * 0.26];
           const tableHeaders = ["Metric", SECTION_TITLES.thisMonth, SECTION_TITLES.lastMonth, SECTION_TITLES.change];
 
+          // Table header row — brand primary background
           setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
           doc.setFontSize(7); setC(C.white);
           let hx = M;
@@ -1119,7 +1177,7 @@ Deno.serve(async (req) => {
             const prevVal = section.prevMetrics[key];
 
             if (rowIdx % 2 === 0) {
-              setF(C.tableAltRow); doc.rect(M, y - 3, CW, 7, "F");
+              setF([249, 249, 249]); doc.rect(M, y - 3, CW, 7, "F");
             }
 
             doc.setFontSize(7.5);
@@ -1137,13 +1195,18 @@ Deno.serve(async (req) => {
 
             if (prevVal !== undefined && key in section.prevMetrics && prevVal !== 0) {
               const change = calcChange(val, prevVal);
-              const isInverted = INVERTED_METRICS.has(key);
-              const { text: changeText } = formatChangePct(change.pct, isInverted);
-              const color = getChangeColor(key, change.dir);
-              setC(color);
-              doc.text(changeText, rx + 4, y + 1);
+              const indicator = formatChangeIndicator(change.pct, INVERTED_METRICS.has(key));
+              if (indicator.isPositive === true) {
+                doc.setTextColor(22, 163, 74);
+              } else if (indicator.isPositive === false) {
+                doc.setTextColor(220, 38, 38);
+              } else {
+                doc.setTextColor(150, 150, 150);
+              }
+              doc.text(indicator.label, rx + 4, y + 1);
+              doc.setTextColor(0, 0, 0);
             } else if (prevVal !== undefined && key in section.prevMetrics) {
-              setC(C.grey); doc.text("— 0.0%", rx + 4, y + 1);
+              setC(C.grey); doc.text("0.0%", rx + 4, y + 1);
             } else {
               setC(C.grey); doc.text("New", rx + 4, y + 1);
             }
@@ -1160,8 +1223,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (section.topContent.length > 0 && platformPageCount <= maxPlatformPages) {
-        const maxPosts = (y + 40 > H - 16 && platformPageCount >= maxPlatformPages) ? 3 : 5;
+      if (maxTopPosts > 0 && section.topContent.length > 0 && platformPageCount <= maxPlatformPages) {
+        const effectiveMaxPosts = Math.min(maxTopPosts, (y + 40 > H - 16 && platformPageCount >= maxPlatformPages) ? 3 : maxTopPosts);
         if (y + 20 > H - 16) {
           if (platformPageCount < maxPlatformPages) {
             y = startNewPage(section.label, platStatus);
@@ -1172,7 +1235,7 @@ Deno.serve(async (req) => {
         if (platformPageCount <= maxPlatformPages) {
           y = drawSectionLabel(SECTION_TITLES.topContent, y);
 
-          const topItems = section.topContent.slice(0, maxPosts) as Record<string, unknown>[];
+          const topItems = section.topContent.slice(0, effectiveMaxPosts) as Record<string, unknown>[];
           for (let idx = 0; idx < topItems.length; idx++) {
             const item = topItems[idx];
             if (y + 12 > H - 16) {
@@ -1184,7 +1247,9 @@ Deno.serve(async (req) => {
 
             doc.setFontSize(8); setC(C.black);
             const postTitle = getPostCaption(item);
-            doc.text(`${idx + 1}.  ${postTitle}`, M + 4, y + 2);
+            const availableWidth = CW * 0.55;
+            const postLines = doc.splitTextToSize(`${idx + 1}.  ${postTitle}`, availableWidth);
+            doc.text(postLines[0], M + 4, y + 2);
 
             const details: string[] = [];
             if (item.spend !== undefined) details.push(`Spend: ${currSymbol}${Number(item.spend).toFixed(2)}`);
@@ -1348,43 +1413,60 @@ Deno.serve(async (req) => {
       doc.text(ctaText, M + 8, y + 4);
     }
 
+    // End page — dark background with brand accents
     if (pageCount > 0) doc.addPage();
     pageCount++;
-    setF(C.primary); doc.rect(0, 0, W, H, "F");
 
-    doc.setFontSize(12); setC(lighten(C.white, 0.2));
-    doc.text(SECTION_TITLES.readyToGrow, W / 2, 55, { align: "center" });
+    // Dark background
+    setF(C.coverDark); doc.rect(0, 0, W, H, 'F');
 
-    const firstName = client.full_name.split(" ")[0];
-    doc.setFontSize(32); setC(C.white);
-    doc.text(`Thank you,`, W / 2, 75, { align: "center" });
-    doc.setFontSize(32); setC(C.white);
-    doc.text(`${firstName}.`, W / 2, 90, { align: "center" });
+    // Top accent bar
+    setF(C.primary); doc.rect(0, 0, W, 4, 'F');
 
-    doc.setFontSize(10); setC(lighten(C.white, 0.15));
-    const closingText = `This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We look forward to building on this next month.`;
-    const closingLines = doc.splitTextToSize(closingText, CW * 0.55);
-    let closingY = 108;
-    for (const line of closingLines) {
-      doc.text(line, W / 2, closingY, { align: "center" });
-      closingY += 5.5;
-    }
+    // Bottom footer bar
+    doc.setFillColor(40, 40, 40); doc.rect(0, H - 20, W, 20, 'F');
 
+    const clientFirstName = client.full_name.split(" ")[0];
+
+    // "READY TO GROW?" label in brand colour
+    setC(C.primary);
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+    doc.text(SECTION_TITLES.readyToGrow.toUpperCase(), 14, 35);
+
+    // "THANK YOU,"
+    doc.setFontSize(28); doc.setFont('helvetica', 'bold');
+    setC(C.white);
+    doc.text('THANK YOU,', 14, 52);
+
+    // Client first name in brand colour
+    setC(C.primary);
+    doc.text((clientFirstName + '.').toUpperCase(), 14, 68);
+    doc.setFont('helvetica', 'normal');
+
+    // Body text
+    doc.setTextColor(180, 180, 180);
+    doc.setFontSize(8.5);
+    const endText = 'This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We look forward to building on this next month.';
+    const endLines = doc.splitTextToSize(endText, 110);
+    doc.text(endLines, 14, 85);
+
+    // Logo in footer if available
     if (logoBase64) {
       try {
-        doc.addImage(`data:image/${logoExt.toLowerCase()};base64,${logoBase64}`, logoExt, W / 2 - 20, closingY + 8, 40, 40);
-      } catch { }
+        doc.addImage(`data:image/${logoExt.toLowerCase()};base64,${logoBase64}`, logoExt, 14, H - 15, 30, 9, undefined, 'FAST');
+      } catch { /* fallback: no logo in footer */ }
     }
 
+    // Org details in footer
+    doc.setTextColor(120, 120, 120);
+    doc.setFontSize(7);
     const endFooterParts: string[] = [];
     if (orgEmail) endFooterParts.push(orgEmail);
     if (orgWebsite) endFooterParts.push(orgWebsite);
-    doc.setFontSize(8); setC(C.white);
     if (endFooterParts.length > 0) {
-      doc.text(endFooterParts.join(" | "), W / 2, H - 18, { align: "center" });
+      doc.text(endFooterParts.join(" | "), W - 14, H - 12, { align: "right" });
     }
-    doc.setFontSize(7); setC(lighten(C.white, 0.15));
-    doc.text(`${SECTION_TITLES.preparedBy(orgName, `${MONTH_NAMES[report_month]} ${report_year}`)}`, W / 2, H - 10, { align: "center" });
+    doc.text(`${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W - 14, H - 7, { align: "right" });
 
     const pdfBuffer = doc.output("arraybuffer");
     const pdfUint8 = new Uint8Array(pdfBuffer);
