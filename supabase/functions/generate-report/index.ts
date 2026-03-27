@@ -236,6 +236,9 @@ Deno.serve(async (req) => {
     const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
     const showLogo = reportSettings.show_logo !== false;
     const reportAccentColor = (reportSettings.report_accent_color as string) || null;
+    const reportLanguage = (reportSettings.report_language as string) || "English";
+    const isNonEnglish = reportLanguage !== "English";
+    const langInstruction = isNonEnglish ? `\nIMPORTANT: Write the ENTIRE response in ${reportLanguage}.\n` : "";
 
     const primaryColor = parseColorToRgb(reportAccentColor || org?.primary_color, [60, 60, 140]);
     const secondaryColor = parseColorToRgb(org?.secondary_color, [80, 120, 180]);
@@ -350,7 +353,7 @@ Rules:
 - Mention any significant declines honestly but constructively
 - Never use jargon or acronyms without explaining them
 - End with a forward-looking sentence
-- Do NOT use markdown formatting, headers, or bullet points — just flowing prose
+- Do NOT use markdown formatting, headers, or bullet points — just flowing prose${langInstruction}
 Data: ${dataContext}`,
           600
         );
@@ -370,7 +373,7 @@ Rules:
 - If anything dropped, explain it simply and say whether it needs attention
 - Include one honest, actionable observation (not a sales pitch)
 - Do NOT use markdown, headers, or bullet points — flowing prose only
-- Never use acronyms without explaining them first (e.g. CTR = Click-Through Rate)
+- Never use acronyms without explaining them first (e.g. CTR = Click-Through Rate)${langInstruction}
 Data: ${platformContext}`,
             400
           );
@@ -382,6 +385,53 @@ Data: ${platformContext}`,
       }
     } else {
       aiSummary = `This report covers ${client.company_name}'s marketing performance for ${MONTH_NAMES[report_month]} ${report_year}.`;
+    }
+
+    // Static label translations for non-English reports
+    const defaultLabels = {
+      performanceReport: "Performance Report",
+      preparedFor: "Prepared for",
+      preparedBy: "Prepared by",
+      date: "Date",
+      tableOfContents: "Table of Contents",
+      thisMonth: "This Month",
+      lastMonth: "Last Month",
+      change: "Change",
+      monthlySummary: "Monthly Summary",
+      keyWins: "Key wins this month",
+      watchList: "Worth keeping an eye on",
+      thankYou: "Thank you",
+      noComparisonNote: "No previous month data available for comparison — this is your first month tracked.",
+      whatThisMeans: "What this means for you",
+      topPosts: "Top Posts",
+      aNoteFrom: "A Note from",
+      interestedCTA: "Interested? Reply to this email or call us.",
+    };
+    let labels = { ...defaultLabels };
+
+    if (isNonEnglish && lovableApiKey) {
+      try {
+        const aiCall = async (prompt: string, maxTokens: number): Promise<string> => {
+          const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${lovableApiKey}` },
+            body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: [{ role: "user", content: prompt }], max_tokens: maxTokens }),
+          });
+          if (!res.ok) return "";
+          const json = await res.json();
+          return json.choices?.[0]?.message?.content ?? "";
+        };
+        const translationResult = await aiCall(
+          `Translate these UI labels to ${reportLanguage}. Return ONLY a valid JSON object with the same keys. No markdown, no explanation.
+${JSON.stringify(defaultLabels)}`,
+          500
+        );
+        const cleaned = translationResult.replace(/```json\s*/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        labels = { ...defaultLabels, ...parsed };
+      } catch (e) {
+        console.error("Label translation failed, using English:", e);
+      }
     }
 
     // ───────── GENERATE PDF — LANDSCAPE A4 ─────────
@@ -480,7 +530,7 @@ Data: ${platformContext}`,
     // Left panel text
     setC(C.white);
     doc.setFontSize(11);
-    doc.text(`Prepared by`, 20, 100);
+    doc.text(labels.preparedBy, 20, 100);
     doc.setFontSize(16);
     doc.text(orgName, 20, 112);
 
@@ -489,7 +539,7 @@ Data: ${platformContext}`,
 
     // Right panel - report title
     doc.setFontSize(14); setC(C.grey);
-    doc.text("Performance Report", 110, 50);
+    doc.text(labels.performanceReport, 110, 50);
 
     doc.setFontSize(36); setC(C.black);
     const companyLines = doc.splitTextToSize(client.company_name, 170);
@@ -501,7 +551,7 @@ Data: ${platformContext}`,
 
     coverY += 5;
     doc.setFontSize(13); setC(C.grey);
-    doc.text(`Prepared for: ${client.full_name}`, 110, coverY);
+    doc.text(`${labels.preparedFor}: ${client.full_name}`, 110, coverY);
 
     // 3 headline KPIs at bottom right
     const allMetrics: Record<string, number> = {};
@@ -554,7 +604,7 @@ Data: ${platformContext}`,
     let y = startNewPage();
     const tocPageNum = pageCount;
     doc.setFontSize(22); setC(C.black);
-    doc.text("Table of Contents", M, y); y += 14;
+    doc.text(labels.tableOfContents, M, y); y += 14;
 
     setF(C.primary); doc.rect(M, y - 5, 50, 1.5, "F"); y += 8;
 
@@ -590,14 +640,14 @@ Data: ${platformContext}`,
 
     // Monthly summary entry
     doc.setFontSize(12); setC(C.black);
-    doc.text("Monthly Summary", M + 4, y);
+    doc.text(labels.monthlySummary, M + 4, y);
     doc.setFontSize(8); setC(C.grey);
     doc.text("Overall performance across all platforms with traffic light status", M + 4, y + 5);
     y += 14;
 
     if (upsellData) {
       doc.setFontSize(12); setC(C.black);
-      doc.text(`A Note from ${orgName}`, M + 4, y);
+      doc.text(`${labels.aNoteFrom} ${orgName}`, M + 4, y);
       doc.setFontSize(8); setC(C.grey);
       doc.text("A service recommendation based on your results", M + 4, y + 5);
       y += 14;
@@ -688,7 +738,7 @@ Data: ${platformContext}`,
         setF(C.offWhite); doc.roundedRect(M, y, CW, 4, 2, 2, "F"); // Placeholder, will size
 
         doc.setFontSize(10); setC(C.primary);
-        doc.text("What This Means", M + 6, y + 6);
+        doc.text(labels.whatThisMeans, M + 6, y + 6);
         y += 10;
         doc.setFontSize(9); setC(C.black);
         const insightY = wrapText(platformInsight, M + 6, y, CW - 12, 4.5);
@@ -849,7 +899,7 @@ Data: ${platformContext}`,
     pageToc.push({ title: "Monthly Summary", page: pageCount });
 
     doc.setFontSize(22); setC(C.black);
-    doc.text("Monthly Summary", M, y); y += 6;
+    doc.text(labels.monthlySummary, M, y); y += 6;
     setF(C.primary); doc.rect(M, y, 50, 1.2, "F"); y += 10;
 
     // Executive summary paragraph
@@ -910,7 +960,7 @@ Data: ${platformContext}`,
 
     // Key wins
     doc.setFontSize(11); setC(C.primary);
-    doc.text("Key Wins This Month", M, y); y += 7;
+    doc.text(labels.keyWins, M, y); y += 7;
     doc.setFontSize(9); setC(C.black);
 
     // Find top 3 improving metrics
@@ -956,7 +1006,7 @@ Data: ${platformContext}`,
     }
     if (declines.length > 0) {
       doc.setFontSize(11); setC(C.amber);
-      doc.text("Worth Keeping an Eye On", M, y); y += 7;
+      doc.text(labels.watchList, M, y); y += 7;
       doc.setFontSize(9); setC(C.black);
       declines.sort((a, b) => b.pct - a.pct);
       for (const d of declines.slice(0, 2)) {
@@ -968,10 +1018,10 @@ Data: ${platformContext}`,
     // ═══════ UPSELL PAGE (if scheduled) ═══════
     if (upsellData) {
       y = startNewPage();
-      pageToc.push({ title: `A Note from ${orgName}`, page: pageCount });
+      pageToc.push({ title: `${labels.aNoteFrom} ${orgName}`, page: pageCount });
 
       doc.setFontSize(22); setC(C.primary);
-      doc.text(`A Note from ${orgName}`, M, y); y += 6;
+      doc.text(`${labels.aNoteFrom} ${orgName}`, M, y); y += 6;
       setF(C.primary); doc.rect(M, y, 50, 1.2, "F"); y += 12;
 
       // Headline
@@ -1015,7 +1065,7 @@ Data: ${platformContext}`,
 
       // CTA
       doc.setFontSize(10); setC(C.primary);
-      doc.text("Interested? Reply to this email or get in touch directly.", M, y);
+      doc.text(labels.interestedCTA, M, y);
     }
 
     // ═══════ END PAGE ═══════
@@ -1037,7 +1087,7 @@ Data: ${platformContext}`,
 
     const firstName = client.full_name.split(" ")[0];
     doc.setFontSize(28); setC(C.white);
-    doc.text(`Thank you, ${firstName}.`, W / 2, 110, { align: "center" });
+    doc.text(`${labels.thankYou}, ${firstName}.`, W / 2, 110, { align: "center" });
 
     doc.setFontSize(11); setC(C.white);
     const closingText = `This report gives you a clear picture of where things stand. Every number here represents real people discovering your business. We're looking forward to building on this next month.`;
@@ -1050,7 +1100,7 @@ Data: ${platformContext}`,
 
     closingY += 15;
     doc.setFontSize(10); setC(C.white);
-    doc.text(`Prepared by ${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, closingY, { align: "center" });
+    doc.text(`${labels.preparedBy} ${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W / 2, closingY, { align: "center" });
 
     if (org?.slug) {
       doc.text(org.slug, W / 2, closingY + 8, { align: "center" });

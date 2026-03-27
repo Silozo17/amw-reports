@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -13,13 +14,32 @@ interface ReportSettings {
   show_logo: boolean;
   show_ai_insights: boolean;
   report_accent_color: string | null;
+  report_language: string;
 }
 
 const DEFAULT_SETTINGS: ReportSettings = {
   show_logo: true,
   show_ai_insights: true,
   report_accent_color: null,
+  report_language: 'English',
 };
+
+const LANGUAGES = [
+  'English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese',
+  'Dutch', 'Polish', 'Russian', 'Ukrainian', 'Czech', 'Romanian',
+  'Hungarian', 'Greek', 'Turkish', 'Arabic', 'Hebrew', 'Hindi',
+  'Bengali', 'Urdu', 'Chinese (Simplified)', 'Chinese (Traditional)',
+  'Japanese', 'Korean', 'Thai', 'Vietnamese', 'Indonesian', 'Malay',
+  'Tagalog', 'Swahili', 'Swedish', 'Norwegian', 'Danish', 'Finnish',
+  'Catalan', 'Basque', 'Galician', 'Croatian', 'Serbian', 'Slovak',
+  'Slovenian', 'Bulgarian', 'Estonian', 'Latvian', 'Lithuanian',
+  'Afrikaans', 'Amharic', 'Azerbaijani', 'Belarusian', 'Bosnian',
+  'Burmese', 'Georgian', 'Gujarati', 'Hausa', 'Icelandic', 'Irish',
+  'Kannada', 'Kazakh', 'Khmer', 'Kurdish', 'Kyrgyz', 'Lao',
+  'Macedonian', 'Malagasy', 'Malayalam', 'Maltese', 'Marathi',
+  'Mongolian', 'Nepali', 'Pashto', 'Persian', 'Punjabi', 'Sinhala',
+  'Somali', 'Tamil', 'Telugu', 'Uzbek', 'Welsh', 'Yoruba', 'Zulu',
+];
 
 const ReportSettingsSection = () => {
   const { org, refetchOrg } = useOrg();
@@ -28,11 +48,12 @@ const ReportSettingsSection = () => {
 
   useEffect(() => {
     if (org) {
-      const raw = (org as any).report_settings as Record<string, unknown> | null;
+      const raw = (org as unknown as Record<string, unknown>).report_settings as Record<string, unknown> | null;
       setSettings({
         show_logo: raw?.show_logo !== false,
         show_ai_insights: raw?.show_ai_insights !== false,
         report_accent_color: (raw?.report_accent_color as string) || null,
+        report_language: (raw?.report_language as string) || 'English',
       });
     }
   }, [org]);
@@ -43,7 +64,7 @@ const ReportSettingsSection = () => {
 
     const { error } = await supabase
       .from('organisations')
-      .update({ report_settings: settings as any })
+      .update({ report_settings: settings as unknown as Record<string, never> })
       .eq('id', org.id);
 
     if (error) {
@@ -86,6 +107,26 @@ const ReportSettingsSection = () => {
             checked={settings.show_ai_insights}
             onCheckedChange={(v) => setSettings(prev => ({ ...prev, show_ai_insights: v }))}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="font-medium">Report Language</Label>
+          <p className="text-xs text-muted-foreground">
+            All AI-generated text and report labels will be written in this language.
+          </p>
+          <Select
+            value={settings.report_language}
+            onValueChange={(v) => setSettings(prev => ({ ...prev, report_language: v }))}
+          >
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Select language" />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map((lang) => (
+                <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
