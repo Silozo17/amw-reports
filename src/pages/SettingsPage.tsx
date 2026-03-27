@@ -26,7 +26,7 @@ const SettingsPage = () => {
     );
   }
 
-  const tabCount = hasWhitelabel ? 5 : 4;
+  const tabGridClass = hasWhitelabel ? 'grid-cols-5' : 'grid-cols-4';
 
   return (
     <AppLayout>
@@ -37,7 +37,7 @@ const SettingsPage = () => {
         </div>
 
         <Tabs defaultValue="organisation" className="w-full">
-          <TabsList className={`grid w-full grid-cols-${tabCount}`}>
+          <TabsList className={`grid w-full ${tabGridClass}`}>
             <TabsTrigger value="organisation">Organisation</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
             {hasWhitelabel && <TabsTrigger value="whitelabel">White Label</TabsTrigger>}
