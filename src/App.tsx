@@ -5,8 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import BrandingProvider from "@/components/BrandingProvider";
-import { OrgProvider } from "@/hooks/useOrg";
-import ErrorBoundary from "@/components/ErrorBoundary";
 import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import FeaturesPage from "./pages/FeaturesPage";
@@ -121,13 +119,9 @@ const App = () => (
       <BrowserRouter>
         <ScrollToTop />
         <AuthProvider>
-          <OrgProvider>
-            <BrandingProvider>
-              <ErrorBoundary>
-                <AppRoutes />
-              </ErrorBoundary>
-            </BrandingProvider>
-          </OrgProvider>
+          <BrandingProvider>
+            <AppRoutes />
+          </BrandingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

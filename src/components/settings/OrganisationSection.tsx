@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/hooks/useOrg';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,25 +23,22 @@ interface TeamMember {
 }
 
 const OrganisationSection = () => {
-  const { org, orgId, orgRole } = useOrg();
+  const { role } = useAuth();
+  const { org, orgId } = useOrg();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchMembers = async () => {
     if (!orgId) return;
-    const membersRes = await supabase.from('org_members').select('*').eq('org_id', orgId);
+    const [membersRes, profilesRes] = await Promise.all([
+      supabase.from('org_members').select('*').eq('org_id', orgId),
+      supabase.from('profiles').select('user_id, full_name, email'),
+    ]);
 
     const members = (membersRes.data ?? []) as Array<{
       id: string; org_id: string; user_id: string | null; role: 'owner' | 'manager';
       invited_email: string | null; accepted_at: string | null;
     }>;
-
-    // Only fetch profiles for members that have a user_id (accepted members)
-    const memberUserIds = members.map(m => m.user_id).filter(Boolean) as string[];
-    const profilesRes = memberUserIds.length > 0
-      ? await supabase.from('profiles').select('user_id, full_name, email').in('user_id', memberUserIds)
-      : { data: [] };
-
     const profiles = (profilesRes.data ?? []) as Array<{ user_id: string; full_name: string | null; email: string | null }>;
 
     const enriched: TeamMember[] = members.map(m => ({
@@ -82,7 +80,7 @@ const OrganisationSection = () => {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Your Role</span>
-            <Badge className="capitalize">{orgRole ?? 'member'}</Badge>
+            <Badge className="capitalize">{role}</Badge>
           </div>
         </CardContent>
       </Card>

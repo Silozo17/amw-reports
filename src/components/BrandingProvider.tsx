@@ -21,15 +21,6 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const root = document.documentElement;
 
-    // Always reset to defaults first so stale values from a previous org don't persist
-    const PROPS_TO_RESET = [
-      '--primary', '--ring', '--amw-purple', '--sidebar-primary',
-      '--secondary', '--amw-blue',
-      '--accent', '--amw-green', '--success',
-      '--font-heading', '--font-display', '--font-body',
-    ];
-    PROPS_TO_RESET.forEach(p => root.style.removeProperty(p));
-
     if (!org) return;
 
     // Apply colors (stored as HSL strings like "295 60% 47%")
@@ -65,7 +56,14 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     return () => {
-      PROPS_TO_RESET.forEach(p => root.style.removeProperty(p));
+      // Clean up on unmount (e.g. logout)
+      const props = [
+        '--primary', '--ring', '--amw-purple', '--sidebar-primary',
+        '--secondary', '--amw-blue',
+        '--accent', '--amw-green', '--success',
+        '--font-heading', '--font-display', '--font-body',
+      ];
+      props.forEach(p => root.style.removeProperty(p));
     };
   }, [org]);
 

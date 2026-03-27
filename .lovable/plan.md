@@ -1,101 +1,63 @@
 
-Immediate diagnosis
 
-- The white-screen root cause is now clear: the app is still trying to load `src/hooks/useOrg.ts`, but that file was renamed to `useOrg.tsx`. Browser logs show a direct `404` for that path, so the app bootstrap breaks before any page renders.
-- There is also a second frontend bug waiting behind it: `SettingsPage` uses `grid-cols-${tabs.length}`, which Tailwind will not generate reliably. That can break the settings layout even after the app loads.
+# Fix Org Switching: 3 Issues
 
-Implementation plan
+## Issues Identified
 
-1. Stabilize the app boot path first
-- Restore `src/hooks/useOrg.ts` as the stable import path.
-- Move the actual provider implementation into a dedicated context file, e.g. `src/contexts/OrgContext.tsx`.
-- Re-export `useOrg` and `OrgProvider` from `src/hooks/useOrg.ts` so existing imports keep working and future refactors do not blank the app again.
-- Replace the dynamic tab grid class in `SettingsPage` with a fixed mapping for 1–5 tabs.
+### 1. Dashboard still shows AMW clients after switching to ReDigital
+**Root cause**: The Dashboard (`Index.tsx`) queries don't filter by `orgId`. RLS uses `user_belongs_to_org()` which returns `true` for ALL orgs the user belongs to. So if you're a member of both AMW and ReDigital, RLS allows data from both — and there's no `.eq('org_id', orgId)` filter on the queries.
 
-2. Clean up org-state architecture
-- Keep a single shared `OrgProvider` as the only source of truth for:
-  - active org
-  - active org role
-  - memberships
-  - org loading state
-- Make `switchOrg` an async action that:
-  - updates the selected org immediately
-  - fetches the next org record
-  - refreshes org-scoped server state after switching
-- Remove duplicated “recover/create org” logic from route/page components. Org creation should happen in backend onboarding/auth flows, not from random page loads.
+The previous fix only added `orgId` as a useEffect dependency (to re-fetch), but never added an actual query filter. Since RLS now allows access to multiple orgs, the queries return data from ALL orgs.
 
-3. Fix org switching so it updates instantly everywhere
-- After `switchOrg`, invalidate/refetch all org-scoped queries:
-  - entitlements
-  - clients
-  - reports
-  - connections
-  - logs
-  - settings/org data
-- Ensure pages that still use manual `useEffect + useState` fetches respond cleanly to `orgId` changes.
-- Keep `localStorage` only as a remembered preference, never as the source of authorization.
+**Fix**: Add explicit `.eq('org_id', orgId)` filters to all dashboard queries in `Index.tsx`. Same issue exists for `Reports.tsx`, `Connections.tsx`, and `Logs.tsx` — queries on tables with `org_id` columns need the filter.
 
-4. Fix remaining multi-tenant data bugs
-- `useEntitlements` currently counts connected platforms without filtering to the active org. This makes plan usage and upgrade prompts wrong for multi-org users.
-- `OrganisationSection` fetches `profiles` too broadly, which can expose unrelated member data across orgs.
-- Audit all org-scoped reads and make them explicitly filter by the selected org, even when backend rules allow multiple memberships.
-- Keep the rule: backend access decides what a user may access; frontend org filters decide which current workspace they are viewing.
+### 2. White Label tab not showing for ReDigital (Agency plan)
+**Root cause**: `useEntitlements` fetches the subscription for the **current `orgId`** (from `useOrg`), but `useAuth` determines `isOwner` by fetching the **first** `org_members` row (`LIMIT 1`). If the user's first membership is for AMW (where they may be a manager), `isOwner` is `false` even though they're an owner of ReDigital.
 
-5. Fix branding so it actually reflects inside the platform
-- Update `BrandingProvider` so it fully resets to default tokens before applying the selected org’s theme.
-- Apply branding tokens consistently to:
-  - primary/ring
-  - sidebar tokens
-  - accent/success helpers
-  - font variables
-- Make branding updates reflect immediately after save by updating/refetching org context once, not waiting for a refresh.
-- Keep public marketing pages on the product brand unless you explicitly want white-labeling to affect public routes too.
+Additionally, `hasWhitelabel` depends on the subscription of the selected org — if the query isn't returning the right subscription for ReDigital, the tab won't show.
 
-6. Tighten user access and team-management logic
-- Stop relying on `profiles.org_id` as a primary multi-org signal. A user can belong to multiple orgs, so a single `org_id` on profiles is a legacy shortcut and causes logic drift.
-- For team/member views, derive membership from `org_members`, then fetch only the minimal profile fields needed for those users.
-- Keep org permissions in `org_members`; keep platform-level roles separate.
-- Verify owner/manager gating uses current org context everywhere, not global “first membership” assumptions.
+**Fix**: `useAuth` should get the role for the **currently selected org**, not just `LIMIT 1`. Import `orgId` from a shared source or accept it. Since `useAuth` is a context provider that loads before `useOrg`, we need to either:
+- Have `useAuth`'s `fetchProfile` accept an `orgId` and re-run when org switches, OR
+- Move role determination into `useOrg` (which already knows the selected org's role via `orgRole`)
 
-7. Fix backend policy mismatches found in the audit
-- `metric_defaults` is not tenant-safe right now:
-  - the table has no `org_id`
-  - any org owner can manage all rows
-- Proper fix: make metric defaults org-scoped (recommended), or explicitly convert them to platform-admin-only global defaults. Because this UI lives in org settings, org-scoped is the better fit.
-- Review `profiles` access so team pages do not depend on broad profile reads.
-- Enable leaked-password protection in auth settings.
+The simplest fix: `SettingsPage` should use `orgRole` from `useOrg()` instead of `isOwner`/`isManager` from `useAuth()` for org-context-sensitive checks.
 
-8. Add guardrails so the product fails safely, not as a white page
-- Add a top-level error boundary for the authenticated app shell.
-- Show a visible fallback panel with a retry action instead of a blank screen if a runtime error slips through.
-- Add defensive loading/empty/error states to org-dependent pages.
+### 3. Agency plan with unlimited clients not reflecting
+This is likely working correctly at the DB level but the UI doesn't re-fetch `useEntitlements` when switching orgs. Since `useEntitlements` already uses `orgId` in its query key, this should work — but the dashboard/settings pages may be caching stale data. Need to verify the subscription query returns correct data for ReDigital.
 
-Files likely touched
-- `src/hooks/useOrg.ts`
-- `src/contexts/OrgContext.tsx` (new)
-- `src/App.tsx`
-- `src/pages/SettingsPage.tsx`
-- `src/components/BrandingProvider.tsx`
-- `src/hooks/useEntitlements.ts`
-- `src/components/settings/OrganisationSection.tsx`
-- `src/pages/Index.tsx`
-- `src/pages/Connections.tsx`
-- `src/pages/Reports.tsx`
-- `src/pages/Logs.tsx`
-- optional: app-level error boundary files
+## Changes
 
-Recommended rollout order
-1. Restore stable `useOrg` import path and fix the white screen.
-2. Fix `SettingsPage` tab class bug.
-3. Refactor org-switch invalidation/refetch flow.
-4. Fix entitlements and team/profile data isolation.
-5. Fix branding token application.
-6. Harden policies and cleanup legacy org/profile assumptions.
-7. Run full QA across public pages, auth, dashboard, settings, org switching, invites, owner/manager access, and branding updates.
+### `src/pages/Index.tsx`
+- Add `.eq('org_id', orgId)` to all queries on org-scoped tables: `clients`, `reports`, `sync_logs`, `email_logs`, `platform_connections`
+- Guard the fetch behind `if (!orgId) return`
 
-Expected outcome
-- No more blank pages.
-- Org switching updates instantly without refresh.
-- Counts, billing limits, branding, and permissions follow the selected org correctly.
-- Team/member data is safer and better isolated.
-- The product becomes more robust instead of relying on fragile client-side recovery logic.
+### `src/pages/clients/ClientList.tsx`
+- Add `.eq('org_id', orgId!)` to the clients query
+
+### `src/pages/Reports.tsx`
+- Add `.eq('org_id', orgId!)` to the reports query
+
+### `src/pages/Connections.tsx`
+- Add org filtering (connections go through clients, so filter clients by org_id first or join)
+
+### `src/pages/Logs.tsx`
+- Add `.eq('org_id', orgId!)` to sync_logs and report_logs queries
+
+### `src/pages/SettingsPage.tsx`
+- Use `orgRole` from `useOrg()` for `isOwner`/`isManager` checks instead of `useAuth()` (which only returns the role for the first org)
+- This ensures White Label tab shows when the selected org has an Agency plan and the user is an owner of that org
+
+### `src/hooks/useAuth.tsx`
+- No changes needed — `isOwner`/`isManager` from useAuth can remain as a "global" role indicator, but org-specific pages should use `useOrg().orgRole`
+
+## Files
+
+| File | Change |
+|---|---|
+| `src/pages/Index.tsx` | Add `orgId` filter to all queries, guard with `if (!orgId)` |
+| `src/pages/clients/ClientList.tsx` | Add `.eq('org_id', orgId!)` to clients query |
+| `src/pages/Reports.tsx` | Add `.eq('org_id', orgId!)` to reports query |
+| `src/pages/Connections.tsx` | Add org_id filtering |
+| `src/pages/Logs.tsx` | Add `.eq('org_id', orgId!)` to log queries |
+| `src/pages/SettingsPage.tsx` | Use `useOrg().orgRole` for role checks instead of `useAuth()` |
+

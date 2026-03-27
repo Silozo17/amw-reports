@@ -1,14 +1,17 @@
 import { useState, useEffect, createContext, useContext, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
-import type { Profile } from '@/types/database';
+import type { AppRole, Profile } from '@/types/database';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  role: AppRole | null;
   isLoading: boolean;
+  isOwner: boolean;
   isPlatformAdmin: boolean;
+  isManager: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -21,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [role, setRole] = useState<AppRole | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,6 +35,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', userId)
       .single();
     setProfile(profileData as Profile | null);
+
+    const { data: memberData } = await supabase
+      .from('org_members')
+      .select('role')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+    setRole((memberData?.role as AppRole) ?? null);
 
     const { data: adminData } = await supabase
       .from('platform_admins')
@@ -55,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => fetchProfile(session.user.id), 0);
         } else {
           setProfile(null);
-          setIsPlatformAdmin(false);
+          setRole(null);
           setIsPlatformAdmin(false);
         }
         setIsLoading(false);
@@ -95,8 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         profile,
+        role,
         isLoading,
+        isOwner: role === 'owner',
         isPlatformAdmin,
+        isManager: role === 'manager',
         signIn,
         signUp,
         signOut,
