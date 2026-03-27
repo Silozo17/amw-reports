@@ -15,6 +15,38 @@ const loadGoogleFont = (fontName: string) => {
   document.head.appendChild(link);
 };
 
+/** Convert hex (#rrggbb) to HSL string "h s% l%" */
+const hexToHsl = (hex: string): string | null => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return null;
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+};
+
+/**
+ * Normalise a stored colour value to HSL for CSS variables.
+ * Accepts both hex (#rrggbb) and existing HSL ("h s% l%") values.
+ */
+const toHsl = (value: string): string => {
+  if (value.startsWith('#')) {
+    return hexToHsl(value) ?? value;
+  }
+  // Already HSL
+  return value;
+};
+
 /** Given an HSL string like "295 60% 47%", return a contrasting foreground HSL */
 const computeForeground = (hsl: string, darkDefault = '340 7% 13%', lightDefault = '0 0% 100%'): string => {
   const parts = hsl.match(/[\d.]+/g);
@@ -42,7 +74,7 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
 
     // ── Primary ──
     if (org.primary_color) {
-      const p = org.primary_color;
+      const p = toHsl(org.primary_color);
       root.style.setProperty('--primary', p);
       root.style.setProperty('--primary-foreground', computeForeground(p));
       root.style.setProperty('--primary-light', lightenHsl(p, 0.85));
@@ -55,7 +87,7 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
 
     // ── Secondary ──
     if (org.secondary_color) {
-      const s = org.secondary_color;
+      const s = toHsl(org.secondary_color);
       root.style.setProperty('--secondary', s);
       root.style.setProperty('--secondary-foreground', computeForeground(s));
       root.style.setProperty('--secondary-light', lightenHsl(s, 0.85));
@@ -64,7 +96,7 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
 
     // ── Accent ──
     if (org.accent_color) {
-      const a = org.accent_color;
+      const a = toHsl(org.accent_color);
       root.style.setProperty('--accent', a);
       root.style.setProperty('--accent-foreground', computeForeground(a));
       root.style.setProperty('--accent-light', lightenHsl(a, 0.85));
@@ -76,17 +108,18 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
     // ── Button colours ──
     const buttonColor = org.button_color ?? org.primary_color;
     if (buttonColor) {
-      root.style.setProperty('--button-primary', buttonColor);
+      const bc = toHsl(buttonColor);
+      root.style.setProperty('--button-primary', bc);
       root.style.setProperty('--button-primary-foreground',
-        org.button_text_color ?? computeForeground(buttonColor));
+        org.button_text_color ? toHsl(org.button_text_color) : computeForeground(bc));
     }
 
     // ── Text colours ──
     if (org.text_on_dark) {
-      root.style.setProperty('--text-on-primary', org.text_on_dark);
+      root.style.setProperty('--text-on-primary', toHsl(org.text_on_dark));
     }
     if (org.text_on_light) {
-      root.style.setProperty('--text-body', org.text_on_light);
+      root.style.setProperty('--text-body', toHsl(org.text_on_light));
     }
 
     // ── Chart colours ──
@@ -94,10 +127,10 @@ const BrandingProvider = ({ children }: { children: React.ReactNode }) => {
     const c2 = org.chart_color_2 ?? org.secondary_color;
     const c3 = org.chart_color_3 ?? org.accent_color;
     const c4 = org.chart_color_4;
-    if (c1) root.style.setProperty('--chart-1', c1);
-    if (c2) root.style.setProperty('--chart-2', c2);
-    if (c3) root.style.setProperty('--chart-3', c3);
-    if (c4) root.style.setProperty('--chart-4', c4);
+    if (c1) root.style.setProperty('--chart-1', toHsl(c1));
+    if (c2) root.style.setProperty('--chart-2', toHsl(c2));
+    if (c3) root.style.setProperty('--chart-3', toHsl(c3));
+    if (c4) root.style.setProperty('--chart-4', toHsl(c4));
 
     // ── Fonts ──
     if (org.heading_font) {
