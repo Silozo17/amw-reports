@@ -63,6 +63,7 @@ const Reports = () => {
 
   // Generate form
   const [selectedClient, setSelectedClient] = useState<string>('');
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { month: defaultMonth, year: defaultYear } = getCurrentReportPeriod();
   const [selectedMonth, setSelectedMonth] = useState<number>(defaultMonth);
   const [selectedYear, setSelectedYear] = useState<number>(defaultYear);
@@ -116,6 +117,23 @@ const Reports = () => {
   useEffect(() => {
     fetchReports();
   }, [orgId]);
+
+  // Poll while any report is pending or running
+  useEffect(() => {
+    const hasActive = reports.some(r => r.status === 'pending' || r.status === 'running');
+    if (hasActive && !pollRef.current) {
+      pollRef.current = setInterval(fetchReports, 3000);
+    } else if (!hasActive && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [reports]);
 
   // When filterClient changes, also set the generate form client
   useEffect(() => {
