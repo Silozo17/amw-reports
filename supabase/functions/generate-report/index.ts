@@ -1343,7 +1343,7 @@ Deno.serve(async (req) => {
 
     // "PERFORMANCE REPORT" label
     doc.setFontSize(10); setC(C.grey);
-    doc.text(SECTION_TITLES.performanceReport.toUpperCase(), 14, 50);
+    doc.text(T.performanceReport, 14, 50);
 
     // Company name — large white text
     doc.setFontSize(34); setC(C.white);
@@ -1362,9 +1362,9 @@ Deno.serve(async (req) => {
 
     // Prepared for
     doc.setFontSize(9); setC(C.grey);
-    doc.text(`${SECTION_TITLES.preparedFor}: ${client.full_name}`, 14, coverY);
+    doc.text(`${T.preparedFor}: ${client.full_name}`, 14, coverY);
     coverY += 5;
-    doc.text(`Prepared by: ${orgName}`, 14, coverY);
+    doc.text(`${T.preparedBy}: ${orgName}`, 14, coverY);
 
     // Hero KPIs on the right panel
     const allMetrics: Record<string, number> = {};
@@ -1415,7 +1415,7 @@ Deno.serve(async (req) => {
     if (coverFooterParts.length > 0) {
       doc.text(coverFooterParts.join(" | "), W / 2, H - 10, { align: "center" });
     }
-    doc.text(`${orgName} | Confidential`, W / 2, H - 5, { align: "center" });
+    doc.text(`${orgName} | ${T.confidential}`, W / 2, H - 5, { align: "center" });
 
     let y = startNewPage(SECTION_TITLES.tableOfContents);
     y += 2;
