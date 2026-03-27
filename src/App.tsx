@@ -21,6 +21,7 @@ import Logs from "./pages/Logs";
 import DebugConsole from "./pages/DebugConsole";
 import SettingsPage from "./pages/SettingsPage";
 import ClientPortal from "./pages/ClientPortal";
+import ClientPortalAuth from "./pages/ClientPortalAuth";
 import OnboardingPage from "./pages/OnboardingPage";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -35,7 +36,7 @@ import LoadingScreen from "./components/LoadingScreen";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isClientUser } = useAuth();
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -43,6 +44,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  // Client users should be redirected to their portal
+  if (isClientUser) {
+    return <Navigate to="/client-portal" replace />;
   }
 
   return <>{children}</>;
@@ -64,9 +70,10 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isClientUser } = useAuth();
 
   if (isLoading) return null;
+  if (user && isClientUser) return <Navigate to="/client-portal" replace />;
   if (user) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
@@ -98,6 +105,7 @@ const AppRoutes = () => (
     <Route path="/admin/users" element={<AdminRoute><AdminUserList /></AdminRoute>} />
     <Route path="/admin/activity" element={<AdminRoute><AdminActivityLog /></AdminRoute>} />
     <Route path="/portal/:token" element={<ClientPortal />} />
+    <Route path="/client-portal" element={<ClientPortalAuth />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
