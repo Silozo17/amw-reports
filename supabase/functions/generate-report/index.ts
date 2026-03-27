@@ -1525,7 +1525,7 @@ Deno.serve(async (req) => {
         y += 12;
       }
 
-      y = drawSectionLabel("Performance Metrics", y);
+      y = drawSectionLabel(T.performanceMetrics, y);
 
       const gridMetrics = section.enabledMetrics.filter(k => typeof section.metrics[k] === "number" && METRIC_LABELS[k]).slice(0, maxMetricCards);
       const colCount = 3;
