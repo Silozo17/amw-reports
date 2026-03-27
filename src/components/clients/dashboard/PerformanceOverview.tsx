@@ -236,7 +236,7 @@ const PerformanceOverview = ({
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                    <YAxis hide domain={[0, 1]} />
+                    <YAxis hide domain={[0, 1.3]} />
                     <RechartsTooltip content={<TrendTooltip />} />
                     {trendKeys.map((tk) => (
                       <Area
@@ -340,7 +340,7 @@ const PerformanceOverview = ({
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis hide domain={[0, 1]} />
+                      <YAxis hide domain={[0, 1.3]} />
                       <RechartsTooltip content={<GscTooltip />} />
                       {gscKeys.map((tk) => (
                         <Area

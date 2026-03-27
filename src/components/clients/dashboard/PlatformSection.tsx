@@ -347,7 +347,7 @@ const PlatformSection = ({
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis hide domain={[0, 1]} />
+                    <YAxis hide domain={[0, 1.3]} />
                     <RechartsTooltip content={<GscTooltip />} />
                     <Legend
                       wrapperStyle={{ fontSize: '11px' }}
