@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, X, ChevronDown } from 'lucide-react';
+import { ArrowRight, Check, X, ChevronDown, FileText, Share2, BarChart3, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+
+const UNIVERSAL_FEATURES = [
+  { icon: FileText, label: 'Branded PDF Reports' },
+  { icon: Share2, label: 'Client Portal' },
+  { icon: BarChart3, label: '10+ Platform Support' },
+  { icon: Mail, label: 'Monthly Reports' },
+];
 
 const PLANS = [
   {
@@ -51,14 +58,18 @@ const COMPARISON_ROWS = [
 ];
 
 const FAQS = [
+  { q: 'What is automated marketing reporting?', a: 'Automated marketing reporting is the process of pulling data from multiple marketing platforms (like Google Ads, Meta, Instagram, LinkedIn) and generating professional reports without manual work. AMW Reports handles the data collection, formatting, and delivery automatically — saving you hours every month.' },
   { q: 'What counts as a connection?', a: 'A connection is a single link between one client and one platform. For example, connecting Google Ads and Instagram for the same client uses 2 connections.' },
   { q: 'How does connection allocation work for add-on clients?', a: 'Each additional client account includes 5 connections — 3 are reserved exclusively for that client, and 2 are added to your flexible pool that can be used across any client. This ensures every client has a minimum level of coverage while giving you flexibility.' },
-  { q: 'What is white-label branding?', a: 'White-label branding lets you replace AMW Reports branding with your own. Upload your logo, set your brand colours and fonts, and even use a custom domain — your clients will see your brand throughout the platform and on PDF reports.' },
+  { q: 'Can I white-label the reports with my agency brand?', a: 'Yes! On the Agency plan, you get full white-label branding. Upload your logo, set your brand colours and fonts, and even use a custom domain. Your clients will see your brand throughout the platform and on PDF reports — AMW Reports branding is completely hidden.' },
+  { q: 'What is the difference between a connection and a client?', a: 'A client represents one of your customers or accounts. A connection is a link between that client and a specific marketing platform. One client might have 3-5 connections (e.g., Google Ads, Facebook, Instagram, Google Analytics, LinkedIn).' },
+  { q: 'What platforms are supported?', a: 'We currently support Google Ads, Meta Ads, Google Analytics, Google Search Console, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, Pinterest, and Google Business Profile — 11 platforms in total.' },
   { q: 'Can I upgrade or downgrade anytime?', a: 'Yes. You can upgrade at any time and the change takes effect immediately. If you downgrade, it takes effect at the end of your current billing period.' },
   { q: 'Is there a contract or commitment?', a: 'No contracts. All plans are month-to-month and you can cancel at any time.' },
-  { q: 'What platforms are supported?', a: 'We currently support Google Ads, Meta Ads, Google Analytics, Google Search Console, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, Pinterest, and Google Business Profile.' },
   { q: 'Do my clients need an account?', a: 'No. Clients can access their dashboard via a unique shareable link — no login required for them.' },
   { q: 'How often is my data synced?', a: 'Creator plans sync data once per month on the 4th. Freelance and Agency plans benefit from daily automatic syncing to keep your dashboards up to date.' },
+  { q: 'How does AMW Reports compare to other reporting tools?', a: 'Unlike tools like DashThis or AgencyAnalytics that charge per dashboard or per user, AMW Reports offers a flat monthly price with no per-seat fees. You get full white-label branding, automated PDF generation, and a client portal — all included. Plus, we offer a genuinely free plan to get started.' },
+  { q: 'What is white-label branding?', a: 'White-label branding lets you replace AMW Reports branding with your own. Upload your logo, set your brand colours and fonts, and even use a custom domain — your clients will see your brand throughout the platform and on PDF reports.' },
 ];
 
 const CellValue = ({ value }: { value: boolean | string }) => {
@@ -68,7 +79,10 @@ const CellValue = ({ value }: { value: boolean | string }) => {
 
 const PricingPage = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  usePageMeta({ title: 'Pricing — AMW Reports', description: 'Start free with 1 client. Upgrade to Freelance or Agency plans. No contracts, no per-seat pricing.' });
+  usePageMeta({
+    title: 'Pricing — Free & Paid Plans | AMW Reports',
+    description: 'Start free with 1 client. Upgrade to Freelance or Agency for white-label reports. No contracts, cancel anytime.',
+  });
 
   return (
     <>
@@ -79,6 +93,21 @@ const PricingPage = () => {
           <p className="text-lg text-amw-offwhite/60 font-body max-w-xl mx-auto">
             Start free. Upgrade when your agency grows. No hidden fees, no per-seat pricing.
           </p>
+        </div>
+      </section>
+
+      {/* Universal Features */}
+      <section className="pb-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body text-center mb-6">What every plan includes</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {UNIVERSAL_FEATURES.map(({ icon: Icon, label }) => (
+              <div key={label} className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/30 border border-sidebar-border/30">
+                <Icon className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-xs font-body text-amw-offwhite/70">{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -164,7 +193,7 @@ const PricingPage = () => {
                   className="w-full flex items-center justify-between p-4 text-left text-sm font-body font-semibold text-amw-offwhite/90 hover:bg-sidebar-accent/20 transition-colors"
                 >
                   {q}
-                  <ChevronDown className={`h-4 w-4 text-amw-offwhite/40 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-amw-offwhite/40 transition-transform shrink-0 ml-2 ${openFaq === i ? 'rotate-180' : ''}`} />
                 </button>
                 {openFaq === i && (
                   <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
