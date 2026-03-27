@@ -15,7 +15,7 @@ import {
   Bell,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useOrg } from '@/hooks/useOrg';
+import { useOrg } from '@/contexts/OrgContext';
 import { useInvites } from '@/hooks/useInvites';
 
 import { cn } from '@/lib/utils';

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useOrg } from '@/hooks/useOrg';
+import { useOrg } from '@/contexts/OrgContext';
 
 export interface PendingInvite {
   id: string;

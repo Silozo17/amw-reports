@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { formatPhone } from '@/lib/utils';
 import { CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
-import { useOrg } from '@/hooks/useOrg';
+import { useOrg } from '@/contexts/OrgContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UpgradePrompt from '@/components/entitlements/UpgradePrompt';
 

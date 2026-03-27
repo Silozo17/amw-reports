@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -28,9 +28,22 @@ export interface OrgMembership {
   created_at: string;
 }
 
+interface OrgContextValue {
+  org: Organisation | null;
+  orgId: string | null;
+  orgRole: 'owner' | 'manager' | null;
+  isOrgOwner: boolean;
+  isLoading: boolean;
+  refetchOrg: (overrideOrgId?: string) => Promise<void>;
+  allMemberships: { org_id: string; role: string; org_name: string; org_logo: string | null }[];
+  switchOrg: (newOrgId: string) => void;
+}
+
+const OrgContext = createContext<OrgContextValue | null>(null);
+
 const SELECTED_ORG_KEY = 'amw_selected_org_id';
 
-export function useOrg() {
+export function OrgProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [org, setOrg] = useState<Organisation | null>(null);
   const [orgRole, setOrgRole] = useState<'owner' | 'manager' | null>(null);
@@ -191,14 +204,28 @@ export function useOrg() {
     fetchOrg();
   }, [user, fetchOrg]);
 
-  return {
-    org,
-    orgId,
-    orgRole,
-    isOrgOwner: orgRole === 'owner',
-    isLoading,
-    refetchOrg: fetchOrg,
-    allMemberships,
-    switchOrg,
-  };
+  return (
+    <OrgContext.Provider
+      value={{
+        org,
+        orgId,
+        orgRole,
+        isOrgOwner: orgRole === 'owner',
+        isLoading,
+        refetchOrg: fetchOrg,
+        allMemberships,
+        switchOrg,
+      }}
+    >
+      {children}
+    </OrgContext.Provider>
+  );
+}
+
+export function useOrg() {
+  const context = useContext(OrgContext);
+  if (!context) {
+    throw new Error('useOrg must be used within an OrgProvider');
+  }
+  return context;
 }

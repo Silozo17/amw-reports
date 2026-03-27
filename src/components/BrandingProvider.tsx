@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useOrg } from '@/hooks/useOrg';
+import { useOrg } from '@/contexts/OrgContext';
 
 const GOOGLE_FONTS_BASE = 'https://fonts.googleapis.com/css2?';
 
