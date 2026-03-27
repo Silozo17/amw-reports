@@ -157,7 +157,7 @@ const BrandingSection = () => {
   // Report settings
   const [showLogo, setShowLogo] = useState(true);
   const [showAiInsights, setShowAiInsights] = useState(true);
-  const [reportAccentColor, setReportAccentColor] = useState('');
+  
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -183,7 +183,7 @@ const BrandingSection = () => {
       const rs = org.report_settings;
       setShowLogo(rs?.show_logo !== false);
       setShowAiInsights(rs?.show_ai_insights !== false);
-      setReportAccentColor(rs?.report_accent_color ?? '');
+      
     }
   }, [org]);
 
@@ -250,7 +250,6 @@ const BrandingSection = () => {
         report_settings: {
           show_logo: showLogo,
           show_ai_insights: showAiInsights,
-          report_accent_color: reportAccentColor || null,
         },
       })
       .eq('id', orgId);
@@ -470,30 +469,6 @@ const BrandingSection = () => {
               <p className="text-xs text-muted-foreground">Add AI-generated platform analysis section</p>
             </div>
             <Switch checked={showAiInsights} onCheckedChange={setShowAiInsights} />
-          </div>
-          <div className="space-y-2">
-            <Label className="font-medium">Report Accent Colour</Label>
-            <p className="text-xs text-muted-foreground">Override the primary colour used in reports. Leave empty to use your primary colour.</p>
-            <div className="flex items-center gap-3">
-              <Input
-                type="color"
-                value={reportAccentColor || primaryColor}
-                onChange={(e) => setReportAccentColor(e.target.value)}
-                className="w-12 h-10 p-1 cursor-pointer"
-              />
-              <Input
-                type="text"
-                value={reportAccentColor}
-                onChange={(e) => setReportAccentColor(e.target.value)}
-                placeholder="e.g. #B32FBF"
-                className="w-32 font-mono text-sm"
-              />
-              {reportAccentColor && (
-                <Button size="sm" variant="ghost" onClick={() => setReportAccentColor('')}>
-                  Reset
-                </Button>
-              )}
-            </div>
           </div>
         </CardContent>
       </Card>

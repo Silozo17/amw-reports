@@ -12,7 +12,7 @@ export interface Organisation {
   accent_color: string | null;
   heading_font: string | null;
   body_font: string | null;
-  report_settings: { show_logo: boolean; show_ai_insights: boolean; report_accent_color: string | null } | null;
+  report_settings: { show_logo: boolean; show_ai_insights: boolean } | null;
   button_color: string | null;
   button_text_color: string | null;
   text_on_dark: string | null;
