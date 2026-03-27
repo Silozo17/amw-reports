@@ -1,57 +1,74 @@
 
 
-# Editable Organisation Details + Revoke Pending Invites for All Roles
+# Client Reports Tab + Improved Reports Page + 12-Report Cap
 
-## 1. Database Migration
+## Overview
 
-Add missing columns to `organisations`:
+Three changes:
+1. Add a "Reports" tab inside ClientDetail (after Upsells) showing that client's report history with preview/download/regenerate/email actions
+2. Enforce a max 12 reports per client — when generating a new one, delete the oldest if at 12
+3. Redesign the main Reports page with better filtering (client filter, status filter, search)
 
-```sql
-ALTER TABLE organisations
-  ADD COLUMN IF NOT EXISTS phone text DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS email text DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS website text DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS address text DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS team_size text DEFAULT NULL;
+---
+
+## 1. New "Reports" Tab in ClientDetail
+
+**File: `src/pages/clients/ClientDetail.tsx`**
+
+Add a `reports` tab after `upsells` in the TabsList (line 436):
+```
+<TabsTrigger value="reports">Reports</TabsTrigger>
 ```
 
-## 2. Update Organisation Interface
+Add a new `TabsContent value="reports"` section that:
+- Fetches reports from the `reports` table filtered by `client_id = client.id`, ordered by year/month desc
+- Joins email_logs for email status (same pattern as main Reports page)
+- Shows each report as a row with: month/year label, status badge, generated date, email status
+- Action buttons: Preview, Download, Regenerate, Send Email (reuse existing handlers from `@/lib/reports`)
+- Shows a "Generate Report" button at the top with month/year pickers (reuses existing `reportMonth`/`reportYear` state already in the component)
+- Empty state: "No reports generated for this client yet"
 
-**File: `src/contexts/OrgContext.tsx`**
+This is essentially a scoped version of the main Reports page, filtered to one client.
 
-Add `phone`, `email`, `website`, `address`, `team_size` to the `Organisation` interface and include them in the select query.
+## 2. Enforce 12-Report Cap Per Client
 
-## 3. Redesign Organisation Card as Editable Form
+**File: `supabase/functions/generate-report/index.ts`**
 
-**File: `src/components/settings/OrganisationSection.tsx`**
+After successfully generating and saving a new report, add cleanup logic:
 
-Replace the read-only Organisation card with an editable form containing:
-- Name (text input)
-- Phone (text input)
-- Email (text input)
-- Website (text input)
-- Address (textarea)
-- Team Size (select: 1-5, 6-15, 16-50, 51-200, 200+)
-- Slug and Role remain read-only display
+```sql
+-- Delete oldest reports beyond the 12 most recent for this client
+DELETE FROM reports
+WHERE client_id = $clientId
+AND id NOT IN (
+  SELECT id FROM reports
+  WHERE client_id = $clientId
+  ORDER BY report_year DESC, report_month DESC
+  LIMIT 12
+)
+```
 
-Add a "Save" button in the card header. On save, update the `organisations` table and call `refetchOrg()` to sync context.
+Also delete the corresponding PDF files from the `reports` storage bucket for any deleted rows.
 
-## 4. Allow All Roles to Revoke Pending Invites
+## 3. Redesign Main Reports Page
 
-Currently, only non-owner members can be removed (line 183: `member.role !== 'owner'`). The delete button already works for pending invites, but owners cannot revoke other owner invites.
+**File: `src/pages/Reports.tsx`**
 
-Change the logic: show a "Revoke" / delete button on any member row where `accepted_at` is null (pending invite), regardless of the invited role. For accepted members, keep the existing restriction (cannot remove owners).
+Current issues: all controls crammed into one row at the top. Redesign:
 
-This means:
-- Pending invite (any role) → show revoke button
-- Accepted owner → no remove button
-- Accepted manager → show remove button (owners only)
+- **Header row**: Title + "Generate Report" button (opens a small inline form or keeps the selectors)
+- **Filter bar**: Client dropdown (with "All clients" option), status filter (All / Success / Failed / Pending), month/year pickers
+- **Reports list**: Filtered by selected client. Group reports by client name when showing all. Each report card shows client name, period, status badge, email status, and action buttons
+- When a client is selected in the filter, the "Generate Report" button uses that client automatically
+- Add report count badge next to each client in the dropdown (e.g. "Acme Corp (3)")
+
+---
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| Database migration | Add 5 columns to `organisations` |
-| `src/contexts/OrgContext.tsx` | Add new fields to interface + select |
-| `src/components/settings/OrganisationSection.tsx` | Editable org form + revoke pending invites logic |
+| `src/pages/clients/ClientDetail.tsx` | Add "Reports" tab with scoped report list + actions |
+| `src/pages/Reports.tsx` | Redesign with filters, client grouping, better layout |
+| `supabase/functions/generate-report/index.ts` | Add 12-report cap cleanup after generation |
 
