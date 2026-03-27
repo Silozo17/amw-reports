@@ -32,29 +32,31 @@ const AdminDashboard = () => {
 
   return (
     <AppLayout>
-      <div>
-        <h1 className="text-3xl font-display">Platform Overview</h1>
-        <p className="text-muted-foreground font-body mt-1">AMW Reports platform statistics</p>
-    </AppLayout>
-
-      {isLoading ? (
-        <div className="text-muted-foreground">Loading...</div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {cards.map((card) => (
-            <Card key={card.label}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-body font-medium text-muted-foreground">{card.label}</CardTitle>
-                <card.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-display">{card.value}</p>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-display">Platform Overview</h1>
+          <p className="text-muted-foreground font-body mt-1">AMW Reports platform statistics</p>
         </div>
-      )}
-    </div>
+
+        {isLoading ? (
+          <div className="text-muted-foreground">Loading...</div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {cards.map((card) => (
+              <Card key={card.label}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-body font-medium text-muted-foreground">{card.label}</CardTitle>
+                  <card.icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-display">{card.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </AppLayout>
   );
 };
 
