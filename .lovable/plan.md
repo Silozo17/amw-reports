@@ -1,36 +1,23 @@
 
 
-## Plan: Replace "AMW" Loading Text with Org Logo (White-Label Only)
+## Fix: Trend Chart Y-Axis Floor at Zero
 
-### What changes
+**Problem**: The normalization formula `(val - min) / (max - min)` maps the lowest data point to 0 on the Y-axis, making lines touch the bottom even when the actual value is far from zero.
 
-There are **3 loading screens** that currently show hardcoded "AMW" text:
+**Solution**: Change the normalization to always use 0 as the minimum: `val / max` instead of `(val - min) / (max - min)`. This ensures lines only touch the bottom when the data is actually 0.
 
-1. **`src/App.tsx` line 43** — `ProtectedRoute` loading state
-2. **`src/App.tsx` line 64** — `AdminRoute` loading state
-3. **`src/pages/Index.tsx` line 225** — onboarding check loading state
+### Files to change
 
-### Approach
+**1. `src/components/clients/dashboard/PerformanceOverview.tsx`** — Two normalization blocks:
+- Line ~85: Change `max === min ? 0.5 : (v - min) / (max - min)` → `max === 0 ? 0 : v / max`
+- Line ~290: Same change for the GSC chart normalization
 
-Since all three locations are inside the `OrgProvider` tree, they can access `useOrg()` for the logo and `useEntitlements()` for the `hasWhitelabel` check.
+Also update the range calculation to only track `max` (no need for `min` anymore), or simply keep the existing range objects but ignore `min` in the normalization formula.
 
-**Logic for each loading screen:**
-- If `org?.logo_url` exists **and** `hasWhitelabel` is true → show `<img src={org.logo_url}>` instead of the "AMW" text
-- Otherwise → keep showing "AMW" as fallback (org data may not be loaded yet, or user is on a non-white-label plan)
+**2. `src/components/clients/dashboard/PlatformSection.tsx`** — One normalization block:
+- Line ~307: Change `range === 0 ? 0.5 : (val - min) / range` → `max === 0 ? 0 : val / max`
 
-### Files changed (2)
+**3. Y-axis domain stays `[0, 1]`** — no change needed there since the normalized values will still be in the 0–1 range, just with a true zero floor.
 
-**`src/App.tsx`**
-- Import `useOrg` and `useEntitlements`
-- In `ProtectedRoute`: after the existing `useAuth()` call, add `useOrg()` and `useEntitlements()`. Update the loading return to conditionally render org logo or "AMW".
-- In `AdminRoute`: same pattern — add org/entitlements hooks, update loading return.
-
-**`src/pages/Index.tsx`**
-- Already imports `useOrg`. Add `useEntitlements` import.
-- Update the `!onboardingChecked` loading block to conditionally render org logo or "AMW".
-
-### No other changes
-- No database changes
-- No edge function changes
-- No new components
+Three surgical edits, no other changes.
 
