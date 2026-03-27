@@ -35,6 +35,7 @@ interface ActivityItem {
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { orgId } = useOrg();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     activeClients: 0,
@@ -194,7 +195,7 @@ const Dashboard = () => {
     };
 
     fetchStats();
-  }, []);
+  }, [orgId]);
 
   const needsAttention = clientHealth.filter(c => c.failedSyncs > 0 || c.disconnected > 0);
 

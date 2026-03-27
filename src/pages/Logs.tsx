@@ -18,6 +18,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 const Logs = () => {
+  const { orgId } = useOrg();
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [reportLogs, setReportLogs] = useState<any[]>([]);
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
@@ -36,7 +37,7 @@ const Logs = () => {
       setIsLoading(false);
     };
     fetch();
-  }, []);
+  }, [orgId]);
 
   const EmptyState = ({ icon: Icon, message }: { icon: any; message: string }) => (
     <div className="py-12 text-center">

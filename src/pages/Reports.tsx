@@ -40,6 +40,7 @@ interface ClientOption {
 }
 
 const Reports = () => {
+  const { orgId } = useOrg();
   const [reports, setReports] = useState<ReportWithClient[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,7 +84,7 @@ const Reports = () => {
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [orgId]);
 
   const handleRegenerate = async (report: ReportWithClient) => {
     setGeneratingIds(prev => new Set(prev).add(report.id));
