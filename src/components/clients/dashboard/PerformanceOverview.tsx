@@ -59,10 +59,10 @@ const PerformanceOverview = ({
 
   // Determine which trend keys have data
   const trendKeys: { key: string; name: string; color: string }[] = [];
-  if (trendChartData.some(d => (d as Record<string, number>).impressions > 0)) trendKeys.push({ key: 'impressions', name: 'Impressions', color: '#b32fbf' });
-  if (trendChartData.some(d => (d as Record<string, number>).clicks > 0)) trendKeys.push({ key: 'clicks', name: 'Clicks', color: '#539BDB' });
-  if (trendChartData.some(d => (d as Record<string, number>).engagement > 0)) trendKeys.push({ key: 'engagement', name: 'Engagement', color: '#4ED68E' });
-  if (trendChartData.some(d => (d as Record<string, number>).reach > 0)) trendKeys.push({ key: 'reach', name: 'Reach', color: '#EE8733' });
+  if (trendChartData.some(d => (d as Record<string, number>).impressions > 0)) trendKeys.push({ key: 'impressions', name: 'Impressions', color: CHART_COLORS[0] });
+  if (trendChartData.some(d => (d as Record<string, number>).clicks > 0)) trendKeys.push({ key: 'clicks', name: 'Clicks', color: CHART_COLORS[1] });
+  if (trendChartData.some(d => (d as Record<string, number>).engagement > 0)) trendKeys.push({ key: 'engagement', name: 'Engagement', color: CHART_COLORS[2] });
+  if (trendChartData.some(d => (d as Record<string, number>).reach > 0)) trendKeys.push({ key: 'reach', name: 'Reach', color: CHART_COLORS[3] });
 
   // Normalize trend data so each metric has its own 0–1 scale
   const normalizedTrendData = (() => {
