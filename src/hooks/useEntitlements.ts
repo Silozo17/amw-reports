@@ -10,6 +10,7 @@ interface SubscriptionPlan {
   included_connections: number;
   additional_client_price: number;
   additional_connection_price: number;
+  has_whitelabel: boolean;
 }
 
 interface OrgSubscription {
@@ -37,7 +38,13 @@ export interface Entitlements {
   canAddConnection: boolean;
   isUnlimited: boolean;
   isLoading: boolean;
+  hasWhitelabel: boolean;
+  /** Check if a connection can be added for a specific client given its current connection count */
+  canAddConnectionForClient: (clientConnectionCount: number) => boolean;
+  flexiblePoolRemaining: number;
 }
+
+const LOCKED_CONNECTIONS_PER_CLIENT = 3;
 
 export function useEntitlements(): Entitlements {
   const { orgId } = useOrg();
@@ -105,6 +112,25 @@ export function useEntitlements(): Entitlements {
       ? subscription.override_max_connections
       : (plan?.included_connections ?? 5) + (subscription?.additional_connections ?? 0);
 
+  const hasWhitelabel = plan?.has_whitelabel ?? false;
+
+  // Connection allocation: locked slots per client + flexible pool
+  const totalLockedSlots = currentClients * LOCKED_CONNECTIONS_PER_CLIENT;
+  const flexiblePoolTotal = maxConnections === Infinity ? Infinity : Math.max(0, maxConnections - totalLockedSlots);
+  // Connections used beyond locked slots count against the flexible pool
+  // We approximate: total used connections - min(total used, locked capacity)
+  const flexiblePoolUsed = Math.max(0, currentConnections - totalLockedSlots);
+  const flexiblePoolRemaining = flexiblePoolTotal === Infinity ? Infinity : Math.max(0, flexiblePoolTotal - flexiblePoolUsed);
+
+  const canAddConnectionForClient = (clientConnectionCount: number): boolean => {
+    if (isUnlimited) return true;
+    if (currentConnections >= maxConnections) return false;
+    // If client has fewer than locked slots, always allowed
+    if (clientConnectionCount < LOCKED_CONNECTIONS_PER_CLIENT) return true;
+    // Otherwise, must have flexible pool remaining
+    return flexiblePoolRemaining > 0;
+  };
+
   return {
     plan,
     subscription: subscription ?? null,
@@ -116,5 +142,8 @@ export function useEntitlements(): Entitlements {
     canAddConnection: currentConnections < maxConnections,
     isUnlimited,
     isLoading,
+    hasWhitelabel,
+    canAddConnectionForClient,
+    flexiblePoolRemaining,
   };
 }

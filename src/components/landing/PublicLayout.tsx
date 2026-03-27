@@ -6,7 +6,7 @@ interface PublicLayoutProps {
 }
 
 const PublicLayout = ({ children }: PublicLayoutProps) => (
-  <div className="min-h-screen flex flex-col bg-amw-black text-amw-offwhite">
+  <div className="min-h-screen flex flex-col bg-amw-black text-amw-offwhite dark">
     <PublicNavbar />
     <main className="flex-1">{children}</main>
     <PublicFooter />
