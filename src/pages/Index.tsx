@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Users, FileText, AlertTriangle, Plug, ArrowRight, RefreshCw,
-  CheckCircle, XCircle, Mail, Clock,
+  CheckCircle, XCircle, Mail, Clock, Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -46,9 +46,16 @@ const Dashboard = () => {
     disconnected: 0,
   });
   const [clientHealth, setClientHealth] = useState<ClientHealth[]>([]);
+  const [pendingDeletion, setPendingDeletion] = useState<Array<{ id: string; company_name: string; scheduled_deletion_at: string }>>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Check org recovery + onboarding
   useEffect(() => {
@@ -136,7 +143,7 @@ const Dashboard = () => {
       // Guard: if no clients, use impossible ID to avoid empty .in() error
       const safeClientIds = orgClientIds.length > 0 ? orgClientIds : ['00000000-0000-0000-0000-000000000000'];
 
-      const [clientsRes, reportsRes, syncsRes, emailsRes, connectionsRes, allClientsRes, allConnectionsRes, allSyncLogsRes, recentSyncsRes, recentReportsRes, recentEmailsRes] = await Promise.all([
+      const [clientsRes, reportsRes, syncsRes, emailsRes, connectionsRes, allClientsRes, allConnectionsRes, allSyncLogsRes, recentSyncsRes, recentReportsRes, recentEmailsRes, pendingDeletionRes] = await Promise.all([
         supabase.from('clients').select('id', { count: 'exact' }).eq('is_active', true).eq('org_id', orgId),
         supabase.from('reports').select('id, status', { count: 'exact' }).eq('org_id', orgId),
         supabase.from('sync_logs').select('id', { count: 'exact' }).eq('status', 'failed').eq('org_id', orgId),
@@ -148,6 +155,7 @@ const Dashboard = () => {
         supabase.from('sync_logs').select('id, client_id, platform, status, started_at').eq('org_id', orgId).order('started_at', { ascending: false }).limit(5),
         supabase.from('reports').select('id, client_id, status, created_at').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
         supabase.from('email_logs').select('id, client_id, status, created_at, recipient_email').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
+        supabase.from('clients').select('id, company_name, scheduled_deletion_at').not('scheduled_deletion_at', 'is', null).eq('org_id', orgId),
       ]);
 
       setStats({
@@ -199,6 +207,15 @@ const Dashboard = () => {
 
       setClientHealth(health);
       setActivity(items.slice(0, 8));
+
+      // Pending deletion clients (filter to future only)
+      const pendingRaw = (pendingDeletionRes.data ?? []) as Array<{ id: string; company_name: string; scheduled_deletion_at: string | null }>;
+      setPendingDeletion(
+        pendingRaw
+          .filter(c => c.scheduled_deletion_at && new Date(c.scheduled_deletion_at) > new Date())
+          .map(c => ({ id: c.id, company_name: c.company_name, scheduled_deletion_at: c.scheduled_deletion_at! }))
+      );
+
       setIsLoading(false);
     };
 
@@ -206,6 +223,14 @@ const Dashboard = () => {
   }, [orgId]);
 
   const needsAttention = clientHealth.filter(c => c.failedSyncs > 0 || c.disconnected > 0);
+
+  const formatCountdown = (scheduledAt: string): string => {
+    const diff = new Date(scheduledAt).getTime() - now.getTime();
+    if (diff <= 0) return 'Deleting soon';
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
 
   const getStatusIcon = (status: string) => {
     if (status === 'success') return <CheckCircle className="h-3.5 w-3.5 text-accent" />;
@@ -336,6 +361,43 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pending Deletion */}
+        {pendingDeletion.length > 0 && (
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold font-body flex items-center gap-2">
+                <Trash2 className="h-4 w-4 text-destructive" />
+                Pending Deletion ({pendingDeletion.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {pendingDeletion.map(client => (
+                <div
+                  key={client.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-background/80 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => navigate(`/clients/${client.id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center text-xs font-bold font-body text-destructive">
+                      {client.company_name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium font-body">{client.company_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Deleting in {formatCountdown(client.scheduled_deletion_at)} — click to cancel
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="destructive" className="text-xs gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatCountdown(client.scheduled_deletion_at)}
+                  </Badge>
                 </div>
               ))}
             </CardContent>

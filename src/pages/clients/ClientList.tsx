@@ -6,11 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Building2, Mail, Phone } from 'lucide-react';
+import { Plus, Search, Building2, Mail, Phone, Trash2 } from 'lucide-react';
 import type { Client } from '@/types/database';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UsageBadge from '@/components/entitlements/UsageBadge';
 import { useOrg } from '@/contexts/OrgContext';
+
+const formatCountdown = (scheduledAt: string, now: Date): string => {
+  const diff = new Date(scheduledAt).getTime() - now.getTime();
+  if (diff <= 0) return 'Deleting soon';
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hours}h ${minutes}m`;
+};
 
 const ClientList = () => {
   const { currentClients, maxClients } = useEntitlements();
@@ -19,6 +27,12 @@ const ClientList = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!orgId) return;
@@ -80,7 +94,11 @@ const ClientList = () => {
             {filtered.map((client) => (
               <Card
                 key={client.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
+                className={`cursor-pointer hover:border-primary/50 transition-colors ${
+                  client.scheduled_deletion_at && new Date(client.scheduled_deletion_at) > now
+                    ? 'border-destructive/50 bg-destructive/5'
+                    : ''
+                }`}
                 onClick={() => navigate(`/clients/${client.id}`)}
               >
                 <CardContent className="p-5">
@@ -89,9 +107,16 @@ const ClientList = () => {
                       <h3 className="font-body font-semibold text-base">{client.company_name}</h3>
                       <p className="text-sm text-muted-foreground">{client.full_name}</p>
                     </div>
-                    <Badge variant={client.is_active ? 'default' : 'secondary'}>
-                      {client.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+                    {client.scheduled_deletion_at && new Date(client.scheduled_deletion_at) > now ? (
+                      <Badge variant="destructive" className="gap-1">
+                        <Trash2 className="h-3 w-3" />
+                        {formatCountdown(client.scheduled_deletion_at, now)}
+                      </Badge>
+                    ) : (
+                      <Badge variant={client.is_active ? 'default' : 'secondary'}>
+                        {client.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    )}
                   </div>
                   <div className="space-y-1.5 text-sm text-muted-foreground">
                     {client.email && (
