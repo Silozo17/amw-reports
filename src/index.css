@@ -192,6 +192,21 @@
   animation: pulse-glow 4s ease-in-out infinite;
 }
 
+.screenshot-fade-bottom {
+  position: relative;
+  overflow: hidden;
+}
+.screenshot-fade-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 25%;
+  background: linear-gradient(to bottom, transparent, hsl(var(--background)));
+  pointer-events: none;
+}
+
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
