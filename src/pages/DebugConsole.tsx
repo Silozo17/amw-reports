@@ -106,6 +106,17 @@ const DebugConsole = () => {
   };
 
 
+  if (!isPlatformAdmin) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center py-20">
+          <Shield className="h-12 w-12 text-muted-foreground/40 mb-4" />
+          <p className="text-muted-foreground">Platform admin access required</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
