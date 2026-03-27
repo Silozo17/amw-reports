@@ -43,7 +43,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
   const [platform, setPlatform] = useState<PlatformType | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const { canAddConnection, canAddConnectionForClient, currentConnections, maxConnections } = useEntitlements();
+  const { canAddConnection, currentConnections, maxConnections } = useEntitlements();
 
   // Filter out platforms that already have a connection
   const connectedPlatforms = new Set(connections.map(c => c.platform));
@@ -54,8 +54,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
       toast.error('Select a platform');
       return;
     }
-    const clientConnectionCount = connections.filter(c => c.is_connected).length;
-    if (!canAddConnection || !canAddConnectionForClient(clientConnectionCount)) {
+    if (!canAddConnection) {
       setShowUpgrade(true);
       return;
     }

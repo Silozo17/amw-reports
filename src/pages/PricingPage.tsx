@@ -30,7 +30,7 @@ const PLANS = [
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: false,
-    features: ['5 clients included', '25 platform connections', 'Weekly data sync', 'Branded PDF reports', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
+    features: ['5 clients included', '25 platform connections', 'Weekly data sync', 'Branded PDF reports', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
   },
   {
     name: 'Agency',
@@ -40,7 +40,7 @@ const PLANS = [
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: true,
-    features: ['5 clients included', '25 platform connections', 'Daily data sync', 'Full white-label branding', 'Custom domain support', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £4.99/mo each'],
+    features: ['5 clients included', '25 platform connections', 'Daily data sync', 'Full white-label branding', 'Custom domain support', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
   },
 ];
 
@@ -53,7 +53,7 @@ const COMPARISON_ROWS = [
   { feature: 'White-Label Branding', starter: false, freelance: false, agency: true },
   { feature: 'Custom Domain', starter: false, freelance: false, agency: true },
   { feature: 'Additional Clients', starter: false, freelance: '£9.99/mo each', agency: '£9.99/mo each' },
-  { feature: 'Additional Connections', starter: false, freelance: '£4.99/mo each', agency: '£4.99/mo each' },
+  { feature: 'Additional Connections', starter: false, freelance: '£9.99/mo (5 pack)', agency: '£9.99/mo (5 pack)' },
   { feature: 'Data Sync Frequency', starter: 'Monthly', freelance: 'Weekly', agency: 'Daily' },
 ];
 
