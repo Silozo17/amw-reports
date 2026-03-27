@@ -187,8 +187,8 @@ const PerformanceOverview = ({
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={fmtNum} />
                     <RechartsTooltip content={<CustomTooltip />} />
-                    <Bar dataKey="impressions" name="Impressions" fill="#539BDB" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="clicks" name="Clicks" fill="#4ED68E" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="impressions" name="Impressions" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="clicks" name="Clicks" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
                     <Legend />
                   </BarChart>
                 </ResponsiveContainer>
