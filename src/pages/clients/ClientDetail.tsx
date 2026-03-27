@@ -25,6 +25,7 @@ import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { triggerInitialSync, SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
 import ConnectionDisclaimer from '@/components/clients/ConnectionDisclaimer';
 import ShareDialog from '@/components/clients/ShareDialog';
+import UpsellTab from '@/components/clients/UpsellTab';
 import { toast } from 'sonner';
 
 const ClientDetail = () => {
@@ -305,6 +306,7 @@ const ClientDetail = () => {
           <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
             <TabsTrigger value="dashboard" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5 hidden sm:inline" />Dashboard</TabsTrigger>
             <TabsTrigger value="connections">Connections</TabsTrigger>
+            <TabsTrigger value="upsells">Upsells</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -472,6 +474,10 @@ const ClientDetail = () => {
 
           <TabsContent value="metrics" className="mt-4">
             <MetricConfigPanel clientId={client.id} connectedPlatforms={connectedPlatforms} />
+          </TabsContent>
+
+          <TabsContent value="upsells" className="mt-4">
+            <UpsellTab clientId={client.id} />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-4">
