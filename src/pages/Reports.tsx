@@ -9,6 +9,7 @@ import { FileText, Download, RotateCw, Send, ExternalLink, Loader2, Filter } fro
 import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod, sendReportEmail } from '@/lib/reports';
 import { toast } from 'sonner';
 import { useOrg } from '@/contexts/OrgContext';
+import usePageMeta from '@/hooks/usePageMeta';
 
 interface ReportWithClient {
   id: string;
@@ -49,6 +50,7 @@ interface ClientOption {
 }
 
 const Reports = () => {
+  usePageMeta({ title: 'Reports — AMW Reports', description: 'Generate and manage client reports' });
   const { orgId } = useOrg();
   const [reports, setReports] = useState<ReportWithClient[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);

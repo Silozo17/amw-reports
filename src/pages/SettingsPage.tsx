@@ -12,8 +12,10 @@ import CustomDomainSection from '@/components/settings/CustomDomainSection';
 import MetricsDefaultsSection from '@/components/settings/MetricsDefaultsSection';
 import BillingSection from '@/components/settings/BillingSection';
 import UpsellsOverviewSection from '@/components/settings/UpsellsOverviewSection';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const SettingsPage = () => {
+  usePageMeta({ title: 'Settings — AMW Reports', description: 'Manage your account and organisation settings' });
   const { isPlatformAdmin } = useAuth();
   const { orgRole } = useOrg();
   const { hasWhitelabel } = useEntitlements();
