@@ -1,86 +1,54 @@
 
 
-# Restyle Marketing Pages to Match AMW Media Visual Language
+# Fix Facebook Sync Timeout for High-Volume Pages
 
-## What's Changing
+## Root Cause
 
-The AMW Media site has a distinctive visual rhythm that the Reports site currently lacks. The key differences:
+Black Steel Doors publishes ~165 posts/month. The current `sync-facebook-page` function makes **2 sequential API calls per post** (post views + post clicks/reactions), totalling ~330+ HTTP requests. Edge functions timeout at ~60 seconds, so the function is killed mid-execution — the sync_log stays "running" forever with no error captured.
 
-1. **Accent subtitles** — AMW Media uses the `Slowdex` font for small italic labels above headings (e.g., "We are AMW Media", "Our Story", "What we do"). Reports pages have none of these.
-2. **Bold gradient divider bands** — AMW Media uses full-width purple/magenta gradient strips as section separators. Reports uses invisible `border-t` lines.
-3. **Stronger section contrast** — AMW Media alternates between deep charcoal and a noticeably warmer/lighter background. Reports uses barely-visible `bg-white/[0.03]`.
-4. **Star decorations** — AMW Media scatters stars across multiple sections. Reports only has them on the hero.
-5. **Cards with hover effects** — AMW Media cards highlight on hover. Reports cards are static.
+Evidence:
+- sync_log `59f64aad` started at 05:00:44 on March 28, status "running", no completion, no error
+- Client c2b194b6 (8 posts) synced fine in ~20 seconds
+- Client d17e96b1 (165 posts) timed out
 
-## Changes Per Page
+## Fix: Batch Post Insights Using IDs Filter
 
-### Global: New CSS utilities (`src/index.css`)
-- Add `.section-light` class: `bg-[hsl(340_7%_18%)]` — a visibly different lighter dark band (matching sidebar-accent shade) instead of the barely-visible `bg-white/[0.03]`
-- Add `.gradient-divider` class: a full-width 4px-high purple-to-blue gradient strip (`bg-gradient-brand h-1`)
+Instead of calling the Graph API individually for each post, use Meta's batch approach — fetch insights for **multiple posts in a single request** using the `ids` parameter. This reduces 330 calls down to ~10-15.
 
-### All 12 Public Pages — Consistent Pattern
-Apply this section rhythm to every page:
+### Changes to `supabase/functions/sync-facebook-page/index.ts`
 
-1. **Add Slowdex accent subtitle** above each page's main `<h1>` — a small italic label in `font-accent text-primary` (e.g., "Our Platform" on Features, "Simple Pricing" on Pricing, "Our Story" on About, "How It Works" on How It Works, etc.)
-2. **Replace `bg-white/[0.03]`** with the stronger `.section-light` background class on alternating sections
-3. **Add gradient divider strips** between major section transitions (1-2 per page, used sparingly for impact — typically after the hero and before the CTA)
-4. **Add `StarDecoration` components** to 2-3 additional sections per page (not just the hero)
-5. **Add hover state to cards**: `hover:border-primary/50 transition-colors` on all feature/platform cards
+**Replace the per-post insights loop (lines 276-317)** with a batched approach:
 
-### Page-Specific Accent Subtitles
+1. **Collect all post IDs** from the `published_posts` response first (no change to existing pagination loop)
+2. **After collecting all posts**, batch-fetch insights using `?ids={id1},{id2},...&fields=insights.metric(post_impressions_unique,post_total_media_view_unique,post_clicks_by_type,post_reactions_by_type_total)` — batches of 25 post IDs per call
+3. **Merge** the batched insights back into the `allTopPosts` array
 
-| Page | Subtitle above H1 |
-|---|---|
-| `HomePage.tsx` | "We Are AMW Media" (already has this in LandingHero, add to HomePage hero) |
-| `FeaturesPage.tsx` | "Our Platform" |
-| `PricingPage.tsx` | "Simple Pricing" |
-| `SocialMediaReportingPage.tsx` | "Social Reporting" |
-| `SeoReportingPage.tsx` | "SEO Reporting" |
-| `PpcReportingPage.tsx` | "PPC Reporting" |
-| `WhiteLabelReportsPage.tsx` | "White Label" |
-| `IntegrationsPage.tsx` | "Our Integrations" |
-| `HowItWorksPage.tsx` | "How It Works" |
-| `ForAgenciesPage.tsx` | "For Agencies" |
-| `ForFreelancersPage.tsx` | "For Freelancers" |
-| `ForSmbsPage.tsx` | "For Small Businesses" |
-| `ForCreatorsPage.tsx` | "For Creators" |
-| `AboutPage.tsx` | "Our Story" |
+This reduces API calls from `2 × N` to `ceil(N / 25)` — for 165 posts that's ~7 calls instead of 330.
 
-Each subtitle renders as:
-```tsx
-<p className="font-accent text-xl text-primary mb-2">Our Platform</p>
-```
+### Specific Code Changes
 
-### Section-Specific Changes
+1. **Split the posts loop** into two phases:
+   - **Phase 1** (existing loop, simplified): Collect post metadata (message, reactions, comments, shares, etc.) — no per-post API calls
+   - **Phase 2** (new): Batch-fetch `post_impressions_unique`, `post_total_media_view_unique`, `post_clicks_by_type`, `post_reactions_by_type_total` for all posts in chunks of 25
 
-**Each section heading** that currently just has `<h2>` will get a smaller Slowdex label above it too, matching the AMW Media pattern of "What we do" → "OUR SERVICES", "Our work" → "FEATURED PROJECTS" etc. For example:
-- "How it works" → `<p className="font-accent text-lg text-primary mb-1">How it works</p>` above `<h2>Three Steps...</h2>`
-- "What you get" → above features sections
-- "What they say" → above testimonial/quote sections
+2. **Add a `batchFetchPostInsights` helper function** that takes an array of post IDs and a page token, calls the Graph API once for a batch, and returns a map of `postId → { views, clicks, clicksByType, reactionBreakdown }`
+
+3. **Add a timeout safety net**: wrap the entire handler in a 50-second deadline check — if approaching timeout, skip remaining post insight batches and save what we have with status "partial" instead of crashing silently
+
+4. **Fix the stuck sync_log**: Add cleanup logic at the start of the function — if a sync_log already exists with status "running" for the same client+platform+month and is older than 5 minutes, mark it as "failed" with "Timeout — sync did not complete"
+
+### Additional Resilience
+
+- Add `AbortController` with 8-second timeout on each fetch call to prevent a single slow API response from blocking the entire function
+- Cap post processing at 200 posts max — beyond that, take top 200 by engagement and skip the rest (diminishing returns on insight data for very old/low-engagement posts)
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `src/index.css` | Add `.section-light` and `.gradient-divider` utility classes |
-| `src/pages/HomePage.tsx` | Add accent subtitle, gradient dividers, stronger section backgrounds, more stars, card hovers |
-| `src/pages/FeaturesPage.tsx` | Same pattern |
-| `src/pages/PricingPage.tsx` | Same pattern |
-| `src/pages/SocialMediaReportingPage.tsx` | Same pattern |
-| `src/pages/SeoReportingPage.tsx` | Same pattern |
-| `src/pages/PpcReportingPage.tsx` | Same pattern |
-| `src/pages/WhiteLabelReportsPage.tsx` | Same pattern |
-| `src/pages/IntegrationsPage.tsx` | Same pattern |
-| `src/pages/HowItWorksPage.tsx` | Same pattern |
-| `src/pages/ForAgenciesPage.tsx` | Same pattern |
-| `src/pages/ForFreelancersPage.tsx` | Same pattern |
-| `src/pages/ForSmbsPage.tsx` | Same pattern |
-| `src/pages/ForCreatorsPage.tsx` | Same pattern |
-| `src/pages/AboutPage.tsx` | Same pattern |
+| `supabase/functions/sync-facebook-page/index.ts` | Batch post insights, add timeout safety, add stuck-log cleanup |
 
-## Implementation Batches
+## Immediate Data Fix
 
-1. **Batch 1**: CSS utilities + HomePage + FeaturesPage + PricingPage + AboutPage
-2. **Batch 2**: Reporting pages (Social, SEO, PPC, White-Label, Integrations, How It Works)
-3. **Batch 3**: Audience pages (Agencies, Freelancers, SMBs, Creators)
+After deploying, manually retry the sync for Black Steel Doors to populate March data. The stuck "running" sync_log will be cleaned up automatically by the new startup logic.
 
