@@ -13,10 +13,7 @@ const cc = (curr: number, prev: number) => (prev !== 0 ? ((curr - prev) / prev) 
 
 const filterIncludesPlatform = (filter: PlatformFilter, platform: PlatformType): boolean => {
   if (filter === "all") return true;
-  if (filter === platform) return true;
-  if (filter === "paid" && (platform === "google_ads" || platform === "meta_ads" || platform === "tiktok")) return true;
-  if (filter === "social" && ["facebook", "instagram", "linkedin", "youtube", "pinterest", "tiktok"].includes(platform)) return true;
-  if (filter === "seo" && (platform === "google_search_console" || platform === "google_analytics" || platform === "google_business_profile")) return true;
+  if (Array.isArray(filter)) return filter.includes(platform);
   return false;
 };
 
