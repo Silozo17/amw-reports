@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Palette, Globe, Mail, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
 
 const CUSTOMISE_CARDS = [
@@ -33,8 +34,13 @@ const WhiteLabelReportsPage = () => {
 
   return (
     <>
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={26} color="purple" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="orange" className="absolute bottom-[20%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">White Label</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             White-Label Marketing Reports for <span className="text-gradient-purple">Agencies</span>
           </h1>
@@ -47,12 +53,15 @@ const WhiteLabelReportsPage = () => {
         </div>
       </section>
 
-      <section className="py-16 bg-white/[0.03] border-t border-sidebar-border/30">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-16 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Customisation</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">What You Can Customise</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {CUSTOMISE_CARDS.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
@@ -66,12 +75,16 @@ const WhiteLabelReportsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={20} color="green" className="absolute top-[10%] right-[4%]" />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">How it works</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">How White-Label Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             {STEPS.map(({ num, title, desc }) => (
-              <div key={num} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={num} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <span className="text-xs font-body text-amw-offwhite/30">{num}</span>
                 <h3 className="text-lg font-body font-semibold mb-2 mt-2">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
@@ -79,7 +92,6 @@ const WhiteLabelReportsPage = () => {
             ))}
           </div>
 
-          {/* Dashboard Screenshot showing branding in context */}
           <img
             src={dashboardSnapshot}
             alt="AMW Reports branded dashboard showing how your agency branding appears across the client portal with custom colours, logo, and metrics"
@@ -88,8 +100,9 @@ const WhiteLabelReportsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Client portal</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">A Branded Portal for Your Clients</h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-8">
             Every client gets a unique shareable link to their own branded dashboard. They see your logo, your colours, and your domain — no AMW Reports branding visible.
@@ -104,8 +117,9 @@ const WhiteLabelReportsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">White-Label FAQ</h2>
           <div className="space-y-3">
             {FAQS.map(({ q, a }) => (
@@ -121,8 +135,11 @@ const WhiteLabelReportsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Your Brand. Your Reports. Start Free.</h2>
           <p className="text-amw-offwhite/60 font-body">No credit card required. Full white-label on the Agency plan.</p>
           <Button size="lg" asChild>

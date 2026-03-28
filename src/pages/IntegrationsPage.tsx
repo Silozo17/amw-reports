@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 
 const PLATFORMS = [
   { name: 'Google Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'], link: '/ppc-reporting' },
@@ -27,8 +28,13 @@ const IntegrationsPage = () => {
 
   return (
     <>
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={26} color="purple" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="green" className="absolute bottom-[20%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">Our Integrations</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             Platform Integrations —<br />Connect Your <span className="text-gradient-purple">Marketing Stack</span>
           </h1>
@@ -41,18 +47,21 @@ const IntegrationsPage = () => {
         </div>
       </section>
 
-      <section className="py-16 border-t border-sidebar-border/30">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-16 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">All platforms</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">All Supported Platforms</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {PLATFORMS.map(({ name, category, metrics, link }) => (
-              <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-lg font-body font-semibold text-amw-offwhite">{name}</h3>
                   <span className="px-2 py-0.5 rounded-full bg-sidebar-accent/60 text-[10px] font-body text-amw-offwhite/50 uppercase tracking-wider">{category}</span>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-body">{m}</span>)}
+                  {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-amw-orange/15 text-amw-orange text-xs font-body">{m}</span>)}
                 </div>
                 <Link to={link} className="text-xs font-body text-primary hover:underline flex items-center gap-1">
                   Learn more <ArrowRight className="h-3 w-3" />
@@ -63,8 +72,9 @@ const IntegrationsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Roadmap</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Coming Soon</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-8">
             We're always adding new integrations. Here's what's on our roadmap:
@@ -79,8 +89,11 @@ const IntegrationsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Connect Your Platforms Today</h2>
           <p className="text-amw-offwhite/60 font-body">Free plan available. No credit card required.</p>
           <Button size="lg" asChild>
