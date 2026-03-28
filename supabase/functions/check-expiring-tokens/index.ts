@@ -184,13 +184,13 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ message: `Processed ${results.length} notifications`, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("check-expiring-tokens error:", e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });

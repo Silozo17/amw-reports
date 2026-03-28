@@ -23,14 +23,14 @@ Deno.serve(async (req) => {
       console.error("Failed to get auth events:", eventsErr);
       return new Response(
         JSON.stringify({ error: eventsErr.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
     if (!events || events.length === 0) {
       return new Response(
         JSON.stringify({ message: "No recent auth events", results: [] }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -180,13 +180,13 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ message: `Processed ${results.length} security events`, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("check-security-events error:", e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });

@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     if (!deliveredEmails || deliveredEmails.length === 0) {
       return new Response(
         JSON.stringify({ message: "No reports to remind about", sent: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -108,13 +108,13 @@ Deno.serve(async (req) => {
         message: `Sent ${results.filter(r => r.success).length} reminders`,
         results,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("check-report-reminders error:", e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });

@@ -11,7 +11,7 @@ const EVENT_TEMPLATE_MAP: Record<string, string> = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204 });
   }
 
   try {
@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     if (!stripeKey || !webhookSecret) {
       return new Response(JSON.stringify({ error: "Missing Stripe config" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     if (!sig) {
       return new Response(JSON.stringify({ error: "Missing signature" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       console.error("Webhook signature verification failed:", err);
       return new Response(JSON.stringify({ error: "Invalid signature" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -143,13 +143,13 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ received: true, event_type: event.type, template: templateName }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("stripe-webhook error:", e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });
