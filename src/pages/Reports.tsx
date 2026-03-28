@@ -50,6 +50,7 @@ interface ClientOption {
 }
 
 const Reports = () => {
+  usePageMeta({ title: 'Reports — AMW Reports', description: 'Generate and manage client reports' });
   const { orgId } = useOrg();
   const [reports, setReports] = useState<ReportWithClient[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
