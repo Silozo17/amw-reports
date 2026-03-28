@@ -282,7 +282,7 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
 
 // ── Meta Ads (Ads only) ──
 async function handleMetaAds(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
-  const appId = "1473709394207184";
+  const appId = Deno.env.get("META_APP_ID") || "1473709394207184";
   const appSecret = Deno.env.get("META_APP_SECRET")!;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
@@ -349,7 +349,7 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
 
 // ── Facebook (Pages only) ──
 async function handleFacebook(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
-  const appId = "1473709394207184";
+  const appId = Deno.env.get("META_APP_ID") || "1473709394207184";
   const appSecret = Deno.env.get("META_APP_SECRET")!;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
@@ -418,7 +418,7 @@ async function handleFacebook(supabase: any, code: string, connectionId: string,
 
 // ── Instagram (IG Business accounts via Facebook Pages) ──
 async function handleInstagram(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
-  const appId = "1473709394207184";
+  const appId = Deno.env.get("META_APP_ID") || "1473709394207184";
   const appSecret = Deno.env.get("META_APP_SECRET")!;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
