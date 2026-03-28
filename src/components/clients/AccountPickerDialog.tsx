@@ -72,8 +72,8 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
     switch (platform) {
       case 'google_ads': return (metadata.customers as DiscoveredAccount[]) || [];
       case 'meta_ads': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
-      case 'facebook': return ((metadata.pages as any[]) || []).map(p => ({ id: p.id, name: p.name }));
-      case 'instagram': return ((metadata.ig_accounts as any[]) || []).map(ig => ({ id: ig.id, name: ig.username ? `@${ig.username} (${ig.page_name})` : ig.id }));
+      case 'facebook': return ((metadata.pages as MetaPage[]) || []).map(p => ({ id: p.id, name: p.name }));
+      case 'instagram': return ((metadata.ig_accounts as Array<{ id: string; username?: string; page_name?: string }>) || []).map(ig => ({ id: ig.id, name: ig.username ? `@${ig.username} (${ig.page_name})` : ig.id }));
       case 'tiktok': return (metadata.accounts as DiscoveredAccount[]) || [];
       case 'linkedin': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
       case 'google_search_console': return (metadata.sites as DiscoveredAccount[]) || [];

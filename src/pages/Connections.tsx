@@ -32,7 +32,7 @@ const Connections = () => {
         .select('*, clients!inner(company_name, org_id)')
         .eq('clients.org_id', orgId)
         .order('created_at', { ascending: false });
-      setConnections(data as any[] ?? []);
+      setConnections((data ?? []) as (PlatformConnection & { clients?: { company_name: string } | null })[]);
       setIsLoading(false);
     };
     fetchConnections();
