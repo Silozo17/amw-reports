@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const appId = "1473709394207184";
+    const appId = Deno.env.get("META_APP_ID") || "1473709394207184";
     const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
     const state = btoa(

@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       if (expiresAt < sevenDaysFromNow) {
         console.log("Meta Ads token expiring soon, re-exchanging for fresh long-lived token...");
-        const appId = "1473709394207184";
+        const appId = Deno.env.get("META_APP_ID") || "1473709394207184";
         const appSecret = Deno.env.get("META_APP_SECRET")!;
         try {
           const reExchangeRes = await fetch(

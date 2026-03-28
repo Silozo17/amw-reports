@@ -34,6 +34,7 @@ import SettingsPage from "./pages/SettingsPage";
 import ClientPortal from "./pages/ClientPortal";
 import ClientPortalAuth from "./pages/ClientPortalAuth";
 import OnboardingPage from "./pages/OnboardingPage";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrgList from "./pages/admin/AdminOrgList";
@@ -43,6 +44,7 @@ import AdminUserList from "./pages/admin/AdminUserList";
 import { usePlatformAdmin } from "./hooks/usePlatformAdmin";
 import ScrollToTop from "./components/ScrollToTop";
 import LoadingScreen from "./components/LoadingScreen";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +113,7 @@ const AppRoutes = () => (
     <Route path="/how-it-works" element={<PublicPageRoute><HowItWorksPage /></PublicPageRoute>} />
     <Route path="/about" element={<PublicPageRoute><AboutPage /></PublicPageRoute>} />
     <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
+    <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/clients" element={<ProtectedRoute><ClientList /></ProtectedRoute>} />
@@ -142,7 +145,9 @@ const App = () => (
         <AuthProvider>
           <OrgProvider>
             <BrandingProvider>
-              <AppRoutes />
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
             </BrandingProvider>
           </OrgProvider>
         </AuthProvider>

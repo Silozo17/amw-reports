@@ -149,7 +149,23 @@ const LandingPage = () => {
                   <Input id="login-email" type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="you@agency.com" required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="login-password">Password</Label>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!loginEmail) { toast.error('Enter your email first'); return; }
+                        const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+                          redirectTo: `${window.location.origin}/reset-password`,
+                        });
+                        if (error) toast.error(error.message);
+                        else toast.success('Password reset link sent — check your email');
+                      }}
+                      className="text-xs text-primary hover:underline font-body"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                   <Input id="login-password" type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>

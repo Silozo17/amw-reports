@@ -1,36 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Organisation } from '@/types/database';
+import { ensureOrgMembership } from '@/lib/orgRecovery';
 
-export interface Organisation {
-  id: string;
-  name: string;
-  slug: string | null;
-  logo_url: string | null;
-  primary_color: string | null;
-  secondary_color: string | null;
-  accent_color: string | null;
-  heading_font: string | null;
-  body_font: string | null;
-  report_settings: { show_logo: boolean; show_ai_insights: boolean } | null;
-  button_color: string | null;
-  button_text_color: string | null;
-  text_on_dark: string | null;
-  text_on_light: string | null;
-  show_org_name: boolean;
-  chart_color_1: string | null;
-  chart_color_2: string | null;
-  chart_color_3: string | null;
-  chart_color_4: string | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  address: string | null;
-  team_size: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type { Organisation } from '@/types/database';
 
 export interface OrgMembership {
   id: string;
@@ -77,78 +51,17 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
       let activeMemberships = memberships ?? [];
 
-      // Recovery: if no memberships exist, try to link to profile.org_id or create new org
+      // Recovery: if no memberships exist, use shared utility
       if (membershipsError || activeMemberships.length === 0) {
-        // Check if profile has an org_id already set
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('org_id')
-          .eq('user_id', user.id)
-          .single();
+        const recoveredOrgId = await ensureOrgMembership(user);
+        if (!recoveredOrgId) return;
 
-        if (profile?.org_id) {
-          // Link user to existing org as manager
-          await supabase.from('org_members').insert({
-            org_id: profile.org_id,
-            user_id: user.id,
-            role: 'manager',
-            accepted_at: new Date().toISOString(),
-          });
-          activeMemberships = [{ org_id: profile.org_id, role: 'manager' }];
-          
-        } else {
-          // No profile org_id — create a brand new org
-          const orgName =
-            user.user_metadata?.company_name ||
-            user.user_metadata?.full_name ||
-            user.email ||
-            'My Workspace';
-
-          const { data: newOrg, error: orgError } = await supabase
-            .from('organisations')
-            .insert({
-              name: orgName,
-              slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-              created_by: user.id,
-            })
-            .select('id')
-            .single();
-
-          if (orgError || !newOrg) {
-            console.error('Failed to recover org:', orgError);
-            return;
-          }
-
-          await supabase.from('org_members').insert({
-            org_id: newOrg.id,
-            user_id: user.id,
-            role: 'owner',
-            accepted_at: new Date().toISOString(),
-          });
-
-          await supabase
-            .from('profiles')
-            .update({ org_id: newOrg.id })
-            .eq('user_id', user.id);
-
-          // Assign starter plan
-          const { data: starterPlan } = await supabase
-            .from('subscription_plans')
-            .select('id')
-            .eq('slug', 'starter')
-            .single();
-
-          if (starterPlan) {
-            await supabase.from('org_subscriptions').insert({
-              org_id: newOrg.id,
-              plan_id: starterPlan.id,
-              status: 'active',
-            });
-          }
-
-          activeMemberships = [{ org_id: newOrg.id, role: 'owner' }];
-          
-        }
+        // Re-fetch memberships after recovery
+        const { data: refreshed } = await supabase
+          .from('org_members')
+          .select('org_id, role')
+          .eq('user_id', user.id);
+        activeMemberships = refreshed ?? [];
       }
 
       // Fetch org details for all memberships

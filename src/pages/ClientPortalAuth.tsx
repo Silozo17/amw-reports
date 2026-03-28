@@ -110,19 +110,25 @@ const ClientPortalAuth = () => {
         const hsl = o.primary_color.startsWith('#') ? hexToHsl(o.primary_color) : o.primary_color;
         if (hsl) root.style.setProperty('--primary', hsl);
       }
+
+      // Load Google Fonts with deduplication
+      const loadFont = (fontName: string, weights: string) => {
+        const href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@${weights}&display=swap`;
+        if (!document.querySelector(`link[href="${href}"]`)) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = href;
+          document.head.appendChild(link);
+        }
+      };
+
       if (o.heading_font) {
         root.style.setProperty('--font-heading', o.heading_font);
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(o.heading_font)}:wght@400;700&display=swap`;
-        document.head.appendChild(link);
+        loadFont(o.heading_font, '400;700');
       }
       if (o.body_font) {
         root.style.setProperty('--font-body', o.body_font);
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(o.body_font)}:wght@300;400;500;600&display=swap`;
-        document.head.appendChild(link);
+        loadFont(o.body_font, '300;400;500;600');
       }
     }
 
