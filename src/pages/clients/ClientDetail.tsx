@@ -43,6 +43,7 @@ const ClientDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cancelDeletionDialogOpen, setCancelDeletionDialogOpen] = useState(false);
   const [countdown, setCountdown] = useState('');
   const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
