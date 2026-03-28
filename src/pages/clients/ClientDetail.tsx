@@ -43,6 +43,7 @@ const ClientDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cancelDeletionDialogOpen, setCancelDeletionDialogOpen] = useState(false);
   const [countdown, setCountdown] = useState('');
   const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -378,7 +379,7 @@ const ClientDetail = () => {
               This client is scheduled for deletion in <span className="font-bold">{countdown}</span>.
               All data will be permanently removed when the timer expires.
             </p>
-            <Button variant="outline" size="sm" onClick={handleCancelDeletion} disabled={isDeleting} className="shrink-0 gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setCancelDeletionDialogOpen(true)} disabled={isDeleting} className="shrink-0 gap-1.5">
               <XCircle className="h-3.5 w-3.5" />
               Cancel Deletion
             </Button>
@@ -408,7 +409,7 @@ const ClientDetail = () => {
             <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
             {isDeletionPending ? (
-              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={handleCancelDeletion} disabled={isDeleting}>
+              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={() => setCancelDeletionDialogOpen(true)} disabled={isDeleting}>
                 <Clock className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{countdown}</span>
                 <span className="text-xs">Cancel</span>
@@ -425,6 +426,22 @@ const ClientDetail = () => {
               onConfirm={handleScheduleDeletion}
               isLoading={isDeleting}
             />
+            <AlertDialog open={cancelDeletionDialogOpen} onOpenChange={setCancelDeletionDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel scheduled deletion?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will cancel the scheduled deletion for <span className="font-semibold">{client.company_name}</span>. The client and all its data will be preserved.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep Scheduled</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => { setCancelDeletionDialogOpen(false); handleCancelDeletion(); }}>
+                    Yes, Cancel Deletion
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Select value={reportMonth?.toString() ?? ''} onValueChange={v => setReportMonth(Number(v))}>
               <SelectTrigger className="w-24 sm:w-28 h-8 text-xs"><SelectValue placeholder="Month" /></SelectTrigger>
               <SelectContent>
