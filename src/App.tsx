@@ -34,6 +34,7 @@ import SettingsPage from "./pages/SettingsPage";
 import ClientPortal from "./pages/ClientPortal";
 import ClientPortalAuth from "./pages/ClientPortalAuth";
 import OnboardingPage from "./pages/OnboardingPage";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrgList from "./pages/admin/AdminOrgList";
@@ -43,6 +44,7 @@ import AdminUserList from "./pages/admin/AdminUserList";
 import { usePlatformAdmin } from "./hooks/usePlatformAdmin";
 import ScrollToTop from "./components/ScrollToTop";
 import LoadingScreen from "./components/LoadingScreen";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
