@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 import instagramPlatform from '@/assets/screenshots/instagram.webp';
 
 const WHY_POINTS = [
@@ -25,8 +26,13 @@ const ForFreelancersPage = () => {
 
   return (
     <>
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={24} color="purple" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="green" className="absolute bottom-[20%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">For Freelancers</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             Client Reporting Tool for <span className="text-gradient-purple">Freelance Marketers</span>
           </h1>
@@ -39,10 +45,12 @@ const ForFreelancersPage = () => {
         </div>
       </section>
 
-      {/* Instagram Screenshot - what freelancers deliver to clients */}
-      <section className="py-12 bg-white/[0.03] border-t border-sidebar-border/30">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-12 section-light">
         <div className="max-w-3xl mx-auto px-4 text-center">
-          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body mb-6">What your clients see</p>
+          <p className="font-accent text-lg text-primary mb-2">What your clients see</p>
+          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body mb-6">Branded reporting in action</p>
           <img
             src={instagramPlatform}
             alt="Instagram analytics report showing follower growth, reach, impressions, engagement, likes, comments, saves, and profile visits — as delivered to clients"
@@ -51,12 +59,16 @@ const ForFreelancersPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={20} color="orange" className="absolute top-[10%] right-[4%]" />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Why freelancers love us</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Why Freelancers Love AMW Reports</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {WHY_POINTS.map(({ title, desc }) => (
-              <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-0.5">
                   <Check className="h-4 w-4 text-accent" />
                 </div>
@@ -70,12 +82,13 @@ const ForFreelancersPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">How it works</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {STEPS.map(({ num, title, desc }) => (
-              <div key={num} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={num} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <span className="text-xs font-body text-amw-offwhite/30">{num}</span>
                 <h3 className="text-lg font-body font-semibold mb-2 mt-2">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
@@ -85,8 +98,9 @@ const ForFreelancersPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Pricing</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Affordable Pricing for Freelancers</h2>
           <p className="text-amw-offwhite/60 font-body mb-8">
             Start free with the Creator plan (1 client, 5 connections). When you grow, upgrade to Freelance at just £29.99/month for 5 clients and 25 connections. No contracts, cancel anytime.
@@ -97,8 +111,11 @@ const ForFreelancersPage = () => {
         </div>
       </section>
 
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start Free. Look Professional.</h2>
           <p className="text-amw-offwhite/60 font-body">No credit card required. Set up in under 5 minutes.</p>
           <Button size="lg" asChild>

@@ -77,6 +77,7 @@ const HomePage = () => {
             <div className="space-y-6">
               <div>
                 <img src={amwLogo} alt="AMW Reports logo" className="h-10 w-auto mb-2" />
+                <p className="font-accent text-xl text-primary mb-1">We Are AMW Reports</p>
                 <p className="text-sm tracking-[0.2em] text-amw-offwhite/70 uppercase font-body font-semibold">AMW Reports</p>
               </div>
               <h1 className="text-4xl lg:text-6xl xl:text-7xl font-heading leading-[0.95] uppercase">
@@ -113,9 +114,13 @@ const HomePage = () => {
         </div>
       </section>
 
+      {/* ── GRADIENT DIVIDER ── */}
+      <div className="gradient-divider w-full" />
+
       {/* ── PLATFORM STRIP ── */}
-      <section className="py-12 border-y border-sidebar-border/30">
+      <section className="py-12 section-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Our Integrations</p>
           <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body mb-6">Connects with the tools you already use</p>
           <div className="flex flex-wrap justify-center gap-3">
             {PLATFORMS.map((p) => (
@@ -128,8 +133,13 @@ const HomePage = () => {
       </section>
 
       {/* ── PROBLEM / SOLUTION ── */}
-      <section className="py-20 lg:py-28 bg-white/[0.03]">
+      <section className="relative py-20 lg:py-28">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={20} color="orange" className="absolute top-[10%] right-[5%]" />
+          <StarDecoration size={14} color="blue" className="absolute bottom-[15%] left-[3%]" animated={false} />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">The Challenge</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase text-center mb-4">
             Stop Copy-Pasting Data.<br />Start Impressing Clients.
           </h2>
@@ -137,7 +147,7 @@ const HomePage = () => {
             Marketing professionals waste hours every month manually pulling data from multiple platforms, formatting spreadsheets, and building reports. AMW Reports eliminates that entirely.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="p-6 rounded-xl bg-destructive/5 border border-destructive/20">
+            <div className="p-6 rounded-xl bg-destructive/5 border border-destructive/20 hover:border-destructive/40 transition-colors">
               <h3 className="text-lg font-body font-semibold mb-3 text-destructive">The Problem</h3>
               <ul className="space-y-2 text-sm font-body text-amw-offwhite/60">
                 <li>• Hours wasted logging into 10 different platforms</li>
@@ -146,7 +156,7 @@ const HomePage = () => {
                 <li>• Reports that don't reflect your agency brand</li>
               </ul>
             </div>
-            <div className="p-6 rounded-xl bg-accent/5 border border-accent/20">
+            <div className="p-6 rounded-xl bg-accent/5 border border-accent/20 hover:border-accent/40 transition-colors">
               <h3 className="text-lg font-body font-semibold mb-3 text-accent">The Solution</h3>
               <ul className="space-y-2 text-sm font-body text-amw-offwhite/60">
                 <li>• One dashboard for all your marketing data</li>
@@ -160,15 +170,19 @@ const HomePage = () => {
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28 section-light">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={22} color="green" className="absolute top-[8%] left-[6%]" />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">How it works</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">Three Steps to Professional Reports</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             Connect your platforms, we handle the rest. Reports ready to present to clients.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {STEPS.map(({ icon: Icon, title, desc }, i) => (
-              <div key={title} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={title} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-6 w-6 text-primary" />
                 </div>
@@ -191,8 +205,12 @@ const HomePage = () => {
       </section>
 
       {/* ── BUILT FOR ── */}
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={16} color="purple" className="absolute top-[12%] right-[8%]" animated={false} />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Who we serve</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">Built for Marketing Professionals</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             Whether you're an agency, freelancer, small business, or creator — AMW Reports has you covered.
@@ -211,16 +229,24 @@ const HomePage = () => {
         </div>
       </section>
 
+      {/* ── GRADIENT DIVIDER ── */}
+      <div className="gradient-divider w-full" />
+
       {/* ── KEY FEATURES ── */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28 section-light">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={18} color="orange" className="absolute bottom-[10%] right-[4%]" />
+          <StarDecoration size={26} color="blue" className="absolute top-[5%] left-[10%]" animated={false} />
+        </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">What you get</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">Everything You Need in One Platform</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             A client-ready reporting and analytics platform that consolidates all your data into one clean, easy-to-digest format.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-left">
+              <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-left hover:border-primary/50 transition-colors">
                 <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center mb-4">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
@@ -233,15 +259,16 @@ const HomePage = () => {
       </section>
 
       {/* ── METRICS AT A GLANCE ── */}
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">At a glance</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 10 Platforms</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             From ad spend to follower growth, we track everything your clients care about.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {STAT_GROUPS.map(({ label, metrics, color }) => (
-              <div key={label} className="p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-left">
+              <div key={label} className="p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-left hover:border-primary/50 transition-colors">
                 <h3 className={`text-sm font-body font-semibold uppercase tracking-wide mb-3 ${color}`}>{label}</h3>
                 <ul className="space-y-1.5">
                   {metrics.map((m) => (
@@ -258,10 +285,14 @@ const HomePage = () => {
       </section>
 
       {/* ── WHY AMW REPORTS ── */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28 section-light">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={20} color="green" className="absolute top-[15%] right-[6%]" />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
+              <p className="font-accent text-lg text-primary mb-2">Why us</p>
               <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">Why Teams Choose AMW Reports</h2>
               <p className="text-amw-offwhite/60 font-body mb-8">
                 We're not just another reporting tool. We built this platform because we run an agency ourselves and know exactly what you need.
@@ -282,8 +313,9 @@ const HomePage = () => {
       </section>
 
       {/* ── FOUNDER QUOTE ── */}
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">What they say</p>
           <Quote className="h-10 w-10 text-primary/40 mx-auto mb-6" aria-hidden="true" />
           <blockquote className="text-xl lg:text-2xl font-body italic leading-relaxed text-amw-offwhite/90 mb-6">
             "We built AMW Reports because we were tired of spending hours manually compiling data from a dozen platforms. Our clients deserved better — and so did we. Now every agency can deliver professional, branded reports without the grind."
@@ -298,9 +330,13 @@ const HomePage = () => {
         </div>
       </section>
 
+      {/* ── GRADIENT DIVIDER ── */}
+      <div className="gradient-divider w-full" />
+
       {/* ── CTA BANNER ── */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5">
+      <section className="py-20 lg:py-28 bg-gradient-to-b from-transparent to-primary/5">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start Free. No Credit Card Required.</h2>
           <p className="text-amw-offwhite/60 font-body">Set up in under 5 minutes. Upgrade when your agency grows.</p>
           <Button size="lg" asChild>

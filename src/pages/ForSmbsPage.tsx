@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, BarChart3, FileText, Mail, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 import gaPlatform from '@/assets/screenshots/G4A.webp';
 
 const FEATURES = [
@@ -21,8 +22,13 @@ const ForSmbsPage = () => {
 
   return (
     <>
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={24} color="purple" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="green" className="absolute bottom-[20%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">For Small Businesses</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             Marketing Reports for <span className="text-gradient-purple">Small Businesses</span>
           </h1>
@@ -35,13 +41,16 @@ const ForSmbsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">What you get</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">What You Get</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {FEATURES.map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                   <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
                     <Icon className="h-5 w-5 text-primary" />
                   </div>
@@ -61,8 +70,9 @@ const ForSmbsPage = () => {
         </div>
       </section>
 
-      <section className="py-16 border-t border-sidebar-border/30">
+      <section className="py-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Integrations</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-8">All Your Marketing Tools in One Place</h2>
           <div className="flex flex-wrap justify-center gap-3">
             {PLATFORMS.map(p => (
@@ -72,8 +82,9 @@ const ForSmbsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Pricing</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Free Plan for Small Businesses</h2>
           <p className="text-amw-offwhite/60 font-body mb-8">
             The Creator plan is completely free — 1 client, 5 platform connections, branded PDF reports, and a client portal. No credit card needed. Perfect for small businesses that want to see their marketing data in one place.
@@ -84,8 +95,11 @@ const ForSmbsPage = () => {
         </div>
       </section>
 
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">See Your Marketing Clearly</h2>
           <p className="text-amw-offwhite/60 font-body">Free plan available. Set up in under 5 minutes.</p>
           <Button size="lg" asChild>

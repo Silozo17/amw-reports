@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, FileText, Mail, Palette, Globe, Users, BarChart3, Share2, Clock, Layers, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
 import perfOverview from '@/assets/screenshots/Performance_Overview.webp';
 
@@ -47,8 +48,13 @@ const FeaturesPage = () => {
   return (
     <>
       {/* Hero */}
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={28} color="purple" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="blue" className="absolute bottom-[20%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-xl text-primary mb-2">Our Platform</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             All-in-One Marketing<br />Reporting <span className="text-gradient-purple">Platform</span>
           </h1>
@@ -64,7 +70,6 @@ const FeaturesPage = () => {
             </Button>
           </div>
 
-          {/* Dashboard Screenshot Showcase */}
           <img
             src={dashboardSnapshot}
             alt="AMW Reports main dashboard showing client KPIs, platform connections, and multi-channel marketing analytics overview"
@@ -73,16 +78,19 @@ const FeaturesPage = () => {
         </div>
       </section>
 
+      <div className="gradient-divider w-full" />
+
       {/* Platform Deep Dives */}
-      <section className="py-16 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-16 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">All platforms</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">10+ Platform Integrations, One Dashboard</h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-12">
             Connect once, sync automatically. Here's every metric we track for each platform.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {PLATFORM_DETAILS.map(({ name, desc, metrics }) => (
-              <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-1">{name}</h3>
                 <p className="text-sm text-amw-offwhite/50 font-body mb-4">{desc}</p>
                 <div className="flex flex-wrap gap-2">
@@ -97,13 +105,17 @@ const FeaturesPage = () => {
       </section>
 
       {/* Reporting Features */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={20} color="green" className="absolute top-[10%] right-[4%]" />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Reporting</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Automated Reporting & Delivery</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {REPORTING_FEATURES.map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                <div key={title} className="flex gap-4 p-5 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                   <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
                     <Icon className="h-5 w-5 text-primary" />
                   </div>
@@ -124,15 +136,16 @@ const FeaturesPage = () => {
       </section>
 
       {/* How Reports Work */}
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">The pipeline</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">How Report Generation Works</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             Reports go through a robust 3-stage pipeline to ensure the best possible outcome every time.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {PIPELINE_STEPS.map(({ icon: Icon, title, desc }, i) => (
-              <div key={title} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={title} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/30">0{i + 1}</span>
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-6 w-6 text-primary" />
@@ -146,10 +159,11 @@ const FeaturesPage = () => {
       </section>
 
       {/* Client Portal */}
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
+              <p className="font-accent text-lg text-primary mb-2">Client portal</p>
               <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Give Clients Their Own Dashboard</h2>
               <p className="text-amw-offwhite/60 font-body mb-6">
                 Every client gets a unique shareable link to their own branded portal — no login required. They see interactive charts, key metrics, and can download their latest report. It's transparency that builds trust.
@@ -183,12 +197,16 @@ const FeaturesPage = () => {
       </section>
 
       {/* Agency Tools */}
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28 section-light">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={22} color="orange" className="absolute bottom-[12%] left-[4%]" />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">For teams</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Agency Management Tools</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {AGENCY_TOOLS.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-center">
+              <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-center hover:border-primary/50 transition-colors">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-6 w-6 text-primary" />
                 </div>
@@ -200,9 +218,12 @@ const FeaturesPage = () => {
         </div>
       </section>
 
+      <div className="gradient-divider w-full" />
+
       {/* CTA */}
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start Your Free Account Today</h2>
           <p className="text-amw-offwhite/60 font-body">No credit card. No commitment. Upgrade when you're ready.</p>
           <div className="flex flex-wrap justify-center gap-3">

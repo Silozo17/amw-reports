@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 import googleAdsPlatform from '@/assets/screenshots/Google_ads.webp';
 import metaAdsPlatform from '@/assets/screenshots/Meta_ads.webp';
 
@@ -35,8 +36,13 @@ const PpcReportingPage = () => {
 
   return (
     <>
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={26} color="orange" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="purple" className="absolute bottom-[20%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">PPC Reporting</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             PPC & Ads Reporting Tool for <span className="text-gradient-purple">Agencies</span>
           </h1>
@@ -47,7 +53,6 @@ const PpcReportingPage = () => {
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
 
-          {/* Google Ads Screenshot */}
           <img
             src={googleAdsPlatform}
             alt="Google Ads reporting card showing ad spend, impressions, clicks, CTR, conversions, conversion value, CPC, CPM, and ROAS"
@@ -56,13 +61,16 @@ const PpcReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-16 bg-white/[0.03] border-t border-sidebar-border/30">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-16 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Integrations</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Ad Platforms We Integrate With</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             <div className="grid grid-cols-1 gap-6">
               {PLATFORMS.map(({ name, metrics }) => (
-                <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                   <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
                   <div className="flex flex-wrap gap-2">
                     {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-amw-orange/15 text-amw-orange text-xs font-body">{m}</span>)}
@@ -79,12 +87,13 @@ const PpcReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Report contents</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">What's in a PPC Report</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {METRICS_GRID.map(m => (
-              <div key={m} className="p-4 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+              <div key={m} className="p-4 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <p className="text-sm font-body text-amw-offwhite/70">{m}</p>
               </div>
             ))}
@@ -92,12 +101,13 @@ const PpcReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Who it's for</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-12">Who It's For</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {AUDIENCES.map(({ title, desc }) => (
-              <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-left">
+              <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-left hover:border-primary/50 transition-colors">
                 <h3 className="text-sm font-body font-semibold mb-2">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
@@ -106,8 +116,9 @@ const PpcReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">PPC Reporting FAQ</h2>
           <div className="space-y-3">
             {FAQS.map(({ q, a }) => (
@@ -123,8 +134,11 @@ const PpcReportingPage = () => {
         </div>
       </section>
 
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start Reporting on PPC Today</h2>
           <p className="text-amw-offwhite/60 font-body">Free plan available. No credit card required.</p>
           <Button size="lg" asChild>
