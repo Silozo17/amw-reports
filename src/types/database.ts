@@ -65,6 +65,7 @@ export interface Profile {
   org_id: string | null;
   phone: string | null;
   position: string | null;
+  account_type: string | null;
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
@@ -116,6 +117,9 @@ export interface PlatformConnection {
   platform: PlatformType;
   account_name: string | null;
   account_id: string | null;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
   is_connected: boolean;
   last_sync_at: string | null;
   last_sync_status: JobStatus | null;

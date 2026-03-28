@@ -17,7 +17,7 @@ export const generateReport = async (clientId: string, month: number, year: numb
         report_month: month,
         report_year: year,
         org_id: clientData.org_id,
-        status: 'pending' as any,
+        status: 'pending' as const,
       },
       { onConflict: 'client_id,report_month,report_year', ignoreDuplicates: false }
     );

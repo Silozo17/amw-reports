@@ -40,7 +40,7 @@ const AccountSection = () => {
   const [phone, setPhone] = useState(profile?.phone ?? '');
   const [position, setPosition] = useState(profile?.position ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
-  const [accountType, setAccountType] = useState((profile as any)?.account_type ?? 'business');
+  const [accountType, setAccountType] = useState(profile?.account_type ?? 'business');
 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
