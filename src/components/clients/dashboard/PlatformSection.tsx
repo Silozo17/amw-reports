@@ -437,7 +437,7 @@ const PlatformSection = ({
               {socialPosts.length > 0 && (
               <TooltipProvider delayDuration={200}>
               <div className="rounded-lg border overflow-x-auto">
-                    <TableHeader>
+                  <Table>
                       <TableRow>
                         <TableHead className="w-10 px-2" />
                         <TableHead>Post</TableHead>
