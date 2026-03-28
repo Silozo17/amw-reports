@@ -1,120 +1,66 @@
 
 
-# Full Platform Audit v2 — AMW Reports
+# Full Platform Audit v3 — AMW Reports
 
-## File Size Analysis (Large Files)
+## Audit Status vs Previous Rounds
 
-| File | Lines | Verdict |
-|---|---|---|
-| `ClientDetail.tsx` | **830** | Monolithic — split required |
-| `OnboardingPage.tsx` | **826** | Monolithic — split required |
-| `ClientDashboard.tsx` | **740** | Monolithic — split recommended |
-| `PlatformSection.tsx` | **594** | Large but focused — split optional |
-| `Index.tsx` (Dashboard) | **447** | Acceptable but data-heavy |
-| `ClientPortalAuth.tsx` | **395** | Acceptable |
-| `Reports.tsx` | **386** | Acceptable |
-| `HomePage.tsx` | **351** | Acceptable |
-| `LandingPage.tsx` | **329** | Acceptable |
-| `AppSidebar.tsx` | **303** | Acceptable |
-
----
-
-## 1. Dead / Unused Code
-
-### `src/pages/Login.tsx` — DEAD FILE
-- 87 lines, **zero imports anywhere** in the codebase. The `/login` route uses `LandingPage.tsx` instead. Safe to delete entirely.
-
-### `src/hooks/use-toast.ts` — likely unused
-- shadcn ships both `use-toast.ts` and `components/ui/use-toast.ts`. Check if both are needed or if one is orphaned.
-
-### `as any` casts — 93 instances across 8 files
-- Most concentrated in `PlatformSection.tsx` (Facebook reaction fields: `reaction_like`, `reaction_love`, `is_promoted`, `views`, `clicks`). These should be typed on the `TopContentItem` interface which already exists but is incomplete.
-- `Logs.tsx` uses `any[]` for all three log arrays instead of proper types.
-- `Connections.tsx` casts query results to `any[]`.
-
----
-
-## 2. Monolithic Components — Split Proposals
-
-### `ClientDetail.tsx` (830 lines) → 4 files
-Split into:
-- **`ClientDetail.tsx`** — page shell, routing, state orchestration (~150 lines)
-- **`ClientInfoTab.tsx`** — contact info, settings, currency/timezone (~200 lines)
-- **`ClientConnectionsTab.tsx`** — connections list, add/remove, sync progress (~200 lines)
-- **`ClientUsersTab.tsx`** — invite users, revoke access (~100 lines)
-
-The dashboard and reports tabs are already extracted as `ClientDashboard` and `ClientReportsTab`.
-
-### `OnboardingPage.tsx` (826 lines) → step components
-Split each onboarding step into its own component:
-- **`OnboardingPage.tsx`** — stepper state, navigation, submission (~150 lines)
-- **`steps/AccountTypeStep.tsx`**, **`steps/CompanyStep.tsx`**, **`steps/PlatformsStep.tsx`**, etc.
-
-### `ClientDashboard.tsx` (740 lines) → extract data hook
-- **`useClientDashboard.ts`** — all data fetching, month navigation, AI analysis (~300 lines)
-- **`ClientDashboard.tsx`** — rendering only (~440 lines)
-
----
-
-## 3. Resource-Heavy Setups
-
-### Dashboard page (`Index.tsx`) fires 12 parallel queries
-Lines 92-115 fire **12 simultaneous Supabase queries** on every mount. Several are redundant:
-- `clientsRes` and `allClientsRes` both query `clients` with the same filters — consolidate into one.
-- `syncsRes` and `allSyncLogsRes` both query `sync_logs` for failed status — consolidate.
-- `connectionsRes` and `allConnectionsRes` both query `platform_connections` — consolidate.
-
-**Fix**: Reduce from 12 to ~7 queries by reusing result sets.
-
-### `PlatformSection.tsx` creates a `TooltipProvider` per table row
-Lines 469-488 wrap each Facebook post's reaction cell in its own `<TooltipProvider>`. This creates unnecessary React context nesting for 10+ rows.
-**Fix**: Move `<TooltipProvider>` to the section level (one per platform card).
-
-### No query caching on authenticated pages
-All data fetching uses raw `useState` + `useEffect` instead of TanStack Query. This means:
-- No automatic cache invalidation
-- No background refetching
-- No stale-while-revalidate
-- Full re-fetch on every navigation
-
-This is a systemic issue but too large to address in one pass. Flag for future migration.
-
----
-
-## 4. Security Check (Post-P0/P1)
-
-### Previously fixed ✅
+### Previously Fixed ✅
+- Login.tsx deleted (dead code)
 - ErrorBoundary added
 - Reports unique index added
-- DRY org recovery
-- Sync timeouts + batching
+- DRY org recovery extracted
+- Sync timeouts + parallel batching
 - Meta App ID moved to secret
 - Password reset flow
-
-### Still outstanding
-- **OAuth tokens in plain text** (P2 — documented)
-- **CORS `*` on edge functions** (P1 — not yet fixed)
-- **No Zod validation on edge function inputs** (P1 — not yet fixed)
-- **No client-side login throttling** (P3)
-- **No FK constraints** (P2)
+- `usePageMeta` on all authenticated pages
+- Logs.tsx properly typed (SyncLog, ReportLog, EmailLog)
+- `hexToHsl` centralized in `colorUtils.ts`
+- `TooltipProvider` moved to section level
+- ClientDetail.tsx split (830 → 444 lines)
+- OnboardingPage.tsx split (826 → 269 lines)
+- ClientDashboard.tsx split (740 → 230 lines + 505-line hook)
+- Dashboard queries consolidated (12 → 9)
+- React.StrictMode enabled
 
 ---
 
-## 5. Code Quality Issues
+## Remaining Issues Found
 
-### `hexToHsl` duplicated
-The `hexToHsl` utility exists in both `ClientPortalAuth.tsx` (line 38) and likely `BrandingProvider.tsx`. Should be extracted to `src/lib/utils.ts`.
+### 1. `hexToHsl` STILL duplicated in `ClientPortal.tsx`
+Lines 28-45 contain an inline copy of `hexToHsl`. `ClientPortalAuth.tsx` and `BrandingProvider.tsx` correctly import from `colorUtils.ts`, but `ClientPortal.tsx` was missed.
+- **Fix**: Replace inline function with `import { hexToHsl } from '@/lib/colorUtils'`.
 
-### Missing page titles on authenticated routes
-`Index.tsx`, `ClientDetail.tsx`, `ClientList.tsx`, `Reports.tsx`, `Connections.tsx`, `Logs.tsx`, and `SettingsPage.tsx` don't call `usePageMeta`. Browser tabs show generic titles.
+### 2. Remaining `as any` casts — 33 instances in 6 files
+Down from 93, but still present:
+- `AccountSection.tsx` (1): `(profile as any)?.account_type`
+- `Connections.tsx` (1): `data as any[]`
+- `AdminOrgList.tsx` (1): `subRes.data as any`
+- `AccountPickerDialog.tsx` (2): `metadata.pages as any[]`, `metadata.ig_accounts as any[]`
+- `reports.ts` (1): `'pending' as any`
+- `DebugConsole.tsx` (4): `(conn as any).token_expires_at` etc.
+- **Fix**: Define proper types/interfaces for each; use Supabase generated types where available.
 
-### `Logs.tsx` uses `any[]` for all state
-```ts
-const [syncLogs, setSyncLogs] = useState<any[]>([]);
-const [reportLogs, setReportLogs] = useState<any[]>([]);
-const [emailLogs, setEmailLogs] = useState<any[]>([]);
-```
-Should define `SyncLog`, `ReportLog`, `EmailLog` interfaces.
+### 3. CORS `*` on ALL 44 edge functions — STILL OPEN (P1)
+Every edge function still uses `"Access-Control-Allow-Origin": "*"`. This was flagged in audit v1 as P1 but not yet addressed.
+- **Fix**: Create a shared `corsHeaders.ts` utility that restricts to known origins (`amw-reports.lovable.app`, preview URL, custom domains). Cron/webhook functions (no browser calls) should remove CORS entirely.
+
+### 4. No foreign key constraints — STILL OPEN (P2)
+All major tables (`clients`, `platform_connections`, `monthly_snapshots`, `reports`, `sync_logs`, `email_logs`) have zero FK constraints. Orphaned records can accumulate silently.
+- **Fix**: Migration to add FKs with `ON DELETE CASCADE`.
+
+### 5. `useClientDashboard.ts` is now 505 lines
+The hook extraction moved data logic out of the component but created a new large file. It's a single hook, not a component, so splitting is lower priority, but it could benefit from extracting the `useMemo` blocks for KPIs and sparklines into separate helper functions.
+- **Fix (optional)**: Extract `computeKpis()` and `computeSparklines()` into pure utility functions in a `src/lib/dashboardCalcs.ts` file.
+
+### 6. `PlatformSection.tsx` is still 602 lines
+Still the largest component. It's focused on a single concern (platform data display) but the Facebook top-content table rendering (lines 430-550) could be extracted.
+- **Fix (optional)**: Extract `FacebookTopContent` sub-component.
+
+### 7. No Zod validation on edge function inputs — STILL OPEN (P1)
+Edge functions accept `req.json()` without schema validation. Malformed input could cause unexpected behavior or crashes.
+
+### 8. OAuth tokens in plain text — STILL OPEN (P2)
+`access_token` and `refresh_token` stored as plain text in `platform_connections`.
 
 ---
 
@@ -122,32 +68,28 @@ Should define `SyncLog`, `ReportLog`, `EmailLog` interfaces.
 
 | Priority | Task | Effort |
 |---|---|---|
-| **P0** | Delete `Login.tsx` (dead code) | 1 min |
-| **P0** | Add missing fields to `TopContentItem` interface, remove ~30 `as any` casts in `PlatformSection.tsx` | 30 min |
-| **P0** | Consolidate redundant dashboard queries (12 → 7) | 20 min |
-| **P1** | Split `ClientDetail.tsx` into tab components | 45 min |
-| **P1** | Split `OnboardingPage.tsx` into step components | 45 min |
-| **P1** | Extract `useClientDashboard` hook from `ClientDashboard.tsx` | 30 min |
-| **P1** | Add `usePageMeta` to all authenticated pages | 15 min |
-| **P1** | Type `Logs.tsx` state properly, remove remaining `as any` | 20 min |
-| **P2** | Extract `hexToHsl` to shared utility | 5 min |
-| **P2** | Move `TooltipProvider` to section level in `PlatformSection` | 10 min |
-| **P2** | CORS restriction on edge functions | 30 min |
-| **P2** | Zod validation on edge function inputs | 1-2 hours |
+| **P0** | Fix `hexToHsl` duplication in `ClientPortal.tsx` | 2 min |
+| **P0** | Remove remaining 10 `as any` casts (6 files) | 15 min |
+| **P1** | Restrict CORS on all 44 edge functions | 45 min |
+| **P1** | Add Zod validation to edge function inputs | 1-2 hrs |
+| **P2** | Add FK constraints via migration | 30 min |
+| **P2** | Extract KPI/sparkline calc helpers from `useClientDashboard` | 20 min |
+| **P3** | Encrypt OAuth tokens at rest | 2-3 hrs |
 
 ---
 
-## What's Working Well (Unchanged from v1)
+## What's Working Well
 
-- RLS policies comprehensive with SECURITY DEFINER helpers
-- Multi-tenant isolation via org_id is consistent
-- Edge functions verify org membership
-- Stripe webhook signature verification
-- Auth state management best practices
-- Token refresh covers all platforms
-- Client portal properly isolated
-- Subscription entitlements enforced at UI + query level
-- ErrorBoundary now in place
+- All monolithic components successfully split
+- Type safety dramatically improved (93 → 33 `as any`, mostly in admin/debug code)
+- Dashboard queries consolidated and efficient
+- All pages have proper browser tab titles
+- ErrorBoundary protecting against crashes
+- Sync engine parallelized with timeouts
 - Reports deduplication via unique index
-- Parallel sync with timeouts
+- DRY utilities (`orgRecovery`, `colorUtils`)
+- RLS comprehensive with SECURITY DEFINER helpers
+- Multi-tenant isolation consistent
+- Stripe webhook signature verification
+- Client portal properly isolated
 
