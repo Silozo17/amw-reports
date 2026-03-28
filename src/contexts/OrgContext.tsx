@@ -63,7 +63,6 @@ export function OrgProvider({ children }: { children: ReactNode }) {
           .eq('user_id', user.id);
         activeMemberships = refreshed ?? [];
       }
-      }
 
       // Fetch org details for all memberships
       const orgIds = activeMemberships.map(m => m.org_id);
