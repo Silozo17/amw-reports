@@ -104,17 +104,17 @@ const Dashboard = () => {
       ]);
 
       setStats({
-        activeClients: clientsRes.count ?? 0,
+        activeClients: clientsRes.data?.length ?? 0,
         totalReports: reportsRes.count ?? 0,
         failedSyncs: syncsRes.count ?? 0,
         failedEmails: emailsRes.count ?? 0,
-        disconnected: connectionsRes.count ?? 0,
+        disconnected: (connectionsRes.data ?? []).filter(c => !c.is_connected).length,
       });
 
-      // Build client health data
-      const clients = (allClientsRes.data ?? []) as Array<{ id: string; company_name: string; logo_url: string | null; is_active: boolean }>;
-      const allConns = (allConnectionsRes.data ?? []) as Array<{ client_id: string; is_connected: boolean; last_sync_at: string | null; platform: string }>;
-      const failedLogs = (allSyncLogsRes.data ?? []) as Array<{ client_id: string; status: string }>;
+      // Build client health data — reuse clientsRes and connectionsRes
+      const clients = (clientsRes.data ?? []) as Array<{ id: string; company_name: string; logo_url: string | null; is_active: boolean }>;
+      const allConns = (connectionsRes.data ?? []) as Array<{ client_id: string; is_connected: boolean; last_sync_at: string | null; platform: string }>;
+      const failedLogs = (syncsRes.data ?? []) as Array<{ client_id: string; status: string }>;
 
       const clientMap = new Map(clients.map(c => [c.id, c.company_name]));
 
