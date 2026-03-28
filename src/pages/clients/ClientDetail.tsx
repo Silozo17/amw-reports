@@ -379,7 +379,7 @@ const ClientDetail = () => {
               This client is scheduled for deletion in <span className="font-bold">{countdown}</span>.
               All data will be permanently removed when the timer expires.
             </p>
-            <Button variant="outline" size="sm" onClick={handleCancelDeletion} disabled={isDeleting} className="shrink-0 gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setCancelDeletionDialogOpen(true)} disabled={isDeleting} className="shrink-0 gap-1.5">
               <XCircle className="h-3.5 w-3.5" />
               Cancel Deletion
             </Button>
@@ -409,7 +409,7 @@ const ClientDetail = () => {
             <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
             {isDeletionPending ? (
-              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={handleCancelDeletion} disabled={isDeleting}>
+              <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={() => setCancelDeletionDialogOpen(true)} disabled={isDeleting}>
                 <Clock className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{countdown}</span>
                 <span className="text-xs">Cancel</span>
