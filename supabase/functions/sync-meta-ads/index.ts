@@ -94,7 +94,43 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    const accessToken = conn.access_token;
+    // ── Proactive token re-exchange if expiring within 7 days ──
+    let accessToken = conn.access_token;
+    if (conn.token_expires_at) {
+      const expiresAt = new Date(conn.token_expires_at);
+      const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      if (expiresAt < sevenDaysFromNow) {
+        console.log("Meta Ads token expiring soon, re-exchanging for fresh long-lived token...");
+        const appId = "1473709394207184";
+        const appSecret = Deno.env.get("META_APP_SECRET")!;
+        try {
+          const reExchangeRes = await fetch(
+            `${GRAPH_BASE}/oauth/access_token?` +
+              new URLSearchParams({
+                grant_type: "fb_exchange_token",
+                client_id: appId,
+                client_secret: appSecret,
+                fb_exchange_token: accessToken,
+              })
+          );
+          const reExchangeData = await reExchangeRes.json();
+          if (reExchangeData.access_token) {
+            accessToken = reExchangeData.access_token;
+            const newExpiresAt = new Date(Date.now() + (reExchangeData.expires_in || 5184000) * 1000).toISOString();
+            await supabase.from("platform_connections").update({
+              access_token: accessToken,
+              token_expires_at: newExpiresAt,
+              last_error: null,
+            }).eq("id", connectionId);
+            console.log("Meta Ads token re-exchanged successfully.");
+          } else {
+            console.warn("Meta Ads token re-exchange failed:", reExchangeData.error?.message || "Unknown");
+          }
+        } catch (e) {
+          console.warn("Meta Ads token re-exchange exception:", e);
+        }
+      }
+    }
 
     // Discover ad account ID if missing
     let adAccountId = conn.account_id;

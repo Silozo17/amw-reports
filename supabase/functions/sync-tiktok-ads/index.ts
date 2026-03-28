@@ -71,7 +71,41 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    const accessToken = conn.access_token;
+    // ── Auto-refresh token if expired ──
+    let accessToken = conn.access_token;
+    if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
+      if (!conn.refresh_token) {
+        throw new Error("TikTok token expired and no refresh token available. Please reconnect.");
+      }
+      console.log("TikTok token expired, refreshing...");
+      const clientKey = Deno.env.get("TIKTOK_APP_ID")!;
+      const clientSecret = Deno.env.get("TIKTOK_APP_SECRET")!;
+
+      const refreshRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_key: clientKey,
+          client_secret: clientSecret,
+          grant_type: "refresh_token",
+          refresh_token: conn.refresh_token,
+        }),
+      });
+      const refreshData = await refreshRes.json();
+      if (refreshData.error || !refreshData.access_token) {
+        throw new Error(`TikTok token refresh failed: ${refreshData.error_description || refreshData.error || "Unknown error"}. Please reconnect.`);
+      }
+
+      accessToken = refreshData.access_token;
+      const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 86400) * 1000).toISOString();
+      await supabase.from("platform_connections").update({
+        access_token: accessToken,
+        refresh_token: refreshData.refresh_token || conn.refresh_token,
+        token_expires_at: newExpiresAt,
+        last_error: null,
+      }).eq("id", connectionId);
+      console.log("TikTok token refreshed successfully.");
+    }
 
     // ── Fetch user info ──
     const accountMetrics = await fetchUserInfo(accessToken);

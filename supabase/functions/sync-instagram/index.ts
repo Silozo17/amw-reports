@@ -50,12 +50,7 @@ Deno.serve(async (req) => {
       throw new Error("Instagram connection is not authenticated. Please connect via OAuth first.");
     }
 
-    if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
-      await supabaseClient.from("platform_connections")
-        .update({ last_error: "Token expired. Please reconnect.", last_sync_status: "failed" })
-        .eq("id", connectionId);
-      return new Response(JSON.stringify({ error: "Token expired" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    // Page tokens stored in metadata are permanent — no expiry check needed
 
     const metadata = conn.metadata as any;
     const igAccounts = (metadata?.ig_accounts || [])
