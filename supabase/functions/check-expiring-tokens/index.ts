@@ -6,6 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/** Platforms that use permanent page tokens — never expire */
+const PERMANENT_TOKEN_PLATFORMS = ["facebook", "instagram"];
+
+/** Platforms that have refresh_token auto-refresh in their sync functions */
+const AUTO_REFRESH_PLATFORMS = [
+  "google_ads", "google_search_console", "google_analytics",
+  "google_business_profile", "youtube", "pinterest", "tiktok", "linkedin",
+];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -25,15 +34,20 @@ Deno.serve(async (req) => {
     const results: Array<{ type: string; success: boolean; error?: string }> = [];
 
     // ─── 1. Token Expiring (within 7 days) ───
+    // Only alert for connections that CANNOT auto-refresh (meta_ads user tokens)
     const { data: expiringConns } = await supabase
       .from("platform_connections")
-      .select("id, platform, account_name, client_id, clients!inner(company_name, org_id)")
+      .select("id, platform, account_name, client_id, refresh_token, clients!inner(company_name, org_id)")
       .eq("is_connected", true)
       .gt("token_expires_at", now.toISOString())
       .lt("token_expires_at", sevenDaysFromNow.toISOString());
 
     for (const conn of expiringConns ?? []) {
-      const trackingKey = `token_expiring_${conn.id}`;
+      // Skip platforms with permanent page tokens
+      if (PERMANENT_TOKEN_PLATFORMS.includes(conn.platform)) continue;
+      // Skip platforms that auto-refresh via refresh_token
+      if (conn.refresh_token && AUTO_REFRESH_PLATFORMS.includes(conn.platform)) continue;
+
       const { data: existing } = await supabase
         .from("notification_tracking")
         .select("id")
@@ -73,14 +87,20 @@ Deno.serve(async (req) => {
     }
 
     // ─── 2. Token Expired (past due, still connected) ───
+    // Only alert for connections that genuinely cannot auto-refresh
     const { data: expiredConns } = await supabase
       .from("platform_connections")
-      .select("id, platform, account_name, client_id, clients!inner(company_name, org_id)")
+      .select("id, platform, account_name, client_id, refresh_token, clients!inner(company_name, org_id)")
       .eq("is_connected", true)
       .lt("token_expires_at", now.toISOString())
       .not("token_expires_at", "is", null);
 
     for (const conn of expiredConns ?? []) {
+      // Skip platforms with permanent page tokens
+      if (PERMANENT_TOKEN_PLATFORMS.includes(conn.platform)) continue;
+      // Skip platforms that auto-refresh via refresh_token
+      if (conn.refresh_token && AUTO_REFRESH_PLATFORMS.includes(conn.platform)) continue;
+
       const { data: existing } = await supabase
         .from("notification_tracking")
         .select("id")
