@@ -1,14 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { subMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Sparkles, Banknote, Eye, MousePointerClick, MessageCircle, Users,
-  Activity, Target, FileText, Link, Search, Crosshair, Hash,
-} from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { PLATFORM_LABELS, getCurrencySymbol, HIDDEN_METRICS } from "@/types/database";
 import type { PlatformType, JobStatus } from "@/types/database";
 import { toast } from "sonner";
 import type { SelectedPeriod, PlatformFilter } from "@/components/clients/DashboardHeader";
+import { computeKpis, computeSparklines } from "@/lib/dashboardCalcs";
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
