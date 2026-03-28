@@ -11,6 +11,7 @@ import type { Client } from '@/types/database';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UsageBadge from '@/components/entitlements/UsageBadge';
 import { useOrg } from '@/contexts/OrgContext';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const formatCountdown = (scheduledAt: string, now: Date): string => {
   const diff = new Date(scheduledAt).getTime() - now.getTime();
@@ -21,6 +22,7 @@ const formatCountdown = (scheduledAt: string, now: Date): string => {
 };
 
 const ClientList = () => {
+  usePageMeta({ title: 'Clients — AMW Reports', description: 'Manage your clients' });
   const { currentClients, maxClients } = useEntitlements();
   const { orgId } = useOrg();
   const navigate = useNavigate();

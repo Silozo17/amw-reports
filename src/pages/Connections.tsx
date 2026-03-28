@@ -10,10 +10,12 @@ import type { PlatformConnection } from '@/types/database';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UsageBadge from '@/components/entitlements/UsageBadge';
 import { useOrg } from '@/contexts/OrgContext';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const META_PERMISSIONS_UPDATE_DATE = '2026-03-24';
 
 const Connections = () => {
+  usePageMeta({ title: 'Connections — AMW Reports', description: 'Manage platform connections' });
   const { currentConnections, maxConnections } = useEntitlements();
   const { orgId } = useOrg();
   const [connections, setConnections] = useState<(PlatformConnection & { clients?: { company_name: string } | null })[]>([]);
