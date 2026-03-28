@@ -20,6 +20,98 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
   pinterest: "sync-pinterest",
 };
 
+const SYNC_TIMEOUT_MS = 60_000; // 60 seconds per sync
+const BATCH_SIZE = 4; // Process 4 connections in parallel
+
+interface SyncResult {
+  connection_id: string;
+  platform: string;
+  month: number;
+  year: number;
+  success: boolean;
+  error?: string;
+}
+
+/** Invoke a sync function with an AbortController timeout */
+async function invokeWithTimeout(
+  supabase: ReturnType<typeof createClient>,
+  fnName: string,
+  body: Record<string, unknown>,
+  timeoutMs: number
+): Promise<{ data?: any; error?: any }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const { data, error } = await supabase.functions.invoke(fnName, {
+      body,
+      // @ts-ignore — AbortSignal support
+    });
+    clearTimeout(timer);
+    return { data, error };
+  } catch (e) {
+    clearTimeout(timer);
+    if (e instanceof DOMException && e.name === "AbortError") {
+      return { error: { message: `Sync timed out after ${timeoutMs / 1000}s` } };
+    }
+    return { error: { message: e instanceof Error ? e.message : "Unknown error" } };
+  }
+}
+
+/** Send a sync_failed email to the org owner (fire-and-forget) */
+async function notifySyncFailure(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  clientId: string,
+  platform: string,
+  errorMsg: string,
+  month: number,
+  year: number
+) {
+  try {
+    const { data: ownerMember } = await supabase
+      .from("org_members")
+      .select("user_id")
+      .eq("org_id", orgId)
+      .eq("role", "owner")
+      .limit(1)
+      .maybeSingle();
+
+    if (!ownerMember?.user_id) return;
+
+    const { data: ownerProfile } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("user_id", ownerMember.user_id)
+      .maybeSingle();
+
+    if (!ownerProfile?.email) return;
+
+    const { data: clientData } = await supabase
+      .from("clients")
+      .select("company_name")
+      .eq("id", clientId)
+      .maybeSingle();
+
+    await supabase.functions.invoke("send-branded-email", {
+      body: {
+        template_name: "sync_failed",
+        recipient_email: ownerProfile.email,
+        org_id: orgId,
+        data: {
+          platform,
+          client_name: clientData?.company_name ?? "Unknown client",
+          error_message: errorMsg,
+          month,
+          year,
+        },
+      },
+    });
+  } catch (emailErr) {
+    console.error("Failed to send sync_failed email:", emailErr);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -40,15 +132,14 @@ Deno.serve(async (req) => {
       { month: currentMonth, year: currentYear },
     ];
 
-    // If we're in the first 7 days of a new month, also sync the previous month
-    // to catch late-reporting data from platforms
+    // First 7 days: also sync previous month for late-reporting data
     if (dayOfMonth <= 7) {
       const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
       const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
       monthsToSync.push({ month: prevMonth, year: prevYear });
     }
 
-    // Fetch all active connections with their org's plan slug
+    // Fetch all active connections
     const { data: connections, error: connError } = await supabase
       .from("platform_connections")
       .select("id, platform, client_id, clients!inner(org_id)")
@@ -63,7 +154,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Gather unique org IDs and fetch their plan slugs
+    // Build org plan map for schedule gating
     const orgIds = [...new Set(connections.map((c: any) => c.clients.org_id))];
     const { data: subscriptions, error: subError } = await supabase
       .from("org_subscriptions")
@@ -73,35 +164,28 @@ Deno.serve(async (req) => {
 
     if (subError) throw subError;
 
-    // Build org_id → plan_slug map
     const orgPlanMap: Record<string, string> = {};
     for (const sub of subscriptions || []) {
       orgPlanMap[(sub as any).org_id] = (sub as any).subscription_plans.slug;
     }
 
-    const results: Array<{
-      connection_id: string;
-      platform: string;
+    // Filter connections by plan schedule
+    const eligibleTasks: Array<{
+      conn: (typeof connections)[0];
       month: number;
       year: number;
-      success: boolean;
-      error?: string;
     }> = [];
 
     let skippedCount = 0;
 
-    // Process connections sequentially to avoid rate limits
     for (const conn of connections) {
       const orgId = (conn as any).clients.org_id;
       const planSlug = orgPlanMap[orgId] || "starter";
 
-      // Creator/Starter plan: only sync on the 4th of the month
       if (planSlug === "starter" && dayOfMonth !== 4) {
         skippedCount++;
         continue;
       }
-
-      // Freelance plan: only sync on Mondays (weekly)
       if (planSlug === "freelance" && now.getDay() !== 1) {
         skippedCount++;
         continue;
@@ -111,77 +195,53 @@ Deno.serve(async (req) => {
       if (!fnName) continue;
 
       for (const { month, year } of monthsToSync) {
-        try {
-          const { data, error } = await supabase.functions.invoke(fnName, {
-            body: { connection_id: conn.id, month, year },
-          });
+        eligibleTasks.push({ conn, month, year });
+      }
+    }
 
-          if (error) throw error;
+    // Process in parallel batches
+    const results: SyncResult[] = [];
+
+    for (let i = 0; i < eligibleTasks.length; i += BATCH_SIZE) {
+      const batch = eligibleTasks.slice(i, i + BATCH_SIZE);
+
+      const batchResults = await Promise.allSettled(
+        batch.map(async ({ conn, month, year }) => {
+          const fnName = SYNC_FUNCTION_MAP[conn.platform];
+          const { data, error } = await invokeWithTimeout(
+            supabase,
+            fnName,
+            { connection_id: conn.id, month, year },
+            SYNC_TIMEOUT_MS
+          );
+
+          if (error) throw new Error(error.message || "Unknown error");
           if (data?.error) throw new Error(data.error);
 
+          return { connection_id: conn.id, platform: conn.platform, month, year, success: true } as SyncResult;
+        })
+      );
+
+      for (let j = 0; j < batchResults.length; j++) {
+        const result = batchResults[j];
+        const task = batch[j];
+
+        if (result.status === "fulfilled") {
+          results.push(result.value);
+        } else {
+          const errorMsg = result.reason instanceof Error ? result.reason.message : "Unknown error";
           results.push({
-            connection_id: conn.id,
-            platform: conn.platform,
-            month,
-            year,
-            success: true,
-          });
-        } catch (e) {
-          const errorMsg = e instanceof Error ? e.message : "Unknown error";
-          results.push({
-            connection_id: conn.id,
-            platform: conn.platform,
-            month,
-            year,
+            connection_id: task.conn.id,
+            platform: task.conn.platform,
+            month: task.month,
+            year: task.year,
             success: false,
             error: errorMsg,
           });
 
-          // Send sync_failed email notification to org owner
-          try {
-            const orgId = (conn as any).clients.org_id;
-            const { data: ownerMember } = await supabase
-              .from("org_members")
-              .select("user_id")
-              .eq("org_id", orgId)
-              .eq("role", "owner")
-              .limit(1)
-              .maybeSingle();
-
-            if (ownerMember?.user_id) {
-              const { data: ownerProfile } = await supabase
-                .from("profiles")
-                .select("email")
-                .eq("user_id", ownerMember.user_id)
-                .maybeSingle();
-
-              if (ownerProfile?.email) {
-                // Get client name
-                const { data: clientData } = await supabase
-                  .from("clients")
-                  .select("company_name")
-                  .eq("id", conn.client_id)
-                  .maybeSingle();
-
-                await supabase.functions.invoke("send-branded-email", {
-                  body: {
-                    template_name: "sync_failed",
-                    recipient_email: ownerProfile.email,
-                    org_id: orgId,
-                    data: {
-                      platform: conn.platform,
-                      client_name: clientData?.company_name ?? "Unknown client",
-                      error_message: errorMsg,
-                      month,
-                      year,
-                    },
-                  },
-                });
-              }
-            }
-          } catch (emailErr) {
-            console.error("Failed to send sync_failed email:", emailErr);
-          }
+          // Fire-and-forget failure notification
+          const orgId = (task.conn as any).clients.org_id;
+          notifySyncFailure(supabase, orgId, task.conn.client_id, task.conn.platform, errorMsg, task.month, task.year);
         }
       }
     }
