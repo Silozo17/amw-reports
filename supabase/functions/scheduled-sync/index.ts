@@ -1,10 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Cron-only function — no CORS needed
 
 const SYNC_FUNCTION_MAP: Record<string, string> = {
   google_ads: "sync-google-ads",

@@ -1,11 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Webhook-only function — no CORS needed (called by Stripe, not browser)
 
 const EVENT_TEMPLATE_MAP: Record<string, string> = {
   "checkout.session.completed": "subscription_activated",
