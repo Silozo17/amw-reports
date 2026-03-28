@@ -20,6 +20,7 @@ import {
 import { Search, Users, Trash2, Ban, CheckCircle, Loader2, Pencil, KeyRound, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import usePageMeta from '@/hooks/usePageMeta';
 
 interface UserRow {
   user_id: string;
@@ -43,6 +44,7 @@ interface OrgOption {
 }
 
 const AdminUserList = () => {
+  usePageMeta({ title: 'Users — Admin — AMW Reports', description: 'Manage all platform users.' });
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
@@ -210,9 +212,9 @@ const AdminUserList = () => {
         toast.success('Password reset link generated');
         setResetTarget(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || 'Failed to reset password');
+      toast.error(err instanceof Error ? err.message : 'Failed to reset password');
     } finally {
       setIsResetting(false);
     }

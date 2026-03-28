@@ -24,6 +24,18 @@ import { ArrowLeft, Loader2, Users, Plug, Trash2, Pencil, Save, Check, RefreshCw
 import { toast } from 'sonner';
 import AdminSyncDialog from '@/components/admin/AdminSyncDialog';
 import { format } from 'date-fns';
+import usePageMeta from '@/hooks/usePageMeta';
+
+interface OrgMember {
+  id: string;
+  org_id: string;
+  user_id: string | null;
+  role: string;
+  invited_email: string | null;
+  invited_at: string | null;
+  accepted_at: string | null;
+  created_at: string;
+}
 
 const AdminOrgDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,8 +57,10 @@ const AdminOrgDetail = () => {
   const [editedOrgName, setEditedOrgName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
 
+  usePageMeta({ title: `${org?.name ?? 'Organisation'} — Admin — AMW Reports`, description: 'Manage organisation subscription, clients and team.' });
+
   // Member edit dialog
-  const [editMember, setEditMember] = useState<any>(null);
+  const [editMember, setEditMember] = useState<OrgMember | null>(null);
   const [editMemberName, setEditMemberName] = useState('');
   const [editMemberEmail, setEditMemberEmail] = useState('');
   const [editMemberRole, setEditMemberRole] = useState('');
@@ -229,7 +243,7 @@ const AdminOrgDetail = () => {
     }
   };
 
-  const openEditMember = (member: any) => {
+  const openEditMember = (member: OrgMember) => {
     const profile = member.user_id ? profileMap[member.user_id] : null;
     setEditMember(member);
     setEditMemberName(profile?.full_name ?? '');
@@ -717,7 +731,7 @@ const AdminOrgDetail = () => {
   );
 };
 
-function OnboardingDataTab({ orgId, members, profileMap }: { orgId: string; members: any[]; profileMap: Record<string, any> }) {
+function OnboardingDataTab({ orgId, members, profileMap }: { orgId: string; members: OrgMember[]; profileMap: Record<string, { full_name: string | null; email: string | null }> }) {
   const { data: onboardingData = [], isLoading } = useQuery({
     queryKey: ['admin-onboarding', orgId],
     queryFn: async () => {
@@ -763,7 +777,7 @@ function OnboardingDataTab({ orgId, members, profileMap }: { orgId: string; memb
               </TableRow>
             </TableHeader>
             <TableBody>
-              {onboardingData.map((row: any) => {
+              {onboardingData.map((row) => {
                 const profile = profileMap[row.user_id];
                 return (
                   <TableRow key={row.id}>

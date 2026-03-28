@@ -3,8 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, Plug } from 'lucide-react';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const AdminDashboard = () => {
+  usePageMeta({ title: 'Platform Overview — Admin — AMW Reports', description: 'AMW Reports platform statistics.' });
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
