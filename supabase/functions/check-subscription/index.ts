@@ -20,7 +20,7 @@ const PLAN_MAP: Record<string, string> = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204 });
   }
 
   try {
@@ -52,7 +52,7 @@ serve(async (req) => {
       logStep("No Stripe customer found");
       return new Response(
         JSON.stringify({ subscribed: false, plan: "starter" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     }
 
@@ -69,7 +69,7 @@ serve(async (req) => {
       logStep("No active subscription");
       return new Response(
         JSON.stringify({ subscribed: false, plan: "starter" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     }
 
@@ -127,13 +127,13 @@ serve(async (req) => {
         subscription_end: subscriptionEnd,
         customer_id: customerId,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      { headers: { "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });
     return new Response(JSON.stringify({ error: msg }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       status: 500,
     });
   }
