@@ -35,6 +35,11 @@ export interface Organisation {
   chart_color_2: string | null;
   chart_color_3: string | null;
   chart_color_4: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  address: string | null;
+  team_size: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
