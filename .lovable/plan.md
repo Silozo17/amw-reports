@@ -1,65 +1,86 @@
 
 
-# Improve Page Readability: Orange Pills + Alternating Dark/Light Sections
+# Restyle Marketing Pages to Match AMW Media Visual Language
 
-## Two Problems
+## What's Changing
 
-1. **Purple metric pills** (`bg-primary/10 text-primary`) are nearly invisible on the dark `bg-amw-black` background
-2. **All sections look the same** — monotone dark creates visual fatigue and makes content hard to scan
+The AMW Media site has a distinctive visual rhythm that the Reports site currently lacks. The key differences:
 
-## Solution
+1. **Accent subtitles** — AMW Media uses the `Slowdex` font for small italic labels above headings (e.g., "We are AMW Media", "Our Story", "What we do"). Reports pages have none of these.
+2. **Bold gradient divider bands** — AMW Media uses full-width purple/magenta gradient strips as section separators. Reports uses invisible `border-t` lines.
+3. **Stronger section contrast** — AMW Media alternates between deep charcoal and a noticeably warmer/lighter background. Reports uses barely-visible `bg-white/[0.03]`.
+4. **Star decorations** — AMW Media scatters stars across multiple sections. Reports only has them on the hero.
+5. **Cards with hover effects** — AMW Media cards highlight on hover. Reports cards are static.
 
-### 1. Change Metric Pills to Orange on Dark Backgrounds
+## Changes Per Page
 
-Replace all instances of `bg-primary/10 text-primary` on metric pill/badge spans with `bg-amw-orange/15 text-amw-orange` across all marketing pages. This applies to the metric tags inside platform cards (e.g., "Search Clicks", "Sessions", "Spend" etc.).
+### Global: New CSS utilities (`src/index.css`)
+- Add `.section-light` class: `bg-[hsl(340_7%_18%)]` — a visibly different lighter dark band (matching sidebar-accent shade) instead of the barely-visible `bg-white/[0.03]`
+- Add `.gradient-divider` class: a full-width 4px-high purple-to-blue gradient strip (`bg-gradient-brand h-1`)
 
-Also update the platform strip tags (e.g., "Google Ads", "Meta Ads") which currently use `bg-sidebar-accent/40 border border-sidebar-border/50 text-amw-offwhite/70` — these are fine as-is since they're neutral, but the metric-specific pills need the orange treatment.
+### All 12 Public Pages — Consistent Pattern
+Apply this section rhythm to every page:
 
-### 2. Alternate Dark/Light Sections
+1. **Add Slowdex accent subtitle** above each page's main `<h1>` — a small italic label in `font-accent text-primary` (e.g., "Our Platform" on Features, "Simple Pricing" on Pricing, "Our Story" on About, "How It Works" on How It Works, etc.)
+2. **Replace `bg-white/[0.03]`** with the stronger `.section-light` background class on alternating sections
+3. **Add gradient divider strips** between major section transitions (1-2 per page, used sparingly for impact — typically after the hero and before the CTA)
+4. **Add `StarDecoration` components** to 2-3 additional sections per page (not just the hero)
+5. **Add hover state to cards**: `hover:border-primary/50 transition-colors` on all feature/platform cards
 
-Introduce alternating section backgrounds across all pages. Every other section gets a slightly lighter background to create visual rhythm:
+### Page-Specific Accent Subtitles
 
-- **Dark sections** (default): no extra class — inherits `bg-amw-black` from the page
-- **Light sections**: add `bg-[hsl(340_7%_18%)]` (a slightly lighter shade of the dark theme, matching `--sidebar-accent`) — this creates a subtle but noticeable contrast band
-
-Pattern per page: Hero (dark) → next section (light) → next (dark) → next (light) → etc.
-
-The light sections replace the current `border-t border-sidebar-border/30` dividers with the background contrast itself, making dividers optional but still kept for extra definition.
-
-## Files to Modify
-
-| File | Changes |
+| Page | Subtitle above H1 |
 |---|---|
-| `src/pages/HomePage.tsx` | Orange pills on metric tags; alternate `bg-sidebar-accent/30` on even sections |
-| `src/pages/FeaturesPage.tsx` | Orange pills on platform metric badges; alternate light sections |
-| `src/pages/SeoReportingPage.tsx` | Orange pills; alternate light sections |
-| `src/pages/SocialMediaReportingPage.tsx` | Orange pills; alternate light sections |
-| `src/pages/PpcReportingPage.tsx` | Orange pills; alternate light sections |
-| `src/pages/WhiteLabelReportsPage.tsx` | Alternate light sections |
-| `src/pages/ForAgenciesPage.tsx` | Orange pills on platform strip; alternate light sections |
-| `src/pages/ForFreelancersPage.tsx` | Alternate light sections |
-| `src/pages/ForSmbsPage.tsx` | Orange pills on platform strip; alternate light sections |
-| `src/pages/ForCreatorsPage.tsx` | Alternate light sections |
+| `HomePage.tsx` | "We Are AMW Media" (already has this in LandingHero, add to HomePage hero) |
+| `FeaturesPage.tsx` | "Our Platform" |
+| `PricingPage.tsx` | "Simple Pricing" |
+| `SocialMediaReportingPage.tsx` | "Social Reporting" |
+| `SeoReportingPage.tsx` | "SEO Reporting" |
+| `PpcReportingPage.tsx` | "PPC Reporting" |
+| `WhiteLabelReportsPage.tsx` | "White Label" |
+| `IntegrationsPage.tsx` | "Our Integrations" |
+| `HowItWorksPage.tsx` | "How It Works" |
+| `ForAgenciesPage.tsx` | "For Agencies" |
+| `ForFreelancersPage.tsx` | "For Freelancers" |
+| `ForSmbsPage.tsx` | "For Small Businesses" |
+| `ForCreatorsPage.tsx` | "For Creators" |
+| `AboutPage.tsx` | "Our Story" |
 
-## Specific Changes
-
-### Pill colour change (all pages)
-```
-// Before
-bg-primary/10 text-primary
-
-// After
-bg-amw-orange/15 text-amw-orange
+Each subtitle renders as:
+```tsx
+<p className="font-accent text-xl text-primary mb-2">Our Platform</p>
 ```
 
-### Alternating section backgrounds
-Every other `<section>` gets an additional class to create the light band:
-```
-// Light band section
-className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30"
-```
-This `bg-white/[0.03]` is extremely subtle on dark backgrounds — enough to break the monotony without looking jarring. Combined with the existing border-t dividers, it creates clear content zones.
+### Section-Specific Changes
 
-### Implementation order
-1. All 10 pages updated in parallel — pill colour swap is a simple find-replace, section backgrounds are added to alternating sections
+**Each section heading** that currently just has `<h2>` will get a smaller Slowdex label above it too, matching the AMW Media pattern of "What we do" → "OUR SERVICES", "Our work" → "FEATURED PROJECTS" etc. For example:
+- "How it works" → `<p className="font-accent text-lg text-primary mb-1">How it works</p>` above `<h2>Three Steps...</h2>`
+- "What you get" → above features sections
+- "What they say" → above testimonial/quote sections
+
+## Files Modified
+
+| File | Change |
+|---|---|
+| `src/index.css` | Add `.section-light` and `.gradient-divider` utility classes |
+| `src/pages/HomePage.tsx` | Add accent subtitle, gradient dividers, stronger section backgrounds, more stars, card hovers |
+| `src/pages/FeaturesPage.tsx` | Same pattern |
+| `src/pages/PricingPage.tsx` | Same pattern |
+| `src/pages/SocialMediaReportingPage.tsx` | Same pattern |
+| `src/pages/SeoReportingPage.tsx` | Same pattern |
+| `src/pages/PpcReportingPage.tsx` | Same pattern |
+| `src/pages/WhiteLabelReportsPage.tsx` | Same pattern |
+| `src/pages/IntegrationsPage.tsx` | Same pattern |
+| `src/pages/HowItWorksPage.tsx` | Same pattern |
+| `src/pages/ForAgenciesPage.tsx` | Same pattern |
+| `src/pages/ForFreelancersPage.tsx` | Same pattern |
+| `src/pages/ForSmbsPage.tsx` | Same pattern |
+| `src/pages/ForCreatorsPage.tsx` | Same pattern |
+| `src/pages/AboutPage.tsx` | Same pattern |
+
+## Implementation Batches
+
+1. **Batch 1**: CSS utilities + HomePage + FeaturesPage + PricingPage + AboutPage
+2. **Batch 2**: Reporting pages (Social, SEO, PPC, White-Label, Integrations, How It Works)
+3. **Batch 3**: Audience pages (Agencies, Freelancers, SMBs, Creators)
 
