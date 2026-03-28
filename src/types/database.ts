@@ -117,6 +117,9 @@ export interface PlatformConnection {
   platform: PlatformType;
   account_name: string | null;
   account_id: string | null;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
   is_connected: boolean;
   last_sync_at: string | null;
   last_sync_status: JobStatus | null;

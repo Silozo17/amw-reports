@@ -55,7 +55,7 @@ const AdminOrgList = () => {
             ...org,
             clientCount: clientRes.count ?? 0,
             connectionCount,
-            subscription: subRes.data as { id: string; status: string; subscription_plans: { name: string; slug: string } | null } | null,
+            subscription: subRes.data as { id: string; status: string; is_custom: boolean; subscription_plans: { name: string; slug: string } | null } | null,
           };
         })
       );
