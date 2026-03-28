@@ -9,6 +9,7 @@ import { FileText, Download, RotateCw, Send, ExternalLink, Loader2, Filter } fro
 import { generateReport, downloadReport, getReportPreviewUrl, getCurrentReportPeriod, sendReportEmail } from '@/lib/reports';
 import { toast } from 'sonner';
 import { useOrg } from '@/contexts/OrgContext';
+import usePageMeta from '@/hooks/usePageMeta';
 
 interface ReportWithClient {
   id: string;
