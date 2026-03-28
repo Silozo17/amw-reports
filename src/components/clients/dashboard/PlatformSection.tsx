@@ -435,8 +435,8 @@ const PlatformSection = ({
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
               {socialPosts.length > 0 && (
+              <TooltipProvider delayDuration={200}>
               <div className="rounded-lg border overflow-x-auto">
-                  <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10 px-2" />
