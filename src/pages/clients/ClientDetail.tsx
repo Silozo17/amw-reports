@@ -426,6 +426,22 @@ const ClientDetail = () => {
               onConfirm={handleScheduleDeletion}
               isLoading={isDeleting}
             />
+            <AlertDialog open={cancelDeletionDialogOpen} onOpenChange={setCancelDeletionDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel scheduled deletion?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will cancel the scheduled deletion for <span className="font-semibold">{client.company_name}</span>. The client and all its data will be preserved.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep Scheduled</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => { setCancelDeletionDialogOpen(false); handleCancelDeletion(); }}>
+                    Yes, Cancel Deletion
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Select value={reportMonth?.toString() ?? ''} onValueChange={v => setReportMonth(Number(v))}>
               <SelectTrigger className="w-24 sm:w-28 h-8 text-xs"><SelectValue placeholder="Month" /></SelectTrigger>
               <SelectContent>
