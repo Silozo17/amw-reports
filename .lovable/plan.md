@@ -1,61 +1,44 @@
 
 
-# Fix Token Auto-Refresh to Prevent Connection Expirations
+# Sync All AMW Media Org Connections
 
-## Root Cause
+## What Needs Syncing
 
-Four platform sync functions store tokens with expiry dates but **never refresh them** when they expire. The `check-expiring-tokens` cron then fires off disconnection emails for every expired token.
+16 connections across 5 clients need a current-month sync (March 2026). AMW Media's 8 connections are already up to date.
 
-| Platform | Has refresh_token? | Auto-refreshes? | Token lifetime |
-|---|---|---|---|
-| Google Ads, GSC, GA4, GBP, YouTube | Yes | **Yes** ✅ | ~1 hour (refreshed) |
-| Pinterest | Yes | **Yes** ✅ | ~1 hour (refreshed) |
-| Meta Ads | No (long-lived) | **No** ❌ | ~60 days |
-| Facebook Pages | No (page tokens are permanent) | **No** ❌ | ~60 days (user token) |
-| Instagram | No (uses page tokens) | **No** ❌ | ~60 days (user token) |
-| TikTok | Yes | **No** ❌ | ~24 hours |
-| LinkedIn | Yes | **No** ❌ | ~60 days |
+## Execution
 
-## The Fix — Two Parts
+Invoke each platform's sync edge function with `month: 3, year: 2026` for each connection:
 
-### Part 1: Add token refresh to sync functions that lack it
+**Black Steel Doors (4):**
+- `sync-google-ads` → `6f64df14`
+- `sync-meta-ads` → `f6be43ec`
+- `sync-facebook-page` → `6743b18a`
+- `sync-instagram` → `9deab0d6`
 
-**TikTok** (`supabase/functions/sync-tiktok-ads/index.ts`):
-- Before syncing, check `token_expires_at`. If expired, call TikTok's refresh endpoint (`POST https://open.tiktokapis.com/v2/oauth/token/` with `grant_type=refresh_token`)
-- Update `access_token`, `refresh_token`, and `token_expires_at` in the DB
-- Use the new token for the sync
+**Blue Light Services (2):**
+- `sync-facebook-page` → `2cd16d0b`
+- `sync-instagram` → `748bf31d`
 
-**LinkedIn** (`supabase/functions/sync-linkedin/index.ts`):
-- Before syncing, check `token_expires_at`. If expired, call LinkedIn's refresh endpoint (`POST https://www.linkedin.com/oauth/v2/accessToken` with `grant_type=refresh_token`)
-- Update `access_token` and `token_expires_at` in the DB
+**Escape Campers (3):**
+- `sync-meta-ads` → `7b11007c`
+- `sync-facebook-page` → `c8744b3d`
+- `sync-instagram` → `2e301a29`
 
-**Meta platforms** (Facebook, Instagram, Meta Ads) — these use long-lived tokens that can't be traditionally refreshed with a refresh_token. Instead:
-- **Facebook Pages**: Page-level access tokens obtained via `me/accounts` are **permanent** and never expire. The issue is the *user* token expiry is stored as `token_expires_at` even though page tokens in metadata don't expire. Fix: After obtaining page tokens during OAuth, set `token_expires_at` to `null` since the actual page tokens used for syncing don't expire.
-- **Instagram**: Same as Facebook — uses page tokens from metadata which are permanent. Set `token_expires_at` to `null`.
-- **Meta Ads**: Long-lived user tokens (~60 days) with no refresh mechanism. Add proactive re-exchange: before expiry, call `fb_exchange_token` again to get a fresh 60-day token.
+**JR Stone (2):**
+- `sync-facebook-page` → `77d4f31c`
+- `sync-instagram` → `7cb7a2ed`
 
-### Part 2: Fix the notification system to not alert on auto-refreshable tokens
+**Wheels VT (5):**
+- `sync-meta-ads` → `a98bbb61`
+- `sync-facebook-page` → `87d48dca`
+- `sync-instagram` → `b1af5c99`
+- `sync-tiktok-ads` → `730569b7`
+- `sync-google-search-console` → `4adfd27e`
 
-**`supabase/functions/check-expiring-tokens/index.ts`**:
-- For Google/Pinterest/TikTok/LinkedIn connections that have a `refresh_token`, **skip** the expiring/expired notification — these will auto-refresh on next sync
-- For Meta platforms with page-level tokens (Facebook, Instagram), skip notifications — page tokens don't expire
-- Only send expiring/expired notifications for connections that genuinely cannot auto-refresh (Meta Ads user tokens approaching 60-day expiry with no refresh mechanism)
+## Method
 
-## Files Modified
+Call `supabase--curl_edge_functions` for each, passing `{ connection_id, month: 3, year: 2026 }`. Process sequentially to avoid rate limits.
 
-| File | Change |
-|---|---|
-| `supabase/functions/sync-tiktok-ads/index.ts` | Add token refresh before sync using TikTok refresh_token |
-| `supabase/functions/sync-linkedin/index.ts` | Add token refresh before sync using LinkedIn refresh_token |
-| `supabase/functions/sync-meta-ads/index.ts` | Add proactive long-lived token re-exchange before expiry |
-| `supabase/functions/sync-facebook-page/index.ts` | Remove expired token check — page tokens don't expire |
-| `supabase/functions/sync-instagram/index.ts` | Remove expired token check — page tokens don't expire |
-| `supabase/functions/oauth-callback/index.ts` | For Facebook/Instagram: set `token_expires_at` to null (page tokens are permanent) |
-| `supabase/functions/check-expiring-tokens/index.ts` | Skip notifications for connections with refresh_tokens or permanent page tokens |
-
-## Implementation Order
-
-1. **Batch 1**: TikTok + LinkedIn refresh logic (both straightforward refresh_token flows)
-2. **Batch 2**: Meta platform fixes (Facebook/Instagram token_expires_at → null, Meta Ads re-exchange)
-3. **Batch 3**: Update check-expiring-tokens to only alert on genuinely un-refreshable tokens
+No code changes required — operational action only.
 
