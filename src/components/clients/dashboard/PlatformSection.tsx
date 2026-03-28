@@ -438,6 +438,7 @@ const PlatformSection = ({
               <TooltipProvider delayDuration={200}>
               <div className="rounded-lg border overflow-x-auto">
                   <Table>
+                    <TableHeader>
                       <TableRow>
                         <TableHead className="w-10 px-2" />
                         <TableHead>Post</TableHead>
