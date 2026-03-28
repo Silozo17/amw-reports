@@ -57,8 +57,6 @@ const AdminOrgDetail = () => {
   const [editedOrgName, setEditedOrgName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
 
-  usePageMeta({ title: `${org?.name ?? 'Organisation'} — Admin — AMW Reports`, description: 'Manage organisation subscription, clients and team.' });
-
   // Member edit dialog
   const [editMember, setEditMember] = useState<OrgMember | null>(null);
   const [editMemberName, setEditMemberName] = useState('');

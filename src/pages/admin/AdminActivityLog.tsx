@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollText, AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; className: string }> = {
   success: { icon: CheckCircle2, className: 'text-green-500' },
