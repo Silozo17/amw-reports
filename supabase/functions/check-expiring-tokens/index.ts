@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
       .lt("token_expires_at", sevenDaysFromNow.toISOString());
 
     for (const conn of expiringConns ?? []) {
+      const clientData = (conn as Record<string, unknown>).clients as { company_name: string; org_id: string };
       // Skip platforms with permanent page tokens
       if (PERMANENT_TOKEN_PLATFORMS.includes(conn.platform)) continue;
       // Skip platforms that auto-refresh via refresh_token
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
 
       if (existing) continue;
 
-      const orgId = (conn as any).clients.org_id;
+      const orgId = clientData.org_id;
       const ownerEmail = await getOrgOwnerEmail(supabase, orgId);
       if (!ownerEmail) continue;
 
@@ -70,7 +71,7 @@ Deno.serve(async (req) => {
             data: {
               platform: conn.platform,
               account_name: conn.account_name ?? conn.platform,
-              client_name: (conn as any).clients.company_name,
+              client_name: clientData.company_name,
             },
           },
         });
@@ -96,6 +97,7 @@ Deno.serve(async (req) => {
       .not("token_expires_at", "is", null);
 
     for (const conn of expiredConns ?? []) {
+      const clientData = (conn as Record<string, unknown>).clients as { company_name: string; org_id: string };
       // Skip platforms with permanent page tokens
       if (PERMANENT_TOKEN_PLATFORMS.includes(conn.platform)) continue;
       // Skip platforms that auto-refresh via refresh_token
@@ -110,7 +112,7 @@ Deno.serve(async (req) => {
 
       if (existing) continue;
 
-      const orgId = (conn as any).clients.org_id;
+      const orgId = clientData.org_id;
       const ownerEmail = await getOrgOwnerEmail(supabase, orgId);
       if (!ownerEmail) continue;
 
@@ -123,7 +125,7 @@ Deno.serve(async (req) => {
             data: {
               platform: conn.platform,
               account_name: conn.account_name ?? conn.platform,
-              client_name: (conn as any).clients.company_name,
+              client_name: clientData.company_name,
             },
           },
         });

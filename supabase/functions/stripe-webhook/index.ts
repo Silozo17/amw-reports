@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
 
     if (event.type === "customer.subscription.updated") {
       const sub = event.data.object as Stripe.Subscription;
-      const prev = event.data.previous_attributes as any;
+      const prev = (event.data as Record<string, unknown>).previous_attributes as { items?: { data?: Array<{ price?: { id?: string; unit_amount?: number } }> } } | undefined;
       customerEmail = await getCustomerEmail(stripe, sub.customer as string);
 
       if (prev?.items) {

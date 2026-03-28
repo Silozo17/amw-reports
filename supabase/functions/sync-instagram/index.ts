@@ -52,13 +52,13 @@ Deno.serve(async (req) => {
 
     // Page tokens stored in metadata are permanent — no expiry check needed
 
-    const metadata = conn.metadata as any;
-    const igAccounts = (metadata?.ig_accounts || [])
-      .filter((ig: any) => ig.id && ig.page_token)
-      .map((ig: any) => ({ ig_id: ig.id, ig_username: ig.username, page_token: ig.page_token }));
+    const metadata = conn.metadata as Record<string, unknown> | null;
+    const igAccounts = (((metadata?.ig_accounts) as Array<{ id?: string; username?: string; page_token?: string }>) || [])
+      .filter((ig) => ig.id && ig.page_token)
+      .map((ig) => ({ ig_id: ig.id!, ig_username: ig.username, page_token: ig.page_token! }));
 
     const targetIgId = conn.account_id;
-    const filteredAccounts = targetIgId ? igAccounts.filter((ig: any) => ig.ig_id === targetIgId) : igAccounts;
+    const filteredAccounts = targetIgId ? igAccounts.filter((ig) => ig.ig_id === targetIgId) : igAccounts;
 
     if (filteredAccounts.length === 0) {
       throw new Error("No Instagram Business accounts found. Please reconnect Instagram and ensure your Facebook Pages have linked Instagram accounts.");

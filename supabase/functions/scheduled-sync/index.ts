@@ -155,7 +155,10 @@ Deno.serve(async (req) => {
     }
 
     // Build org plan map for schedule gating
-    const orgIds = [...new Set(connections.map((c: any) => c.clients.org_id))];
+    const orgIds = [...new Set(connections.map((c) => {
+      const clientData = (c as Record<string, unknown>).clients as { org_id: string };
+      return clientData.org_id;
+    }))];
     const { data: subscriptions, error: subError } = await supabase
       .from("org_subscriptions")
       .select("org_id, subscription_plans!inner(slug)")
@@ -166,7 +169,8 @@ Deno.serve(async (req) => {
 
     const orgPlanMap: Record<string, string> = {};
     for (const sub of subscriptions || []) {
-      orgPlanMap[(sub as any).org_id] = (sub as any).subscription_plans.slug;
+      const subData = sub as Record<string, unknown>;
+      orgPlanMap[subData.org_id as string] = ((subData.subscription_plans as { slug: string }).slug);
     }
 
     // Filter connections by plan schedule
@@ -179,7 +183,8 @@ Deno.serve(async (req) => {
     let skippedCount = 0;
 
     for (const conn of connections) {
-      const orgId = (conn as any).clients.org_id;
+      const connClientData = (conn as Record<string, unknown>).clients as { org_id: string };
+      const orgId = connClientData.org_id;
       const planSlug = orgPlanMap[orgId] || "starter";
 
       if (planSlug === "starter" && dayOfMonth !== 4) {
@@ -240,8 +245,8 @@ Deno.serve(async (req) => {
           });
 
           // Fire-and-forget failure notification
-          const orgId = (task.conn as any).clients.org_id;
-          notifySyncFailure(supabase, orgId, task.conn.client_id, task.conn.platform, errorMsg, task.month, task.year);
+          const taskClientData = (task.conn as Record<string, unknown>).clients as { org_id: string };
+          const orgId = taskClientData.org_id;
         }
       }
     }
