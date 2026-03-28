@@ -247,6 +247,7 @@ Deno.serve(async (req) => {
           // Fire-and-forget failure notification
           const taskClientData = (task.conn as Record<string, unknown>).clients as { org_id: string };
           const orgId = taskClientData.org_id;
+          notifySyncFailure(supabase, orgId, task.conn.client_id, task.conn.platform, errorMsg, task.month, task.year);
         }
       }
     }
