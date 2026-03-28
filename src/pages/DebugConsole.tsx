@@ -11,10 +11,32 @@ import { Copy, RefreshCw, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformType, PlatformConnection } from '@/types/database';
+import usePageMeta from '@/hooks/usePageMeta';
 
 interface Client {
   id: string;
   company_name: string;
+}
+
+interface DebugSyncLog {
+  id: string;
+  platform: string;
+  status: string;
+  report_month: number;
+  report_year: number;
+  started_at: string;
+  error_message: string | null;
+}
+
+interface DebugSnapshot {
+  id: string;
+  platform: string;
+  report_month: number;
+  report_year: number;
+  snapshot_locked: boolean;
+  metrics_data: unknown;
+  top_content: unknown;
+  raw_data: unknown;
 }
 
 
@@ -46,12 +68,13 @@ const JsonViewer = ({ data, label }: { data: unknown; label: string }) => {
 };
 
 const DebugConsole = () => {
+  usePageMeta({ title: 'Debug Console — AMW Reports', description: 'Inspect raw data pipeline for connections, sync logs and snapshots.' });
   const { isPlatformAdmin } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
-  const [syncLogs, setSyncLogs] = useState<any[]>([]);
-  const [snapshots, setSnapshots] = useState<any[]>([]);
+  const [syncLogs, setSyncLogs] = useState<DebugSyncLog[]>([]);
+  const [snapshots, setSnapshots] = useState<DebugSnapshot[]>([]);
   const [loading, setLoading] = useState({ connections: false, syncLogs: false, snapshots: false });
 
   // Fetch clients on mount

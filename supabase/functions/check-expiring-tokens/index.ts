@@ -1,10 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Cron-only function — no CORS needed (never called from browser)
 
 /** Platforms that use permanent page tokens — never expire */
 const PERMANENT_TOKEN_PLATFORMS = ["facebook", "instagram"];
@@ -17,7 +13,7 @@ const AUTO_REFRESH_PLATFORMS = [
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204 });
   }
 
   try {
@@ -43,6 +39,7 @@ Deno.serve(async (req) => {
       .lt("token_expires_at", sevenDaysFromNow.toISOString());
 
     for (const conn of expiringConns ?? []) {
+      const clientData = (conn as Record<string, unknown>).clients as { company_name: string; org_id: string };
       // Skip platforms with permanent page tokens
       if (PERMANENT_TOKEN_PLATFORMS.includes(conn.platform)) continue;
       // Skip platforms that auto-refresh via refresh_token
@@ -57,7 +54,7 @@ Deno.serve(async (req) => {
 
       if (existing) continue;
 
-      const orgId = (conn as any).clients.org_id;
+      const orgId = clientData.org_id;
       const ownerEmail = await getOrgOwnerEmail(supabase, orgId);
       if (!ownerEmail) continue;
 
@@ -70,7 +67,7 @@ Deno.serve(async (req) => {
             data: {
               platform: conn.platform,
               account_name: conn.account_name ?? conn.platform,
-              client_name: (conn as any).clients.company_name,
+              client_name: clientData.company_name,
             },
           },
         });
@@ -96,6 +93,7 @@ Deno.serve(async (req) => {
       .not("token_expires_at", "is", null);
 
     for (const conn of expiredConns ?? []) {
+      const clientData = (conn as Record<string, unknown>).clients as { company_name: string; org_id: string };
       // Skip platforms with permanent page tokens
       if (PERMANENT_TOKEN_PLATFORMS.includes(conn.platform)) continue;
       // Skip platforms that auto-refresh via refresh_token
@@ -110,7 +108,7 @@ Deno.serve(async (req) => {
 
       if (existing) continue;
 
-      const orgId = (conn as any).clients.org_id;
+      const orgId = clientData.org_id;
       const ownerEmail = await getOrgOwnerEmail(supabase, orgId);
       if (!ownerEmail) continue;
 
@@ -123,7 +121,7 @@ Deno.serve(async (req) => {
             data: {
               platform: conn.platform,
               account_name: conn.account_name ?? conn.platform,
-              client_name: (conn as any).clients.company_name,
+              client_name: clientData.company_name,
             },
           },
         });
@@ -186,13 +184,13 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ message: `Processed ${results.length} notifications`, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("check-expiring-tokens error:", e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });

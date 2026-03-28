@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import usePageMeta from '@/hooks/usePageMeta';
 
 import AppLayout from '@/components/layout/AppLayout';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -21,6 +22,8 @@ const AdminOrgList = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  usePageMeta({ title: 'Organisations — Admin — AMW Reports', description: 'Manage all organisations on the platform.' });
 
   const { data: orgs = [], isLoading } = useQuery({
     queryKey: ['admin-orgs'],

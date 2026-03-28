@@ -1,10 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Cron-only function — no CORS needed
 
 const SYNC_FUNCTION_MAP: Record<string, string> = {
   google_ads: "sync-google-ads",
@@ -114,7 +110,7 @@ async function notifySyncFailure(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204 });
   }
 
   try {
@@ -150,12 +146,15 @@ Deno.serve(async (req) => {
     if (!connections || connections.length === 0) {
       return new Response(
         JSON.stringify({ message: "No active connections to sync", synced: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } }
       );
     }
 
     // Build org plan map for schedule gating
-    const orgIds = [...new Set(connections.map((c: any) => c.clients.org_id))];
+    const orgIds = [...new Set(connections.map((c) => {
+      const clientData = (c as Record<string, unknown>).clients as { org_id: string };
+      return clientData.org_id;
+    }))];
     const { data: subscriptions, error: subError } = await supabase
       .from("org_subscriptions")
       .select("org_id, subscription_plans!inner(slug)")
@@ -166,7 +165,8 @@ Deno.serve(async (req) => {
 
     const orgPlanMap: Record<string, string> = {};
     for (const sub of subscriptions || []) {
-      orgPlanMap[(sub as any).org_id] = (sub as any).subscription_plans.slug;
+      const subData = sub as Record<string, unknown>;
+      orgPlanMap[subData.org_id as string] = ((subData.subscription_plans as { slug: string }).slug);
     }
 
     // Filter connections by plan schedule
@@ -179,7 +179,8 @@ Deno.serve(async (req) => {
     let skippedCount = 0;
 
     for (const conn of connections) {
-      const orgId = (conn as any).clients.org_id;
+      const connClientData = (conn as Record<string, unknown>).clients as { org_id: string };
+      const orgId = connClientData.org_id;
       const planSlug = orgPlanMap[orgId] || "starter";
 
       if (planSlug === "starter" && dayOfMonth !== 4) {
@@ -240,7 +241,8 @@ Deno.serve(async (req) => {
           });
 
           // Fire-and-forget failure notification
-          const orgId = (task.conn as any).clients.org_id;
+          const taskClientData = (task.conn as Record<string, unknown>).clients as { org_id: string };
+          const orgId = taskClientData.org_id;
           notifySyncFailure(supabase, orgId, task.conn.client_id, task.conn.platform, errorMsg, task.month, task.year);
         }
       }
@@ -257,13 +259,13 @@ Deno.serve(async (req) => {
         skipped_count: skippedCount,
         results,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("Scheduled sync error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });

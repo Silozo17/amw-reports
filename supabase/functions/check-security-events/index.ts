@@ -1,14 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Cron-only function — no CORS needed
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204 });
   }
 
   try {
@@ -27,14 +23,14 @@ Deno.serve(async (req) => {
       console.error("Failed to get auth events:", eventsErr);
       return new Response(
         JSON.stringify({ error: eventsErr.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
     if (!events || events.length === 0) {
       return new Response(
         JSON.stringify({ message: "No recent auth events", results: [] }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -184,13 +180,13 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ message: `Processed ${results.length} security events`, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("check-security-events error:", e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });

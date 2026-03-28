@@ -2,11 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+// Cron-only function — no CORS needed
 
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
@@ -20,7 +16,7 @@ const PLAN_MAP: Record<string, string> = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204 });
   }
 
   try {
@@ -52,7 +48,7 @@ serve(async (req) => {
       logStep("No Stripe customer found");
       return new Response(
         JSON.stringify({ subscribed: false, plan: "starter" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     }
 
@@ -69,7 +65,7 @@ serve(async (req) => {
       logStep("No active subscription");
       return new Response(
         JSON.stringify({ subscribed: false, plan: "starter" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     }
 
@@ -127,13 +123,13 @@ serve(async (req) => {
         subscription_end: subscriptionEnd,
         customer_id: customerId,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      { headers: { "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });
     return new Response(JSON.stringify({ error: msg }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       status: 500,
     });
   }

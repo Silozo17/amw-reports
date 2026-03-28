@@ -176,8 +176,8 @@ Deno.serve(async (req) => {
 
     // Page tokens stored in metadata are permanent — no expiry check needed
 
-    const metadata = conn.metadata as any;
-    const allPages = metadata?.pages || [];
+    const metadata = conn.metadata as Record<string, unknown> | null;
+    const allPages = ((metadata?.pages) as Array<{ id?: string; name?: string; access_token?: string }>) || [];
 
     let pages: any[];
     if (conn.account_id) {

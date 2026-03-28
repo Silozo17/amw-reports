@@ -114,8 +114,8 @@ Deno.serve(async (req) => {
       console.log("LinkedIn token refreshed successfully.");
     }
 
-    const metadata = conn.metadata as any;
-    const organizations = metadata?.organizations || [];
+    const metadata = conn.metadata as Record<string, unknown> | null;
+    const organizations = ((metadata?.organizations) as Array<{ id?: string; name?: string }>) || [];
 
     // Date range for the target month
     const monthStart = new Date(year, month - 1, 1);

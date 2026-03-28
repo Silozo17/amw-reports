@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollText, AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; className: string }> = {
   success: { icon: CheckCircle2, className: 'text-green-500' },
@@ -15,6 +16,7 @@ const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; className: stri
 };
 
 const AdminActivityLog = () => {
+  usePageMeta({ title: 'Activity Log — Admin — AMW Reports', description: 'Platform-wide sync and report activity.' });
   const { data: syncLogs = [], isLoading: syncLoading } = useQuery({
     queryKey: ['admin-sync-logs'],
     queryFn: async () => {
@@ -51,23 +53,23 @@ const AdminActivityLog = () => {
   const isLoading = syncLoading || reportLoading;
 
   const allActivity = [
-    ...syncLogs.map((l: any) => ({
+    ...syncLogs.map((l) => ({
       type: 'sync' as const,
-      timestamp: l.started_at,
-      status: l.status,
-      platform: l.platform,
-      clientName: l.clients?.company_name ?? 'Unknown',
-      orgName: orgMap[l.org_id] ?? 'Unknown',
-      error: l.error_message,
+      timestamp: (l as Record<string, unknown>).started_at as string,
+      status: (l as Record<string, unknown>).status as string,
+      platform: (l as Record<string, unknown>).platform as string | null,
+      clientName: ((l as Record<string, unknown>).clients as { company_name?: string } | null)?.company_name ?? 'Unknown',
+      orgName: orgMap[(l as Record<string, unknown>).org_id as string] ?? 'Unknown',
+      error: (l as Record<string, unknown>).error_message as string | null,
     })),
-    ...reportLogs.map((l: any) => ({
+    ...reportLogs.map((l) => ({
       type: 'report' as const,
-      timestamp: l.created_at,
-      status: l.status,
+      timestamp: (l as Record<string, unknown>).created_at as string,
+      status: (l as Record<string, unknown>).status as string,
       platform: null,
-      clientName: l.clients?.company_name ?? 'Unknown',
-      orgName: orgMap[l.org_id] ?? 'Unknown',
-      error: l.error_message,
+      clientName: ((l as Record<string, unknown>).clients as { company_name?: string } | null)?.company_name ?? 'Unknown',
+      orgName: orgMap[(l as Record<string, unknown>).org_id as string] ?? 'Unknown',
+      error: (l as Record<string, unknown>).error_message as string | null,
     })),
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 100);
 

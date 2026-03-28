@@ -1,11 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Webhook-only function — no CORS needed (called by Stripe, not browser)
 
 const EVENT_TEMPLATE_MAP: Record<string, string> = {
   "checkout.session.completed": "subscription_activated",
@@ -15,7 +11,7 @@ const EVENT_TEMPLATE_MAP: Record<string, string> = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204 });
   }
 
   try {
@@ -24,7 +20,7 @@ Deno.serve(async (req) => {
     if (!stripeKey || !webhookSecret) {
       return new Response(JSON.stringify({ error: "Missing Stripe config" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -34,7 +30,7 @@ Deno.serve(async (req) => {
     if (!sig) {
       return new Response(JSON.stringify({ error: "Missing signature" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -45,7 +41,7 @@ Deno.serve(async (req) => {
       console.error("Webhook signature verification failed:", err);
       return new Response(JSON.stringify({ error: "Invalid signature" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -60,7 +56,7 @@ Deno.serve(async (req) => {
 
     if (event.type === "customer.subscription.updated") {
       const sub = event.data.object as Stripe.Subscription;
-      const prev = event.data.previous_attributes as any;
+      const prev = (event.data as Record<string, unknown>).previous_attributes as { items?: { data?: Array<{ price?: { id?: string; unit_amount?: number } }> } } | undefined;
       customerEmail = await getCustomerEmail(stripe, sub.customer as string);
 
       if (prev?.items) {
@@ -147,13 +143,13 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ received: true, event_type: event.type, template: templateName }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("stripe-webhook error:", e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });
