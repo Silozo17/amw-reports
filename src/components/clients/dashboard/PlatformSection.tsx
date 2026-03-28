@@ -515,6 +515,7 @@ const PlatformSection = ({
                     </TableBody>
                   </Table>
                 </div>
+              </TooltipProvider>
               )}
 
               {gscQueries.length > 0 && (

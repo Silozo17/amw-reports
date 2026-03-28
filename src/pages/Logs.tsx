@@ -4,9 +4,37 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollText, RefreshCw, FileText, Mail } from 'lucide-react';
+import { RefreshCw, FileText, Mail } from 'lucide-react';
 import { PLATFORM_LABELS } from '@/types/database';
+import type { PlatformType, JobStatus } from '@/types/database';
 import { useOrg } from '@/contexts/OrgContext';
+import usePageMeta from '@/hooks/usePageMeta';
+
+interface SyncLog {
+  id: string;
+  platform: PlatformType;
+  status: JobStatus;
+  started_at: string;
+  error_message: string | null;
+  clients?: { company_name: string } | null;
+}
+
+interface ReportLog {
+  id: string;
+  status: JobStatus;
+  created_at: string;
+  error_message: string | null;
+  clients?: { company_name: string } | null;
+}
+
+interface EmailLog {
+  id: string;
+  recipient_email: string;
+  status: string;
+  created_at: string;
+  error_message: string | null;
+  clients?: { company_name: string } | null;
+}
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   success: 'default',
@@ -18,10 +46,11 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 const Logs = () => {
+  usePageMeta({ title: 'Activity Logs — AMW Reports', description: 'Sync, report, and email history' });
   const { orgId } = useOrg();
-  const [syncLogs, setSyncLogs] = useState<any[]>([]);
-  const [reportLogs, setReportLogs] = useState<any[]>([]);
-  const [emailLogs, setEmailLogs] = useState<any[]>([]);
+  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
+  const [reportLogs, setReportLogs] = useState<ReportLog[]>([]);
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -32,15 +61,15 @@ const Logs = () => {
         supabase.from('report_logs').select('*, clients(company_name)').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
         supabase.from('email_logs').select('*, clients(company_name)').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
       ]);
-      setSyncLogs(s.data ?? []);
-      setReportLogs(r.data ?? []);
-      setEmailLogs(e.data ?? []);
+      setSyncLogs((s.data ?? []) as SyncLog[]);
+      setReportLogs((r.data ?? []) as ReportLog[]);
+      setEmailLogs((e.data ?? []) as EmailLog[]);
       setIsLoading(false);
     };
     fetch();
   }, [orgId]);
 
-  const EmptyState = ({ icon: Icon, message }: { icon: any; message: string }) => (
+  const EmptyState = ({ icon: Icon, message }: { icon: React.ElementType; message: string }) => (
     <div className="py-12 text-center">
       <Icon className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
       <p className="text-muted-foreground text-sm">{message}</p>
@@ -69,7 +98,7 @@ const Logs = () => {
                   <Card key={log.id}>
                     <CardContent className="flex items-center justify-between p-3">
                       <div>
-                        <p className="text-sm font-body font-medium">{log.clients?.company_name} — {PLATFORM_LABELS[log.platform as keyof typeof PLATFORM_LABELS]}</p>
+                        <p className="text-sm font-body font-medium">{log.clients?.company_name} — {PLATFORM_LABELS[log.platform]}</p>
                         <p className="text-xs text-muted-foreground">{new Date(log.started_at).toLocaleString()}</p>
                         {log.error_message && <p className="text-xs text-destructive mt-1">{log.error_message}</p>}
                       </div>
