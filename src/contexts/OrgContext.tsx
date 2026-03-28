@@ -1,36 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Organisation } from '@/types/database';
+import { ensureOrgMembership } from '@/lib/orgRecovery';
 
-export interface Organisation {
-  id: string;
-  name: string;
-  slug: string | null;
-  logo_url: string | null;
-  primary_color: string | null;
-  secondary_color: string | null;
-  accent_color: string | null;
-  heading_font: string | null;
-  body_font: string | null;
-  report_settings: { show_logo: boolean; show_ai_insights: boolean } | null;
-  button_color: string | null;
-  button_text_color: string | null;
-  text_on_dark: string | null;
-  text_on_light: string | null;
-  show_org_name: boolean;
-  chart_color_1: string | null;
-  chart_color_2: string | null;
-  chart_color_3: string | null;
-  chart_color_4: string | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  address: string | null;
-  team_size: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type { Organisation } from '@/types/database';
 
 export interface OrgMembership {
   id: string;

@@ -113,6 +113,7 @@ const AppRoutes = () => (
     <Route path="/how-it-works" element={<PublicPageRoute><HowItWorksPage /></PublicPageRoute>} />
     <Route path="/about" element={<PublicPageRoute><AboutPage /></PublicPageRoute>} />
     <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
+    <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/clients" element={<ProtectedRoute><ClientList /></ProtectedRoute>} />
@@ -144,7 +145,9 @@ const App = () => (
         <AuthProvider>
           <OrgProvider>
             <BrandingProvider>
-              <AppRoutes />
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
             </BrandingProvider>
           </OrgProvider>
         </AuthProvider>
