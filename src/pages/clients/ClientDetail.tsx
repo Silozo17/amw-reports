@@ -52,7 +52,7 @@ const ClientDetail = () => {
   const [reportYear, setReportYear] = useState<number | null>(null);
   const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
 
-  usePageMeta({ title: client ? `${client.company_name} — AMW Reports` : 'Client — AMW Reports' });
+  usePageMeta({ title: client ? `${client.company_name} — AMW Reports` : 'Client — AMW Reports', description: 'Client detail and performance dashboard' });
 
   // Handle OAuth callback query params
   useEffect(() => {
