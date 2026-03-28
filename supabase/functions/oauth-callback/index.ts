@@ -398,12 +398,13 @@ async function handleFacebook(supabase: any, code: string, connectionId: string,
     console.warn("Could not discover pages:", e);
   }
 
+  // Page-level tokens are permanent — set token_expires_at to null
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
       access_token: accessToken,
       refresh_token: null,
-      token_expires_at: expiresAt,
+      token_expires_at: null,
       is_connected: true,
       last_error: null,
       account_name: null,
@@ -474,12 +475,13 @@ async function handleInstagram(supabase: any, code: string, connectionId: string
     console.warn("Could not discover Instagram accounts:", e);
   }
 
+  // Page-level tokens (used for IG) are permanent — set token_expires_at to null
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
       access_token: accessToken,
       refresh_token: null,
-      token_expires_at: expiresAt,
+      token_expires_at: null,
       is_connected: true,
       last_error: null,
       account_name: null,

@@ -78,7 +78,42 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    const accessToken = conn.access_token;
+    // ── Auto-refresh token if expired ──
+    let accessToken = conn.access_token;
+    if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
+      if (!conn.refresh_token) {
+        throw new Error("LinkedIn token expired and no refresh token available. Please reconnect.");
+      }
+      console.log("LinkedIn token expired, refreshing...");
+      const liClientId = Deno.env.get("LINKEDIN_CLIENT_ID")!;
+      const liClientSecret = Deno.env.get("LINKEDIN_CLIENT_SECRET")!;
+
+      const refreshRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: conn.refresh_token,
+          client_id: liClientId,
+          client_secret: liClientSecret,
+        }),
+      });
+      const refreshData = await refreshRes.json();
+      if (refreshData.error || !refreshData.access_token) {
+        throw new Error(`LinkedIn token refresh failed: ${refreshData.error_description || refreshData.error || "Unknown error"}. Please reconnect.`);
+      }
+
+      accessToken = refreshData.access_token;
+      const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 5184000) * 1000).toISOString();
+      await supabase.from("platform_connections").update({
+        access_token: accessToken,
+        refresh_token: refreshData.refresh_token || conn.refresh_token,
+        token_expires_at: newExpiresAt,
+        last_error: null,
+      }).eq("id", connectionId);
+      console.log("LinkedIn token refreshed successfully.");
+    }
+
     const metadata = conn.metadata as any;
     const organizations = metadata?.organizations || [];
 
