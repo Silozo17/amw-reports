@@ -26,7 +26,7 @@ import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
 import ClientConnectionsTab from '@/components/clients/tabs/ClientConnectionsTab';
 import ClientSettingsTab from '@/components/clients/tabs/ClientSettingsTab';
 import { toast } from 'sonner';
-import { usePageMeta } from '@/hooks/usePageMeta';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const ClientDetail = () => {
   const { id } = useParams();
