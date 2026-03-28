@@ -79,6 +79,8 @@ const AdminOrgDetail = () => {
     enabled: !!id,
   });
 
+  usePageMeta({ title: `${org?.name ?? 'Organisation'} — Admin — AMW Reports`, description: 'Manage organisation subscription, clients and team.' });
+
   const { data: plans = [] } = useQuery({
     queryKey: ['subscription-plans'],
     queryFn: async () => {
