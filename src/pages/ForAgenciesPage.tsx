@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Users, Palette, Mail, Globe, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
 import googleAdsPlatform from '@/assets/screenshots/Google_ads.webp';
 
@@ -35,8 +36,13 @@ const ForAgenciesPage = () => {
 
   return (
     <>
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={28} color="purple" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="blue" className="absolute bottom-[20%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">For Agencies</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             Marketing Reporting Platform for <span className="text-gradient-purple">Agencies</span>
           </h1>
@@ -47,7 +53,6 @@ const ForAgenciesPage = () => {
             <Link to="/login?view=signup">Start Your Free Agency Account <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
 
-          {/* Dashboard Screenshot */}
           <img
             src={dashboardSnapshot}
             alt="AMW Reports agency dashboard showing multi-client overview with KPI cards, platform connections, and marketing performance data"
@@ -56,12 +61,15 @@ const ForAgenciesPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">The problem</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">The Agency Reporting Problem</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {PAIN_POINTS.map(({ title, desc }) => (
-              <div key={title} className="p-6 rounded-xl bg-destructive/5 border border-destructive/20">
+              <div key={title} className="p-6 rounded-xl bg-destructive/5 border border-destructive/20 hover:border-destructive/40 transition-colors">
                 <h3 className="text-sm font-body font-semibold mb-2 text-destructive">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
@@ -70,12 +78,13 @@ const ForAgenciesPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">The solution</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">How AMW Reports Solves It</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {SOLUTIONS.map(({ title, desc }) => (
-              <div key={title} className="p-6 rounded-xl bg-accent/5 border border-accent/20">
+              <div key={title} className="p-6 rounded-xl bg-accent/5 border border-accent/20 hover:border-accent/40 transition-colors">
                 <h3 className="text-sm font-body font-semibold mb-2 text-accent">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
@@ -84,13 +93,17 @@ const ForAgenciesPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 bg-white/[0.03] border-t border-sidebar-border/30">
+      <section className="relative py-20 lg:py-28 section-light">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={20} color="orange" className="absolute top-[8%] right-[4%]" />
+        </div>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">What you get</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-12">Key Features for Agencies</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {KEY_FEATURES.map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40">
+                <div key={title} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                   <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center mb-4">
                     <Icon className="h-5 w-5 text-primary" />
                   </div>
@@ -108,8 +121,9 @@ const ForAgenciesPage = () => {
         </div>
       </section>
 
-      <section className="py-16 border-t border-sidebar-border/30">
+      <section className="py-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">Integrations</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-8">All the Platforms Your Clients Use</h2>
           <div className="flex flex-wrap justify-center gap-3">
             {PLATFORMS.map(p => (
@@ -119,8 +133,11 @@ const ForAgenciesPage = () => {
         </div>
       </section>
 
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start Your Free Agency Account</h2>
           <p className="text-amw-offwhite/60 font-body">No credit card required. Upgrade to Agency for full white-label branding.</p>
           <Button size="lg" asChild>
