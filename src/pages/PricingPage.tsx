@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check, X, ChevronDown, FileText, Share2, BarChart3, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 
 const UNIVERSAL_FEATURES = [
   { icon: FileText, label: 'Branded PDF Reports' },
@@ -87,8 +88,13 @@ const PricingPage = () => {
   return (
     <>
       {/* Hero */}
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={24} color="purple" className="absolute top-[15%] right-[10%]" />
+          <StarDecoration size={16} color="green" className="absolute bottom-[20%] left-[6%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">Simple Pricing</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">Simple, Transparent Pricing</h1>
           <p className="text-lg text-amw-offwhite/60 font-body max-w-xl mx-auto">
             Start free. Upgrade when your agency grows. No hidden fees, no per-seat pricing.
@@ -102,7 +108,7 @@ const PricingPage = () => {
           <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body text-center mb-6">What every plan includes</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {UNIVERSAL_FEATURES.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/30 border border-sidebar-border/30">
+              <div key={label} className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/30 border border-sidebar-border/30 hover:border-primary/50 transition-colors">
                 <Icon className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-xs font-body text-amw-offwhite/70">{label}</span>
               </div>
@@ -111,8 +117,10 @@ const PricingPage = () => {
         </div>
       </section>
 
+      <div className="gradient-divider w-full" />
+
       {/* Plan Cards */}
-      <section className="pb-20">
+      <section className="py-20 section-light">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {PLANS.map((plan) => (
@@ -153,8 +161,9 @@ const PricingPage = () => {
       </section>
 
       {/* Comparison Table */}
-      <section className="py-20 border-t border-sidebar-border/30">
+      <section className="py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Side by side</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Compare Plans</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -182,8 +191,9 @@ const PricingPage = () => {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 border-t border-sidebar-border/30">
+      <section className="py-20 section-light">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Frequently Asked Questions</h2>
           <div className="space-y-3">
             {FAQS.map(({ q, a }, i) => (
@@ -204,9 +214,12 @@ const PricingPage = () => {
         </div>
       </section>
 
+      <div className="gradient-divider w-full" />
+
       {/* CTA */}
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start Free, Upgrade When Ready</h2>
           <p className="text-amw-offwhite/60 font-body">No credit card required. Set up in under 5 minutes.</p>
           <Button size="lg" asChild>

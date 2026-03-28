@@ -152,6 +152,15 @@
   .bg-gradient-brand {
     background: linear-gradient(135deg, hsl(var(--amw-purple)), hsl(var(--amw-blue)));
   }
+
+  .section-light {
+    background-color: hsl(340 7% 18%);
+  }
+
+  .gradient-divider {
+    height: 4px;
+    background: linear-gradient(135deg, hsl(var(--amw-purple)), hsl(var(--amw-blue)));
+  }
 }
 
 @keyframes star-spin {

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Quote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
+import StarDecoration from '@/components/landing/StarDecoration';
 
 const AboutPage = () => {
   usePageMeta({
@@ -11,8 +12,13 @@ const AboutPage = () => {
 
   return (
     <>
-      <section className="py-20 lg:py-28 text-center">
+      <section className="relative py-20 lg:py-28 text-center">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={28} color="purple" className="absolute top-[12%] right-[8%]" />
+          <StarDecoration size={16} color="green" className="absolute bottom-[25%] left-[5%]" animated={false} />
+        </div>
         <div className="max-w-4xl mx-auto px-4">
+          <p className="font-accent text-xl text-primary mb-2">Our Story</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-4">
             About AMW Reports —<br />Built by Marketers, for <span className="text-gradient-purple">Marketers</span>
           </h1>
@@ -22,8 +28,11 @@ const AboutPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">The problem</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">The Problem We Solved</h2>
           <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
             At AMW Media, our UK-based marketing agency, we were logging into 10 different platforms every month for every client — pulling screenshots, copying data into spreadsheets, formatting slides, and sending them out manually. It was tedious, error-prone, and took hours away from the strategic work we actually enjoyed.
@@ -34,8 +43,9 @@ const AboutPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">Our mission</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Make Professional Reporting Accessible to Every Marketer</h2>
           <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
             Our mission is simple: make it possible for any marketing professional — whether you run a 50-person agency, freelance on your own, manage a small business, or create content — to deliver beautiful, branded, data-driven reports without the manual grind.
@@ -46,8 +56,9 @@ const AboutPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28 section-light">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="font-accent text-lg text-primary mb-2">What they say</p>
           <Quote className="h-10 w-10 text-primary/40 mx-auto mb-6" aria-hidden="true" />
           <blockquote className="text-xl lg:text-2xl font-body italic leading-relaxed text-amw-offwhite/90 mb-6">
             "We built AMW Reports because we were tired of spending hours manually compiling data from a dozen platforms. Our clients deserved better — and so did we."
@@ -62,8 +73,9 @@ const AboutPage = () => {
         </div>
       </section>
 
-      <section className="py-20 lg:py-28 border-t border-sidebar-border/30">
+      <section className="py-20 lg:py-28">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">Who we are</p>
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Built by AMW Media</h2>
           <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
             AMW Reports is developed and operated by{' '}
@@ -75,8 +87,11 @@ const AboutPage = () => {
         </div>
       </section>
 
-      <section className="py-20 border-t border-sidebar-border/30 bg-gradient-to-b from-transparent to-primary/5 text-center">
+      <div className="gradient-divider w-full" />
+
+      <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
+          <p className="font-accent text-lg text-primary mb-2">Get started</p>
           <h2 className="text-3xl lg:text-5xl font-heading uppercase">Join Us. Start Free.</h2>
           <p className="text-amw-offwhite/60 font-body">No credit card required. Built by marketers who understand your workflow.</p>
           <Button size="lg" asChild>
