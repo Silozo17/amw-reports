@@ -1,66 +1,65 @@
 
 
-# Full Platform Audit v3 — AMW Reports
+# Full Platform Audit v4 — AMW Reports
 
-## Audit Status vs Previous Rounds
+## Status vs Previous Rounds
 
-### Previously Fixed ✅
-- Login.tsx deleted (dead code)
-- ErrorBoundary added
-- Reports unique index added
-- DRY org recovery extracted
-- Sync timeouts + parallel batching
-- Meta App ID moved to secret
-- Password reset flow
-- `usePageMeta` on all authenticated pages
+### Fixed in v1-v3 ✅
+- Login.tsx deleted, ErrorBoundary added, Reports unique index, DRY org recovery
+- Sync timeouts + parallel batching, Meta App ID to secret, React.StrictMode
+- ClientDetail split (830→444), OnboardingPage split (826→269), ClientDashboard split (740→230+hook)
+- Dashboard queries consolidated (12→9), TooltipProvider lifted to section level
+- `hexToHsl` centralized in `colorUtils.ts` — all 3 consumers import correctly
+- All `as any` removed from frontend (`src/`) — 0 instances
+- FK constraints added via migration (13 FKs with CASCADE)
+- KPI/sparkline calcs extracted to `dashboardCalcs.ts`
+- `usePageMeta` on all main authenticated pages + all public pages
 - Logs.tsx properly typed (SyncLog, ReportLog, EmailLog)
-- `hexToHsl` centralized in `colorUtils.ts`
-- `TooltipProvider` moved to section level
-- ClientDetail.tsx split (830 → 444 lines)
-- OnboardingPage.tsx split (826 → 269 lines)
-- ClientDashboard.tsx split (740 → 230 lines + 505-line hook)
-- Dashboard queries consolidated (12 → 9)
-- React.StrictMode enabled
 
 ---
 
-## Remaining Issues Found
+## Remaining Issues
 
-### 1. `hexToHsl` STILL duplicated in `ClientPortal.tsx`
-Lines 28-45 contain an inline copy of `hexToHsl`. `ClientPortalAuth.tsx` and `BrandingProvider.tsx` correctly import from `colorUtils.ts`, but `ClientPortal.tsx` was missed.
-- **Fix**: Replace inline function with `import { hexToHsl } from '@/lib/colorUtils'`.
+### 1. `as any` still in 7 edge functions — 12 instances (P1)
+All frontend casts eliminated, but edge functions still have them:
+- `check-expiring-tokens/index.ts` (4): `(conn as any).clients.org_id`, `(conn as any).clients.company_name`
+- `scheduled-sync/index.ts` (4): same pattern — joined `clients` data accessed via `as any`
+- `sync-facebook-page/index.ts` (1): `conn.metadata as any`
+- `sync-instagram/index.ts` (1): `conn.metadata as any`
+- `sync-linkedin/index.ts` (1): `conn.metadata as any`
+- `stripe-webhook/index.ts` (1): `event.data.previous_attributes as any`
+- **Fix**: Define typed interfaces for joined query results and metadata shapes in each function.
 
-### 2. Remaining `as any` casts — 33 instances in 6 files
-Down from 93, but still present:
-- `AccountSection.tsx` (1): `(profile as any)?.account_type`
-- `Connections.tsx` (1): `data as any[]`
-- `AdminOrgList.tsx` (1): `subRes.data as any`
-- `AccountPickerDialog.tsx` (2): `metadata.pages as any[]`, `metadata.ig_accounts as any[]`
-- `reports.ts` (1): `'pending' as any`
-- `DebugConsole.tsx` (4): `(conn as any).token_expires_at` etc.
-- **Fix**: Define proper types/interfaces for each; use Supabase generated types where available.
+### 2. `useState<any>` in 2 files (P0)
+- `DebugConsole.tsx`: `syncLogs: any[]`, `snapshots: any[]`
+- `AdminOrgDetail.tsx`: `editMember: any`
+- **Fix**: Define interfaces for each (DebugSyncLog, DebugSnapshot, OrgMember).
 
-### 3. CORS `*` on ALL 44 edge functions — STILL OPEN (P1)
-Every edge function still uses `"Access-Control-Allow-Origin": "*"`. This was flagged in audit v1 as P1 but not yet addressed.
-- **Fix**: Create a shared `corsHeaders.ts` utility that restricts to known origins (`amw-reports.lovable.app`, preview URL, custom domains). Cron/webhook functions (no browser calls) should remove CORS entirely.
+### 3. `catch (err: any)` in AdminUserList.tsx (P0)
+Line 213 uses `catch (err: any)` — should use `catch (err: unknown)` with `instanceof Error` check.
 
-### 4. No foreign key constraints — STILL OPEN (P2)
-All major tables (`clients`, `platform_connections`, `monthly_snapshots`, `reports`, `sync_logs`, `email_logs`) have zero FK constraints. Orphaned records can accumulate silently.
-- **Fix**: Migration to add FKs with `ON DELETE CASCADE`.
+### 4. Missing `usePageMeta` on 7 pages (P1)
+- `ClientForm.tsx`, `ClientPortal.tsx`, `ClientPortalAuth.tsx`, `DebugConsole.tsx`, `OnboardingPage.tsx`, `ResetPassword.tsx`
+- All 4 admin pages: `AdminDashboard`, `AdminOrgList`, `AdminOrgDetail`, `AdminUserList`, `AdminActivityLog`
 
-### 5. `useClientDashboard.ts` is now 505 lines
-The hook extraction moved data logic out of the component but created a new large file. It's a single hook, not a component, so splitting is lower priority, but it could benefit from extracting the `useMemo` blocks for KPIs and sparklines into separate helper functions.
-- **Fix (optional)**: Extract `computeKpis()` and `computeSparklines()` into pure utility functions in a `src/lib/dashboardCalcs.ts` file.
+### 5. CORS `*` on ALL 44 edge functions — STILL OPEN (P1)
+Every edge function uses `"Access-Control-Allow-Origin": "*"`. This has been flagged since audit v1.
+- **Fix**: Per Lovable's edge function docs, `Access-Control-Allow-Origin: *` is the **recommended default** for edge functions called by web apps. However, cron/webhook-only functions (no browser calls) should have CORS removed entirely since they're never called from a browser. These are: `check-expiring-tokens`, `check-report-reminders`, `check-security-events`, `check-subscription`, `monthly-digest`, `process-scheduled-deletions`, `scheduled-sync`, `stripe-webhook`.
+- **Action**: Remove CORS headers from those 8 cron/webhook functions. Keep `*` on the remaining 36 browser-callable functions per Lovable docs.
 
-### 6. `PlatformSection.tsx` is still 602 lines
-Still the largest component. It's focused on a single concern (platform data display) but the Facebook top-content table rendering (lines 430-550) could be extracted.
-- **Fix (optional)**: Extract `FacebookTopContent` sub-component.
+### 6. AdminOrgDetail.tsx is 792 lines (P2)
+The largest file in the codebase. It handles org overview, subscription management, member management, client listing, and connection listing — 5 distinct concerns.
+- **Fix**: Extract into `AdminOrgOverview`, `AdminOrgSubscription`, `AdminOrgMembers`, `AdminOrgClients` sub-components.
 
-### 7. No Zod validation on edge function inputs — STILL OPEN (P1)
-Edge functions accept `req.json()` without schema validation. Malformed input could cause unexpected behavior or crashes.
+### 7. AdminUserList.tsx is 599 lines (P2)
+Handles user listing, editing, password reset, deactivation, and deletion.
+- **Fix**: Extract edit/reset dialogs into sub-components.
 
-### 8. OAuth tokens in plain text — STILL OPEN (P2)
-`access_token` and `refresh_token` stored as plain text in `platform_connections`.
+### 8. No Zod validation on edge function inputs — STILL OPEN (P1)
+Edge functions accept `req.json()` without schema validation.
+
+### 9. OAuth tokens in plain text — STILL OPEN (P3)
+Documented as future work.
 
 ---
 
@@ -68,28 +67,32 @@ Edge functions accept `req.json()` without schema validation. Malformed input co
 
 | Priority | Task | Effort |
 |---|---|---|
-| **P0** | Fix `hexToHsl` duplication in `ClientPortal.tsx` | 2 min |
-| **P0** | Remove remaining 10 `as any` casts (6 files) | 15 min |
-| **P1** | Restrict CORS on all 44 edge functions | 45 min |
-| **P1** | Add Zod validation to edge function inputs | 1-2 hrs |
-| **P2** | Add FK constraints via migration | 30 min |
-| **P2** | Extract KPI/sparkline calc helpers from `useClientDashboard` | 20 min |
+| **P0** | Type `DebugConsole.tsx` state (`syncLogs`, `snapshots`) and `AdminOrgDetail.tsx` (`editMember`) — remove 3 `any` uses | 10 min |
+| **P0** | Fix `catch (err: any)` → `catch (err: unknown)` in `AdminUserList.tsx` | 2 min |
+| **P1** | Add `usePageMeta` to 11 missing pages | 15 min |
+| **P1** | Type edge function joined queries — remove 12 `as any` casts across 7 functions | 30 min |
+| **P1** | Remove CORS from 8 cron/webhook-only edge functions | 20 min |
+| **P1** | Add Zod validation to critical edge function inputs (portal-data, generate-report, invite-client-user, admin-reset-password) | 1 hr |
+| **P2** | Split `AdminOrgDetail.tsx` (792 lines) into 4 sub-components | 45 min |
+| **P2** | Split `AdminUserList.tsx` (599 lines) — extract dialogs | 30 min |
 | **P3** | Encrypt OAuth tokens at rest | 2-3 hrs |
 
 ---
 
 ## What's Working Well
 
-- All monolithic components successfully split
-- Type safety dramatically improved (93 → 33 `as any`, mostly in admin/debug code)
+- **Zero `as any` in frontend** — all 93 original casts eliminated
+- All monolithic components split (ClientDetail, OnboardingPage, ClientDashboard)
+- `hexToHsl` properly centralized — no duplicates
 - Dashboard queries consolidated and efficient
-- All pages have proper browser tab titles
+- All main pages have proper browser tab titles
 - ErrorBoundary protecting against crashes
 - Sync engine parallelized with timeouts
-- Reports deduplication via unique index
-- DRY utilities (`orgRecovery`, `colorUtils`)
+- FK constraints now in place with CASCADE deletes
+- KPI/sparkline calculations extracted to pure utility functions
 - RLS comprehensive with SECURITY DEFINER helpers
-- Multi-tenant isolation consistent
+- Multi-tenant isolation consistent via org_id
 - Stripe webhook signature verification
 - Client portal properly isolated
+- Token auto-refresh implemented for all platforms
 
