@@ -1,54 +1,61 @@
 
 
-# Fix Facebook Sync Timeout for High-Volume Pages
+# Fix Token Auto-Refresh to Prevent Connection Expirations
 
 ## Root Cause
 
-Black Steel Doors publishes ~165 posts/month. The current `sync-facebook-page` function makes **2 sequential API calls per post** (post views + post clicks/reactions), totalling ~330+ HTTP requests. Edge functions timeout at ~60 seconds, so the function is killed mid-execution — the sync_log stays "running" forever with no error captured.
+Four platform sync functions store tokens with expiry dates but **never refresh them** when they expire. The `check-expiring-tokens` cron then fires off disconnection emails for every expired token.
 
-Evidence:
-- sync_log `59f64aad` started at 05:00:44 on March 28, status "running", no completion, no error
-- Client c2b194b6 (8 posts) synced fine in ~20 seconds
-- Client d17e96b1 (165 posts) timed out
+| Platform | Has refresh_token? | Auto-refreshes? | Token lifetime |
+|---|---|---|---|
+| Google Ads, GSC, GA4, GBP, YouTube | Yes | **Yes** ✅ | ~1 hour (refreshed) |
+| Pinterest | Yes | **Yes** ✅ | ~1 hour (refreshed) |
+| Meta Ads | No (long-lived) | **No** ❌ | ~60 days |
+| Facebook Pages | No (page tokens are permanent) | **No** ❌ | ~60 days (user token) |
+| Instagram | No (uses page tokens) | **No** ❌ | ~60 days (user token) |
+| TikTok | Yes | **No** ❌ | ~24 hours |
+| LinkedIn | Yes | **No** ❌ | ~60 days |
 
-## Fix: Batch Post Insights Using IDs Filter
+## The Fix — Two Parts
 
-Instead of calling the Graph API individually for each post, use Meta's batch approach — fetch insights for **multiple posts in a single request** using the `ids` parameter. This reduces 330 calls down to ~10-15.
+### Part 1: Add token refresh to sync functions that lack it
 
-### Changes to `supabase/functions/sync-facebook-page/index.ts`
+**TikTok** (`supabase/functions/sync-tiktok-ads/index.ts`):
+- Before syncing, check `token_expires_at`. If expired, call TikTok's refresh endpoint (`POST https://open.tiktokapis.com/v2/oauth/token/` with `grant_type=refresh_token`)
+- Update `access_token`, `refresh_token`, and `token_expires_at` in the DB
+- Use the new token for the sync
 
-**Replace the per-post insights loop (lines 276-317)** with a batched approach:
+**LinkedIn** (`supabase/functions/sync-linkedin/index.ts`):
+- Before syncing, check `token_expires_at`. If expired, call LinkedIn's refresh endpoint (`POST https://www.linkedin.com/oauth/v2/accessToken` with `grant_type=refresh_token`)
+- Update `access_token` and `token_expires_at` in the DB
 
-1. **Collect all post IDs** from the `published_posts` response first (no change to existing pagination loop)
-2. **After collecting all posts**, batch-fetch insights using `?ids={id1},{id2},...&fields=insights.metric(post_impressions_unique,post_total_media_view_unique,post_clicks_by_type,post_reactions_by_type_total)` — batches of 25 post IDs per call
-3. **Merge** the batched insights back into the `allTopPosts` array
+**Meta platforms** (Facebook, Instagram, Meta Ads) — these use long-lived tokens that can't be traditionally refreshed with a refresh_token. Instead:
+- **Facebook Pages**: Page-level access tokens obtained via `me/accounts` are **permanent** and never expire. The issue is the *user* token expiry is stored as `token_expires_at` even though page tokens in metadata don't expire. Fix: After obtaining page tokens during OAuth, set `token_expires_at` to `null` since the actual page tokens used for syncing don't expire.
+- **Instagram**: Same as Facebook — uses page tokens from metadata which are permanent. Set `token_expires_at` to `null`.
+- **Meta Ads**: Long-lived user tokens (~60 days) with no refresh mechanism. Add proactive re-exchange: before expiry, call `fb_exchange_token` again to get a fresh 60-day token.
 
-This reduces API calls from `2 × N` to `ceil(N / 25)` — for 165 posts that's ~7 calls instead of 330.
+### Part 2: Fix the notification system to not alert on auto-refreshable tokens
 
-### Specific Code Changes
-
-1. **Split the posts loop** into two phases:
-   - **Phase 1** (existing loop, simplified): Collect post metadata (message, reactions, comments, shares, etc.) — no per-post API calls
-   - **Phase 2** (new): Batch-fetch `post_impressions_unique`, `post_total_media_view_unique`, `post_clicks_by_type`, `post_reactions_by_type_total` for all posts in chunks of 25
-
-2. **Add a `batchFetchPostInsights` helper function** that takes an array of post IDs and a page token, calls the Graph API once for a batch, and returns a map of `postId → { views, clicks, clicksByType, reactionBreakdown }`
-
-3. **Add a timeout safety net**: wrap the entire handler in a 50-second deadline check — if approaching timeout, skip remaining post insight batches and save what we have with status "partial" instead of crashing silently
-
-4. **Fix the stuck sync_log**: Add cleanup logic at the start of the function — if a sync_log already exists with status "running" for the same client+platform+month and is older than 5 minutes, mark it as "failed" with "Timeout — sync did not complete"
-
-### Additional Resilience
-
-- Add `AbortController` with 8-second timeout on each fetch call to prevent a single slow API response from blocking the entire function
-- Cap post processing at 200 posts max — beyond that, take top 200 by engagement and skip the rest (diminishing returns on insight data for very old/low-engagement posts)
+**`supabase/functions/check-expiring-tokens/index.ts`**:
+- For Google/Pinterest/TikTok/LinkedIn connections that have a `refresh_token`, **skip** the expiring/expired notification — these will auto-refresh on next sync
+- For Meta platforms with page-level tokens (Facebook, Instagram), skip notifications — page tokens don't expire
+- Only send expiring/expired notifications for connections that genuinely cannot auto-refresh (Meta Ads user tokens approaching 60-day expiry with no refresh mechanism)
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `supabase/functions/sync-facebook-page/index.ts` | Batch post insights, add timeout safety, add stuck-log cleanup |
+| `supabase/functions/sync-tiktok-ads/index.ts` | Add token refresh before sync using TikTok refresh_token |
+| `supabase/functions/sync-linkedin/index.ts` | Add token refresh before sync using LinkedIn refresh_token |
+| `supabase/functions/sync-meta-ads/index.ts` | Add proactive long-lived token re-exchange before expiry |
+| `supabase/functions/sync-facebook-page/index.ts` | Remove expired token check — page tokens don't expire |
+| `supabase/functions/sync-instagram/index.ts` | Remove expired token check — page tokens don't expire |
+| `supabase/functions/oauth-callback/index.ts` | For Facebook/Instagram: set `token_expires_at` to null (page tokens are permanent) |
+| `supabase/functions/check-expiring-tokens/index.ts` | Skip notifications for connections with refresh_tokens or permanent page tokens |
 
-## Immediate Data Fix
+## Implementation Order
 
-After deploying, manually retry the sync for Black Steel Doors to populate March data. The stuck "running" sync_log will be cleaned up automatically by the new startup logic.
+1. **Batch 1**: TikTok + LinkedIn refresh logic (both straightforward refresh_token flows)
+2. **Batch 2**: Meta platform fixes (Facebook/Instagram token_expires_at → null, Meta Ads re-exchange)
+3. **Batch 3**: Update check-expiring-tokens to only alert on genuinely un-refreshable tokens
 
