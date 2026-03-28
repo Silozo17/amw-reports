@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import usePageMeta from '@/hooks/usePageMeta';
 
 import AccountTypeStep from '@/components/onboarding/steps/AccountTypeStep';
 import OrgSetupStep from '@/components/onboarding/steps/OrgSetupStep';
@@ -19,6 +20,7 @@ import CompletionStep from '@/components/onboarding/steps/CompletionStep';
 const TOTAL_STEPS = 7;
 
 const OnboardingPage = () => {
+  usePageMeta({ title: 'Get Started — AMW Reports', description: 'Set up your AMW Reports account.' });
   const { user } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);

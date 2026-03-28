@@ -18,6 +18,7 @@ import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { triggerInitialSync, SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
 import { hexToHsl } from '@/lib/colorUtils';
+import usePageMeta from '@/hooks/usePageMeta';
 
 interface PortalOrg {
   id: string;
@@ -37,6 +38,7 @@ interface PortalClient {
 }
 
 const ClientPortalAuth = () => {
+  usePageMeta({ title: 'Client Portal — AMW Reports', description: 'Access your marketing performance dashboard and manage connections.' });
   const { user, signOut, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

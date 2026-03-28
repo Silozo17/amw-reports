@@ -23,6 +23,8 @@ const AdminOrgList = () => {
   const [newOrgName, setNewOrgName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  usePageMeta({ title: 'Organisations — Admin — AMW Reports', description: 'Manage all organisations on the platform.' });
+
   const { data: orgs = [], isLoading } = useQuery({
     queryKey: ['admin-orgs'],
     queryFn: async () => {

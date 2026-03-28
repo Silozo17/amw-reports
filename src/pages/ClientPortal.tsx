@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { getCurrencySymbol } from '@/types/database';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { hexToHsl } from '@/lib/colorUtils';
+import usePageMeta from '@/hooks/usePageMeta';
 
 interface PortalOrg {
   id: string;
@@ -49,6 +50,7 @@ const applyBranding = (org: PortalOrg) => {
 };
 
 const ClientPortal = () => {
+  usePageMeta({ title: 'Client Dashboard — AMW Reports', description: 'View your marketing performance dashboard.' });
   const { token } = useParams<{ token: string }>();
   const [client, setClient] = useState<PortalClient | null>(null);
   const [org, setOrg] = useState<PortalOrg | null>(null);

@@ -19,8 +19,10 @@ import { TIMEZONE_OPTIONS } from '@/types/metrics';
 import { useOrg } from '@/contexts/OrgContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UpgradePrompt from '@/components/entitlements/UpgradePrompt';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const ClientForm = () => {
+  usePageMeta({ title: 'New Client — AMW Reports', description: 'Add a new client to the platform.' });
   const navigate = useNavigate();
   const { user } = useAuth();
   const { orgId, isLoading: isOrgLoading } = useOrg();
