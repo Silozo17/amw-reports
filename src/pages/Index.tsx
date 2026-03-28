@@ -14,6 +14,7 @@ import {
   CheckCircle, XCircle, Mail, Clock, Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import usePageMeta from '@/hooks/usePageMeta';
 
 interface ClientHealth {
   id: string;

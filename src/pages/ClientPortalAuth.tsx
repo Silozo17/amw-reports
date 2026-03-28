@@ -17,6 +17,7 @@ import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { triggerInitialSync, SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
+import { hexToHsl } from '@/lib/colorUtils';
 
 interface PortalOrg {
   id: string;
@@ -34,26 +35,6 @@ interface PortalClient {
   logo_url: string | null;
   preferred_currency: string;
 }
-
-const hexToHsl = (hex: string): string | null => {
-  try {
-    const h = hex.replace('#', '');
-    const r = parseInt(h.substring(0, 2), 16) / 255;
-    const g = parseInt(h.substring(2, 4), 16) / 255;
-    const b = parseInt(h.substring(4, 6), 16) / 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let hue = 0, sat = 0;
-    const light = (max + min) / 2;
-    if (max !== min) {
-      const d = max - min;
-      sat = light > 0.5 ? d / (2 - max - min) : d / (max + min);
-      if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-      else if (max === g) hue = ((b - r) / d + 2) / 6;
-      else hue = ((r - g) / d + 4) / 6;
-    }
-    return `${Math.round(hue * 360)} ${Math.round(sat * 100)}% ${Math.round(light * 100)}%`;
-  } catch { return null; }
-};
 
 const ClientPortalAuth = () => {
   const { user, signOut, isLoading: authLoading } = useAuth();
