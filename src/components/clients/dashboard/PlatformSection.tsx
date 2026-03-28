@@ -50,6 +50,14 @@ interface TopContentItem {
   title?: string;
   videoId?: string;
   video_views?: number;
+  is_promoted?: boolean;
+  reactions?: number;
+  reaction_like?: number;
+  reaction_love?: number;
+  reaction_wow?: number;
+  reaction_haha?: number;
+  reaction_sorry?: number;
+  reaction_anger?: number;
 }
 
 interface ConnectionInfo {
@@ -457,35 +465,33 @@ const PlatformSection = ({
                           </TableCell>
                           <TableCell className="text-sm max-w-[200px]">
                             <span className="truncate block">{(p.message || p.caption || 'No caption').slice(0, 80)}</span>
-                            {(p as any).is_promoted && (
-                              <span className="inline-block text-[9px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded mt-0.5 font-medium">Ad</span>
+                            {p.is_promoted && (
+                               <span className="inline-block text-[9px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded mt-0.5 font-medium">Ad</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right text-sm tabular-nums">
-                            {(p as any).views > 0 ? (p as any).views.toLocaleString() : (p.reach ?? 0) > 0 ? (p.reach ?? 0).toLocaleString() : '—'}
+                             {(p.views ?? 0) > 0 ? (p.views ?? 0).toLocaleString() : (p.reach ?? 0) > 0 ? (p.reach ?? 0).toLocaleString() : '—'}
                           </TableCell>
                           <TableCell className="text-right text-sm tabular-nums">
                             {platform === 'facebook' ? (
-                              <TooltipProvider delayDuration={200}>
-                                <Tooltip>
+                              <Tooltip>
                                   <TooltipTrigger asChild>
                                     <span className="cursor-help underline decoration-dotted underline-offset-2">
-                                      {((p as any).reactions ?? p.likes ?? 0).toLocaleString()}
+                                      {(p.reactions ?? p.likes ?? 0).toLocaleString()}
                                     </span>
                                   </TooltipTrigger>
                                   <TooltipContent side="top" className="text-xs space-y-0.5 max-w-[180px]">
-                                    {(p as any).reaction_like > 0 && <p>👍 Like: {(p as any).reaction_like.toLocaleString()}</p>}
-                                    {(p as any).reaction_love > 0 && <p>❤️ Love: {(p as any).reaction_love.toLocaleString()}</p>}
-                                    {(p as any).reaction_wow > 0 && <p>😮 Wow: {(p as any).reaction_wow.toLocaleString()}</p>}
-                                    {(p as any).reaction_haha > 0 && <p>😂 Haha: {(p as any).reaction_haha.toLocaleString()}</p>}
-                                    {(p as any).reaction_sorry > 0 && <p>😢 Sorry: {(p as any).reaction_sorry.toLocaleString()}</p>}
-                                    {(p as any).reaction_anger > 0 && <p>😡 Angry: {(p as any).reaction_anger.toLocaleString()}</p>}
-                                    {!((p as any).reaction_like || (p as any).reaction_love || (p as any).reaction_wow || (p as any).reaction_haha || (p as any).reaction_sorry || (p as any).reaction_anger) && (
+                                    {(p.reaction_like ?? 0) > 0 && <p>👍 Like: {(p.reaction_like ?? 0).toLocaleString()}</p>}
+                                    {(p.reaction_love ?? 0) > 0 && <p>❤️ Love: {(p.reaction_love ?? 0).toLocaleString()}</p>}
+                                    {(p.reaction_wow ?? 0) > 0 && <p>😮 Wow: {(p.reaction_wow ?? 0).toLocaleString()}</p>}
+                                    {(p.reaction_haha ?? 0) > 0 && <p>😂 Haha: {(p.reaction_haha ?? 0).toLocaleString()}</p>}
+                                    {(p.reaction_sorry ?? 0) > 0 && <p>😢 Sorry: {(p.reaction_sorry ?? 0).toLocaleString()}</p>}
+                                    {(p.reaction_anger ?? 0) > 0 && <p>😡 Angry: {(p.reaction_anger ?? 0).toLocaleString()}</p>}
+                                    {!(p.reaction_like || p.reaction_love || p.reaction_wow || p.reaction_haha || p.reaction_sorry || p.reaction_anger) && (
                                       <p className="text-muted-foreground">No breakdown available</p>
                                     )}
                                   </TooltipContent>
                                 </Tooltip>
-                              </TooltipProvider>
                             ) : (
                               (p.likes ?? 0).toLocaleString()
                             )}
@@ -494,7 +500,7 @@ const PlatformSection = ({
                           <TableCell className="text-right text-sm tabular-nums">{(p.shares ?? 0) > 0 ? (p.shares ?? 0).toLocaleString() : '—'}</TableCell>
                           {platform === 'facebook' && (
                             <TableCell className="text-right text-sm tabular-nums">
-                              {(p as any).clicks > 0 ? (p as any).clicks.toLocaleString() : '—'}
+                             {(p.clicks ?? 0) > 0 ? (p.clicks ?? 0).toLocaleString() : '—'}
                             </TableCell>
                           )}
                           <TableCell className="w-10 px-2">
