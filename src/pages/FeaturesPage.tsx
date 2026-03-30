@@ -85,7 +85,7 @@ const FeaturesPage = () => {
       <section className="py-16 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="font-accent text-lg text-primary text-center mb-2">All platforms</p>
-          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">10+ Platform Integrations, One Dashboard</h2>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4"><h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">12 Platform Integrations, One Dashboard</h2></h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-12">
             Connect once, sync automatically. Here's every metric we track for each platform.
           </p>

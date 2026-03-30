@@ -27,7 +27,7 @@ const AUDIENCES = [
 ];
 
 const FAQS = [
-  { q: 'What social media platforms does AMW Reports support?', a: 'We support Facebook Pages, Instagram, LinkedIn Company Pages, TikTok (ads), YouTube, and Pinterest — covering all major social networks your clients use.' },
+  { q: 'What social media platforms does AMW Reports support?', a: 'We support Facebook Pages, Instagram, LinkedIn Company Pages, TikTok (organic), TikTok Ads, YouTube, and Pinterest — covering all major social networks your clients use.' },
   { q: 'Can I track organic and paid social media in the same report?', a: 'Yes. AMW Reports pulls both organic social metrics (followers, engagement, reach) and paid ad metrics (spend, ROAS, conversions) into a single unified report for each client.' },
   { q: 'How often is social media data synced?', a: 'Agency plans sync daily. Freelance plans sync weekly (every Monday). The free Creator plan syncs monthly on the 4th.' },
   { q: 'Can I choose which social media metrics appear in the report?', a: 'Absolutely. Each client has a configurable dashboard where you can enable or disable specific metrics and platforms to show only what matters.' },

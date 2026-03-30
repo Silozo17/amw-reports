@@ -9,7 +9,7 @@ import metaAdsPlatform from '@/assets/screenshots/Meta_ads.webp';
 const PLATFORMS = [
   { name: 'Google Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'] },
   { name: 'Meta Ads', metrics: ['Spend', 'Impressions', 'Reach', 'Clicks', 'Link Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'ROAS', 'Frequency', 'Leads'] },
-  { name: 'TikTok Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Video Views'] },
+  { name: 'TikTok Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'] },
 ];
 
 const METRICS_GRID = ['Total Ad Spend', 'Return on Ad Spend', 'Cost Per Click', 'Cost Per Mille', 'Click-Through Rate', 'Conversions', 'Conversion Value', 'Cost Per Conversion', 'Impression Share', 'Frequency'];
