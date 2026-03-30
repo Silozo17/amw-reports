@@ -10,7 +10,7 @@ import usePageMeta from '@/hooks/usePageMeta';
 
 const PLATFORMS = [
   'Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console',
-  'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'Pinterest', 'Google Business Profile',
+  'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile',
 ];
 
 const STEPS = [
