@@ -12,7 +12,8 @@ const PLATFORMS = [
   { name: 'Facebook', metrics: ['Page Likes', 'Followers', 'Reach', 'Impressions', 'Engagement', 'Reactions', 'Comments', 'Shares', 'Video Views', 'Posts Published'] },
   { name: 'Instagram', metrics: ['Followers', 'Reach', 'Impressions', 'Engagement', 'Likes', 'Comments', 'Saves', 'Shares', 'Profile Visits', 'Reels', 'Carousels'] },
   { name: 'LinkedIn', metrics: ['Followers', 'Follower Growth', 'Impressions', 'Engagement', 'Clicks', 'Reactions', 'Comments', 'Shares', 'Posts Published'] },
-  { name: 'TikTok', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Video Views'] },
+  { name: 'TikTok', metrics: ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Video Views'] },
+  { name: 'TikTok Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Reach', 'Video Views'] },
   { name: 'YouTube', metrics: ['Subscribers', 'Views', 'Watch Time', 'Avg. View Duration', 'Videos Published', 'Top Videos'] },
   { name: 'Pinterest', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'] },
 ];
