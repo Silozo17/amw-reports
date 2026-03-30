@@ -12,7 +12,7 @@ import youtubeLogo from '@/assets/logos/youtube.webp';
 import pinterestLogo from '@/assets/logos/pinterest.webp';
 
 export type AppRole = 'owner' | 'manager';
-export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube' | 'pinterest';
+export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'tiktok_ads' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube' | 'pinterest';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
 
 export interface Organisation {
@@ -188,6 +188,7 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   facebook: 'Facebook',
   instagram: 'Instagram',
   tiktok: 'TikTok',
+  tiktok_ads: 'TikTok Ads',
   linkedin: 'LinkedIn',
   google_search_console: 'Google Search Console',
   google_analytics: 'Google Analytics',
@@ -203,6 +204,7 @@ export const PLATFORM_LOGOS: Record<string, string> = {
   facebook: facebookLogo,
   instagram: instagramLogo,
   tiktok: tiktokLogo,
+  tiktok_ads: tiktokLogo,
   linkedin: linkedinLogo,
   google_search_console: gscLogo,
   google_analytics: gaLogo,
@@ -405,6 +407,10 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'likes', 'comments', 'shares', 'engagement_rate',
     'total_likes_received', 'total_video_count', 'bio_link_clicks',
     'completion_rate', 'average_time_watched', 'following',
+  ],
+  tiktok_ads: [
+    'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm',
+    'conversions', 'conversions_value', 'reach', 'video_views', 'conversion_rate',
   ],
   linkedin: [
     'total_followers', 'follower_growth', 'follower_removes',

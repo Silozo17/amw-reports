@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Cron-only function — no CORS needed (never called from browser)
 
 /** Platforms that use permanent page tokens — never expire */
-const PERMANENT_TOKEN_PLATFORMS = ["facebook", "instagram"];
+const PERMANENT_TOKEN_PLATFORMS = ["facebook", "instagram", "tiktok_ads"];
 
 /** Platforms that have refresh_token auto-refresh in their sync functions */
 const AUTO_REFRESH_PLATFORMS = [

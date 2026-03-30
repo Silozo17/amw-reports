@@ -20,9 +20,9 @@ interface ConnectionDialogProps {
   onUpdate: () => void;
 }
 
-const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
+const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'tiktok_ads', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
 
-const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
+const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'tiktok_ads', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
 
 const CONNECT_FUNCTION_MAP: Record<string, string> = {
   google_ads: 'google-ads-connect',
@@ -30,6 +30,7 @@ const CONNECT_FUNCTION_MAP: Record<string, string> = {
   facebook: 'facebook-connect',
   instagram: 'instagram-connect',
   tiktok: 'tiktok-ads-connect',
+  tiktok_ads: 'tiktok-business-connect',
   linkedin: 'linkedin-connect',
   google_search_console: 'google-search-console-connect',
   google_analytics: 'google-analytics-connect',

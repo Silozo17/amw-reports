@@ -11,6 +11,7 @@ export const SYNC_FUNCTION_MAP: Record<string, string> = {
   facebook: 'sync-facebook-page',
   instagram: 'sync-instagram',
   tiktok: 'sync-tiktok-ads',
+  tiktok_ads: 'sync-tiktok-business',
   linkedin: 'sync-linkedin',
   google_search_console: 'sync-google-search-console',
   google_analytics: 'sync-google-analytics',
