@@ -20,7 +20,7 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Pull data from 10+ marketing platforms into a single dashboard. No more switching between tools.' },
+  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Pull data from 12 marketing platforms into a single dashboard. No more switching between tools.' },
   { icon: FileText, title: 'Branded PDF Reports', desc: 'Automatically generated, beautifully designed PDF reports with your logo, colours, and branding.' },
   { icon: Mail, title: 'Automated Delivery', desc: 'Reports are emailed directly to your clients on schedule — no manual work required.' },
   { icon: Palette, title: 'White-Label Branding', desc: 'Your logo, your colours, your fonts, your domain. Clients see your brand, not ours.' },
