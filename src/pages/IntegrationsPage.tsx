@@ -22,7 +22,7 @@ const COMING_SOON = ['X (Twitter)', 'Shopify', 'Bing Ads', 'Snapchat Ads', 'Mail
 
 const IntegrationsPage = () => {
   usePageMeta({
-    title: 'Integrations — 10+ Marketing Platforms | AMW Reports',
+    title: 'Integrations — 12 Marketing Platforms | AMW Reports',
     description: 'Connect Google Ads, Meta Ads, Analytics, Search Console, YouTube, Facebook, Instagram, LinkedIn, TikTok, Pinterest & more.',
   });
 
