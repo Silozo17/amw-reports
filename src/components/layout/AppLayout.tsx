@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useOrg } from '@/contexts/OrgContext';
 import AppSidebar from './AppSidebar';
+import BillingStatusBanner from './BillingStatusBanner';
 
 interface AppLayoutProps {
   children: ReactNode;
