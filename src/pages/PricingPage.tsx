@@ -8,7 +8,7 @@ import StarDecoration from '@/components/landing/StarDecoration';
 const UNIVERSAL_FEATURES = [
   { icon: FileText, label: 'Branded PDF Reports' },
   { icon: Share2, label: 'Client Portal' },
-  { icon: BarChart3, label: '10+ Platform Support' },
+  { icon: BarChart3, label: '12 Platform Integrations' },
   { icon: Mail, label: 'Monthly Reports' },
 ];
 
