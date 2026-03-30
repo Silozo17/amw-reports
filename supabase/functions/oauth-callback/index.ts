@@ -64,7 +64,8 @@ Deno.serve(async (req) => {
       await handleInstagram(supabase, authCode, connectionId, supabaseUrl);
     } else if (platform === "tiktok") {
       await handleTikTok(supabase, authCode, connectionId);
-    } else if (platform === "linkedin") {
+    } else if (platform === "tiktok_ads") {
+      await handleTikTokAds(supabase, authCode, connectionId);
       await handleLinkedIn(supabase, authCode, connectionId, supabaseUrl);
     } else if (platform === "google_search_console") {
       await handleGoogleSearchConsole(supabase, authCode, connectionId, supabaseUrl);
