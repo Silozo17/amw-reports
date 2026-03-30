@@ -15,7 +15,8 @@ const PLATFORM_DETAILS = [
   { name: 'Facebook', desc: 'Monitor your Facebook Page performance including reach, engagement, and follower growth.', metrics: ['Page Likes', 'Followers', 'Reach', 'Impressions', 'Engagement', 'Reactions', 'Comments', 'Shares', 'Video Views', 'Posts Published'] },
   { name: 'Instagram', desc: 'Track your Instagram growth, content performance, and audience engagement.', metrics: ['Followers', 'Reach', 'Impressions', 'Engagement', 'Likes', 'Comments', 'Saves', 'Shares', 'Profile Visits', 'Reels', 'Carousels'] },
   { name: 'LinkedIn', desc: 'Monitor your LinkedIn company page with follower analytics and post performance.', metrics: ['Followers', 'Follower Growth', 'Impressions', 'Engagement', 'Clicks', 'Reactions', 'Comments', 'Shares', 'Posts Published'] },
-  { name: 'TikTok', desc: 'Track your TikTok ad campaigns with detailed spend, reach, and engagement data.', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Video Views'] },
+  { name: 'TikTok', desc: 'Track organic TikTok content performance including followers, views, likes, and engagement.', metrics: ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Video Views'] },
+  { name: 'TikTok Ads', desc: 'Track TikTok ad campaign performance with detailed spend, conversion, and reach metrics.', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'] },
   { name: 'Google Business Profile', desc: 'See how customers find and interact with your Google Business listing.', metrics: ['Views', 'Searches', 'Calls', 'Direction Requests', 'Website Clicks', 'Reviews Count', 'Avg. Rating'] },
   { name: 'Pinterest', desc: 'Track your Pinterest presence with pin performance, impressions, and audience growth.', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'] },
 ];
