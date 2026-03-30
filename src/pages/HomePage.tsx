@@ -54,7 +54,7 @@ const STAT_GROUPS = [
 const HomePage = () => {
   usePageMeta({
     title: 'AMW Reports — Client-Ready Marketing Reports',
-    description: 'Consolidate 10+ platforms into branded PDF reports. Free plan available. Built for agencies, freelancers, and creators.',
+    description: 'Consolidate 12 platforms into branded PDF reports. Free plan available. Built for agencies, freelancers, and creators.',
   });
 
   return (
