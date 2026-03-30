@@ -43,7 +43,7 @@ const PIPELINE_STEPS = [
 const FeaturesPage = () => {
   usePageMeta({
     title: 'Features — Marketing Report Automation | AMW Reports',
-    description: '10 platform integrations, 70+ metrics, branded PDFs, automated delivery, white-label client portal. Free plan.',
+    description: '12 platform integrations, 70+ metrics, branded PDFs, automated delivery, white-label client portal. Free plan.',
   });
 
   return (
