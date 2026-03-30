@@ -15,6 +15,7 @@ const PLATFORMS = [
   { name: 'Instagram', category: 'Social', metrics: ['Followers', 'Reach', 'Impressions', 'Engagement', 'Likes', 'Comments', 'Saves', 'Shares', 'Reels', 'Carousels'], link: '/social-media-reporting' },
   { name: 'LinkedIn', category: 'Social', metrics: ['Followers', 'Follower Growth', 'Impressions', 'Engagement', 'Clicks', 'Reactions', 'Comments', 'Shares'], link: '/social-media-reporting' },
   { name: 'YouTube', category: 'Social', metrics: ['Subscribers', 'Views', 'Watch Time', 'Avg. View Duration', 'Videos Published', 'Top Videos'], link: '/social-media-reporting' },
+  { name: 'TikTok', category: 'Social', metrics: ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Video Views'], link: '/social-media-reporting' },
   { name: 'Pinterest', category: 'Social', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'], link: '/social-media-reporting' },
 ];
 
