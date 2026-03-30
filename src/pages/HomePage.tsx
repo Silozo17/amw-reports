@@ -262,7 +262,7 @@ const HomePage = () => {
       <section className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="font-accent text-lg text-primary mb-2">At a glance</p>
-          <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 10 Platforms</h2>
+          <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4"><h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 12 Platforms</h2></h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             From ad spend to follower growth, we track everything your clients care about.
           </p>
