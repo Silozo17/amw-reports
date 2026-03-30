@@ -30,6 +30,7 @@ const CONNECT_FUNCTION_MAP: Record<string, string> = {
   facebook: 'facebook-connect',
   instagram: 'instagram-connect',
   tiktok: 'tiktok-ads-connect',
+  tiktok_ads: 'tiktok-business-connect',
   linkedin: 'linkedin-connect',
   google_search_console: 'google-search-console-connect',
   google_analytics: 'google-analytics-connect',

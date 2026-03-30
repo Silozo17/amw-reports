@@ -15,8 +15,8 @@ interface MetricDefault {
 }
 
 const ALL_PLATFORMS: PlatformType[] = [
-  'google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'linkedin',
-  'google_search_console', 'google_analytics', 'google_business_profile', 'youtube',
+  'google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'tiktok_ads', 'linkedin',
+  'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest',
 ];
 
 const MetricsDefaultsSection = () => {

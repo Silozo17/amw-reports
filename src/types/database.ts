@@ -408,6 +408,10 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'total_likes_received', 'total_video_count', 'bio_link_clicks',
     'completion_rate', 'average_time_watched', 'following',
   ],
+  tiktok_ads: [
+    'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm',
+    'conversions', 'conversions_value', 'reach', 'video_views', 'conversion_rate',
+  ],
   linkedin: [
     'total_followers', 'follower_growth', 'follower_removes',
     'impressions', 'engagement', 'engagement_rate', 'likes', 'comments',
