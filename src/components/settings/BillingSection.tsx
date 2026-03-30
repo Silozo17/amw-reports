@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UsageBadge from '@/components/entitlements/UsageBadge';
-import { CreditCard, Users, Plug, ExternalLink, Loader2, Check, Sparkles } from 'lucide-react';
+import { CreditCard, Users, Plug, ExternalLink, Loader2, Check, Sparkles, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router-dom';
@@ -40,6 +40,10 @@ const BillingSection = () => {
     currentConnections,
     isUnlimited,
     isLoading,
+    subscriptionStatus,
+    isInGracePeriod,
+    isLocked,
+    gracePeriodEnd,
   } = useEntitlements();
 
   const [searchParams] = useSearchParams();
@@ -128,10 +132,31 @@ const BillingSection = () => {
                   {isUnlimited ? 'Unlimited access' : plan.base_price === 0 ? 'Free' : `£${plan.base_price}/month`}
                 </p>
               </div>
-              <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'} className="capitalize">
-                {subscription.status}
+              <Badge
+                variant={subscription.status === 'active' ? 'default' : 'destructive'}
+                className="capitalize"
+              >
+                {subscription.status === 'past_due' ? 'Past Due' : subscription.status}
               </Badge>
             </div>
+            {isInGracePeriod && gracePeriodEnd && (
+              <div className="flex items-center gap-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  Your payment failed. Features will be restricted on{' '}
+                  <strong>{gracePeriodEnd.toLocaleDateString()}</strong>. Please update your payment method below.
+                </span>
+              </div>
+            )}
+            {isLocked && (
+              <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  Your subscription has been suspended. You are limited to Starter plan features.
+                  Please update your payment method or upgrade to restore full access.
+                </span>
+              </div>
+            )}
             {subscription.is_custom && (
               <Badge variant="outline" className="text-xs">Custom Plan</Badge>
             )}
