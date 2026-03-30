@@ -4,12 +4,13 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 // Cron-only function — no CORS needed
 
+const GRACE_PERIOD_DAYS = 7;
+
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[CHECK-SUBSCRIPTION] ${step}${d}`);
 };
 
-// Plan mapping
 const PLAN_MAP: Record<string, string> = {
   prod_UDjL6VWZaFj7Ta: "agency",
 };
@@ -55,29 +56,79 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found customer", { customerId });
 
-    const subscriptions = await stripe.subscriptions.list({
+    // Query active subscriptions first
+    const activeSubscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: "active",
       limit: 1,
     });
 
-    if (subscriptions.data.length === 0) {
-      logStep("No active subscription");
+    // Also query past_due subscriptions
+    const pastDueSubscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "past_due",
+      limit: 1,
+    });
+
+    const sub = activeSubscriptions.data[0] || pastDueSubscriptions.data[0] || null;
+
+    if (!sub) {
+      logStep("No active or past_due subscription");
+
+      // Sync cancelled status to org_subscriptions
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("org_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile?.org_id) {
+        const { data: existingSub } = await supabase
+          .from("org_subscriptions")
+          .select("id, status, grace_period_end")
+          .eq("org_id", profile.org_id)
+          .maybeSingle();
+
+        if (existingSub && existingSub.status !== "active" && existingSub.status !== "cancelled") {
+          // Only update if not already properly set
+        } else if (existingSub && existingSub.status === "active") {
+          // Stripe says no sub, but DB says active — check if plan is starter (free)
+          const { data: planData } = await supabase
+            .from("org_subscriptions")
+            .select("subscription_plans(slug)")
+            .eq("id", existingSub.id)
+            .single();
+
+          const planSlug = (planData as unknown as { subscription_plans: { slug: string } })?.subscription_plans?.slug;
+          if (planSlug && planSlug !== "starter") {
+            const graceEnd = new Date();
+            graceEnd.setDate(graceEnd.getDate() + GRACE_PERIOD_DAYS);
+            await supabase
+              .from("org_subscriptions")
+              .update({
+                status: "cancelled",
+                grace_period_end: existingSub.grace_period_end || graceEnd.toISOString(),
+              })
+              .eq("id", existingSub.id);
+            logStep("Synced cancelled status", { orgId: profile.org_id });
+          }
+        }
+      }
+
       return new Response(
         JSON.stringify({ subscribed: false, plan: "starter" }),
         { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     }
 
-    const sub = subscriptions.data[0];
     const productId = sub.items.data[0].price.product as string;
     const plan = PLAN_MAP[productId] || "agency";
     const subscriptionEnd = new Date(sub.current_period_end * 1000).toISOString();
+    const stripeStatus = sub.status; // "active" or "past_due"
 
-    logStep("Active subscription found", { subscriptionId: sub.id, plan, productId });
+    logStep("Subscription found", { subscriptionId: sub.id, plan, productId, status: stripeStatus });
 
     // Sync subscription status to org_subscriptions
-    // Find org via profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("org_id")
@@ -85,7 +136,6 @@ serve(async (req) => {
       .single();
 
     if (profile?.org_id) {
-      // Find the Agency plan in subscription_plans
       const { data: agencyPlan } = await supabase
         .from("subscription_plans")
         .select("id")
@@ -95,23 +145,33 @@ serve(async (req) => {
       if (agencyPlan) {
         const { data: existingSub } = await supabase
           .from("org_subscriptions")
-          .select("id")
+          .select("id, grace_period_end")
           .eq("org_id", profile.org_id)
           .maybeSingle();
 
-        const subPayload = {
+        const dbStatus = stripeStatus === "past_due" ? "past_due" : "active";
+
+        const subPayload: Record<string, unknown> = {
           org_id: profile.org_id,
           plan_id: agencyPlan.id,
-          status: "active",
+          status: dbStatus,
           current_period_end: subscriptionEnd,
         };
+
+        if (dbStatus === "active") {
+          subPayload.grace_period_end = null;
+        } else if (dbStatus === "past_due" && !existingSub?.grace_period_end) {
+          const graceEnd = new Date();
+          graceEnd.setDate(graceEnd.getDate() + GRACE_PERIOD_DAYS);
+          subPayload.grace_period_end = graceEnd.toISOString();
+        }
 
         if (existingSub) {
           await supabase.from("org_subscriptions").update(subPayload).eq("id", existingSub.id);
         } else {
           await supabase.from("org_subscriptions").insert(subPayload);
         }
-        logStep("Synced org subscription", { orgId: profile.org_id });
+        logStep("Synced org subscription", { orgId: profile.org_id, status: dbStatus });
       }
     }
 
@@ -119,6 +179,7 @@ serve(async (req) => {
       JSON.stringify({
         subscribed: true,
         plan,
+        status: stripeStatus,
         product_id: productId,
         subscription_end: subscriptionEnd,
         customer_id: customerId,
