@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 import amwLogo from '@/assets/AMW_Logo_White.png';
 
 const NAV_LINKS = [
@@ -29,6 +30,7 @@ const PublicNavbar = () => {
   const [solOpen, setSolOpen] = useState(false);
   const solRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const { user } = useAuth();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -99,12 +101,20 @@ const PublicNavbar = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" asChild className="text-amw-offwhite/80 hover:text-amw-offwhite hover:bg-sidebar-accent/50">
-              <Link to="/login">Log In</Link>
-            </Button>
-            <Button asChild>
-              <Link to="/login?view=signup">Get Started Free</Link>
-            </Button>
+            {user ? (
+              <Button asChild>
+                <Link to="/dashboard">Dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" asChild className="text-amw-offwhite/80 hover:text-amw-offwhite hover:bg-sidebar-accent/50">
+                  <Link to="/login">Log In</Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/login?view=signup">Get Started Free</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile hamburger */}
@@ -139,12 +149,20 @@ const PublicNavbar = () => {
             </Link>
           ))}
           <div className="flex flex-col gap-2 pt-3">
-            <Button variant="outline" asChild className="w-full border-sidebar-border text-amw-offwhite">
-              <Link to="/login">Log In</Link>
-            </Button>
-            <Button asChild className="w-full">
-              <Link to="/login?view=signup">Get Started Free</Link>
-            </Button>
+            {user ? (
+              <Button asChild className="w-full">
+                <Link to="/dashboard">Dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" asChild className="w-full border-sidebar-border text-amw-offwhite">
+                  <Link to="/login">Log In</Link>
+                </Button>
+                <Button asChild className="w-full">
+                  <Link to="/login?view=signup">Get Started Free</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}
