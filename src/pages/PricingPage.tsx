@@ -8,7 +8,7 @@ import StarDecoration from '@/components/landing/StarDecoration';
 const UNIVERSAL_FEATURES = [
   { icon: FileText, label: 'Branded PDF Reports' },
   { icon: Share2, label: 'Client Portal' },
-  { icon: BarChart3, label: '10+ Platform Support' },
+  { icon: BarChart3, label: '12 Platform Integrations' },
   { icon: Mail, label: 'Monthly Reports' },
 ];
 
@@ -64,7 +64,7 @@ const FAQS = [
   { q: 'How does connection allocation work for add-on clients?', a: 'Each additional client account includes 5 connections — 3 are reserved exclusively for that client, and 2 are added to your flexible pool that can be used across any client. This ensures every client has a minimum level of coverage while giving you flexibility.' },
   { q: 'Can I white-label the reports with my agency brand?', a: 'Yes! On the Agency plan, you get full white-label branding. Upload your logo, set your brand colours and fonts, and even use a custom domain. Your clients will see your brand throughout the platform and on PDF reports — AMW Reports branding is completely hidden.' },
   { q: 'What is the difference between a connection and a client?', a: 'A client represents one of your customers or accounts. A connection is a link between that client and a specific marketing platform. One client might have 3-5 connections (e.g., Google Ads, Facebook, Instagram, Google Analytics, LinkedIn).' },
-  { q: 'What platforms are supported?', a: 'We currently support Google Ads, Meta Ads, Google Analytics, Google Search Console, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, Pinterest, and Google Business Profile — 11 platforms in total.' },
+  { q: 'What platforms are supported?', a: 'We currently support Google Ads, Meta Ads, Google Analytics, Google Search Console, YouTube, Facebook Pages, Instagram, LinkedIn, TikTok, TikTok Ads, Pinterest, and Google Business Profile — 12 platforms in total.' },
   { q: 'Can I upgrade or downgrade anytime?', a: 'Yes. You can upgrade at any time and the change takes effect immediately. If you downgrade, it takes effect at the end of your current billing period.' },
   { q: 'Is there a contract or commitment?', a: 'No contracts. All plans are month-to-month and you can cancel at any time.' },
   { q: 'Do my clients need an account?', a: 'No. Clients can access their dashboard via a unique shareable link — no login required for them.' },

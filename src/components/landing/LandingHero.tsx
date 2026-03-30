@@ -5,7 +5,7 @@ import mascot from '@/assets/mascot.svg';
 import amwLogo from '@/assets/AMW_Logo_White.png';
 
 const FEATURES = [
-  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Google, Meta, TikTok, LinkedIn & more — all in one place' },
+  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Google, Meta, TikTok Ads, LinkedIn & more — all in one place' },
   { icon: FileText, title: 'Automated Reports', desc: 'Beautiful branded PDFs generated and emailed monthly' },
   { icon: Users, title: 'Client Management', desc: 'Manage clients, recipients, and platform connections' },
   { icon: Palette, title: 'White-Label Ready', desc: 'Your brand, your logo, your colours — fully customisable' },

@@ -7,7 +7,7 @@ import StarDecoration from '@/components/landing/StarDecoration';
 const PLATFORMS = [
   { name: 'Google Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'], link: '/ppc-reporting' },
   { name: 'Meta Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Reach', 'Clicks', 'Link Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'ROAS', 'Frequency', 'Leads'], link: '/ppc-reporting' },
-  { name: 'TikTok Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Video Views'], link: '/ppc-reporting' },
+  { name: 'TikTok Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'], link: '/ppc-reporting' },
   { name: 'Google Analytics', category: 'SEO', metrics: ['Sessions', 'Active Users', 'New Users', 'Page Views', 'Bounce Rate', 'Avg. Session Duration', 'Pages/Session', 'Traffic Sources'], link: '/seo-reporting' },
   { name: 'Google Search Console', category: 'SEO', metrics: ['Search Clicks', 'Search Impressions', 'Search CTR', 'Avg. Position', 'Top Queries', 'Top Pages'], link: '/seo-reporting' },
   { name: 'Google Business Profile', category: 'SEO', metrics: ['Views', 'Searches', 'Calls', 'Direction Requests', 'Website Clicks', 'Reviews Count', 'Avg. Rating'], link: '/seo-reporting' },
@@ -15,6 +15,7 @@ const PLATFORMS = [
   { name: 'Instagram', category: 'Social', metrics: ['Followers', 'Reach', 'Impressions', 'Engagement', 'Likes', 'Comments', 'Saves', 'Shares', 'Reels', 'Carousels'], link: '/social-media-reporting' },
   { name: 'LinkedIn', category: 'Social', metrics: ['Followers', 'Follower Growth', 'Impressions', 'Engagement', 'Clicks', 'Reactions', 'Comments', 'Shares'], link: '/social-media-reporting' },
   { name: 'YouTube', category: 'Social', metrics: ['Subscribers', 'Views', 'Watch Time', 'Avg. View Duration', 'Videos Published', 'Top Videos'], link: '/social-media-reporting' },
+  { name: 'TikTok', category: 'Social', metrics: ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Video Views'], link: '/social-media-reporting' },
   { name: 'Pinterest', category: 'Social', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'], link: '/social-media-reporting' },
 ];
 
@@ -22,7 +23,7 @@ const COMING_SOON = ['X (Twitter)', 'Shopify', 'Bing Ads', 'Snapchat Ads', 'Mail
 
 const IntegrationsPage = () => {
   usePageMeta({
-    title: 'Integrations — 10+ Marketing Platforms | AMW Reports',
+    title: 'Integrations — 12 Marketing Platforms | AMW Reports',
     description: 'Connect Google Ads, Meta Ads, Analytics, Search Console, YouTube, Facebook, Instagram, LinkedIn, TikTok, Pinterest & more.',
   });
 
@@ -39,7 +40,7 @@ const IntegrationsPage = () => {
             Platform Integrations —<br />Connect Your <span className="text-gradient-purple">Marketing Stack</span>
           </h1>
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
-            One dashboard for all your marketing data. Connect 10+ platforms and pull 70+ metrics into branded, client-ready reports automatically.
+            One dashboard for all your marketing data. One dashboard for all your marketing data. Connect 12 platforms and pull 70+ metrics into branded, client-ready reports automatically. and pull 70+ metrics into branded, client-ready reports automatically.
           </p>
           <Button size="lg" asChild>
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>

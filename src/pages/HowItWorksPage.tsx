@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
 
-const PLATFORMS = ['Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'Pinterest', 'Google Business Profile'];
+const PLATFORMS = ['Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile'];
 
 const HowItWorksPage = () => {
   usePageMeta({
@@ -42,7 +42,7 @@ const HowItWorksPage = () => {
               <p className="font-accent text-lg text-primary mb-2">Step one</p>
               <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Step 1: Connect Your Platforms</h2>
               <p className="text-amw-offwhite/60 font-body mb-6">
-                Link your marketing platforms with a single click using secure OAuth connections. We support 10+ platforms including Google, Meta, TikTok, LinkedIn, YouTube, and more. Your credentials are never stored — we use the same secure method that Google and Meta recommend.
+                Link your marketing platforms with a single click using secure OAuth connections. Link your marketing platforms with a single click using secure OAuth connections. We support 12 platforms including Google, Meta, TikTok, TikTok Ads, LinkedIn, YouTube, and more. Your credentials are never stored — we use the same secure method that Google and Meta recommend. including Google, Meta, TikTok, LinkedIn, YouTube, and more. Your credentials are never stored — we use the same secure method that Google and Meta recommend.
               </p>
               <div className="flex flex-wrap gap-2">
                 {PLATFORMS.map(p => (

@@ -10,7 +10,7 @@ import usePageMeta from '@/hooks/usePageMeta';
 
 const PLATFORMS = [
   'Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console',
-  'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'Pinterest', 'Google Business Profile',
+  'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile',
 ];
 
 const STEPS = [
@@ -20,7 +20,7 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Pull data from 10+ marketing platforms into a single dashboard. No more switching between tools.' },
+  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Pull data from 12 marketing platforms into a single dashboard. No more switching between tools.' },
   { icon: FileText, title: 'Branded PDF Reports', desc: 'Automatically generated, beautifully designed PDF reports with your logo, colours, and branding.' },
   { icon: Mail, title: 'Automated Delivery', desc: 'Reports are emailed directly to your clients on schedule — no manual work required.' },
   { icon: Palette, title: 'White-Label Branding', desc: 'Your logo, your colours, your fonts, your domain. Clients see your brand, not ours.' },
@@ -38,7 +38,7 @@ const AUDIENCES = [
 const WHY_US = [
   'White-label everything — your brand, your logo, your colours',
   'Automated monthly email delivery to your clients',
-  '10+ platforms in one dashboard — no switching tools',
+  '12 platforms in one dashboard — no switching tools',
   'No per-seat pricing — your whole team for one price',
   'Built by marketers who run an agency themselves',
   'Client portal with shareable links for transparency',
@@ -54,7 +54,7 @@ const STAT_GROUPS = [
 const HomePage = () => {
   usePageMeta({
     title: 'AMW Reports — Client-Ready Marketing Reports',
-    description: 'Consolidate 10+ platforms into branded PDF reports. Free plan available. Built for agencies, freelancers, and creators.',
+    description: 'Consolidate 12 platforms into branded PDF reports. Free plan available. Built for agencies, freelancers, and creators.',
   });
 
   return (
@@ -88,7 +88,7 @@ const HomePage = () => {
                 AMW Reports pulls data from Google, Meta, TikTok, LinkedIn and more into clean, client-ready reports — automatically. Built for agencies, freelancers, and creators.
               </p>
               <div className="flex items-center gap-3 text-xs font-body text-amw-offwhite/50 tracking-wide uppercase">
-                <span>10 Platforms</span>
+                <span>12 Platforms</span>
                 <span className="w-1 h-1 rounded-full bg-primary" />
                 <span>70+ Metrics</span>
                 <span className="w-1 h-1 rounded-full bg-primary" />
@@ -262,7 +262,7 @@ const HomePage = () => {
       <section className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="font-accent text-lg text-primary mb-2">At a glance</p>
-          <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 10 Platforms</h2>
+          <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4"><h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 12 Platforms</h2></h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             From ad spend to follower growth, we track everything your clients care about.
           </p>
