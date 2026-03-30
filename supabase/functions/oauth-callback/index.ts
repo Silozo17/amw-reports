@@ -563,7 +563,86 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
   if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
 }
 
-// ── LinkedIn ──
+// ── TikTok Ads (Business API — long-lived tokens) ──
+async function handleTikTokAds(supabase: any, authCode: string, connectionId: string) {
+  const appId = Deno.env.get("TIKTOK_BUSINESS_APP_ID")!;
+  const appSecret = Deno.env.get("TIKTOK_BUSINESS_APP_SECRET")!;
+
+  // Exchange auth code for access token via Business API
+  const tokenRes = await fetch("https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      app_id: appId,
+      secret: appSecret,
+      auth_code: authCode,
+    }),
+  });
+
+  const tokenData = await tokenRes.json();
+  console.log("TikTok Business API token response:", JSON.stringify(tokenData));
+
+  if (tokenData.code !== 0 || !tokenData.data?.access_token) {
+    throw new Error(
+      tokenData.message || "TikTok Business API token exchange failed"
+    );
+  }
+
+  const accessToken = tokenData.data.access_token;
+  const advertiserIds: string[] = tokenData.data.advertiser_ids || [];
+
+  // Discover advertiser accounts with names
+  const adAccounts: Array<{ id: string; name: string }> = [];
+  if (advertiserIds.length > 0) {
+    try {
+      const advUrl = new URL("https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get/");
+      advUrl.searchParams.set("app_id", appId);
+      advUrl.searchParams.set("secret", appSecret);
+      advUrl.searchParams.set("access_token", accessToken);
+
+      const advRes = await fetch(advUrl.toString(), {
+        headers: { "Access-Token": accessToken },
+      });
+      const advData = await advRes.json();
+      console.log("TikTok advertiser discovery:", JSON.stringify(advData));
+
+      if (advData.code === 0 && advData.data?.list) {
+        for (const adv of advData.data.list) {
+          adAccounts.push({
+            id: String(adv.advertiser_id),
+            name: adv.advertiser_name || `TikTok Ads (${adv.advertiser_id})`,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Could not discover TikTok advertiser accounts:", e);
+      // Fall back to raw IDs
+      for (const id of advertiserIds) {
+        adAccounts.push({ id: String(id), name: `TikTok Ads (${id})` });
+      }
+    }
+  }
+
+  // Auto-select if exactly one account
+  const autoSelect = adAccounts.length === 1;
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: accessToken,
+      refresh_token: null,
+      token_expires_at: null, // Business API tokens are long-lived
+      is_connected: true,
+      last_error: null,
+      account_name: autoSelect ? adAccounts[0].name : null,
+      account_id: autoSelect ? adAccounts[0].id : null,
+      metadata: { token_type: "bearer", long_lived: true, ad_accounts: adAccounts },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
 async function handleLinkedIn(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("LINKEDIN_CLIENT_ID")!;
   const clientSecret = Deno.env.get("LINKEDIN_CLIENT_SECRET")!;
