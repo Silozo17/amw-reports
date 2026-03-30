@@ -7,7 +7,7 @@ import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
 import googleAdsPlatform from '@/assets/screenshots/Google_ads.webp';
 
 const PAIN_POINTS = [
-  { title: 'Hours wasted on manual reports', desc: '{ title: 'Hours wasted on manual reports', desc: 'Logging into 12 platforms, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },
+  { title: 'Hours wasted on manual reports', desc: 'Logging into 12 platforms, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },
   { title: 'Inconsistent formatting', desc: 'Different team members create reports differently. No unified brand presence across client deliverables.' },
   { title: 'Manual data pulling is error-prone', desc: 'Wrong date ranges, missed metrics, outdated screenshots — manual reporting introduces mistakes that erode client trust.' },
 ];

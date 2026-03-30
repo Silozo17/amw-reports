@@ -6,7 +6,7 @@ import StarDecoration from '@/components/landing/StarDecoration';
 import instagramPlatform from '@/assets/screenshots/instagram.webp';
 
 const WHY_POINTS = [
-  { title: 'Save hours every month', desc: '{ title: 'Save hours every month', desc: 'Stop manually pulling data from 12 platforms. AMW Reports does it automatically.' },. AMW Reports does it automatically.' },
+  { title: 'Save hours every month', desc: 'Stop manually pulling data from 12 platforms. AMW Reports does it automatically.' },. AMW Reports does it automatically.' },. AMW Reports does it automatically.' },
   { title: 'Impress clients with professional reports', desc: 'Branded PDF reports with your logo make you look like a full-service agency.' },
   { title: 'White-label your deliverables', desc: 'Clients see your brand on every report and portal page. They will never know you use AMW Reports.' },
   { title: 'Start free, upgrade when ready', desc: 'The Creator plan is free with 1 client and 5 connections. Upgrade to Freelance at just £29.99/mo.' },
