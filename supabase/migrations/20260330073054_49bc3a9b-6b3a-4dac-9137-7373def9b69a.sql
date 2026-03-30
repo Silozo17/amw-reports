@@ -1,0 +1,1 @@
+ALTER TABLE org_subscriptions ADD COLUMN grace_period_end timestamptz DEFAULT NULL;

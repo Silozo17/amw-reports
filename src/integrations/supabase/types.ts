@@ -603,6 +603,7 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          grace_period_end: string | null
           id: string
           is_custom: boolean
           org_id: string
@@ -618,6 +619,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          grace_period_end?: string | null
           id?: string
           is_custom?: boolean
           org_id: string
@@ -633,6 +635,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          grace_period_end?: string | null
           id?: string
           is_custom?: boolean
           org_id?: string
