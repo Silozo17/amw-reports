@@ -204,6 +204,7 @@ export const PLATFORM_LOGOS: Record<string, string> = {
   facebook: facebookLogo,
   instagram: instagramLogo,
   tiktok: tiktokLogo,
+  tiktok_ads: tiktokLogo,
   linkedin: linkedinLogo,
   google_search_console: gscLogo,
   google_analytics: gaLogo,
