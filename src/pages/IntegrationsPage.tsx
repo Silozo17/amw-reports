@@ -7,7 +7,7 @@ import StarDecoration from '@/components/landing/StarDecoration';
 const PLATFORMS = [
   { name: 'Google Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'], link: '/ppc-reporting' },
   { name: 'Meta Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Reach', 'Clicks', 'Link Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'ROAS', 'Frequency', 'Leads'], link: '/ppc-reporting' },
-  { name: 'TikTok Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Video Views'], link: '/ppc-reporting' },
+  { name: 'TikTok Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'], link: '/ppc-reporting' },
   { name: 'Google Analytics', category: 'SEO', metrics: ['Sessions', 'Active Users', 'New Users', 'Page Views', 'Bounce Rate', 'Avg. Session Duration', 'Pages/Session', 'Traffic Sources'], link: '/seo-reporting' },
   { name: 'Google Search Console', category: 'SEO', metrics: ['Search Clicks', 'Search Impressions', 'Search CTR', 'Avg. Position', 'Top Queries', 'Top Pages'], link: '/seo-reporting' },
   { name: 'Google Business Profile', category: 'SEO', metrics: ['Views', 'Searches', 'Calls', 'Direction Requests', 'Website Clicks', 'Reviews Count', 'Avg. Rating'], link: '/seo-reporting' },
