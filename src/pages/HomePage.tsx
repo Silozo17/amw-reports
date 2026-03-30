@@ -88,7 +88,7 @@ const HomePage = () => {
                 AMW Reports pulls data from Google, Meta, TikTok, LinkedIn and more into clean, client-ready reports — automatically. Built for agencies, freelancers, and creators.
               </p>
               <div className="flex items-center gap-3 text-xs font-body text-amw-offwhite/50 tracking-wide uppercase">
-                <span>10 Platforms</span>
+                <span>12 Platforms</span>
                 <span className="w-1 h-1 rounded-full bg-primary" />
                 <span>70+ Metrics</span>
                 <span className="w-1 h-1 rounded-full bg-primary" />
