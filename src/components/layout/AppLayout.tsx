@@ -21,6 +21,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   if (isMobile) {
     return (
       <div className="flex h-screen flex-col overflow-hidden">
+        <BillingStatusBanner />
         <header className="flex h-14 items-center gap-3 border-b border-border bg-sidebar px-4">
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild>
@@ -51,11 +52,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   return (
     <div className="flex h-screen overflow-hidden">
       <AppSidebar />
-      <main className="flex-1 overflow-y-auto bg-background">
-        <div className="p-6 lg:p-8 max-w-[1400px]">
-          {children}
-        </div>
-      </main>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <BillingStatusBanner />
+        <main className="flex-1 overflow-y-auto bg-background">
+          <div className="p-6 lg:p-8 max-w-[1400px]">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
