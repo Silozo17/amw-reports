@@ -24,8 +24,11 @@ interface OrgSubscription {
   override_max_connections: number | null;
   current_period_start: string | null;
   current_period_end: string | null;
+  grace_period_end: string | null;
   subscription_plans: SubscriptionPlan;
 }
+
+export type SubscriptionStatus = 'active' | 'past_due' | 'cancelled' | 'none';
 
 export interface Entitlements {
   plan: SubscriptionPlan | null;
@@ -39,7 +42,16 @@ export interface Entitlements {
   isUnlimited: boolean;
   isLoading: boolean;
   hasWhitelabel: boolean;
+  subscriptionStatus: SubscriptionStatus;
+  isInGracePeriod: boolean;
+  isLocked: boolean;
+  gracePeriodEnd: Date | null;
 }
+
+const STARTER_LIMITS = {
+  maxClients: 1,
+  maxConnections: 5,
+};
 
 export function useEntitlements(): Entitlements {
   const { orgId } = useOrg();
@@ -94,21 +106,65 @@ export function useEntitlements(): Entitlements {
   const isLoading = subLoading || clientsLoading || connLoading;
   const plan = subscription?.subscription_plans ?? null;
 
-  const isUnlimited = subscription?.override_max_clients === -1 || subscription?.override_max_connections === -1;
+  // --- Subscription status logic ---
+  const rawStatus = subscription?.status ?? 'none';
+  const subscriptionStatus: SubscriptionStatus =
+    rawStatus === 'active' ? 'active' :
+    rawStatus === 'past_due' ? 'past_due' :
+    rawStatus === 'cancelled' ? 'cancelled' : 'none';
 
-  const maxClients = subscription?.override_max_clients === -1
-    ? Infinity
-    : subscription?.override_max_clients != null
-      ? subscription.override_max_clients
-      : (plan?.included_clients ?? 1) + (subscription?.additional_clients ?? 0);
+  const gracePeriodEnd = subscription?.grace_period_end
+    ? new Date(subscription.grace_period_end)
+    : null;
 
-  const maxConnections = subscription?.override_max_connections === -1
-    ? Infinity
-    : subscription?.override_max_connections != null
-      ? subscription.override_max_connections
-      : (plan?.included_connections ?? 5) + ((subscription?.additional_connections ?? 0) * 5);
+  const now = new Date();
+  const isInGracePeriod =
+    (subscriptionStatus === 'past_due' || subscriptionStatus === 'cancelled') &&
+    gracePeriodEnd !== null &&
+    gracePeriodEnd > now;
 
-  const hasWhitelabel = plan?.has_whitelabel ?? false;
+  const isLocked =
+    (subscriptionStatus === 'past_due' || subscriptionStatus === 'cancelled') &&
+    !isInGracePeriod;
+
+  // --- Entitlement calculations ---
+  const isUnlimited = !isLocked && (
+    subscription?.override_max_clients === -1 || subscription?.override_max_connections === -1
+  );
+
+  let maxClients: number;
+  let maxConnections: number;
+  let hasWhitelabel: boolean;
+
+  if (isLocked) {
+    // Locked: fall back to Starter limits
+    maxClients = STARTER_LIMITS.maxClients;
+    maxConnections = STARTER_LIMITS.maxConnections;
+    hasWhitelabel = false;
+  } else {
+    maxClients = subscription?.override_max_clients === -1
+      ? Infinity
+      : subscription?.override_max_clients != null
+        ? subscription.override_max_clients
+        : (plan?.included_clients ?? 1) + (subscription?.additional_clients ?? 0);
+
+    maxConnections = subscription?.override_max_connections === -1
+      ? Infinity
+      : subscription?.override_max_connections != null
+        ? subscription.override_max_connections
+        : (plan?.included_connections ?? 5) + ((subscription?.additional_connections ?? 0) * 5);
+
+    hasWhitelabel = plan?.has_whitelabel ?? false;
+  }
+
+  // During grace period: existing features work, but no expansion
+  const canAddClient = isInGracePeriod
+    ? false
+    : !isLocked && currentClients < maxClients;
+
+  const canAddConnection = isInGracePeriod
+    ? false
+    : !isLocked && currentConnections < maxConnections;
 
   return {
     plan,
@@ -117,10 +173,14 @@ export function useEntitlements(): Entitlements {
     maxConnections,
     currentClients,
     currentConnections,
-    canAddClient: currentClients < maxClients,
-    canAddConnection: currentConnections < maxConnections,
+    canAddClient,
+    canAddConnection,
     isUnlimited,
     isLoading,
     hasWhitelabel,
+    subscriptionStatus,
+    isInGracePeriod,
+    isLocked,
+    gracePeriodEnd,
   };
 }

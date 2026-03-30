@@ -3,11 +3,7 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 
 // Webhook-only function — no CORS needed (called by Stripe, not browser)
 
-const EVENT_TEMPLATE_MAP: Record<string, string> = {
-  "checkout.session.completed": "subscription_activated",
-  "invoice.payment_failed": "payment_failed",
-  "customer.subscription.trial_will_end": "trial_ending",
-};
+const GRACE_PERIOD_DAYS = 7;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -49,21 +45,75 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Handle subscription updates (upgraded/downgraded/cancelled)
     let templateName: string | null = null;
     let emailData: Record<string, unknown> = {};
     let customerEmail: string | null = null;
 
+    // --- Subscription status sync helper ---
+    async function syncOrgSubscriptionStatus(
+      email: string,
+      status: string,
+      setGracePeriod: boolean,
+      clearGracePeriod: boolean
+    ) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (!profile?.user_id) return;
+
+      const { data: membership } = await supabase
+        .from("org_members")
+        .select("org_id")
+        .eq("user_id", profile.user_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!membership?.org_id) return;
+
+      const updatePayload: Record<string, unknown> = { status };
+
+      if (setGracePeriod) {
+        const graceEnd = new Date();
+        graceEnd.setDate(graceEnd.getDate() + GRACE_PERIOD_DAYS);
+        updatePayload.grace_period_end = graceEnd.toISOString();
+      }
+
+      if (clearGracePeriod) {
+        updatePayload.grace_period_end = null;
+      }
+
+      await supabase
+        .from("org_subscriptions")
+        .update(updatePayload)
+        .eq("org_id", membership.org_id);
+
+      console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} status=${status}`);
+    }
+
+    // --- Handle events ---
     if (event.type === "customer.subscription.updated") {
       const sub = event.data.object as Stripe.Subscription;
       const prev = (event.data as Record<string, unknown>).previous_attributes as { items?: { data?: Array<{ price?: { id?: string; unit_amount?: number } }> } } | undefined;
       customerEmail = await getCustomerEmail(stripe, sub.customer as string);
 
+      // Sync status changes
+      if (customerEmail) {
+        if (sub.status === "past_due") {
+          await syncOrgSubscriptionStatus(customerEmail, "past_due", true, false);
+        } else if (sub.status === "canceled" || sub.status === "unpaid") {
+          await syncOrgSubscriptionStatus(customerEmail, "cancelled", true, false);
+        } else if (sub.status === "active") {
+          await syncOrgSubscriptionStatus(customerEmail, "active", false, true);
+        }
+      }
+
       if (prev?.items) {
         const oldPrice = prev.items?.data?.[0]?.price?.id;
         const newPrice = sub.items.data[0]?.price?.id;
         if (oldPrice && newPrice && oldPrice !== newPrice) {
-          // Determine direction by comparing amounts
           const oldAmount = prev.items?.data?.[0]?.price?.unit_amount ?? 0;
           const newAmount = sub.items.data[0]?.price?.unit_amount ?? 0;
           templateName = newAmount > oldAmount ? "subscription_upgraded" : "subscription_downgraded";
@@ -84,11 +134,20 @@ Deno.serve(async (req) => {
       customerEmail = await getCustomerEmail(stripe, sub.customer as string);
       templateName = "trial_expired";
       emailData = { reason: "Subscription ended" };
+
+      if (customerEmail) {
+        await syncOrgSubscriptionStatus(customerEmail, "cancelled", true, false);
+      }
     } else if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
       customerEmail = session.customer_email ?? await getCustomerEmail(stripe, session.customer as string);
       templateName = "subscription_activated";
       emailData = { session_id: session.id };
+
+      // Restore to active and clear grace period
+      if (customerEmail) {
+        await syncOrgSubscriptionStatus(customerEmail, "active", false, true);
+      }
     } else if (event.type === "invoice.payment_failed") {
       const invoice = event.data.object as Stripe.Invoice;
       customerEmail = invoice.customer_email ?? await getCustomerEmail(stripe, invoice.customer as string);
@@ -100,6 +159,11 @@ Deno.serve(async (req) => {
           ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString()
           : null,
       };
+
+      // Set past_due with grace period
+      if (customerEmail) {
+        await syncOrgSubscriptionStatus(customerEmail, "past_due", true, false);
+      }
     } else if (event.type === "customer.subscription.trial_will_end") {
       const sub = event.data.object as Stripe.Subscription;
       customerEmail = await getCustomerEmail(stripe, sub.customer as string);
@@ -112,7 +176,6 @@ Deno.serve(async (req) => {
     }
 
     if (templateName && customerEmail) {
-      // Look up org via profile email
       const { data: profile } = await supabase
         .from("profiles")
         .select("user_id")
