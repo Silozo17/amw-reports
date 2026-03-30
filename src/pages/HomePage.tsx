@@ -38,7 +38,7 @@ const AUDIENCES = [
 const WHY_US = [
   'White-label everything — your brand, your logo, your colours',
   'Automated monthly email delivery to your clients',
-  '10+ platforms in one dashboard — no switching tools',
+  '12 platforms in one dashboard — no switching tools',
   'No per-seat pricing — your whole team for one price',
   'Built by marketers who run an agency themselves',
   'Client portal with shareable links for transparency',
