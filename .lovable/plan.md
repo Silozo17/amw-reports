@@ -1,111 +1,103 @@
 
 
-# Add TikTok Ads Integration (Business API)
+# Update All SEO Content for 12 Platforms + AI Bot Access
 
-## Overview
+## What Changed
+TikTok Ads was added as a separate platform (Business API), bringing the total from 11 to **12 platforms**. The SEO static HTML in `index.html`, React page content, `robots.txt`, and meta descriptions all reference outdated platform counts ("10+", "10", "11") and are missing "TikTok Ads" from platform lists. The `robots.txt` also lacks rules for AI crawlers.
 
-Add TikTok Ads as a new platform type (`tiktok_ads`) alongside the existing organic TikTok integration (`tiktok`). This uses the TikTok Marketing/Business API v1.3, which is entirely separate from the Login Kit used for organic content.
+## Plan
 
-**Key difference**: TikTok Business API tokens are **long-lived** (no expiry), auth uses `app_id` + `secret` + `auth_code` exchange, and data comes from the Reporting API (`/report/integrated/get/`).
+### 1. Update `robots.txt` — AI bot access
+Add explicit rules for all major AI crawlers to ensure content is accessible:
+- `GPTBot`, `ChatGPT-User` (OpenAI)
+- `Google-Extended`, `Googlebot` (Google/Gemini)  
+- `anthropic-ai`, `Claude-Web` (Anthropic)
+- `Bytespider` (TikTok/Bytedance)
+- `PerplexityBot`, `YouBot`, `CCBot`, `Applebot-Extended`
+- All set to `Allow: /`
 
----
+### 2. Update `index.html` SEO static content
+Every `data-seo-page` section needs these changes:
 
-## New Secrets Required
+**Global across all pages:**
+- Copyright `© 2025` → `© 2026`
+- All "10 platforms" / "10+" references → "12"
+- All "11 platforms" references → "12"
 
-Two new secrets (separate from existing `TIKTOK_APP_ID`/`TIKTOK_APP_SECRET`):
+**Home page (`/`):**
+- Platform pills: add `TikTok Ads` pill (currently only has `TikTok`)
+- "70+ Metrics Across 10 Platforms" → "12 Platforms"
+- "10 platforms in one dashboard" → "12 platforms"
+- "connects 10+ marketing platforms" → "connects 12 marketing platforms"
 
-- `TIKTOK_BUSINESS_APP_ID` — App ID from your TikTok Marketing API developer app
-- `TIKTOK_BUSINESS_APP_SECRET` — Secret from your TikTok Marketing API developer app
+**Features page (`/features`):**
+- "10 platforms, 70+ metrics" → "12 platforms"
+- Split TikTok card into **TikTok** (organic: followers, views, likes, comments, shares, video views) and **TikTok Ads** (paid: spend, impressions, clicks, CTR, CPC, CPM, conversions, conv. value, reach, video views, conversion rate)
+- FAQ "We currently support...TikTok..." → add "TikTok Ads"
 
----
+**Integrations page (`/integrations`):**
+- "Connect 11 marketing platforms" → "Connect 12 marketing platforms"
+- Platform pills already has TikTok Ads — confirmed correct
 
-## Implementation Plan
+**Social Media Reporting (`/social-media-reporting`):**
+- TikTok card currently shows ad metrics — rename to "TikTok Ads" or add a separate organic TikTok card
+- Add TikTok Ads as distinct platform card
 
-### 1. Add secrets
-Use the `add_secret` tool for `TIKTOK_BUSINESS_APP_ID` and `TIKTOK_BUSINESS_APP_SECRET`.
+**PPC Reporting (`/ppc-reporting`):**
+- FAQ: "Google Ads, Meta Ads, and TikTok Ads" — already correct
+- Ensure TikTok Ads card is present with full metrics
 
-### 2. Update `PlatformType` and mappings in `src/types/database.ts`
-- Add `'tiktok_ads'` to the `PlatformType` union
-- Add `tiktok_ads` entry to `PLATFORM_LABELS` → `'TikTok Ads'`
-- Add `tiktok_ads` entry to `PLATFORM_LOGOS` → reuse `tiktokLogo`
-- Remove `tiktok` from `ORGANIC_PLATFORMS` set (it's already there, `tiktok_ads` should NOT be added since it's a paid platform)
-- Add `tiktok_ads` to `PLATFORM_AVAILABLE_METRICS` with ad-specific metrics:
-  `['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'conversions', 'conversions_value', 'reach', 'video_views', 'conversion_rate']`
+**For SMBs (`/for-smbs`):**
+- Platform pills: add `TikTok Ads`
 
-### 3. Update platform lists in frontend components
-- `ConnectionDialog.tsx` — add `'tiktok_ads'` to `PLATFORMS`, `OAUTH_SUPPORTED`, and `CONNECT_FUNCTION_MAP` (`tiktok_ads: 'tiktok-business-connect'`)
-- `src/lib/triggerSync.ts` — add `tiktok_ads: 'sync-tiktok-business'` to `SYNC_FUNCTION_MAP`
-- `MetricsDefaultsSection.tsx` — add `'tiktok_ads'` to `ALL_PLATFORMS`
-- `IntegrationsPage.tsx` — already lists TikTok Ads in the marketing copy (no change needed)
+**For Creators (`/for-creators`):**
+- Platform pills: add `TikTok Ads` (creators may run ads too)
 
-### 4. Create `tiktok-business-connect` edge function
-OAuth connect function using TikTok Business API authorization:
-- Uses `TIKTOK_BUSINESS_APP_ID` and `TIKTOK_BUSINESS_APP_SECRET`
-- Builds authorization URL: `https://business-api.tiktok.com/portal/auth/` with `app_id`, `redirect_uri`, and `state`
-- State includes `platform: "tiktok_ads"` to distinguish from organic in the callback
-- Redirect URI points to the existing `oauth-callback` function
+**Pricing (`/pricing`):**
+- FAQ "What platforms are supported?": update to include TikTok Ads, say "12 platforms in total"
 
-### 5. Update `oauth-callback` to handle `tiktok_ads` platform
-Add a new `handleTikTokAds` function:
-- Token exchange via `POST https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/` with `{app_id, secret, auth_code}`
-- Returns a **long-lived token** (no expiry) and `advertiser_ids[]`
-- Discover advertiser accounts via `GET /open_api/v1.3/oauth2/advertiser/get/` with `Access-Token` header
-- Store accounts in `metadata.ad_accounts` for the account picker
-- Token does not expire → set `token_expires_at = null`
+### 3. Update `index.html` head meta tags
+- `<meta name="description">`: "Connect 10+ marketing platforms" → "Connect 12 marketing platforms"
+- OG/Twitter descriptions: same update
 
-### 6. Create `sync-tiktok-business` edge function
-Sync function for TikTok Ads reporting data:
-- Uses TikTok Reporting API: `GET /open_api/v1.3/report/integrated/get/`
-- Query at `AUCTION_ADVERTISER` level with `advertiser_id` from `account_id`
-- Metrics requested: `spend`, `impressions`, `clicks`, `ctr`, `cpc`, `cpm`, `conversion`, `complete_payment_roas`, `reach`, `video_play_actions`, `total_complete_payment_rate`
-- Date range: first day to last day of the requested month/year
-- Maps API response fields to our standard metric names (spend, impressions, clicks, etc.)
-- Upserts into `monthly_snapshots` with platform `'tiktok_ads'`
-- Standard sync log, connection status, and org membership verification (following the pattern from `sync-meta-ads`)
+### 4. Update React page meta descriptions + content
+Files to modify with "10+" → "12" and add "TikTok Ads" to platform arrays:
 
-### 7. Update `scheduled-sync` and `check-expiring-tokens`
-- `scheduled-sync` already iterates all connections — no change needed since it uses `SYNC_FUNCTION_MAP` pattern via platform lookup
-- `check-expiring-tokens` — add logic to skip `tiktok_ads` connections since Business API tokens are long-lived (no expiry)
+| File | Changes |
+|---|---|
+| `HomePage.tsx` | PLATFORMS array: add `'TikTok Ads'`; FEATURES desc: "12"; WHY_POINTS: "12 platforms"; pageTitle desc: "12"; stat labels: "12 Platforms" |
+| `FeaturesPage.tsx` | usePageMeta desc: "12"; hero text: "12"; section title: "12" |
+| `IntegrationsPage.tsx` | usePageMeta title: "12"; already has TikTok Ads in PLATFORMS |
+| `HowItWorksPage.tsx` | PLATFORMS array: add `'TikTok Ads'`; step text: "12 platforms" |
+| `SocialMediaReportingPage.tsx` | Add TikTok Ads to PLATFORMS array with ad metrics; update TikTok entry to organic metrics |
+| `PpcReportingPage.tsx` | Verify TikTok Ads is listed |
+| `ForSmbsPage.tsx` | PLATFORMS array: add `'TikTok Ads'` |
+| `ForAgenciesPage.tsx` | "10 platforms" → "12 platforms" |
+| `PricingPage.tsx` | "10+ Platform Support" → "12 Platform Integrations"; FAQ answer: "12 platforms" |
+| `ForFreelancersPage.tsx` | "10 platforms" → "12 platforms" |
+| `LandingHero.tsx` | FEATURES desc: "12 platforms" if referenced |
+
+### 5. Update `LandingHero.tsx`
+- Feature card "Google, Meta, TikTok, LinkedIn & more" → "Google, Meta, TikTok Ads, LinkedIn & more"
 
 ---
 
 ## Technical Details
 
-**TikTok Business API Auth Flow:**
-```text
-1. User clicks "Add Connection" → selects TikTok Ads
-2. Frontend calls tiktok-business-connect edge function
-3. Edge function builds auth URL → redirects user to TikTok
-4. Advertiser authorizes → TikTok redirects to oauth-callback with auth_code
-5. oauth-callback exchanges auth_code for long-lived access_token
-6. Discovers advertiser accounts → stores in metadata
-7. Account picker shows if multiple accounts found
-```
-
-**TikTok Reporting API Request:**
-```json
-{
-  "advertiser_id": "<from account_id>",
-  "report_type": "BASIC",
-  "data_level": "AUCTION_ADVERTISER",
-  "dimensions": ["advertiser_id"],
-  "metrics": ["spend", "impressions", "clicks", "ctr", "cpc", "cpm",
-              "conversion", "complete_payment_roas", "reach",
-              "video_play_actions", "total_complete_payment_rate"],
-  "start_date": "2026-03-01",
-  "end_date": "2026-03-31"
-}
-```
-
-**Files to create:**
-- `supabase/functions/tiktok-business-connect/index.ts`
-- `supabase/functions/sync-tiktok-business/index.ts`
-
 **Files to modify:**
-- `src/types/database.ts` — add `tiktok_ads` to types, labels, logos, metrics
-- `src/components/clients/ConnectionDialog.tsx` — add `tiktok_ads` to platform lists
-- `src/lib/triggerSync.ts` — add sync function mapping
-- `src/components/settings/MetricsDefaultsSection.tsx` — add to ALL_PLATFORMS
-- `supabase/functions/oauth-callback/index.ts` — add `tiktok_ads` handler
-- `supabase/functions/check-expiring-tokens/index.ts` — skip tiktok_ads (long-lived tokens)
+- `public/robots.txt`
+- `index.html` (SEO static HTML + head meta tags)
+- `src/pages/HomePage.tsx`
+- `src/pages/FeaturesPage.tsx`
+- `src/pages/IntegrationsPage.tsx`
+- `src/pages/HowItWorksPage.tsx`
+- `src/pages/SocialMediaReportingPage.tsx`
+- `src/pages/PpcReportingPage.tsx`
+- `src/pages/ForSmbsPage.tsx`
+- `src/pages/ForAgenciesPage.tsx`
+- `src/pages/ForFreelancersPage.tsx`
+- `src/pages/PricingPage.tsx`
+- `src/components/landing/LandingHero.tsx`
+
+No new files. No database changes. No edge function changes.
 
