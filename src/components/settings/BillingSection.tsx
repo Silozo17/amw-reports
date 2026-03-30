@@ -160,7 +160,21 @@ const BillingSection = () => {
             {subscription.is_custom && (
               <Badge variant="outline" className="text-xs">Custom Plan</Badge>
             )}
-            {stripeStatus?.subscribed && (
+            {(isInGracePeriod || isLocked) && (
+              <Button
+                onClick={handleManageSubscription}
+                disabled={isOpeningPortal}
+                className="w-full"
+                variant="destructive"
+              >
+                {isOpeningPortal ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Opening...</>
+                ) : (
+                  <><CreditCard className="h-4 w-4 mr-2" /> Update Payment Method</>
+                )}
+              </Button>
+            )}
+            {stripeStatus?.subscribed && !isInGracePeriod && !isLocked && (
               <Button
                 variant="outline"
                 onClick={handleManageSubscription}
