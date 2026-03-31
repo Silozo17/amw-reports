@@ -6,6 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const ADS_REPORT_URL = "https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -29,6 +31,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Fetch connection ──
     const { data: conn, error: connError } = await supabase
       .from("platform_connections")
       .select("*")
@@ -48,152 +51,191 @@ Deno.serve(async (req) => {
       throw new Error("Connection is not authenticated. Please connect via OAuth first.");
     }
 
-    const { data: clientData } = await supabase.from("clients").select("org_id").eq("id", clientId).single();
+    if (!conn.account_id) {
+      throw new Error("No advertiser_id found. Please reconnect TikTok Ads.");
+    }
+
+    const { data: clientData } = await supabase
+      .from("clients")
+      .select("org_id")
+      .eq("id", clientId)
+      .single();
     const orgId = clientData?.org_id;
 
-    // Verify requesting user belongs to the client's org
+    // ── Verify requesting user belongs to the client's org ──
     const authHeader = req.headers.get("Authorization");
     if (authHeader && orgId) {
       const token = authHeader.replace("Bearer ", "");
       const { data: { user: caller } } = await supabase.auth.getUser(token);
       if (caller) {
-        const { data: membership } = await supabase.from("org_members").select("id").eq("user_id", caller.id).eq("org_id", orgId).limit(1).single();
+        const { data: membership } = await supabase
+          .from("org_members")
+          .select("id")
+          .eq("user_id", caller.id)
+          .eq("org_id", orgId)
+          .limit(1)
+          .single();
         if (!membership) {
-          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(
+            JSON.stringify({ error: "Forbidden" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
       }
     }
 
-
+    // ── Create sync log ──
     const { data: syncLog } = await supabase
       .from("sync_logs")
-      .insert({ client_id: clientId, platform: "tiktok", status: "running", report_month: month, report_year: year, org_id: orgId })
+      .insert({
+        client_id: clientId,
+        platform: "tiktok_ads",
+        status: "running",
+        report_month: month,
+        report_year: year,
+        org_id: orgId,
+      })
       .select("id")
       .single();
 
-    // ── Auto-refresh token if expired ──
-    let accessToken = conn.access_token;
-    if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
-      if (!conn.refresh_token) {
-        throw new Error("TikTok token expired and no refresh token available. Please reconnect.");
-      }
-      console.log("TikTok token expired, refreshing...");
-      const clientKey = Deno.env.get("TIKTOK_APP_ID")!;
-      const clientSecret = Deno.env.get("TIKTOK_APP_SECRET")!;
+    // ── Build date range for the target month ──
+    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-      const refreshRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_key: clientKey,
-          client_secret: clientSecret,
-          grant_type: "refresh_token",
-          refresh_token: conn.refresh_token,
-        }),
-      });
-      const refreshData = await refreshRes.json();
-      if (refreshData.error || !refreshData.access_token) {
-        throw new Error(`TikTok token refresh failed: ${refreshData.error_description || refreshData.error || "Unknown error"}. Please reconnect.`);
-      }
+    const accessToken = conn.access_token;
+    const advertiserId = conn.account_id;
 
-      accessToken = refreshData.access_token;
-      const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 86400) * 1000).toISOString();
-      await supabase.from("platform_connections").update({
-        access_token: accessToken,
-        refresh_token: refreshData.refresh_token || conn.refresh_token,
-        token_expires_at: newExpiresAt,
-        last_error: null,
-      }).eq("id", connectionId);
-      console.log("TikTok token refreshed successfully.");
-    }
+    // ── Fetch advertiser-level metrics ──
+    const metrics = [
+      "spend",
+      "impressions",
+      "clicks",
+      "ctr",
+      "cpc",
+      "cpm",
+      "conversions",
+      "conversion_rate",
+      "cost_per_conversion",
+      "reach",
+      "video_views_p25",
+      "video_views_p50",
+      "video_views_p75",
+      "video_views_p100",
+    ];
 
-    // ── Fetch user info ──
-    const accountMetrics = await fetchUserInfo(accessToken);
-
-    // ── Fetch videos for the period ──
-    const allVideos = await fetchVideosForPeriod(accessToken, month, year);
-
-    // ── Fetch video insights (avg_time_watched) in batches ──
-    const insightsMap = await fetchVideoInsights(accessToken, allVideos.map(v => v.id));
-
-    // ── Map videos to enriched format ──
-    const enrichedVideos: EnrichedVideo[] = allVideos.map((v) => {
-      const views = Number(v.view_count || 0);
-      const likes = Number(v.like_count || 0);
-      const comments = Number(v.comment_count || 0);
-      const shares = Number(v.share_count || 0);
-      const duration = v.duration || 0;
-      const insight = insightsMap.get(v.id);
-      const avgTimeWatched = insight?.avg_time_watched ?? 0;
-      const completionRate = duration > 0 && avgTimeWatched > 0 ? (avgTimeWatched / duration) * 100 : 0;
-      return {
-        id: v.id,
-        title: v.title || v.video_description?.substring(0, 80) || "Untitled",
-        description: v.video_description || "",
-        duration,
-        cover_image_url: v.cover_image_url || "",
-        permalink_url: v.share_url || "",
-        views,
-        reach: views,
-        likes,
-        comments,
-        shares,
-        total_engagement: likes + comments + shares,
-        create_time: v.create_time,
-        avg_time_watched: avgTimeWatched,
-        completion_rate: completionRate,
-      };
+    const params = new URLSearchParams({
+      advertiser_id: advertiserId,
+      report_type: "BASIC",
+      data_level: "AUCTION_ADVERTISER",
+      dimensions: JSON.stringify(["advertiser_id"]),
+      metrics: JSON.stringify(metrics),
+      start_date: startDate,
+      end_date: endDate,
+      page: "1",
+      page_size: "10",
     });
 
-    // ── Aggregate metrics ──
-    const aggregated = aggregateVideoMetrics(enrichedVideos);
+    console.log(`Fetching TikTok Ads report for advertiser ${advertiserId}, ${startDate} to ${endDate}`);
 
-    const totalEngagement = aggregated.likes + aggregated.comments + aggregated.shares;
-    const engagementRate = aggregated.views > 0 ? (totalEngagement / aggregated.views) * 100 : 0;
+    const reportRes = await fetch(`${ADS_REPORT_URL}?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        "Access-Token": accessToken,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const reportData = await reportRes.json();
+    console.log("TikTok Ads report response code:", reportData.code);
+
+    if (reportData.code !== 0) {
+      throw new Error(
+        `TikTok Ads API error: ${reportData.message || "Unknown error"} (code: ${reportData.code})`
+      );
+    }
+
+    const rows = reportData.data?.list || [];
+    const row = rows.length > 0 ? rows[0].metrics : {};
 
     const metricsData = {
-      total_followers: accountMetrics.followers,
-      following: accountMetrics.following,
-      reach: aggregated.views,
-      video_views: aggregated.views,
-      likes: aggregated.likes,
-      comments: aggregated.comments,
-      shares: aggregated.shares,
-      engagement: totalEngagement,
-      engagement_rate: engagementRate,
-      videos_published: allVideos.length,
-      total_video_count: accountMetrics.videoCount,
-      total_likes_received: accountMetrics.likesReceived,
-      completion_rate: aggregated.avgCompletionRate,
-      average_time_watched: aggregated.avgTimeWatched,
+      spend: Number(row.spend || 0),
+      impressions: Number(row.impressions || 0),
+      clicks: Number(row.clicks || 0),
+      ctr: Number(row.ctr || 0),
+      cpc: Number(row.cpc || 0),
+      cpm: Number(row.cpm || 0),
+      conversions: Number(row.conversions || 0),
+      conversion_rate: Number(row.conversion_rate || 0),
+      cost_per_conversion: Number(row.cost_per_conversion || 0),
+      reach: Number(row.reach || 0),
+      video_views_p25: Number(row.video_views_p25 || 0),
+      video_views_p50: Number(row.video_views_p50 || 0),
+      video_views_p75: Number(row.video_views_p75 || 0),
+      video_views_p100: Number(row.video_views_p100 || 0),
     };
 
-    const topContent = enrichedVideos
-      .sort((a, b) => b.total_engagement - a.total_engagement)
-      .slice(0, 20)
-      .map((v) => ({
-        ...v,
-        message: v.title || v.description || "Untitled",
-        full_picture: v.cover_image_url || null,
-        created_time: new Date(v.create_time * 1000).toISOString(),
-      }));
+    console.log("TikTok Ads metrics:", JSON.stringify(metricsData));
+
+    // ── Fetch ad-level breakdown for top content ──
+    let topContent: Record<string, unknown>[] = [];
+    try {
+      const adMetrics = ["ad_name", "spend", "impressions", "clicks", "conversions", "ctr", "cpc", "cpm"];
+      const adParams = new URLSearchParams({
+        advertiser_id: advertiserId,
+        report_type: "BASIC",
+        data_level: "AUCTION_AD",
+        dimensions: JSON.stringify(["ad_id"]),
+        metrics: JSON.stringify(adMetrics),
+        start_date: startDate,
+        end_date: endDate,
+        page: "1",
+        page_size: "20",
+        order_field: "spend",
+        order_type: "DESC",
+      });
+
+      const adRes = await fetch(`${ADS_REPORT_URL}?${adParams.toString()}`, {
+        method: "GET",
+        headers: { "Access-Token": accessToken, "Content-Type": "application/json" },
+      });
+      const adData = await adRes.json();
+
+      if (adData.code === 0 && adData.data?.list) {
+        topContent = adData.data.list.map((item: { dimensions: Record<string, string>; metrics: Record<string, string> }) => ({
+          id: item.dimensions?.ad_id || "",
+          message: item.metrics?.ad_name || `Ad ${item.dimensions?.ad_id || "unknown"}`,
+          spend: Number(item.metrics?.spend || 0),
+          impressions: Number(item.metrics?.impressions || 0),
+          clicks: Number(item.metrics?.clicks || 0),
+          conversions: Number(item.metrics?.conversions || 0),
+          ctr: Number(item.metrics?.ctr || 0),
+          cpc: Number(item.metrics?.cpc || 0),
+          cpm: Number(item.metrics?.cpm || 0),
+        }));
+      }
+    } catch (adErr) {
+      console.warn("Could not fetch ad-level breakdown:", adErr);
+    }
 
     // ── Upsert monthly snapshot ──
     const { data: existing } = await supabase
       .from("monthly_snapshots")
       .select("id, snapshot_locked")
       .eq("client_id", clientId)
-      .eq("platform", "tiktok")
+      .eq("platform", "tiktok_ads")
       .eq("report_month", month)
       .eq("report_year", year)
       .single();
 
-    if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
+    if (existing?.snapshot_locked) {
+      throw new Error("Snapshot for this period is locked.");
+    }
 
     const snapshotPayload = {
       metrics_data: metricsData,
       top_content: topContent,
-      raw_data: { videos: enrichedVideos },
+      raw_data: { report: rows },
     };
 
     if (existing) {
@@ -201,37 +243,44 @@ Deno.serve(async (req) => {
     } else {
       await supabase.from("monthly_snapshots").insert({
         client_id: clientId,
-        platform: "tiktok",
+        platform: "tiktok_ads",
         report_month: month,
         report_year: year,
         ...snapshotPayload,
       });
     }
 
-    await supabase.from("platform_connections").update({
-      last_sync_at: new Date().toISOString(),
-      last_sync_status: "success",
-      last_error: null,
-    }).eq("id", connectionId);
+    // ── Update connection status ──
+    await supabase
+      .from("platform_connections")
+      .update({
+        last_sync_at: new Date().toISOString(),
+        last_sync_status: "success",
+        last_error: null,
+      })
+      .eq("id", connectionId);
 
     if (syncLog?.id) {
-      await supabase.from("sync_logs").update({
-        status: "success",
-        completed_at: new Date().toISOString(),
-      }).eq("id", syncLog.id);
+      await supabase
+        .from("sync_logs")
+        .update({ status: "success", completed_at: new Date().toISOString() })
+        .eq("id", syncLog.id);
     }
 
     return new Response(
-      JSON.stringify({ success: true, metrics: metricsData, videos_synced: allVideos.length }),
+      JSON.stringify({ success: true, metrics: metricsData, top_ads: topContent.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
-    console.error("TikTok sync error:", e);
+    console.error("TikTok Ads sync error:", e);
     if (connectionId) {
-      await supabase.from("platform_connections").update({
-        last_sync_status: "failed",
-        last_error: e instanceof Error ? e.message : "Unknown error",
-      }).eq("id", connectionId);
+      await supabase
+        .from("platform_connections")
+        .update({
+          last_sync_status: "failed",
+          last_error: e instanceof Error ? e.message : "Unknown error",
+        })
+        .eq("id", connectionId);
     }
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
@@ -239,195 +288,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
-// ── Helper functions ──
-
-interface AccountMetrics {
-  followers: number;
-  following: number;
-  likesReceived: number;
-  videoCount: number;
-}
-
-async function fetchUserInfo(accessToken: string): Promise<AccountMetrics> {
-  const result: AccountMetrics = {
-    followers: 0, following: 0, likesReceived: 0, videoCount: 0,
-  };
-
-  try {
-    const res = await fetch(
-      "https://open.tiktokapis.com/v2/user/info/?fields=follower_count,following_count,likes_count,video_count",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const data = await res.json();
-    console.log("TikTok user info:", JSON.stringify(data));
-
-    if (data.data?.user) {
-      const u = data.data.user;
-      result.followers = Number(u.follower_count || 0);
-      result.following = Number(u.following_count || 0);
-      result.likesReceived = Number(u.likes_count || 0);
-      result.videoCount = Number(u.video_count || 0);
-    }
-  } catch (e) {
-    console.warn("Could not fetch TikTok user info:", e);
-  }
-
-  return result;
-}
-
-interface RawVideo {
-  id: string;
-  title?: string;
-  video_description?: string;
-  duration?: number;
-  cover_image_url?: string;
-  share_url?: string;
-  view_count?: number;
-  like_count?: number;
-  comment_count?: number;
-  share_count?: number;
-  create_time: number;
-}
-
-interface EnrichedVideo {
-  id: string;
-  title: string;
-  description: string;
-  duration: number;
-  cover_image_url: string;
-  permalink_url: string;
-  views: number;
-  reach: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  total_engagement: number;
-  create_time: number;
-  avg_time_watched: number;
-  completion_rate: number;
-}
-
-interface VideoInsight {
-  avg_time_watched: number;
-}
-
-async function fetchVideoInsights(accessToken: string, videoIds: string[]): Promise<Map<string, VideoInsight>> {
-  const result = new Map<string, VideoInsight>();
-  if (videoIds.length === 0) return result;
-
-  try {
-    // Batch in groups of 20
-    for (let i = 0; i < videoIds.length; i += 20) {
-      const batch = videoIds.slice(i, i + 20);
-      const res = await fetch(
-        "https://open.tiktokapis.com/v2/video/query/?fields=id,duration,avg_time_watched",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ filters: { video_ids: batch } }),
-        }
-      );
-      const data = await res.json();
-      const videos = data.data?.videos || [];
-      for (const v of videos) {
-        if (v.id) {
-          result.set(v.id, { avg_time_watched: Number(v.avg_time_watched || 0) });
-        }
-      }
-    }
-    console.log(`Fetched insights for ${result.size}/${videoIds.length} videos`);
-  } catch (e) {
-    console.warn("Could not fetch TikTok video insights (scope may not be granted):", e);
-  }
-
-  return result;
-}
-
-async function fetchVideosForPeriod(accessToken: string, month: number, year: number): Promise<RawVideo[]> {
-  const allVideos: RawVideo[] = [];
-  let cursor: number | undefined = undefined;
-  let hasMore = true;
-
-  while (hasMore) {
-    const body: Record<string, unknown> = { max_count: 20 };
-    if (cursor !== undefined) body.cursor = cursor;
-
-    const res = await fetch(
-      "https://open.tiktokapis.com/v2/video/list/?fields=id,title,video_description,duration,cover_image_url,share_url,view_count,like_count,comment_count,share_count,create_time",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }
-    );
-
-    const data = await res.json();
-    console.log("TikTok video list page:", data.data?.videos?.length || 0, "videos");
-
-    if (data.error?.code && data.error.code !== "ok") {
-      console.error("TikTok video list error:", JSON.stringify(data.error));
-      break;
-    }
-
-    const videos: RawVideo[] = data.data?.videos || [];
-    if (videos.length === 0) break;
-
-    for (const v of videos) {
-      const d = new Date(v.create_time * 1000);
-      if (d.getFullYear() === year && d.getMonth() + 1 === month) {
-        allVideos.push(v);
-      }
-    }
-
-    hasMore = data.data?.has_more || false;
-    cursor = data.data?.cursor;
-
-    // Stop if we've passed the target month
-    const oldest = videos[videos.length - 1];
-    const oldestDate = new Date(oldest.create_time * 1000);
-    if (oldestDate.getFullYear() < year || (oldestDate.getFullYear() === year && oldestDate.getMonth() + 1 < month)) {
-      break;
-    }
-  }
-
-  return allVideos;
-}
-
-
-interface AggregatedMetrics {
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  avgCompletionRate: number;
-  avgTimeWatched: number;
-}
-
-function aggregateVideoMetrics(videos: EnrichedVideo[]): AggregatedMetrics {
-  let views = 0, likes = 0, comments = 0, shares = 0;
-  let totalCompletionRate = 0, totalTimeWatched = 0;
-  let videosWithInsights = 0;
-
-  for (const v of videos) {
-    views += v.views;
-    likes += v.likes;
-    comments += v.comments;
-    shares += v.shares;
-
-    if (v.avg_time_watched > 0) {
-      totalTimeWatched += v.avg_time_watched;
-      totalCompletionRate += v.completion_rate;
-      videosWithInsights++;
-    }
-  }
-
-  return {
-    views,
-    likes,
-    comments,
-    shares,
-    avgCompletionRate: videosWithInsights > 0 ? totalCompletionRate / videosWithInsights : 0,
-    avgTimeWatched: videosWithInsights > 0 ? totalTimeWatched / videosWithInsights : 0,
-  };
-}
