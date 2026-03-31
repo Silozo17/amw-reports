@@ -61,6 +61,7 @@ const COMPARISON_ROWS: ComparisonRow[] = [
   { feature: 'Clients Included', tooltip: 'A client is one of your customers. Each client has their own dashboard, connections, and reports.', starter: '1', freelance: '5', agency: '5' },
   { feature: 'Connections Included', tooltip: 'A connection links one client to one platform. E.g. connecting Google Ads + Instagram for one client = 2 connections.', starter: '5', freelance: '25', agency: '25' },
   { feature: 'Data Sync Frequency', tooltip: 'How often we pull fresh data from your connected platforms. More frequent = more up-to-date dashboards.', starter: 'Monthly', freelance: 'Weekly', agency: 'Daily' },
+  { feature: 'Historical Data Sync', tooltip: 'How many months of historical data we import when you first connect a platform.', starter: '12 months', freelance: '12 months', agency: '24 months' },
   { feature: 'Branded PDF Reports', tooltip: 'Professionally designed PDF reports with your branding, generated automatically from your data.', starter: true, freelance: true, agency: true },
   { feature: 'Client Portal', tooltip: 'A unique shareable link for each client to view their live dashboard — no login required for them.', starter: true, freelance: true, agency: true },
   { feature: 'AI-Powered Analysis', tooltip: 'An AI assistant that analyses your marketing data and provides plain-English insights, trends, and recommendations.', starter: false, freelance: true, agency: true },

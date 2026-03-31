@@ -236,7 +236,7 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
             {/* Summary */}
             {isReady() && (
               <p className="text-xs text-muted-foreground">
-                Will sync <strong>{getTargetConnections().length}</strong> connection{getTargetConnections().length !== 1 ? 's' : ''} × 12 months
+                Will sync <strong>{getTargetConnections().length}</strong> connection{getTargetConnections().length !== 1 ? 's' : ''} × 24 months
               </p>
             )}
           </div>
