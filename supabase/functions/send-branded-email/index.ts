@@ -596,6 +596,8 @@ const TEMPLATES: Record<string, TemplateBuilder> = {
   // Security
   new_device_login,
   failed_login_attempts,
+  // Client Portal
+  client_invite,
 };
 
 // ═══════════════════════════════════════════════════════════
