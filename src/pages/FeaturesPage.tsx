@@ -60,7 +60,7 @@ const FeaturesPage = () => {
             All-in-One Marketing<br />Reporting <span className="text-gradient-purple">Platform</span>
           </h1>
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
-            A client-ready reporting and analytics platform that consolidates A client-ready reporting and analytics platform that consolidates data from 12 marketing platforms into one clean, branded, easy-to-digest format — ready to present to clients. into one clean, branded, easy-to-digest format — ready to present to clients.
+            A client-ready reporting and analytics platform that consolidates data from 12 marketing platforms into one clean, branded, easy-to-digest format — ready to present to clients.
           </p>
           <div className="flex flex-wrap justify-center gap-3 mb-12">
             <Button size="lg" asChild>
