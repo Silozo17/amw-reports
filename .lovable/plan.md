@@ -1,45 +1,76 @@
 
 
-# Show GSC Top Pages, Countries & Devices on Dashboard
+# Add Client Business Context Fields for Better AI Insights
 
 ## Problem
-The GSC sync function already fetches and stores top pages, countries, and devices in both `top_content` and `raw_data`. But the `PlatformSection` UI component only renders GSC queries — it never shows the pages table, and the geo/device widgets are hard-gated to `platform === 'google_analytics'`.
+The AI analysis, chat, and voice briefing functions only know the client's company name and metrics data. They lack business context (industry, target audience, service areas, goals) that would make recommendations far more relevant and actionable.
 
-## Changes
+## Plan
 
-### `src/components/clients/dashboard/PlatformSection.tsx`
+### 1. Database Migration — Add columns to `clients` table
 
-**1. Filter GSC-specific content using `type` field**
-The `top_content` items from GSC have `type: "query"`, `type: "page"`, `type: "country"`, `type: "device"`. Update filtering:
-```ts
-const gscQueries = (topContent ?? []).filter(p => (p as any).type === 'query' || (p.query && platform === 'google_search_console'));
-const gscPages = (topContent ?? []).filter(p => (p as any).type === 'page' || (p.page && !p.query && platform === 'google_search_console'));
-const gscCountries = (topContent ?? []).filter(p => (p as any).type === 'country');
-const gscDevices = (topContent ?? []).filter(p => (p as any).type === 'device');
+```sql
+ALTER TABLE public.clients
+  ADD COLUMN industry text,
+  ADD COLUMN target_audience text,
+  ADD COLUMN service_area_type text NOT NULL DEFAULT 'local',
+  ADD COLUMN service_areas text,
+  ADD COLUMN business_goals text,
+  ADD COLUMN competitors text,
+  ADD COLUMN unique_selling_points text,
+  ADD COLUMN brand_voice text;
 ```
 
-**2. Add GSC Top Pages table**
-After the existing GSC queries table, render a "Top Pages" table showing page URL, clicks, impressions, CTR.
+- `industry` — e.g. "Real Estate", "Fitness", "SaaS", "Hospitality"
+- `target_audience` — free text, e.g. "First-time homebuyers aged 25-40 in London"
+- `service_area_type` — one of: `local`, `national`, `international`, `worldwide`
+- `service_areas` — free text for specifics, e.g. "Greater Manchester, Leeds, Liverpool"
+- `business_goals` — free text, e.g. "Increase leads by 30%, grow Instagram following"
+- `competitors` — free text, e.g. "Competitor A, Competitor B"
+- `unique_selling_points` — free text, e.g. "24/7 support, free consultations"
+- `brand_voice` — free text, e.g. "Professional but friendly, avoid jargon"
 
-**3. Expand `hasTopContent` check**
-Include `gscPages.length > 0` and update the collapsible label logic.
+### 2. Update `Client` interface in `src/types/database.ts`
 
-**4. Render GeoHeatmap and DeviceBreakdown for GSC**
-After the top content collapsible, add a GSC-specific block (similar to the GA4 block at line 605) that renders:
-- `GeoHeatmap` using `rawData.topCountries` (countries only, no cities for GSC)
-- `DeviceBreakdown` using `rawData.topDevices` (no new/returning for GSC)
+Add all 8 new fields as optional strings.
 
-Both components already exist and accept the right props.
+### 3. Add "Business Context" card to `ClientSettingsTab`
 
-**5. Update `TopContentItem` interface**
-Add `type?: string`, `country?: string`, `device?: string` fields.
+New card section with:
+- **Industry** — Select dropdown with common industries + "Other" free text
+- **Target Audience** — Textarea
+- **Service Area** — Select (`Local`, `National`, `International`, `Worldwide`) + Textarea for specifics
+- **Business Goals** — Textarea
+- **Competitors** — Textarea
+- **Unique Selling Points** — Textarea
+- **Brand Voice** — Textarea
 
-### No backend changes needed
-The sync function already stores all this data correctly.
+All fields use the existing `onSettingChange` callback.
+
+### 4. Add fields to `ClientForm.tsx` (new client creation)
+
+Add a collapsible "Business Context (Optional)" section with the same fields, so context can be provided at creation time.
+
+### 5. Feed context into AI functions
+
+**`analyze-client/index.ts`** — Expand the client select to include the new fields. Add a `business_context` object to the `dataContext` JSON and update the system prompt to reference industry, audience, goals, and service area when making recommendations.
+
+**`chat-with-data/index.ts`** — Expand the client select and add business context to the system prompt so conversational answers are tailored.
+
+**`voice-briefing/index.ts`** — Same pattern: fetch and inject business context.
+
+**`generate-report/index.ts`** — Pass business context to the AI executive summary prompt so report insights are industry-aware.
 
 ## Files Changed
 
 | File | Change |
 |---|---|
-| `src/components/clients/dashboard/PlatformSection.tsx` | Add GSC pages table, wire up geo/device widgets for GSC, update content filters |
+| Database migration | Add 8 columns to `clients` |
+| `src/types/database.ts` | Add 8 fields to `Client` interface |
+| `src/components/clients/tabs/ClientSettingsTab.tsx` | Add "Business Context" card |
+| `src/pages/clients/ClientForm.tsx` | Add optional business context section |
+| `supabase/functions/analyze-client/index.ts` | Include business context in AI prompt |
+| `supabase/functions/chat-with-data/index.ts` | Include business context in system prompt |
+| `supabase/functions/voice-briefing/index.ts` | Include business context in prompt |
+| `supabase/functions/generate-report/index.ts` | Include business context in AI summary prompt |
 
