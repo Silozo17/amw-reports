@@ -105,6 +105,14 @@ export interface Client {
   email_monthly_digest: boolean;
   email_alert_warnings: boolean;
   email_recipient_mode: string;
+  industry: string | null;
+  target_audience: string | null;
+  service_area_type: string;
+  service_areas: string | null;
+  business_goals: string | null;
+  competitors: string | null;
+  unique_selling_points: string | null;
+  brand_voice: string | null;
 }
 
 export interface ClientRecipient {
