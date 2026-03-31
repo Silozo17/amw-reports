@@ -29,6 +29,16 @@ interface ShareDialogProps {
   clientName: string;
 }
 
+const generateSlugToken = (name: string): string => {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
+  const suffix = Math.floor(1000 + Math.random() * 9000);
+  return `${slug}-${suffix}`;
+};
+
 const ShareDialog = ({ clientId, orgId, clientName }: ShareDialogProps) => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
