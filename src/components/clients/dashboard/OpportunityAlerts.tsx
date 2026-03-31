@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { TrendingUp, TrendingDown, Lightbulb } from "lucide-react";
+import { getDaysInMonth } from "date-fns";
 import { computeOpportunityAlerts } from "@/lib/opportunityAlerts";
 import type { OpportunityAlert, AlertType } from "@/lib/opportunityAlerts";
 import { PLATFORM_LOGOS, PLATFORM_LABELS } from "@/types/database";
@@ -15,6 +16,7 @@ interface OpportunityAlertsProps {
   current: SnapshotLike[];
   previous: SnapshotLike[];
   currSymbol: string;
+  selectedPeriod: { type: string; month: number; year: number };
 }
 
 const ALERT_STYLES: Record<AlertType, { bg: string; border: string; icon: React.ElementType; iconColor: string }> = {
