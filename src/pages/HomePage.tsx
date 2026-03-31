@@ -108,6 +108,8 @@ const HomePage = () => {
                 src={dashboardSnapshot}
                 alt="AMW Reports dashboard showing multi-platform marketing analytics with KPI cards, charts, and performance metrics"
                 className="w-full max-w-xl rounded-xl border border-sidebar-border/30 shadow-2xl"
+                width={576}
+                height={400}
               />
             </div>
           </div>
