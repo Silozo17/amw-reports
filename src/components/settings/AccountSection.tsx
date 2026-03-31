@@ -130,7 +130,8 @@ const AccountSection = () => {
         phone: phone.trim() || null,
         position: position.trim() || null,
         account_type: accountType,
-      })
+        default_org_id: defaultOrgId === 'auto' ? null : defaultOrgId,
+      } as any)
       .eq('user_id', user.id);
 
     if (profileError) {
