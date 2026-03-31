@@ -24,6 +24,8 @@ import MetricTooltip from '@/components/clients/MetricTooltip';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { useChartColors } from '@/hooks/useChartColors';
+import GeoHeatmap from '@/components/clients/dashboard/GeoHeatmap';
+import DeviceBreakdown from '@/components/clients/dashboard/DeviceBreakdown';
 
 interface TopContentItem {
   page_name?: string;
