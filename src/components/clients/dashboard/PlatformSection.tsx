@@ -173,6 +173,7 @@ const PlatformSection = ({
   enabledMetrics,
   reportMonth,
   reportYear,
+  rawData,
 }: PlatformSectionProps) => {
   const CHART_COLORS = useChartColors();
   const [contentOpen, setContentOpen] = useState(false);
