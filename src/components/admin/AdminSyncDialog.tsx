@@ -110,8 +110,8 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < 12; i++) {
-      setProgress(`${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/12) — ${targets.length} connection${targets.length > 1 ? 's' : ''}`);
+    for (let i = 0; i < 24; i++) {
+      setProgress(`${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/24) — ${targets.length} connection${targets.length > 1 ? 's' : ''}`);
       for (const conn of targets) {
         const fn = SYNC_FUNCTION_MAP[conn.platform];
         if (!fn) continue;
