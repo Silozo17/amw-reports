@@ -71,6 +71,7 @@ Deno.serve(async (req) => {
 
 Here is their complete data:
 ${dataContext}
+${businessContext ? `\nBusiness Context:\n${businessContext}` : ''}
 
 Rules:
 - Answer in plain, jargon-free English that any business owner can understand
@@ -80,7 +81,9 @@ Rules:
 - Use bullet points for lists
 - Format currency values appropriately
 - Be encouraging but honest about areas needing improvement
-- Never make up data — only reference what's in the metrics above`;
+- Never make up data — only reference what's in the metrics above
+- If business context is available, tailor your answers to their industry, audience, goals, and service area
+- Consider their competitors and USPs when making suggestions`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

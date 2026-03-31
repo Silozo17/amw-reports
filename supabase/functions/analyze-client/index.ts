@@ -147,7 +147,10 @@ Rules:
 - Compare to previous month data where available
 - Each highlight should be one clear, specific sentence
 - Recommendations should be actionable and specific
-- Only include category sections for categories that have data: ${activeCategories.join(", ")}`,
+- Only include category sections for categories that have data: ${activeCategories.join(", ")}
+- If business context is provided (industry, target audience, goals, service area), tailor your recommendations to be relevant to their specific industry, audience, and goals
+- Reference their competitors or USPs when making strategic suggestions
+- Consider their service area scope (local/national/international/worldwide) when recommending strategies`,
         }],
         tools: [{
           type: "function",

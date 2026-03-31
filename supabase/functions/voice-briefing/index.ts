@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
           content: `Write a 200-word conversational voice briefing script for ${clientName}'s marketing performance in ${MONTH_NAMES[month]} ${year}.
 
 The client's currency is ${preferredCurrency}. Always use ${preferredCurrency} when mentioning any monetary values. Never use USD or dollars unless ${preferredCurrency} is USD.
+${clientRes.data?.industry ? `\nIndustry: ${clientRes.data.industry}` : ''}${clientRes.data?.target_audience ? `\nTarget Audience: ${clientRes.data.target_audience}` : ''}${clientRes.data?.service_area_type ? `\nService Area: ${clientRes.data.service_area_type}${clientRes.data?.service_areas ? ` (${clientRes.data.service_areas})` : ''}` : ''}${clientRes.data?.business_goals ? `\nBusiness Goals: ${clientRes.data.business_goals}` : ''}
 
 Tone: Professional but warm, like a trusted marketing advisor giving a quick morning update.
 
@@ -84,7 +85,7 @@ Structure:
 - Start with "Here's your marketing update for ${MONTH_NAMES[month]}."
 - Cover the 2-3 most important things happening across their platforms
 - Mention specific numbers and month-over-month changes
-- End with one clear recommendation or thing to watch
+- End with one clear recommendation or thing to watch, tailored to their industry and goals if available
 
 Rules:
 - Write for speech, not reading — use short sentences and natural pauses
@@ -92,6 +93,7 @@ Rules:
 - Use "your" not "the client's"
 - Round numbers naturally (say "about twelve hundred" not "1,247")
 - Never use marketing jargon without explaining it
+- If business context is available, reference their industry and goals naturally
 
 Data: ${dataContext}`
         }],
