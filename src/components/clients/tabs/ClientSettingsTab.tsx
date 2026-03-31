@@ -1,10 +1,11 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Mail, Trash2, UserPlus, Users } from 'lucide-react';
+import { Loader2, Mail, Save, Trash2, UserPlus, Users } from 'lucide-react';
 import type { Client } from '@/types/database';
 import { CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
