@@ -1,44 +1,38 @@
 
 
-# Scope AI Analysis to Selected Period
+# Partial-Month Normalization for Insights & Opportunities
 
 ## Problem
-AI analysis is stored in a single React `useState` variable. When the user changes the month or timeframe, the stale analysis from the previous period remains visible. It should only display for the period it was generated for.
+When viewing the current month (e.g. April 6th), the dashboard compares 6 days of April data against a full 30 days of March. Volume metrics (reach, engagement, clicks, spend) will always appear dramatically lower, triggering false "warning" alerts and suppressing "win" alerts.
 
 ## Approach
-Store analyses in a **keyed map** (`Map<string, { text: string; date: Date }>`) in `useClientDashboard`, keyed by a period identifier (e.g. `"3-2026"` or `"ytd-2026"`). When the user generates an analysis, it's saved under the current period key. When they switch months, the hook looks up the map — if an analysis exists for that period it's shown; if not, the AI analysis card is hidden and the button says "AI Analysis" (not "Refresh Analysis").
+**Pro-rate the previous month's data** to match the number of elapsed days in the current month. This way, comparisons are apples-to-apples.
+
+- If the current period is the current calendar month, calculate `dayOfMonth / daysInMonth` as a scaling factor
+- Multiply previous month's volume metrics by this factor before comparing
+- Only apply scaling when viewing the current month (historical full months need no adjustment)
+- Rate/ratio metrics (CTR, CPC, CPL, engagement rate) are **not** scaled — they're already normalized by nature
 
 ## Changes
 
-### File: `src/hooks/useClientDashboard.ts`
+### File: `src/lib/opportunityAlerts.ts`
 
-1. Replace the single `aiAnalysis` / `aiAnalysisDate` state with a `Map`:
-   ```typescript
-   const [analysisMap, setAnalysisMap] = useState<Map<string, { text: string; date: Date }>>(new Map());
-   ```
+1. Add a new optional parameter `partialMonthRatio?: number` (0-1, e.g. `6/30 = 0.2` on April 6th)
+2. When provided and < 1, scale previous month's volume metrics down by this ratio before comparison:
+   - `prevEng * ratio`, `prevReach * ratio`, `prevFollowers * ratio`
+3. Do **not** scale rate metrics (CPC, CPL, CTR) — they're already per-unit
 
-2. Build a period key from the current `selectedPeriod` (month + year, or include timeframe if applicable):
-   ```typescript
-   const periodKey = `${selectedPeriod.month}-${selectedPeriod.year}`;
-   ```
+### File: `src/components/clients/dashboard/OpportunityAlerts.tsx`
 
-3. Derive `aiAnalysis` and `aiAnalysisDate` from the map for the current period:
-   ```typescript
-   const currentAnalysis = analysisMap.get(periodKey);
-   const aiAnalysis = currentAnalysis?.text ?? "";
-   const aiAnalysisDate = currentAnalysis?.date ?? null;
-   ```
+1. Accept new prop `selectedPeriod` from the parent
+2. Calculate `partialMonthRatio`: if `selectedPeriod.type === "monthly"` and the month/year matches the current calendar month, compute `dayOfMonth / daysInCurrentMonth`; otherwise pass `1` (no scaling)
+3. Pass the ratio to `computeOpportunityAlerts`
 
-4. In `handleAnalyse`, store the result under the current period key:
-   ```typescript
-   setAnalysisMap(prev => new Map(prev).set(periodKey, { text: data.analysis, date: new Date() }));
-   ```
+### File: `src/components/clients/ClientDashboard.tsx`
 
-5. Keep returning `aiAnalysis` and `aiAnalysisDate` from the hook — no changes needed in `ClientDashboard.tsx` since the interface stays the same.
+1. Pass `selectedPeriod` to the `OpportunityAlerts` component (already available in scope)
 
-### No other files need changes
-The `ClientDashboard.tsx` component already reads `aiAnalysis` and `aiAnalysisDate` from the hook and conditionally renders based on whether they have values. The map approach makes those values period-aware automatically.
+### Runtime error fix (same file batch)
 
-### No database changes needed
-Analyses remain ephemeral in-session state. If the user navigates away and back, they regenerate as needed.
+The `aiAnalysis is not defined` error at line 475 of `useClientDashboard.ts` will also be fixed — likely a stale reference from the refactor to `analysisMap`. This will be addressed in the same change set.
 
