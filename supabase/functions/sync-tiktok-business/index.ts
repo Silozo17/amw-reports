@@ -54,8 +54,8 @@ async function fetchVideos(accessToken: string, cursor?: number): Promise<{ vide
   if (data.error?.code === "access_token_invalid") {
     throw new Error("TOKEN_EXPIRED");
   }
-  if (data.error?.code) {
-    throw new Error(`TikTok API error: ${data.error.code} — ${data.error.message}`);
+  if (data.error?.code && data.error.code !== "ok") {
+    throw new Error(`TikTok API error: ${data.error.code} — ${data.error.message ?? ""}`);
   }
   return {
     videos: data.data?.videos ?? [],

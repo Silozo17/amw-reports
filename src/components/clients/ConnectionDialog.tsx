@@ -74,7 +74,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
 
   const triggerOAuth = async (conn: PlatformConnection) => {
     try {
-      const functionName = CONNECT_FUNCTION_MAP[conn.platform];
+      const functionName = CONNECT_FUNCTION_MAP[conn.platform as string];
       if (!functionName) {
         toast.info(`OAuth for ${PLATFORM_LABELS[conn.platform]} is not yet available.`);
         return;
