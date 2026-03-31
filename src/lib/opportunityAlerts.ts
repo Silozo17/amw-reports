@@ -56,9 +56,12 @@ export function computeOpportunityAlerts(
       }
     }
 
+    // Scale factor for volume metrics when viewing a partial month
+    const r = partialMonthRatio > 0 && partialMonthRatio <= 1 ? partialMonthRatio : 1;
+
     // Engagement Spike (win)
     const curEng = (m.engagement || 0) + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
-    const prevEng = (pm.engagement || 0) + (pm.likes || 0) + (pm.comments || 0) + (pm.shares || 0);
+    const prevEng = ((pm.engagement || 0) + (pm.likes || 0) + (pm.comments || 0) + (pm.shares || 0)) * r;
     if (curEng > 0 && prevEng > 0) {
       const engChange = pctChange(curEng, prevEng);
       if (engChange >= 25) {
