@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     // Fetch client + snapshots
     const [clientRes, snapshotsRes, prevSnapshotsRes, connectionsRes] = await Promise.all([
-      supabase.from("clients").select("company_name, services_subscribed").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, services_subscribed, preferred_currency").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data, top_content").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
@@ -100,10 +100,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    const currency = client.preferred_currency || "GBP";
+    const currencySymbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : "£";
+
     const dataContext = JSON.stringify({
       client_name: client.company_name,
       month: MONTH_NAMES[month],
       year,
+      currency,
       platforms_connected: connections.filter((c: any) => c.is_connected && c.account_id).map((c: any) => c.platform),
       categories: categoryData,
     });
@@ -129,6 +133,7 @@ Data: ${dataContext}
 Rules:
 - Use plain English that a non-technical business owner would understand
 - Be specific with numbers and percentages where available
+- Always use ${currencySymbol} for any monetary values. Never use $ or USD unless that is the client's selected currency.
 - Compare to previous month data where available
 - Each highlight should be one clear, specific sentence
 - Recommendations should be actionable and specific
