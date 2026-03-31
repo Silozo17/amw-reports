@@ -1978,7 +1978,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (upsellData) {
+    if (upsellData && client.enable_upsell !== false) {
       y = startNewPage(`${T.noteFrom} ${orgName}`);
       pageToc.push({ title: `${T.noteFrom} ${orgName}`, page: pageCount });
 

@@ -100,6 +100,11 @@ export interface Client {
   updated_at: string;
   logo_url: string | null;
   scheduled_deletion_at: string | null;
+  email_report_delivery: boolean;
+  email_weekly_update: boolean;
+  email_monthly_digest: boolean;
+  email_alert_warnings: boolean;
+  email_recipient_mode: string;
 }
 
 export interface ClientRecipient {

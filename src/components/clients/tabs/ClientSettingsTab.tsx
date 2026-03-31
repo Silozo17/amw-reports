@@ -119,6 +119,50 @@ const ClientSettingsTab = ({
         </CardContent>
       </Card>
 
+      {/* Email Preferences */}
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            <Mail className="h-5 w-5" /> Email Preferences
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { key: 'email_report_delivery', label: 'Report Delivery', desc: 'Send generated reports via email' },
+            { key: 'email_weekly_update', label: 'Weekly Updates', desc: 'Send weekly performance summaries' },
+            { key: 'email_monthly_digest', label: 'Monthly Digest', desc: 'Send monthly overview digest' },
+            { key: 'email_alert_warnings', label: 'Alert Warnings', desc: 'Send alerts when something goes wrong (e.g. sync failures, token expiry)' },
+          ].map(item => (
+            <div key={item.key} className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">{item.label}</p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </div>
+              <Switch
+                checked={client[item.key as keyof Client] as boolean}
+                onCheckedChange={v => onSettingChange(item.key, v)}
+              />
+            </div>
+          ))}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Email Recipient</p>
+                <p className="text-xs text-muted-foreground">Who receives emails for this client</p>
+              </div>
+              <Select value={client.email_recipient_mode ?? 'agency'} onValueChange={v => onSettingChange('email_recipient_mode', v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="agency">Agency Only</SelectItem>
+                  <SelectItem value="client">Client Only</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Client Self-Service Access */}
       <Card className="mt-4">
         <CardHeader>
