@@ -1,59 +1,77 @@
 
 
-# Fix: Facebook Top Posts Not Showing + TikTok Organic Sync
+# Fix TikTok Organic vs TikTok Ads — Complete Audit
 
-## Issues Found
+## Current State (fully mapped)
 
-### Issue 1: Facebook Top Posts Not Displaying
-Facebook sync **does** populate `top_content` correctly in `monthly_snapshots`. The `collectPosts` function in `useClientDashboard.ts` reads `top_content` from snapshots and filters by `p.message || p.caption` for social posts. The Facebook posts have a `message` field, so they **should** appear.
+### Edge Functions — Connect
+| Function | Credentials | OAuth URL | State platform | Purpose |
+|---|---|---|---|---|
+| `tiktok-ads-connect` | `TIKTOK_APP_ID` / `TIKTOK_APP_SECRET` | `tiktok.com/v2/auth/authorize/` (Login Kit) | `"tiktok"` | Organic TikTok |
+| `tiktok-business-connect` | `TIKTOK_BUSINESS_APP_ID` / `TIKTOK_BUSINESS_APP_SECRET` | `business-api.tiktok.com/portal/auth` | `"tiktok_ads"` | TikTok Ads |
 
-However, looking at the query that fetches snapshots — it selects `top_content` from the DB. Let me verify this is actually being fetched. The `top_content` column is selected in the snapshot query. The posts are stored correctly. The `socialPosts` filter on line 220 of PlatformSection filters for `p.message || p.caption`. If posts have no `message` (e.g. photo-only posts), they'd be excluded. This is a data-level issue: posts with only images and no text are silently dropped from the "Top Posts" table.
+### CONNECT_FUNCTION_MAP (ConnectionDialog.tsx)
+- `tiktok` → `tiktok-ads-connect` ✅ (confusing name, but correctly uses Login Kit for organic)
+- `tiktok_ads` → `tiktok-business-connect` ✅ (confusing name, but correctly uses Business API for ads)
 
-**Fix:** Change the filter to also include posts that have `full_picture`, `permalink_url`, or any engagement data — essentially show all posts, not just ones with text.
+### OAuth Callback
+- `"tiktok"` → `handleTikTok()` → Login Kit v2 token exchange with `TIKTOK_APP_ID` ✅
+- `"tiktok_ads"` → `handleTikTokAds()` → Business API token exchange with `TIKTOK_BUSINESS_APP_ID` ✅
 
-### Issue 2: TikTok Organic — No Auto-Sync After Connection
-Two sub-problems:
+### Edge Functions — Sync (THIS IS WHERE IT'S BROKEN)
+| Function | Actually calls | Credentials used | Purpose |
+|---|---|---|---|
+| `sync-tiktok-business` | `open.tiktokapis.com/v2/video/list/` | `TIKTOK_APP_ID` | Organic TikTok ✅ |
+| `sync-tiktok-ads` | `open.tiktokapis.com/v2/video/list/` + `user/info/` | `TIKTOK_APP_ID` | **ALSO Organic TikTok** ❌ |
 
-**2a. No initial 12-month sync triggered after OAuth.**  
-When TikTok organic connects, the OAuth callback auto-selects the account (sets `account_id = openId`), so the redirect uses `oauth_connected`. The `oauthConnected` handler in `ClientDetail.tsx` (line 68-84) only shows a toast and calls `fetchData()` — it does NOT trigger `triggerInitialSync`. The 12-month sync only runs from `handlePickerComplete`, which fires on `oauth_pending_selection` (when user picks an account). Since TikTok auto-selects, the picker is never shown, and no sync runs.
+### SYNC_FUNCTION_MAP (triggerSync.ts + scheduled-sync)
+- `tiktok` → `sync-tiktok-business` ✅
+- `tiktok_ads` → `sync-tiktok-ads` — but `sync-tiktok-ads` has **organic** code, not ads code ❌
 
-**2b. `sync-tiktok-business` is actually an Ads API sync, not an organic sync.**  
-The `sync-tiktok-business` edge function calls `business-api.tiktok.com/open_api/v1.3/report/integrated/get/` with an `advertiser_id`. This is the **TikTok Ads Reporting API** — it requires a Business API token and advertiser account. But organic TikTok uses Login Kit v2 tokens and an `open_id`, not an advertiser ID. So even if the sync triggered, it would fail because it's calling the wrong API entirely.
+### AdminSyncDialog PLATFORM_LABELS (line 43)
+- `tiktok` → `'TikTok Ads'` ❌ — should be `'TikTok'`
+- `tiktok_ads` → **missing entirely** ❌
 
-**Fix:** 
-1. Rewrite `sync-tiktok-business` to use the TikTok Content Posting API / Login Kit v2 endpoints to fetch organic video data (video list, views, likes, comments, shares).
-2. Add auto-sync trigger in `ClientDetail.tsx` for platforms that auto-select (like TikTok organic) when receiving `oauth_connected`.
+---
+
+## Problems Summary
+
+1. **`sync-tiktok-ads/index.ts` contains organic TikTok code** instead of TikTok Ads (Business API) code. It needs to be rewritten to call `business-api.tiktok.com/open_api/v1.3/report/integrated/get/` with `advertiser_id` and the Business API access token.
+
+2. **AdminSyncDialog has wrong label** — `tiktok` is labeled `'TikTok Ads'` (line 43), which is why the screenshot shows "TikTok Ads — BLACK STEEL DOORS" for an organic TikTok connection. Also missing `tiktok_ads` entry.
+
+3. The connect functions, oauth callback, sync maps, and `sync-tiktok-business` are all correct. No changes needed there.
 
 ---
 
 ## Plan
 
-### Step 1: Fix Facebook top posts filter
-**File:** `src/components/clients/dashboard/PlatformSection.tsx`  
-Change `socialPosts` filter from `p.message || p.caption` to also include posts with `full_picture` or `permalink_url` or any engagement. This ensures photo/video-only posts appear in the table. Add a fallback display text like "(No caption)" for posts without text.
+### Step 1: Rewrite `sync-tiktok-ads/index.ts` for actual TikTok Ads
+Replace the current organic code with a proper TikTok Business API sync:
+- Call `business-api.tiktok.com/open_api/v1.3/report/integrated/get/` with the `advertiser_id` from `connection.account_id`
+- Use the Business API access token (long-lived, no refresh needed)
+- Fetch ad metrics: `spend`, `impressions`, `clicks`, `ctr`, `cpc`, `cpm`, `conversions`, `conversion_value`, `reach`, `video_views`, `conversion_rate`
+- Log platform as `tiktok_ads` in sync_logs and monthly_snapshots
+- No token refresh needed (Business API tokens are long-lived)
 
-### Step 2: Rewrite `sync-tiktok-business` for organic TikTok
-**File:** `supabase/functions/sync-tiktok-business/index.ts`  
-Replace the Ads Reporting API calls with TikTok Login Kit v2 endpoints:
-- Use `https://open.tiktokapis.com/v2/video/list/` to fetch the user's videos published in the target month
-- Extract per-video metrics: `view_count`, `like_count`, `comment_count`, `share_count`
-- Aggregate into `metrics_data`: `video_views`, `likes`, `comments`, `shares`, `engagement`, `posts_published`
-- Store individual videos in `top_content` for the post performance table
-- Remove the `account_id` advertiser check (organic uses `open_id`)
-- Log as platform `tiktok` (not `tiktok_ads`)
+### Step 2: Fix AdminSyncDialog PLATFORM_LABELS
+**File:** `src/components/admin/AdminSyncDialog.tsx`
+- Change `tiktok: 'TikTok Ads'` → `tiktok: 'TikTok'`
+- Add `tiktok_ads: 'TikTok Ads'`
 
-### Step 3: Trigger 12-month auto-sync for auto-selected connections
-**File:** `src/pages/clients/ClientDetail.tsx`  
-In the `oauthConnected` handler (around line 68), after fetching connection data, check if the connection has `account_id` set and no existing snapshots for that platform. If so, call `triggerInitialSync` with the progress tracking — same logic as `handlePickerComplete` but triggered from the `oauth_connected` path.
+### No other changes needed
+- Connect functions: correct ✅
+- OAuth callback: correct ✅
+- SYNC_FUNCTION_MAP: correct ✅ (`tiktok` → `sync-tiktok-business`, `tiktok_ads` → `sync-tiktok-ads`)
+- `sync-tiktok-business`: correct ✅ (organic Login Kit API)
+- Global `PLATFORM_LABELS` in `database.ts`: correct ✅
 
 ---
 
-## Technical Details
+## Files Modified
 
-- TikTok Login Kit v2 video list endpoint: `POST https://open.tiktokapis.com/v2/video/list/` with `Authorization: Bearer {access_token}` and fields `id,title,create_time,cover_image_url,share_url,view_count,like_count,comment_count,share_count,duration`
-- Token refresh: Login Kit tokens expire in 24h; the `refresh_token` (valid 1 year) is stored in `platform_connections`. The sync function should attempt a token refresh if the API returns 401.
-- The `CONNECT_FUNCTION_MAP` for TikTok organic (`tiktok → tiktok-ads-connect`) is confusingly named but works correctly — no change needed there.
-- Facebook `socialPosts` filter change is minimal: just broaden the condition.
-
-**Files modified:** 3 files (1 edge function rewrite, 2 frontend fixes)
+| File | Change |
+|---|---|
+| `supabase/functions/sync-tiktok-ads/index.ts` | Full rewrite — replace organic code with TikTok Business API ads reporting |
+| `src/components/admin/AdminSyncDialog.tsx` | Fix `tiktok` label from "TikTok Ads" to "TikTok", add `tiktok_ads` entry |
 
