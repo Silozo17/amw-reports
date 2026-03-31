@@ -49,6 +49,8 @@ const ClientDetail = () => {
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const entitlements = useEntitlements();
+  const syncMonths = entitlements.plan?.slug === 'agency' ? 24 : 12;
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [reportYear, setReportYear] = useState<number | null>(null);
   const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
