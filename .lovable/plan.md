@@ -1,25 +1,37 @@
 
 
-# Fix AI Analysis Currency & Health Score Label Overflow
+# Extend Agency Plan Historical Sync to 24 Months
 
-## Issue 1: AI Analysis uses wrong currency
+## Summary
+Agency plan users should sync 24 months of historical data instead of 12. This affects initial connection sync, admin sync dialog, and scheduled sync. The pricing page and comparison table need updating to reflect this.
 
-The `analyze-client` edge function fetches only `company_name, services_subscribed` from the clients table. It never reads `preferred_currency`, so the AI prompt has no currency context and defaults to USD (`$`).
+## Changes
 
-### Fix: `supabase/functions/analyze-client/index.ts`
-- Change the client select to include `preferred_currency`: `"company_name, services_subscribed, preferred_currency"`
-- Add currency context to the `dataContext` JSON: `currency: client.preferred_currency || "GBP"`
-- Add a rule to the AI prompt: `"Always use ${currencySymbol} for any monetary values. Never use $ or USD unless that is the client's selected currency."`
+### 1. `src/lib/triggerSync.ts`
+- `triggerInitialSync` already accepts a `months` parameter (defaults to 12). No change needed here — callers will pass the correct value.
 
-## Issue 2: Health score label overflows inside the circle
+### 2. `src/pages/clients/ClientDetail.tsx`
+- Import `useEntitlements` hook
+- Determine sync months: `const syncMonths = entitlements.plan?.slug === 'agency' ? 24 : 12`
+- Replace all three hardcoded `12` values in `triggerInitialSync` calls and the `total: 12` in `activeSyncs` with `syncMonths`
 
-The label text (e.g. "NEEDS ATTENTION") uses fixed `text-[10px]` inside a 128px SVG circle with no size constraints, causing overflow on longer labels.
+### 3. `src/pages/ClientPortalAuth.tsx`
+- This calls `triggerInitialSync(conn.id, conn.platform)` with default 12 months
+- Since this is the client portal (external users connecting their own accounts), it does not have org context — leave at 12 months (client portal users don't have plan context)
 
-### Fix: `src/components/clients/dashboard/HealthScore.tsx`
-- On the label `<span>` (line 48), add `max-w-[80%] leading-tight` and reduce font to `text-[9px]` to ensure longer labels like "NEEDS ATTENTION" fit within the circular gauge
-- Wrap the inner container div with `px-2` for breathing room
+### 4. `src/components/admin/AdminSyncDialog.tsx`
+- Change the loop from `for (let i = 0; i < 12; i++)` to `for (let i = 0; i < 24; i++)`
+- Update all UI text: "12 months" → "24 months" (button label, dialog title, description, summary)
+- Admin sync always does the maximum (24) since admins are platform-level
 
-## Files to change
-1. `supabase/functions/analyze-client/index.ts` — fetch and use `preferred_currency`
-2. `src/components/clients/dashboard/HealthScore.tsx` — constrain label text inside circle
+### 5. `supabase/functions/scheduled-sync/index.ts`
+- No change needed — scheduled sync only syncs current month (+ previous month in first 7 days), not historical backfill
+
+### 6. `src/pages/PricingPage.tsx`
+- **Agency plan features list**: Add `'24 months historical data sync'`
+- **Freelance plan features list**: Add `'12 months historical data sync'` for clarity
+- **Comparison table**: Add a new row:
+  ```
+  { feature: 'Historical Data Sync', tooltip: 'How many months of historical data we import when you first connect a platform.', starter: '12 months', freelance: '12 months', agency: '24 months' }
+  ```
 
