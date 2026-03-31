@@ -30,7 +30,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
 
   // Filter out platforms that already have a connection
   const connectedPlatforms = new Set(connections.map(c => c.platform));
-  const availablePlatforms = PLATFORMS.filter(p => !connectedPlatforms.has(p));
+  const availablePlatforms = ALL_PLATFORMS.filter(p => !connectedPlatforms.has(p));
 
   const handleAddAndConnect = async () => {
     if (!platform) {
