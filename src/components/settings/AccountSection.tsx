@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useOrg } from '@/contexts/OrgContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Camera, Save, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -33,6 +35,7 @@ const getPasswordStrength = (password: string) => {
 
 const AccountSection = () => {
   const { user, profile, refetchProfile } = useAuth();
+  const { allMemberships } = useOrg();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
@@ -41,6 +44,7 @@ const AccountSection = () => {
   const [position, setPosition] = useState(profile?.position ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
   const [accountType, setAccountType] = useState(profile?.account_type ?? 'business');
+  const [defaultOrgId, setDefaultOrgId] = useState<string>((profile as any)?.default_org_id ?? 'auto');
 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -126,7 +130,8 @@ const AccountSection = () => {
         phone: phone.trim() || null,
         position: position.trim() || null,
         account_type: accountType,
-      })
+        default_org_id: defaultOrgId === 'auto' ? null : defaultOrgId,
+      } as any)
       .eq('user_id', user.id);
 
     if (profileError) {
@@ -242,6 +247,25 @@ const AccountSection = () => {
             </div>
             <p className="text-xs text-muted-foreground">This helps us tailor your experience. You can change it anytime.</p>
                 </div>
+
+          {/* Default Organisation */}
+          {allMemberships.length > 1 && (
+            <div className="space-y-2">
+              <Label>Default Organisation</Label>
+              <Select value={defaultOrgId} onValueChange={setDefaultOrgId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select default org" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (last used)</SelectItem>
+                  {allMemberships.map(m => (
+                    <SelectItem key={m.org_id} value={m.org_id}>{m.org_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Choose which organisation opens when you log in.</p>
+            </div>
+          )}
                 {newPassword && (
                   <div className="space-y-1">
                     <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
