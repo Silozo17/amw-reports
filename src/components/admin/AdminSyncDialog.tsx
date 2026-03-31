@@ -145,7 +145,7 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-2">
           <RefreshCw className="h-3.5 w-3.5" />
-          Sync (12 months)
+          Sync (24 months)
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
