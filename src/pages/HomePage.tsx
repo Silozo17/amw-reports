@@ -76,7 +76,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <div>
-                <img src={amwLogo} alt="AMW Reports logo" className="h-10 w-auto mb-2" />
+                <img src={amwLogo} alt="AMW Reports logo" className="h-10 w-auto mb-2" width={160} height={40} />
                 <p className="font-accent text-xl text-primary mb-1">We Are AMW Reports</p>
                 <p className="text-sm tracking-[0.2em] text-amw-offwhite/70 uppercase font-body font-semibold">AMW Reports</p>
               </div>
