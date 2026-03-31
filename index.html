@@ -19,9 +19,17 @@
     <meta property="og:description" content="AMW Reports — Automated marketing reports for agencies. Connect 12 platforms, generate branded PDF reports, and deliver insights to clients automatically.">
     <meta name="twitter:description" content="AMW Reports — Automated marketing reports for agencies. Connect 12 platforms, generate branded PDF reports, and deliver insights to clients automatically.">
 
+    <!-- Preconnect to Google Fonts origins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Non-render-blocking Google Fonts loading -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@300;400;500;600;700&display=swap"></noscript>
+    <!-- Preload critical custom font -->
+    <link rel="preload" href="/fonts/Slowdex.otf" as="font" type="font/opentype" crossorigin>
+
     <!-- SEO static styles — scoped to #seo-static, visually hidden from users but readable by crawlers -->
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@300;400;500;600;700&display=swap');
       @font-face{font-family:'Slowdex';src:url('/fonts/Slowdex.otf') format('opentype');font-weight:400;font-style:normal;font-display:swap}
 
       /* Visually hidden — crawlers still parse the DOM, users never see it (no flash) */

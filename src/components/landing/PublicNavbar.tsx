@@ -50,7 +50,7 @@ const PublicNavbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
-            <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" />
+            <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" width={112} height={28} />
             <span className="text-xs tracking-[0.25em] text-amw-offwhite/60 uppercase font-body">Reports</span>
           </Link>
 

@@ -147,7 +147,7 @@ const FeaturesPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {PIPELINE_STEPS.map(({ icon: Icon, title, desc }, i) => (
               <div key={title} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
-                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/30">0{i + 1}</span>
+                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/50">0{i + 1}</span>
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-6 w-6 text-primary" />
                 </div>

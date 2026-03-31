@@ -8,7 +8,7 @@ const PublicFooter = () => (
         {/* Brand */}
         <div className="col-span-2 md:col-span-1 space-y-3">
           <div className="flex items-center gap-2">
-            <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" />
+            <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" width={112} height={28} />
             <span className="text-xs tracking-[0.25em] text-amw-offwhite/50 uppercase font-body">Reports</span>
           </div>
           <p className="text-xs font-body leading-relaxed max-w-xs">
@@ -24,7 +24,7 @@ const PublicFooter = () => (
 
         {/* Product */}
         <div className="space-y-3">
-          <h4 className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Product</h4>
+          <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Product</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/features" className="hover:text-primary transition-colors">Features</Link>
             <Link to="/integrations" className="hover:text-primary transition-colors">Integrations</Link>
@@ -35,7 +35,7 @@ const PublicFooter = () => (
 
         {/* Solutions */}
         <div className="space-y-3">
-          <h4 className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Solutions</h4>
+          <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Solutions</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/social-media-reporting" className="hover:text-primary transition-colors">Social Media Reporting</Link>
             <Link to="/seo-reporting" className="hover:text-primary transition-colors">SEO Reporting</Link>
@@ -46,7 +46,7 @@ const PublicFooter = () => (
 
         {/* For */}
         <div className="space-y-3">
-          <h4 className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Built For</h4>
+          <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Built For</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/for-agencies" className="hover:text-primary transition-colors">Agencies</Link>
             <Link to="/for-freelancers" className="hover:text-primary transition-colors">Freelancers</Link>
@@ -57,7 +57,7 @@ const PublicFooter = () => (
 
         {/* Company */}
         <div className="space-y-3">
-          <h4 className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Company</h4>
+          <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Company</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/about" className="hover:text-primary transition-colors">About</Link>
             <Link to="/login" className="hover:text-primary transition-colors">Log In</Link>

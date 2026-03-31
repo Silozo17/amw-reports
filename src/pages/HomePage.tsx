@@ -60,7 +60,7 @@ const HomePage = () => {
   return (
     <>
       {/* ── HERO ── */}
-      <section className="relative overflow-hidden py-20 lg:py-32">
+      <section className="relative overflow-hidden py-20 lg:py-32 min-h-[600px] lg:min-h-[700px]">
         <WarpedGrid />
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px]" />
@@ -76,7 +76,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <div>
-                <img src={amwLogo} alt="AMW Reports logo" className="h-10 w-auto mb-2" />
+                <img src={amwLogo} alt="AMW Reports logo" className="h-10 w-auto mb-2" width={160} height={40} />
                 <p className="font-accent text-xl text-primary mb-1">We Are AMW Reports</p>
                 <p className="text-sm tracking-[0.2em] text-amw-offwhite/70 uppercase font-body font-semibold">AMW Reports</p>
               </div>
@@ -108,6 +108,8 @@ const HomePage = () => {
                 src={dashboardSnapshot}
                 alt="AMW Reports dashboard showing multi-platform marketing analytics with KPI cards, charts, and performance metrics"
                 className="w-full max-w-xl rounded-xl border border-sidebar-border/30 shadow-2xl"
+                width={576}
+                height={400}
               />
             </div>
           </div>
@@ -186,7 +188,7 @@ const HomePage = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-6 w-6 text-primary" />
                 </div>
-                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/30">0{i + 1}</span>
+                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/50">0{i + 1}</span>
                 <h3 className="text-lg font-body font-semibold mb-2">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
@@ -199,6 +201,9 @@ const HomePage = () => {
               src={perfOverview}
               alt="AMW Reports performance overview showing monthly trends, engagement charts, and platform comparison data"
               className="w-full max-w-5xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+              width={1024}
+              height={600}
+              loading="lazy"
             />
           </div>
         </div>
@@ -262,7 +267,7 @@ const HomePage = () => {
       <section className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="font-accent text-lg text-primary mb-2">At a glance</p>
-          <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4"><h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 12 Platforms</h2></h2>
+          <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4">70+ Metrics Across 12 Platforms</h2>
           <p className="text-amw-offwhite/60 font-body max-w-xl mx-auto mb-12">
             From ad spend to follower growth, we track everything your clients care about.
           </p>

@@ -85,7 +85,7 @@ const WhiteLabelReportsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             {STEPS.map(({ num, title, desc }) => (
               <div key={num} className="relative p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
-                <span className="text-xs font-body text-amw-offwhite/30">{num}</span>
+                <span className="text-xs font-body text-amw-offwhite/50">{num}</span>
                 <h3 className="text-lg font-body font-semibold mb-2 mt-2">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
