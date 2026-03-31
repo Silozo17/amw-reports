@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plug } from 'lucide-react';
 import { format } from 'date-fns';
 import AdminSyncDialog from '@/components/admin/AdminSyncDialog';
+import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import type { Tables } from '@/integrations/supabase/types';
+import type { SyncProgress } from '@/lib/triggerSync';
 
 interface AdminOrgClientsProps {
   orgId: string;
@@ -16,6 +19,22 @@ interface AdminOrgClientsProps {
 
 const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) => {
   const queryClient = useQueryClient();
+  const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncProgress>>(new Map());
+  const [syncStartTime, setSyncStartTime] = useState(0);
+
+  const handleSyncStart = useCallback((syncs: Map<string, SyncProgress>, startTime: number) => {
+    setActiveSyncs(syncs);
+    setSyncStartTime(startTime);
+  }, []);
+
+  const handleSyncProgress = useCallback((syncs: Map<string, SyncProgress>) => {
+    setActiveSyncs(new Map(syncs));
+  }, []);
+
+  const handleSyncEnd = useCallback(() => {
+    setActiveSyncs(new Map());
+    setSyncStartTime(0);
+  }, []);
 
   const connectionsByClient = connections.reduce<Record<string, Tables<'platform_connections'>[]>>((acc, c) => {
     (acc[c.client_id] ??= []).push(c);
@@ -24,6 +43,10 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
 
   return (
     <>
+      {activeSyncs.size > 0 && (
+        <SyncProgressBar activeSyncs={activeSyncs} startTime={syncStartTime} />
+      )}
+
       <Card>
         <CardHeader><CardTitle className="font-display text-lg">Clients</CardTitle></CardHeader>
         <CardContent>
@@ -78,6 +101,9 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
                 clients={clients}
                 connections={connections}
                 onComplete={() => queryClient.invalidateQueries({ queryKey: ['admin-org-connections', orgId] })}
+                onSyncStart={handleSyncStart}
+                onSyncProgress={handleSyncProgress}
+                onSyncEnd={handleSyncEnd}
               />
             </div>
           </CardHeader>
