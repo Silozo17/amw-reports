@@ -1,39 +1,43 @@
 
 
-# Fix: Google Ads CTR Double-Division Bug
+# Fix: CTR Still Showing 0.1% — Wrong Formatter
 
 ## Problem
 
-The Google Ads CTR is stored as a **decimal ratio** (e.g., `0.1012` for 10.12%) but the display formatter in `PlatformMetricsCard.tsx` treats it as if it's already a percentage, rendering `0.10%` instead of `10.12%`.
-
-This affects all platforms that store CTR as a ratio — Google Ads, Meta Ads, TikTok Ads, and potentially others.
+The previous fix was applied to `PlatformMetricsCard.tsx`, but the dashboard is actually rendering metrics via `PlatformSection.tsx`, which has its own `formatMetricValue` function. That function (line 114) does not multiply ratio values by 100.
 
 ## Root Cause
 
-- **Sync function** (`sync-google-ads/index.ts` line 261): `overallCtr = totalClicks / totalImpressions` → stores `0.1012`
-- **Display** (`PlatformMetricsCard.tsx` line 42-43): `value.toFixed(2)%` → renders `0.10%`
-- Missing: a `* 100` conversion either at storage or display time
-
-## Fix Approach
-
-**Multiply by 100 at the display layer** in `PlatformMetricsCard.tsx`, since the ratio format is the standard across all sync functions and changing storage would require re-syncing all existing data.
-
-### File: `src/components/clients/PlatformMetricsCard.tsx`
-
-In the `formatMetricValue` function (line 42-43), when the key is `ctr`, multiply by 100 before formatting — but only if the value is ≤ 1 (to handle any snapshots that may already be stored as percentages):
+`src/components/clients/dashboard/PlatformSection.tsx` line 112-114:
 
 ```typescript
-if (key === 'ctr' || key === 'engagement_rate' || key === 'conversion_rate' || key === 'audience_growth_rate') {
-  const displayVal = (key === 'ctr' && value <= 1) ? value * 100 : value;
-  return `${displayVal.toFixed(2)}%`;
+const formatMetricValue = (key: string, value: number, currSymbol: string): string => {
+  if (PERCENT_METRICS.has(key)) return `${value.toFixed(1)}%`;  // ← No ratio conversion!
+};
+```
+
+Google Ads stores CTR as `0.1012` (ratio). This renders as `0.1%` instead of `10.1%`.
+
+## Fix
+
+**File: `src/components/clients/dashboard/PlatformSection.tsx`** — line 114
+
+Change:
+```typescript
+if (PERCENT_METRICS.has(key)) return `${value.toFixed(1)}%`;
+```
+
+To:
+```typescript
+if (PERCENT_METRICS.has(key)) {
+  const displayVal = value <= 1 ? value * 100 : value;
+  return `${displayVal.toFixed(1)}%`;
 }
 ```
 
-### Also check these files for the same issue:
-- `src/components/clients/dashboard/HeroKPIs.tsx` — if CTR flows into hero KPIs
-- `src/components/clients/widgets/WidgetRenderer.tsx` — if CTR is rendered in widgets
-- `src/lib/dashboardCalcs.ts` — already correctly recalculates `(totalSearchClicks / totalSearchImpressions) * 100` for GSC CTR, so that one is fine
+This applies to all metrics in `PERCENT_METRICS`: `ctr`, `engagement_rate`, `bounce_rate`, `search_ctr`, `conversion_rate`, `audience_growth_rate`, `ga_engagement_rate`.
 
-### No edge function or database changes needed
-The stored ratio format is correct and standard. Only the display needs fixing.
+The `<= 1` guard ensures any snapshots already stored as whole percentages (e.g. `10.12`) are not double-multiplied.
+
+**Single line change, single file.**
 
