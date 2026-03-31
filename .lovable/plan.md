@@ -1,70 +1,72 @@
 
 
-# Fix Client Settings Effectiveness + Add Email Preferences
+# Admin Sync Progress Bar + Enriched Platform Data
 
-## Problem Summary
+## 1. Admin Sync Dialog — Background Progress Bar
 
-1. **Client settings toggles don't affect reports**: The four client-level switches (`enable_mom_comparison`, `enable_yoy_comparison`, `enable_explanations`, `enable_upsell`) are saved to the database but the `generate-report` edge function completely ignores them. It always renders MoM comparison tables, AI explanations ("What This Means"), and the upsell section (when upsell data exists).
+**Problem**: The admin sync runs in a blocking modal with just a text spinner. It should close the dialog and show a SyncProgressBar like the dashboard does when connecting accounts.
 
-2. **Metrics defaults tab works partially**: The Settings > Metrics tab saves to `metric_defaults` correctly, and `MetricConfigPanel` reads from it. However, the `generate-report` function only reads `client_platform_config.enabled_metrics` — it does not fall back to `metric_defaults.default_metrics` when a client has no per-platform config. So the org-level defaults are only applied on the dashboard, not in reports.
+**Fix**: Refactor `AdminSyncDialog` to use `triggerInitialSync` from `src/lib/triggerSync.ts` and expose the `activeSyncs` Map + `startTime` state upward so the parent (`AdminOrgClients`) can render the existing `SyncProgressBar` component. The dialog closes immediately after starting, and sync runs in the background with real-time progress.
 
-3. **No email preferences per client**: There's no way to configure which email types go to clients vs the agency, or to opt clients in/out of specific email categories.
+**Files**: `src/components/admin/AdminSyncDialog.tsx`, `src/components/admin/AdminOrgClients.tsx`
 
 ---
 
-## Plan
+## 2. GSC — Add Countries & Devices
 
-### 1. Wire up client setting toggles in `generate-report` edge function
+**Problem**: Currently only fetches aggregate metrics + top queries + top pages. The GSC Search Analytics API supports `country` and `device` dimensions but we're not using them.
 
-**File: `supabase/functions/generate-report/index.ts`**
+**Fix**: Add two additional API calls in `sync-google-search-console/index.ts`:
+- **Country breakdown**: `dimensions: ["country"]`, `rowLimit: 30`, ordered by clicks — stored as `topCountries` in `raw_data`
+- **Device breakdown**: `dimensions: ["device"]`, `rowLimit: 5`, ordered by clicks — stored as `topDevices` in `raw_data`
 
-The function already fetches the full `client` row (line 1067: `select("*")`), so all toggles are available. Add conditional logic:
+Both added to `top_content` array with `type: "country"` and `type: "device"` for consistency with existing pattern.
 
-- **`enable_mom_comparison`**: Guard the MoM comparison table rendering (~line 1735). When `client.enable_mom_comparison === false`, skip the comparison table section entirely.
-- **`enable_yoy_comparison`**: Currently there's no YoY table in the report (only MoM). This toggle is a UI placeholder — leave as-is for now, but add a comment noting it's reserved for future YoY comparison support.
-- **`enable_explanations`**: Guard the "What This Means For You" section (~line 1703). When `client.enable_explanations === false`, skip the AI summary text block.
-- **`enable_upsell`**: Guard the upsell/agency note section (~line 1596 in ToC, ~line 1967 in rendering). When `client.enable_upsell === false`, skip the upsell page even if `upsellData` exists.
+**File**: `supabase/functions/sync-google-search-console/index.ts`
 
-### 2. Wire up metric defaults fallback in `generate-report`
+---
 
-**File: `supabase/functions/generate-report/index.ts`**
+## 3. Google Ads — Geographic Breakdown
 
-Around line 1066, add a fetch for `metric_defaults`:
-```
-supabase.from("metric_defaults").select("*")
-```
+**Problem**: Only fetches campaign-level data. Google Ads API supports geographic segmentation via `geographic_view`.
 
-Then in the metric selection logic (~line 1218), when `config?.enabled_metrics` is empty, fall back to `metric_defaults` for that platform's `default_metrics` before falling back to the auto-detect logic (`cleanMetricsForDisplay`).
-
-### 3. Add email preferences to the clients table
-
-**Database migration** — add columns to `clients`:
+**Fix**: Add a second GAQL query in `sync-google-ads/index.ts`:
 ```sql
-ALTER TABLE public.clients
-  ADD COLUMN email_report_delivery boolean NOT NULL DEFAULT true,
-  ADD COLUMN email_weekly_update boolean NOT NULL DEFAULT false,
-  ADD COLUMN email_monthly_digest boolean NOT NULL DEFAULT true,
-  ADD COLUMN email_alert_warnings boolean NOT NULL DEFAULT true,
-  ADD COLUMN email_recipient_mode text NOT NULL DEFAULT 'agency';
+SELECT
+  geographic_view.country_criterion_id,
+  geographic_view.resource_name,
+  metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+FROM geographic_view
+WHERE segments.date BETWEEN ... AND ...
+ORDER BY metrics.cost_micros DESC
+LIMIT 30
 ```
+Parse results and store as `geoBreakdown` in `raw_data`. Also add to `top_content` with `type: "geo"`.
 
-`email_recipient_mode` values: `'agency'` (emails go to org members), `'client'` (emails go to client recipients), `'both'`.
+**File**: `supabase/functions/sync-google-ads/index.ts`
 
-### 4. Add Email Preferences UI to ClientSettingsTab
+---
 
-**File: `src/components/clients/tabs/ClientSettingsTab.tsx`**
+## 4. Platform Data Audit — Missing Data Summary
 
-Add a new Card section "Email Preferences" with:
-- **4 switches**: Report Delivery, Weekly Updates, Monthly Digest, Alert Warnings — each maps to the new boolean columns
-- **1 select**: "Email Recipient" with options: Agency Only, Client Only, Both — maps to `email_recipient_mode`
+After reviewing all 12 sync functions, here's what's currently **missing** that the APIs provide:
 
-All changes use the existing `onSettingChange` callback which already does generic `supabase.update`.
+| Platform | Missing Data | API Available? | Priority |
+|---|---|---|---|
+| **Google Ads** | Geographic breakdown, Device breakdown | Yes (geographic_view, segments.device) | High |
+| **GSC** | Countries, Devices | Yes (dimensions) | High |
+| **Meta Ads** | Age/gender breakdown, Country breakdown, Placement breakdown | Yes (breakdowns param) | Medium |
+| **YouTube** | Geographic breakdown, Traffic sources, Device types | Yes (Analytics dimensions) | Medium |
+| **TikTok Ads** | Age/gender breakdown, Country breakdown | Yes (report dimensions) | Medium |
+| **LinkedIn** | Page views/unique visitors, Follower demographics | Yes (org page stats) | Low |
+| **Pinterest** | Top individual pins analytics | Yes (pins endpoint) | Low |
+| **GBP** | Photo views | Yes (PHOTOS_VIEWS metrics) | Low |
+| **Facebook** | Already comprehensive | — | — |
+| **Instagram** | Already comprehensive | — | — |
+| **TikTok Organic** | Limited by Login Kit API | No more available | — |
+| **GA4** | Already the gold standard | — | — |
 
-### 5. Update Client type
-
-**File: `src/types/database.ts`**
-
-Add the new fields to the `Client` interface so TypeScript knows about them.
+**This plan implements**: Google Ads geo, GSC countries + devices (High priority). The Medium/Low items can be tackled in follow-up iterations.
 
 ---
 
@@ -72,8 +74,8 @@ Add the new fields to the `Client` interface so TypeScript knows about them.
 
 | File | Change |
 |---|---|
-| `supabase/functions/generate-report/index.ts` | Respect 4 client toggles + metric_defaults fallback |
-| `src/components/clients/tabs/ClientSettingsTab.tsx` | Add Email Preferences card |
-| `src/types/database.ts` | Add email preference fields to Client type |
-| Database migration | Add 5 new columns to `clients` table |
+| `src/components/admin/AdminSyncDialog.tsx` | Refactor to use `triggerInitialSync`, expose progress state, close dialog on start |
+| `src/components/admin/AdminOrgClients.tsx` | Accept and render `SyncProgressBar` from admin sync state |
+| `supabase/functions/sync-google-search-console/index.ts` | Add country + device dimension queries |
+| `supabase/functions/sync-google-ads/index.ts` | Add geographic_view query |
 
