@@ -133,6 +133,7 @@ Data: ${dataContext}
 Rules:
 - Use plain English that a non-technical business owner would understand
 - Be specific with numbers and percentages where available
+- Always use ${currencySymbol} for any monetary values. Never use $ or USD unless that is the client's selected currency.
 - Compare to previous month data where available
 - Each highlight should be one clear, specific sentence
 - Recommendations should be actionable and specific
