@@ -41,11 +41,11 @@ const CircularGauge = ({ score }: { score: number }) => {
           className="transition-all duration-1000 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-2">
         <span className="text-3xl font-bold font-body tabular-nums" style={{ color }}>
           {score}
         </span>
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-body">
+        <span className="max-w-[80%] text-center text-[9px] leading-tight text-muted-foreground uppercase tracking-wider font-body">
           {getScoreLabel(score)}
         </span>
       </div>
