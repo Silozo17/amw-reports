@@ -1063,13 +1063,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [clientRes, snapshotsRes, configRes, prevSnapshotsRes] = await Promise.all([
+    const [clientRes, snapshotsRes, configRes, prevSnapshotsRes, metricDefaultsRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year),
       supabase.from("client_platform_config").select("*").eq("client_id", client_id).eq("is_enabled", true),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id)
         .eq("report_month", report_month === 1 ? 12 : report_month - 1)
         .eq("report_year", report_month === 1 ? report_year - 1 : report_year),
+      supabase.from("metric_defaults").select("*"),
     ]);
 
     const client = clientRes.data;
@@ -1216,6 +1217,7 @@ Deno.serve(async (req) => {
       const topContent = Array.isArray(snapshot.top_content) ? snapshot.top_content : [];
 
       let enabledMetrics: string[];
+      const metricDefaults = (metricDefaultsRes?.data ?? []) as { platform: string; default_metrics: string[] }[];
       if (config?.enabled_metrics?.length > 0) {
         const configMetrics = (config.enabled_metrics as string[]).filter((k: string) => METRIC_LABELS[k] && !HIDDEN_METRICS.has(k));
         enabledMetrics = configMetrics.filter(k => {
@@ -1225,7 +1227,19 @@ Deno.serve(async (req) => {
           return curr !== 0 || prev !== 0;
         }).slice(0, 12);
       } else {
-        enabledMetrics = cleanMetricsForDisplay(snapshot.platform as string, metrics, hasPrevSnapshot ? prevMetrics : null);
+        // Fall back to org-level metric defaults if available
+        const platformDefault = metricDefaults.find(d => d.platform === snapshot.platform);
+        if (platformDefault?.default_metrics?.length > 0) {
+          const defaultMetrics = platformDefault.default_metrics.filter((k: string) => METRIC_LABELS[k] && !HIDDEN_METRICS.has(k));
+          enabledMetrics = defaultMetrics.filter(k => {
+            if (ALWAYS_SHOW_METRICS.has(k)) return true;
+            const curr = metrics[k] ?? 0;
+            const prev = prevMetrics[k] ?? 0;
+            return curr !== 0 || prev !== 0;
+          }).slice(0, 12);
+        } else {
+          enabledMetrics = cleanMetricsForDisplay(snapshot.platform as string, metrics, hasPrevSnapshot ? prevMetrics : null);
+        }
       }
 
       const hasAnyData = enabledMetrics.some(k => (metrics[k] ?? 0) !== 0);
@@ -1593,7 +1607,7 @@ Deno.serve(async (req) => {
     y += 18;
     tocIndex++;
 
-    if (upsellData) {
+    if (upsellData && client.enable_upsell !== false) {
       if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
       setF(C.primary); doc.rect(M, y - 4, 3, 14, "F");
@@ -1701,7 +1715,7 @@ Deno.serve(async (req) => {
       y += 8;
 
       const summaryText = platformSummaries[section.platform];
-      if (summaryText && platformPageCount <= maxPlatformPages) {
+      if (summaryText && platformPageCount <= maxPlatformPages && client.enable_explanations !== false) {
         y = drawSectionLabel(T.whatThisMeans, y);
 
         doc.setFontSize(8.5);
@@ -1732,7 +1746,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (showComparisonTable && hasPrev && gridMetrics.length > 0 && platformPageCount <= maxPlatformPages) {
+      if (showComparisonTable && client.enable_mom_comparison !== false && hasPrev && gridMetrics.length > 0 && platformPageCount <= maxPlatformPages) {
         const pageUsedPct = (y - 14) / (H - 30);
         const needsNewPage = pageUsedPct > 0.55 && platformPageCount < maxPlatformPages;
 
@@ -1964,7 +1978,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (upsellData) {
+    if (upsellData && client.enable_upsell !== false) {
       y = startNewPage(`${T.noteFrom} ${orgName}`);
       pageToc.push({ title: `${T.noteFrom} ${orgName}`, page: pageCount });
 
