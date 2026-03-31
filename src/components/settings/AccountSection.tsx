@@ -247,6 +247,25 @@ const AccountSection = () => {
             </div>
             <p className="text-xs text-muted-foreground">This helps us tailor your experience. You can change it anytime.</p>
                 </div>
+
+          {/* Default Organisation */}
+          {allMemberships.length > 1 && (
+            <div className="space-y-2">
+              <Label>Default Organisation</Label>
+              <Select value={defaultOrgId} onValueChange={setDefaultOrgId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select default org" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (last used)</SelectItem>
+                  {allMemberships.map(m => (
+                    <SelectItem key={m.org_id} value={m.org_id}>{m.org_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Choose which organisation opens when you log in.</p>
+            </div>
+          )}
                 {newPassword && (
                   <div className="space-y-1">
                     <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
