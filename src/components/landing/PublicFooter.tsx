@@ -46,7 +46,7 @@ const PublicFooter = () => (
 
         {/* For */}
         <div className="space-y-3">
-          <h4 className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Built For</h4>
+          <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Built For</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/for-agencies" className="hover:text-primary transition-colors">Agencies</Link>
             <Link to="/for-freelancers" className="hover:text-primary transition-colors">Freelancers</Link>
