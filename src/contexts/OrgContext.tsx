@@ -82,11 +82,23 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       });
       setAllMemberships(membershipList);
 
+      // Fetch the user's default_org_id from profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('default_org_id')
+        .eq('user_id', user.id)
+        .single();
+
+      const defaultOrgId = profileData?.default_org_id as string | null;
+
       // Determine which org to select
+      // Priority: override → localStorage → profile default → first membership
       const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
       const targetOrgId =
         overrideOrgId ??
-        (savedOrgId && orgIds.includes(savedOrgId) ? savedOrgId : orgIds[0]);
+        (savedOrgId && orgIds.includes(savedOrgId) ? savedOrgId : null) ??
+        (defaultOrgId && orgIds.includes(defaultOrgId) ? defaultOrgId : null) ??
+        orgIds[0];
 
       const selectedMembership = activeMemberships.find(m => m.org_id === targetOrgId) ?? activeMemberships[0];
 
