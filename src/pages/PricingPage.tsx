@@ -34,7 +34,7 @@ const PLANS = [
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: false,
-    features: ['5 clients included', '25 platform connections', 'Weekly data sync', 'Branded PDF reports', 'Automated email delivery', 'AI-powered analysis', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
+    features: ['5 clients included', '25 platform connections', 'Weekly data sync', '12 months historical data sync', 'Branded PDF reports', 'Automated email delivery', 'AI-powered analysis', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
   },
   {
     name: 'Agency',
