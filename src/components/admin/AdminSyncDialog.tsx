@@ -150,8 +150,8 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display">Sync Data (12 months)</DialogTitle>
-          <DialogDescription>Choose what to sync. Data will be fetched for the last 12 months.</DialogDescription>
+          <DialogTitle className="font-display">Sync Data (24 months)</DialogTitle>
+          <DialogDescription>Choose what to sync. Data will be fetched for the last 24 months.</DialogDescription>
         </DialogHeader>
 
         {isSyncing ? (
