@@ -217,7 +217,7 @@ const PlatformSection = ({
   const lastSyncAt = connection?.last_sync_at;
 
   // Top content for tables
-  const socialPosts = (topContent ?? []).filter(p => p.message || p.caption || p.full_picture || p.permalink_url || p.engagement || p.likes || p.comments || p.shares || p.view_count || p.like_count);
+  const socialPosts = (topContent ?? []).filter(p => p.message || p.caption || p.full_picture || p.permalink_url || p.likes || p.comments || p.shares);
   const gscQueries = (topContent ?? []).filter(p => p.query);
   const gscPages = (topContent ?? []).filter(p => p.page && !p.query);
   const gaPages = (topContent ?? []).filter(p => p.page && !p.query && platform === 'google_analytics');
