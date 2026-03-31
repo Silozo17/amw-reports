@@ -31,6 +31,7 @@ export function computeOpportunityAlerts(
   current: SnapshotLike[],
   previous: SnapshotLike[],
   currSymbol: string,
+  partialMonthRatio: number = 1,
 ): OpportunityAlert[] {
   const alerts: OpportunityAlert[] = [];
 
