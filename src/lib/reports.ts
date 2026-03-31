@@ -114,11 +114,7 @@ export const sendReportEmail = async (reportId: string) => {
 
 export const getCurrentReportPeriod = () => {
   const now = new Date();
-  const month = now.getDate() < 5
-    ? (now.getMonth() === 0 ? 12 : now.getMonth())
-    : now.getMonth() + 1;
-  const year = now.getDate() < 5 && now.getMonth() === 0
-    ? now.getFullYear() - 1
-    : now.getFullYear();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
   return { month, year };
 };
