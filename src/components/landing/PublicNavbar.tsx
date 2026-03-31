@@ -156,9 +156,15 @@ const PublicNavbar = () => {
           ))}
           <div className="flex flex-col gap-2 pt-3">
             {user ? (
-              <Button asChild className="w-full">
-                <Link to="/dashboard">Dashboard</Link>
-              </Button>
+              <>
+                <Button asChild className="w-full">
+                  <Link to="/dashboard">Dashboard</Link>
+                </Button>
+                <Button variant="outline" onClick={() => signOut()} className="w-full border-sidebar-border text-amw-offwhite">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log Out
+                </Button>
+              </>
             ) : (
               <>
                 <Button variant="outline" asChild className="w-full border-sidebar-border text-amw-offwhite">
