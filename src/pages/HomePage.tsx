@@ -201,6 +201,9 @@ const HomePage = () => {
               src={perfOverview}
               alt="AMW Reports performance overview showing monthly trends, engagement charts, and platform comparison data"
               className="w-full max-w-5xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
+              width={1024}
+              height={600}
+              loading="lazy"
             />
           </div>
         </div>
