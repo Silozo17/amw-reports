@@ -21,6 +21,24 @@ interface ClientSettingsTabProps {
   onSettingChange: (field: string, value: string | boolean) => void;
 }
 
+const BUSINESS_CONTEXT_KEYS = [
+  'industry', 'target_audience', 'service_area_type', 'service_areas',
+  'business_goals', 'competitors', 'unique_selling_points', 'brand_voice',
+] as const;
+
+type BusinessDraft = Record<typeof BUSINESS_CONTEXT_KEYS[number], string>;
+
+const pickDraft = (c: Client): BusinessDraft => ({
+  industry: c.industry ?? '',
+  target_audience: c.target_audience ?? '',
+  service_area_type: c.service_area_type ?? 'local',
+  service_areas: c.service_areas ?? '',
+  business_goals: c.business_goals ?? '',
+  competitors: c.competitors ?? '',
+  unique_selling_points: c.unique_selling_points ?? '',
+  brand_voice: c.brand_voice ?? '',
+});
+
 const ClientSettingsTab = ({
   client,
   clientUsers,
@@ -31,6 +49,41 @@ const ClientSettingsTab = ({
   onRevokeClientUser,
   onSettingChange,
 }: ClientSettingsTabProps) => {
+  const [draft, setDraft] = useState<BusinessDraft>(() => pickDraft(client));
+
+  // Reset draft when client changes
+  useEffect(() => {
+    setDraft(pickDraft(client));
+  }, [client.id]);
+
+  const isDirty = BUSINESS_CONTEXT_KEYS.some(
+    k => draft[k] !== (client[k as keyof Client] ?? (k === 'service_area_type' ? 'local' : ''))
+  );
+
+  // Warn on tab/window close with unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  const handleDraftChange = useCallback((key: string, value: string) => {
+    setDraft(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleSave = useCallback(() => {
+    BUSINESS_CONTEXT_KEYS.forEach(key => {
+      const original = client[key as keyof Client] ?? (key === 'service_area_type' ? 'local' : '');
+      if (draft[key] !== original) {
+        onSettingChange(key, draft[key]);
+      }
+    });
+  }, [draft, client, onSettingChange]);
+
   return (
     <>
       <Card>
