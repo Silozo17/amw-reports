@@ -30,7 +30,7 @@ const PublicNavbar = () => {
   const [solOpen, setSolOpen] = useState(false);
   const solRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
