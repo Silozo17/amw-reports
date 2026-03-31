@@ -194,6 +194,11 @@ export type Database = {
           created_at: string
           created_by: string | null
           email: string | null
+          email_alert_warnings: boolean
+          email_monthly_digest: boolean
+          email_recipient_mode: string
+          email_report_delivery: boolean
+          email_weekly_update: boolean
           enable_explanations: boolean | null
           enable_mom_comparison: boolean | null
           enable_upsell: boolean | null
@@ -224,6 +229,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string | null
+          email_alert_warnings?: boolean
+          email_monthly_digest?: boolean
+          email_recipient_mode?: string
+          email_report_delivery?: boolean
+          email_weekly_update?: boolean
           enable_explanations?: boolean | null
           enable_mom_comparison?: boolean | null
           enable_upsell?: boolean | null
@@ -254,6 +264,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string | null
+          email_alert_warnings?: boolean
+          email_monthly_digest?: boolean
+          email_recipient_mode?: string
+          email_report_delivery?: boolean
+          email_weekly_update?: boolean
           enable_explanations?: boolean | null
           enable_mom_comparison?: boolean | null
           enable_upsell?: boolean | null
