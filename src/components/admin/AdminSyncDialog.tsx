@@ -132,7 +132,7 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
     if (failCount > 0) {
       toast.error(`Sync done: ${successCount} ok, ${failCount} failed`);
     } else {
-      toast.success(`Sync complete: ${successCount} syncs across 12 months`);
+      toast.success(`Sync complete: ${successCount} syncs across 24 months`);
     }
 
     setProgress('');
