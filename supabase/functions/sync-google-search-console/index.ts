@@ -284,7 +284,11 @@ Deno.serve(async (req) => {
     const topContent = [
       ...topQueries.map((q: any) => ({ type: "query", ...q })),
       ...topPages.map((p: any) => ({ type: "page", ...p })),
+      ...topCountries.map((c: any) => ({ type: "country", ...c })),
+      ...topDevices.map((d: any) => ({ type: "device", ...d })),
     ];
+
+    const rawData = { topQueries, topPages, topCountries, topDevices };
 
     // Upsert snapshot
     const { data: existing } = await supabase
