@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     // Build current period query
     let currentQuery = supabase
       .from("monthly_snapshots")
-      .select("platform, metrics_data, top_content, report_month, report_year")
+      .select("platform, metrics_data, top_content, raw_data, report_month, report_year")
       .eq("client_id", client_id);
 
     let prevMonth = m === 1 ? 12 : m - 1;
