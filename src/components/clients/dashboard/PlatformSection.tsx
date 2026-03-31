@@ -650,6 +650,33 @@ const PlatformSection = ({
             )}
           </>
         )}
+
+        {/* GSC Extended Widgets — Countries & Devices */}
+        {platform === 'google_search_console' && rawData && (
+          <>
+            {(rawData.topCountries as any[])?.length > 0 && (
+              <GeoHeatmap
+                countries={((rawData.topCountries as any[]) || []).map((c: any) => ({
+                  country: c.country || c.keys?.[0] || 'Unknown',
+                  countryId: c.countryId || c.keys?.[0] || '',
+                  users: c.clicks ?? 0,
+                  sessions: c.impressions ?? 0,
+                }))}
+                cities={[]}
+              />
+            )}
+            {(rawData.topDevices as any[])?.length > 0 && (
+              <DeviceBreakdown
+                devices={((rawData.topDevices as any[]) || []).map((d: any) => ({
+                  device: d.device || d.keys?.[0] || 'Unknown',
+                  users: d.clicks ?? 0,
+                  sessions: d.impressions ?? 0,
+                }))}
+                newVsReturning={[]}
+              />
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
