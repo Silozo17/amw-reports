@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
         report_year: year,
         metrics_data: metricsData,
         top_content: topContent,
-        raw_data: { topQueries, topPages },
+        raw_data: rawData,
       });
     }
 
