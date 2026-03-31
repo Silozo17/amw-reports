@@ -555,7 +555,31 @@ const PlatformSection = ({
                 </div>
               )}
 
-              {ytVideos.length > 0 && (
+              {gscPages.length > 0 && (
+                <div className="rounded-lg border overflow-hidden mt-3">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Page</TableHead>
+                        <TableHead className="text-right">Clicks</TableHead>
+                        <TableHead className="text-right">Impressions</TableHead>
+                        <TableHead className="text-right">CTR</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {gscPages.slice(0, 10).map((p, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-sm max-w-[300px] truncate font-body">{p.page}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{(p.clicks ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{(p.impressions ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{p.ctr != null ? `${(p.ctr * 100).toFixed(1)}%` : '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
                 <div className="rounded-lg border overflow-hidden">
                   <Table>
                     <TableHeader>
