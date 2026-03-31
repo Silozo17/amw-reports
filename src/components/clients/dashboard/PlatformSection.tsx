@@ -79,6 +79,7 @@ interface PlatformSectionProps {
   enabledMetrics?: string[];
   reportMonth: number;
   reportYear: number;
+  rawData?: Record<string, unknown>;
 }
 
 /** Priority metrics per platform category */
