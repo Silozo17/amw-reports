@@ -220,6 +220,60 @@ Deno.serve(async (req) => {
       position: r.position,
     }));
 
+    // Top countries
+    const countriesRes = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ["country"],
+          rowLimit: 30,
+          orderBy: [{ fieldName: "clicks", sortOrder: "DESCENDING" }],
+        }),
+      }
+    );
+    const countriesData = await countriesRes.json();
+    const topCountries = (countriesData.rows || []).map((r: any) => ({
+      country: r.keys?.[0],
+      clicks: r.clicks,
+      impressions: r.impressions,
+      ctr: r.ctr,
+      position: r.position,
+    }));
+
+    // Device breakdown
+    const devicesRes = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ["device"],
+          rowLimit: 5,
+          orderBy: [{ fieldName: "clicks", sortOrder: "DESCENDING" }],
+        }),
+      }
+    );
+    const devicesData = await devicesRes.json();
+    const topDevices = (devicesData.rows || []).map((r: any) => ({
+      device: r.keys?.[0],
+      clicks: r.clicks,
+      impressions: r.impressions,
+      ctr: r.ctr,
+      position: r.position,
+    }));
+
     const metricsData = {
       search_clicks: totalClicks,
       search_impressions: totalImpressions,
@@ -230,7 +284,11 @@ Deno.serve(async (req) => {
     const topContent = [
       ...topQueries.map((q: any) => ({ type: "query", ...q })),
       ...topPages.map((p: any) => ({ type: "page", ...p })),
+      ...topCountries.map((c: any) => ({ type: "country", ...c })),
+      ...topDevices.map((d: any) => ({ type: "device", ...d })),
     ];
+
+    const rawData = { topQueries, topPages, topCountries, topDevices };
 
     // Upsert snapshot
     const { data: existing } = await supabase
@@ -249,7 +307,7 @@ Deno.serve(async (req) => {
     if (existing) {
       await supabase
         .from("monthly_snapshots")
-        .update({ metrics_data: metricsData, top_content: topContent, raw_data: { topQueries, topPages } })
+        .update({ metrics_data: metricsData, top_content: topContent, raw_data: rawData })
         .eq("id", existing.id);
     } else {
       await supabase.from("monthly_snapshots").insert({
@@ -259,7 +317,7 @@ Deno.serve(async (req) => {
         report_year: year,
         metrics_data: metricsData,
         top_content: topContent,
-        raw_data: { topQueries, topPages },
+        raw_data: rawData,
       });
     }
 

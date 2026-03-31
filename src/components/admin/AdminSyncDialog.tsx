@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useCallback } from 'react';
+import { triggerInitialSync, type SyncProgress } from '@/lib/triggerSync';
 import { SYNC_FUNCTION_MAP } from '@/lib/platformRouting';
+import type { PlatformType } from '@/types/database';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 type SyncScope = 'channel' | 'client' | 'organisation' | 'platform';
@@ -31,9 +32,10 @@ interface AdminSyncDialogProps {
   clients: Client[];
   connections: Connection[];
   onComplete: () => void;
+  onSyncStart?: (activeSyncs: Map<string, SyncProgress>, startTime: number) => void;
+  onSyncProgress?: (activeSyncs: Map<string, SyncProgress>) => void;
+  onSyncEnd?: () => void;
 }
-
-const MONTH_NAMES_SHORT = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const PLATFORM_LABELS: Record<string, string> = {
   google_ads: 'Google Ads',
@@ -50,14 +52,12 @@ const PLATFORM_LABELS: Record<string, string> = {
   pinterest: 'Pinterest',
 };
 
-export default function AdminSyncDialog({ clients, connections, onComplete }: AdminSyncDialogProps) {
+export default function AdminSyncDialog({ clients, connections, onComplete, onSyncStart, onSyncProgress, onSyncEnd }: AdminSyncDialogProps) {
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<SyncScope>('organisation');
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [progress, setProgress] = useState('');
 
   const activeConnections = connections.filter(c => c.is_connected && c.account_id);
 
@@ -87,7 +87,6 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
   };
 
   const isReady = (): boolean => {
-    if (isSyncing) return false;
     switch (scope) {
       case 'channel': return !!selectedConnectionId;
       case 'client': return !!selectedClientId;
@@ -96,38 +95,54 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
     }
   };
 
-  const handleSync = async () => {
+  const handleSync = useCallback(async () => {
     const targets = getTargetConnections();
     if (targets.length === 0) {
       toast.info('No active connections to sync');
       return;
     }
 
-    setIsSyncing(true);
-    const now = new Date();
-    let m = now.getMonth() + 1;
-    let y = now.getFullYear();
+    // Close dialog immediately
+    setOpen(false);
+
+    const startTime = Date.now();
+    const activeSyncs = new Map<string, SyncProgress>();
+
+    // Initialize all syncs in the map
+    for (const conn of targets) {
+      activeSyncs.set(conn.id, {
+        platform: conn.platform,
+        completed: 0,
+        total: 24,
+        currentMonth: 0,
+        currentYear: 0,
+      });
+    }
+
+    onSyncStart?.(new Map(activeSyncs), startTime);
+
+    toast.info(`Starting sync for ${targets.length} connection${targets.length > 1 ? 's' : ''} × 24 months`);
+
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < 24; i++) {
-      setProgress(`${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/24) — ${targets.length} connection${targets.length > 1 ? 's' : ''}`);
-      for (const conn of targets) {
-        const fn = SYNC_FUNCTION_MAP[conn.platform];
-        if (!fn) continue;
-        try {
-          const { data, error } = await supabase.functions.invoke(fn, {
-            body: { connection_id: conn.id, month: m, year: y },
-          });
-          if (error || data?.error) failCount++;
-          else successCount++;
-        } catch {
-          failCount++;
-        }
-      }
-      m--;
-      if (m === 0) { m = 12; y--; }
+    // Run syncs sequentially per connection
+    for (const conn of targets) {
+      const platform = conn.platform as PlatformType;
+      if (!SYNC_FUNCTION_MAP[platform]) continue;
+
+      const results = await triggerInitialSync(conn.id, platform, 24, (progress) => {
+        activeSyncs.set(conn.id, progress);
+        onSyncProgress?.(new Map(activeSyncs));
+      });
+
+      const failed = results.filter(r => !r.success).length;
+      const succeeded = results.filter(r => r.success).length;
+      successCount += succeeded;
+      failCount += failed;
     }
+
+    onSyncEnd?.();
 
     if (failCount > 0) {
       toast.error(`Sync done: ${successCount} ok, ${failCount} failed`);
@@ -135,10 +150,8 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
       toast.success(`Sync complete: ${successCount} syncs across 24 months`);
     }
 
-    setProgress('');
-    setIsSyncing(false);
     onComplete();
-  };
+  }, [scope, selectedClientId, selectedConnectionId, selectedPlatform, activeConnections, onComplete, onSyncStart, onSyncProgress, onSyncEnd]);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { resetSelections(); setScope('organisation'); } }}>
@@ -151,104 +164,95 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">Sync Data (24 months)</DialogTitle>
-          <DialogDescription>Choose what to sync. Data will be fetched for the last 24 months.</DialogDescription>
+          <DialogDescription>Choose what to sync. Data will be fetched for the last 24 months in the background.</DialogDescription>
         </DialogHeader>
 
-        {isSyncing ? (
-          <div className="flex flex-col items-center gap-3 py-6">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">{progress}</p>
+        <div className="space-y-5">
+          {/* Scope selection */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Sync scope</Label>
+            <RadioGroup value={scope} onValueChange={(v) => { setScope(v as SyncScope); resetSelections(); }}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="channel" id="scope-channel" />
+                <Label htmlFor="scope-channel" className="font-normal cursor-pointer">Single Channel</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="client" id="scope-client" />
+                <Label htmlFor="scope-client" className="font-normal cursor-pointer">Single Client (all channels)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="organisation" id="scope-org" />
+                <Label htmlFor="scope-org" className="font-normal cursor-pointer">Whole Organisation</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="platform" id="scope-platform" />
+                <Label htmlFor="scope-platform" className="font-normal cursor-pointer">Whole Platform (across all clients)</Label>
+              </div>
+            </RadioGroup>
           </div>
-        ) : (
-          <div className="space-y-5">
-            {/* Scope selection */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Sync scope</Label>
-              <RadioGroup value={scope} onValueChange={(v) => { setScope(v as SyncScope); resetSelections(); }}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="channel" id="scope-channel" />
-                  <Label htmlFor="scope-channel" className="font-normal cursor-pointer">Single Channel</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="client" id="scope-client" />
-                  <Label htmlFor="scope-client" className="font-normal cursor-pointer">Single Client (all channels)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="organisation" id="scope-org" />
-                  <Label htmlFor="scope-org" className="font-normal cursor-pointer">Whole Organisation</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="platform" id="scope-platform" />
-                  <Label htmlFor="scope-platform" className="font-normal cursor-pointer">Whole Platform (across all clients)</Label>
-                </div>
-              </RadioGroup>
+
+          {/* Conditional selects */}
+          {(scope === 'channel' || scope === 'client') && (
+            <div className="space-y-2">
+              <Label>Client</Label>
+              <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedConnectionId(''); }}>
+                <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          )}
 
-            {/* Conditional selects */}
-            {(scope === 'channel' || scope === 'client') && (
-              <div className="space-y-2">
-                <Label>Client</Label>
-                <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedConnectionId(''); }}>
-                  <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
+          {scope === 'channel' && selectedClientId && (
+            <div className="space-y-2">
+              <Label>Channel</Label>
+              {clientConnections.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active connections for this client</p>
+              ) : (
+                <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
+                  <SelectTrigger><SelectValue placeholder="Select a channel" /></SelectTrigger>
                   <SelectContent>
-                    {clients.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
+                    {clientConnections.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {PLATFORM_LABELS[c.platform] ?? c.platform} — {c.account_name || c.account_id}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            {scope === 'channel' && selectedClientId && (
-              <div className="space-y-2">
-                <Label>Channel</Label>
-                {clientConnections.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No active connections for this client</p>
-                ) : (
-                  <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
-                    <SelectTrigger><SelectValue placeholder="Select a channel" /></SelectTrigger>
-                    <SelectContent>
-                      {clientConnections.map(c => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {PLATFORM_LABELS[c.platform] ?? c.platform} — {c.account_name || c.account_id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            )}
+          {scope === 'platform' && (
+            <div className="space-y-2">
+              <Label>Platform</Label>
+              <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
+                <SelectTrigger><SelectValue placeholder="Select a platform" /></SelectTrigger>
+                <SelectContent>
+                  {distinctPlatforms.map(p => (
+                    <SelectItem key={p} value={p}>{PLATFORM_LABELS[p] ?? p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-            {scope === 'platform' && (
-              <div className="space-y-2">
-                <Label>Platform</Label>
-                <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                  <SelectTrigger><SelectValue placeholder="Select a platform" /></SelectTrigger>
-                  <SelectContent>
-                    {distinctPlatforms.map(p => (
-                      <SelectItem key={p} value={p}>{PLATFORM_LABELS[p] ?? p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Summary */}
-            {isReady() && (
-              <p className="text-xs text-muted-foreground">
-                Will sync <strong>{getTargetConnections().length}</strong> connection{getTargetConnections().length !== 1 ? 's' : ''} × 24 months
-              </p>
-            )}
-          </div>
-        )}
+          {/* Summary */}
+          {isReady() && (
+            <p className="text-xs text-muted-foreground">
+              Will sync <strong>{getTargetConnections().length}</strong> connection{getTargetConnections().length !== 1 ? 's' : ''} × 24 months
+            </p>
+          )}
+        </div>
 
         <DialogFooter>
-          {!isSyncing && (
-            <Button onClick={handleSync} disabled={!isReady()} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Start Sync
-            </Button>
-          )}
+          <Button onClick={handleSync} disabled={!isReady()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Start Sync
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
