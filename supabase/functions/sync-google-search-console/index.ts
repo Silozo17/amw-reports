@@ -220,6 +220,60 @@ Deno.serve(async (req) => {
       position: r.position,
     }));
 
+    // Top countries
+    const countriesRes = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ["country"],
+          rowLimit: 30,
+          orderBy: [{ fieldName: "clicks", sortOrder: "DESCENDING" }],
+        }),
+      }
+    );
+    const countriesData = await countriesRes.json();
+    const topCountries = (countriesData.rows || []).map((r: any) => ({
+      country: r.keys?.[0],
+      clicks: r.clicks,
+      impressions: r.impressions,
+      ctr: r.ctr,
+      position: r.position,
+    }));
+
+    // Device breakdown
+    const devicesRes = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ["device"],
+          rowLimit: 5,
+          orderBy: [{ fieldName: "clicks", sortOrder: "DESCENDING" }],
+        }),
+      }
+    );
+    const devicesData = await devicesRes.json();
+    const topDevices = (devicesData.rows || []).map((r: any) => ({
+      device: r.keys?.[0],
+      clicks: r.clicks,
+      impressions: r.impressions,
+      ctr: r.ctr,
+      position: r.position,
+    }));
+
     const metricsData = {
       search_clicks: totalClicks,
       search_impressions: totalImpressions,
