@@ -102,9 +102,15 @@ const PublicNavbar = () => {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
             {user ? (
-              <Button asChild>
-                <Link to="/dashboard">Dashboard</Link>
-              </Button>
+              <>
+                <Button asChild>
+                  <Link to="/dashboard">Dashboard</Link>
+                </Button>
+                <Button variant="ghost" onClick={() => signOut()} className="text-amw-offwhite/80 hover:text-amw-offwhite hover:bg-sidebar-accent/50">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log Out
+                </Button>
+              </>
             ) : (
               <>
                 <Button variant="ghost" asChild className="text-amw-offwhite/80 hover:text-amw-offwhite hover:bg-sidebar-accent/50">
