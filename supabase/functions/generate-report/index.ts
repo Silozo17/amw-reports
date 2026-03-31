@@ -1100,6 +1100,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Verify caller belongs to the org that owns this client
+    const { data: membership } = await supabase.from("org_members").select("id").eq("user_id", callerId).eq("org_id", client.org_id).limit(1).single();
+    if (!membership) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Upsert report record with "running" status immediately
     const { data: runningReport } = await supabase.from("reports")
       .upsert({
@@ -1115,18 +1121,6 @@ Deno.serve(async (req) => {
       .single();
 
     earlyReportId = runningReport?.id;
-
-    const authHeader = req.headers.get("Authorization");
-    if (authHeader && client.org_id) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data: { user: caller } } = await supabase.auth.getUser(token);
-      if (caller) {
-        const { data: membership } = await supabase.from("org_members").select("id").eq("user_id", caller.id).eq("org_id", client.org_id).limit(1).single();
-        if (!membership) {
-          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-      }
-    }
 
     const { data: org } = await supabase.from("organisations").select("*").eq("id", client.org_id).single();
     const orgName = org?.name ?? "Your Agency";

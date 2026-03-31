@@ -420,7 +420,7 @@ async function handleFacebook(supabase: any, code: string, connectionId: string,
 
 // ── Instagram (IG Business accounts via Facebook Pages) ──
 async function handleInstagram(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
-  const appId = Deno.env.get("META_APP_ID") || "1473709394207184";
+  const appId = Deno.env.get("META_APP_ID")!;
   const appSecret = Deno.env.get("META_APP_SECRET")!;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
