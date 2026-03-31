@@ -293,8 +293,8 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken }: UseC
       const { data, error } = await supabase.functions.invoke("analyze-client", { body: { client_id: clientId, month: selectedPeriod.month, year: selectedPeriod.year } });
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
-      setAiAnalysis(data.analysis || "No analysis available.");
-      setAiAnalysisDate(new Date());
+      const pKey = `${selectedPeriod.type}-${selectedPeriod.month}-${selectedPeriod.year}`;
+      setAnalysisMap(prev => new Map(prev).set(pKey, { text: data.analysis || "No analysis available.", date: new Date() }));
       setLastAnalysisTime(Date.now());
       setCooldownRemaining(60);
       setAnalysisDialogOpen(true);
