@@ -1,72 +1,129 @@
 
 
-# Plan: Pricing Page Expansion, Dashboard Categories, Portal AI Analysis
+# Plan: Add Reddit (Organic) and Reddit Ads Integrations
 
-## Task 1 — Expand Pricing Page with Comparison Table and Tooltips
+This is a large integration touching database schema, 4 new edge functions, the OAuth callback, and multiple frontend files. It follows the exact same pattern as your existing platforms (e.g. LinkedIn, Pinterest).
 
-The current pricing page has plan cards and a basic comparison table but lacks explanatory tooltips or detailed feature descriptions.
-
-**Changes to `src/pages/PricingPage.tsx`:**
-- Add an `info` tooltip (ℹ) to each row in `COMPARISON_ROWS` with a plain-English explanation of what the feature means (e.g. "Connections" → "A connection links one client to one platform. Connecting Google Ads + Instagram for one client = 2 connections.")
-- Expand `COMPARISON_ROWS` to include additional features: AI Analysis, Data Retention, Team Members, Report Customisation, Email Support
-- Add a "What's included in every plan" expanded section below universal features with short descriptions for each
-- Use `TooltipProvider` / `Tooltip` from shadcn for the (i) icons in the comparison table
-- Add a "Who is this for?" blurb under each plan card name
-
-**No new files.** Single file edit.
+**Before I can build anything, you need to create two Reddit applications.** I will guide you through that below.
 
 ---
 
-## Task 2 — Categorise Platform Breakdowns on Dashboard
+## Prerequisites — Reddit App Setup (You Do This)
 
-Currently, the "Platform Breakdown" section in `ClientDashboard.tsx` lists all platforms in a flat list. This will group them under category headings.
+### App 1: Reddit Organic (subreddit/profile data)
 
-**Changes to `src/types/database.ts`:**
-- Add a `PLATFORM_CATEGORIES` constant mapping categories to platforms:
-  - **Paid Advertising**: `google_ads`, `meta_ads`, `tiktok_ads`
-  - **Organic Social**: `facebook`, `instagram`, `tiktok`, `linkedin`, `youtube`, `pinterest`
-  - **SEO & Web Analytics**: `google_search_console`, `google_analytics`, `google_business_profile`
+1. Go to **https://www.reddit.com/prefs/apps**
+2. Click **"create another app..."**
+3. Fill in:
+   - **Name**: AMW Reports - Organic
+   - **Type**: Select **"web app"**
+   - **Redirect URI**: `https://kcdixfmjiifpnbtplodv.supabase.co/functions/v1/oauth-callback`
+4. Save — note the **Client ID** (under app name) and **Client Secret**
+5. I will ask you to store these as `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`
 
-**Changes to `src/components/clients/ClientDashboard.tsx`:**
-- Replace the flat `filtered.map(snapshot => ...)` with a grouped render:
-  - Loop through `PLATFORM_CATEGORIES`, filter snapshots per category
-  - Render a category heading (e.g. "Paid Advertising", "Organic Social", "SEO & Web Analytics") with an icon before each group
-  - Skip empty categories (no snapshots for that group)
+### App 2: Reddit Ads (ad account reporting)
+
+Reddit Ads uses the **same OAuth infrastructure** (reddit.com/api/v1/authorize) but with ads-specific scopes (`ads_read`). You can either:
+- **Use the same app** (recommended — one app, different scopes per flow), or
+- Create a second app if you want separate credentials
+
+The Reddit Ads API base URL is `https://ads-api.reddit.com/api/v3/`. You need to **request Ads API access** from Reddit — go to **https://www.reddit.com/wiki/api/** and apply, as Ads API requires approval.
+
+I will ask you to store these as `REDDIT_ADS_CLIENT_ID` and `REDDIT_ADS_CLIENT_SECRET` (or reuse the same credentials).
 
 ---
 
-## Task 3 — Add AI Analysis to Client Portal (Share Link)
+## Technical Implementation
 
-Currently, AI analysis is hidden when `isPortal` is true. This will enable it for portal users with a restructured prompt that generates a main overview + per-category section breakdowns.
+### Step 1 — Database Migration
 
-### 3a. Update Edge Function — `supabase/functions/analyze-client/index.ts`
+Add two new values to the `platform_type` enum:
 
-- Accept an optional `portal` boolean in the request body
-- Restructure the AI prompt to generate:
-  1. **Overall Performance Summary** (2-3 paragraphs covering everything)
-  2. **Paid Advertising** section (only if paid platform data exists)
-  3. **Organic Social** section (only if organic platform data exists)
-  4. **SEO & Web Analytics** section (only if SEO platform data exists)
-- Each section uses a markdown `## Heading` so it can be split/rendered in the UI
-- Increase `max_tokens` from 1000 to 2000 to accommodate the longer structured output
+```sql
+ALTER TYPE public.platform_type ADD VALUE IF NOT EXISTS 'reddit';
+ALTER TYPE public.platform_type ADD VALUE IF NOT EXISTS 'reddit_ads';
+```
 
-### 3b. Update `useClientDashboard.ts`
+Insert metric defaults for both platforms.
 
-- Remove the `isPortal` guard that prevents AI analysis from running
-- Allow portal users to trigger analysis (the edge function uses service role key, so no auth needed)
-- Store the analysis text as before
+### Step 2 — Add Logo Assets
 
-### 3c. Update `ClientDashboard.tsx`
+You will need to provide a Reddit logo (`.webp`). I will add it as `src/assets/logos/reddit.webp`.
 
-- Remove the `!isPortal &&` guards around the AI Analysis card, button, and dialog
-- Parse the markdown analysis into sections using `## ` heading splits
-- Render the main summary at the top as before
-- Render per-category mini-analysis cards under each platform category group (from Task 2), matching by heading name
-- In the full analysis dialog, show all sections with proper heading hierarchy
+### Step 3 — Update Frontend Type Definitions (`src/types/database.ts`)
 
-### 3d. Update `supabase/functions/portal-data/index.ts`
+- Add `'reddit' | 'reddit_ads'` to `PlatformType`
+- Add entries to `PLATFORM_LABELS`, `PLATFORM_LOGOS`, `METRIC_LABELS`, `AVAILABLE_METRICS`
+- Add `reddit` to "Organic Social" category, `reddit_ads` to "Paid Advertising" category
 
-- No changes needed — the analyze-client function already uses service role key and accepts client_id directly
+### Step 4 — Update Platform Routing (`src/lib/platformRouting.ts`)
+
+```typescript
+// CONNECT_FUNCTION_MAP
+reddit: 'reddit-connect',
+reddit_ads: 'reddit-ads-connect',
+
+// SYNC_FUNCTION_MAP
+reddit: 'sync-reddit',
+reddit_ads: 'sync-reddit-ads',
+```
+
+Add both to `OAUTH_SUPPORTED` and `ALL_PLATFORMS`.
+
+### Step 5 — Create Edge Functions (4 new functions)
+
+| Function | Purpose |
+|---|---|
+| `reddit-connect` | Build OAuth URL for Reddit organic (scopes: `identity`, `read`, `mysubreddits`) |
+| `reddit-ads-connect` | Build OAuth URL for Reddit Ads (scopes: `identity`, `ads_read`) |
+| `sync-reddit` | Fetch subreddit/profile stats from `oauth.reddit.com/api/v1/me`, subscriber counts, post engagement |
+| `sync-reddit-ads` | Fetch ad account metrics from `ads-api.reddit.com/api/v3/ad_accounts/{id}/reports` (impressions, clicks, spend, CTR, CPC, CPM, conversions) |
+
+### Step 6 — Update OAuth Callback (`supabase/functions/oauth-callback/index.ts`)
+
+Add `handleReddit` and `handleRedditAds` handlers that:
+1. Exchange auth code for tokens at `https://www.reddit.com/api/v1/access_token`
+2. Discover available subreddits (organic) or ad accounts (ads)
+3. Auto-select if single result, otherwise populate metadata for the account picker
+
+### Step 7 — Update Scheduled Sync (`supabase/functions/scheduled-sync/index.ts`)
+
+Add `reddit` and `reddit_ads` to the `SYNC_FUNCTION_MAP`.
+
+### Step 8 — Update Remaining Frontend Files
+
+- `src/components/onboarding/steps/PlatformsStep.tsx` — add reddit to the grid
+- `src/components/clients/ConnectionDialog.tsx` — already dynamic from `ALL_PLATFORMS`
+
+### Step 9 — Reddit Organic Metrics
+
+| Key | Label |
+|---|---|
+| `subscribers` | Subscribers |
+| `subscriber_growth` | Subscriber Growth |
+| `posts_published` | Posts Published |
+| `post_karma` | Post Karma |
+| `comment_karma` | Comment Karma |
+| `impressions` | Impressions |
+| `engagement` | Engagement |
+| `engagement_rate` | Engagement Rate |
+| `upvotes` | Upvotes |
+| `comments` | Comments |
+
+### Step 10 — Reddit Ads Metrics
+
+| Key | Label |
+|---|---|
+| `spend` | Spend |
+| `impressions` | Impressions |
+| `clicks` | Clicks |
+| `ctr` | CTR |
+| `cpc` | CPC |
+| `cpm` | CPM |
+| `conversions` | Conversions |
+| `reach` | Reach |
+| `video_views` | Video Views |
+| `engagement_rate` | Engagement Rate |
 
 ---
 
@@ -74,9 +131,26 @@ Currently, AI analysis is hidden when `isPortal` is true. This will enable it fo
 
 | File | Change |
 |---|---|
-| `src/pages/PricingPage.tsx` | Add tooltips, expand comparison table, add feature descriptions |
-| `src/types/database.ts` | Add `PLATFORM_CATEGORIES` constant |
-| `src/components/clients/ClientDashboard.tsx` | Group platforms by category, enable AI for portal, section-based rendering |
-| `src/hooks/useClientDashboard.ts` | Remove portal guard on AI analysis |
-| `supabase/functions/analyze-client/index.ts` | Restructure prompt for sectioned output, increase max_tokens |
+| New migration | Add `reddit`, `reddit_ads` to enum + metric defaults |
+| `src/assets/logos/reddit.webp` | New logo asset (need from you) |
+| `src/types/database.ts` | Add types, labels, logos, metrics, categories |
+| `src/lib/platformRouting.ts` | Add routing entries |
+| `supabase/functions/reddit-connect/index.ts` | New — OAuth connect |
+| `supabase/functions/reddit-ads-connect/index.ts` | New — OAuth connect |
+| `supabase/functions/sync-reddit/index.ts` | New — organic data sync |
+| `supabase/functions/sync-reddit-ads/index.ts` | New — ads data sync |
+| `supabase/functions/oauth-callback/index.ts` | Add Reddit + Reddit Ads handlers |
+| `supabase/functions/scheduled-sync/index.ts` | Add to sync map |
+| `src/components/onboarding/steps/PlatformsStep.tsx` | Add to grid |
+
+---
+
+## What I Need From You First
+
+1. **Create the Reddit app(s)** at https://www.reddit.com/prefs/apps (follow steps above)
+2. **Provide a Reddit logo** in `.webp` format (or confirm I should use a generic one)
+3. **Confirm**: Do you want one Reddit app for both organic + ads, or separate apps?
+4. **Reddit Ads API access**: Have you applied for / been approved for the Reddit Ads API? (It requires separate approval from Reddit)
+
+Once you confirm these, I will store the secrets and build everything.
 
