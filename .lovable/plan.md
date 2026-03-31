@@ -1,28 +1,35 @@
 
 
-# Fix: Use Client Name Slugs for Share Links
+# Set Default Organisation on Login
 
-The previous plan was approved but the code change was never applied. The `createToken` function in `ShareDialog.tsx` still inserts without providing a `token` value, so the database default (`encode(gen_random_bytes(32), 'hex')`) generates the long random strings you're seeing.
+## What it does
 
-## Change
+Adds a "Default Organisation" dropdown to the Account settings. When you log in, the app opens this org instead of whichever one was last used on that device. The setting is stored in the database so it works across all devices.
 
-**File:** `src/components/clients/ShareDialog.tsx`
+## Implementation
 
-1. Add a `generateSlugToken` helper that converts `clientName` to a URL-safe slug and appends a random 4-digit number:
-   - Lowercase, replace non-alphanumeric with hyphens, trim edges, cap at 40 chars
-   - Append `-NNNN` (1000–9999)
-   - Example: `"Black Steel Doors"` → `black-steel-doors-4829`
+### 1. Database migration — add `default_org_id` to `profiles`
 
-2. In the `createToken` function (line 71), pass the generated slug as `token` in the insert:
-```typescript
-const token = generateSlugToken(clientName);
-const { error } = await supabase.from('client_share_tokens').insert({
-  client_id: clientId,
-  org_id: orgId,
-  created_by: user?.id ?? null,
-  token,
-});
-```
+Add a nullable `uuid` column `default_org_id` to the `profiles` table. No foreign key needed (consistent with existing pattern). Default is `NULL`, meaning "use existing behaviour" (last-used org from localStorage).
 
-No database migration needed — the `token` column is `text` and the default is only used when no value is provided. Existing links continue to work.
+### 2. Update `AccountSection.tsx` — add Default Org picker
+
+- Import `useOrg` to access `allMemberships`
+- Add a `Select` dropdown listing all orgs the user belongs to, plus an "Auto (last used)" option
+- On save, include `default_org_id` in the profile update call
+
+### 3. Update `OrgContext.tsx` — respect default org on initial load
+
+In `fetchOrg`, when determining `targetOrgId`:
+- Fetch the user's profile `default_org_id`
+- Priority order: `overrideOrgId` → `localStorage` (only if already set this session) → `default_org_id` from profile → first membership
+- On first login (no localStorage value yet), `default_org_id` takes effect
+
+## Files modified
+
+| File | Change |
+|---|---|
+| Migration | `ALTER TABLE profiles ADD COLUMN default_org_id uuid` |
+| `src/components/settings/AccountSection.tsx` | Add Default Org dropdown using `allMemberships` |
+| `src/contexts/OrgContext.tsx` | Check `profile.default_org_id` as fallback before first membership |
 
