@@ -1,106 +1,69 @@
 
 
-# Expand Google Analytics Data Collection & Dashboard Display
+# Fix Swapped TikTok Platform Mappings
 
-## Current State
+## Root Cause
 
-**Currently synced (7 metrics + 2 tables):**
-- sessions, active_users, new_users, ga_page_views, bounce_rate, avg_session_duration, pages_per_session
-- Top 20 pages (page path, views, users)
-- Traffic sources by channel group (source, sessions, users)
+The `tiktok` (organic) and `tiktok_ads` platform keys are **swapped** across three mapping files, plus there's a stray `handleLinkedIn` call in the oauth-callback. Here's the current (wrong) state:
 
-**Currently missing:** Geographic data, device breakdown, user demographics, conversions, engagement rate, landing pages, referrals, and event data.
-
-## What the GA4 Data API Can Provide
-
-The GA4 `runReport` endpoint supports 100+ metrics and dimensions. Here are the high-value additions grouped by category:
-
-### New Metrics (aggregate KPIs)
-| Metric | GA4 API Name | Value |
+| File | `tiktok` maps to | `tiktok_ads` maps to |
 |---|---|---|
-| Total Users | `totalUsers` | Distinct user count |
-| Engaged Sessions | `engagedSessions` | Sessions > 10s or with conversion |
-| Engagement Rate | `engagementRate` | Inverse of bounce rate, more modern |
-| Conversions | `conversions` | Total conversion events |
-| Event Count | `eventCount` | All tracked events |
-| User Engagement Duration | `userEngagementDuration` | Total engagement time |
+| `ConnectionDialog.tsx` CONNECT_FUNCTION_MAP | `tiktok-ads-connect` | `tiktok-business-connect` |
+| `triggerSync.ts` SYNC_FUNCTION_MAP | `sync-tiktok-ads` | `sync-tiktok-business` |
+| `scheduled-sync/index.ts` | `sync-tiktok-ads` | *(missing)* |
 
-### New Dimension Reports (stored in `raw_data` / `top_content`)
+**The naming is backwards.** `tiktok-ads-connect` uses Login Kit (organic TikTok credentials: `TIKTOK_APP_ID`), while `tiktok-business-connect` uses the Business API (ads credentials: `TIKTOK_BUSINESS_APP_ID`). So when a user picks "TikTok" (organic), it calls `tiktok-ads-connect` which is actually the Login Kit flow — the naming is just confusing but the OAuth itself works. However, the **sync** is completely wrong: organic TikTok connections get routed to `sync-tiktok-ads` which tries to call the TikTok Business/Ads API expecting an advertiser `account_id`, finds none, and returns no data.
 
-| Report | Dimensions | Metrics | Dashboard Display |
-|---|---|---|---|
-| **Geographic (Country)** | `country`, `countryId` | `activeUsers`, `sessions` | **World heatmap** with color intensity by user count |
-| **Geographic (City)** | `city`, `country` | `activeUsers`, `sessions` | Table below heatmap with top 30 cities |
-| **Device Category** | `deviceCategory` | `activeUsers`, `sessions` | Donut chart (Desktop/Mobile/Tablet) |
-| **Browser** | `browser` | `activeUsers` | Horizontal bar chart |
-| **Operating System** | `operatingSystem` | `activeUsers` | Horizontal bar chart |
-| **Landing Pages** | `landingPage` | `sessions`, `activeUsers`, `bounceRate` | Table with bounce rate per page |
-| **Referral Sources** | `sessionSource`, `sessionMedium` | `sessions`, `activeUsers` | Table with source/medium pairs |
-| **New vs Returning** | `newVsReturning` | `activeUsers`, `sessions` | Pie/donut chart |
-| **Page Title** | `pageTitle` | `screenPageViews`, `userEngagementDuration` | Enhanced top pages table |
-
-### About the World Heatmap
-
-GA4 provides `country` and ISO `countryId` dimensions. We can fetch users-per-country and render a **choropleth world map** using a lightweight SVG map component. This is *not* real-time data — it's the synced monthly snapshot data showing geographic distribution for that period. True real-time requires the GA4 Realtime API (`runRealtimeReport`), which only returns the last 30 minutes and would need constant polling — not suitable for our monthly snapshot architecture.
-
-**Recommendation:** Display the geographic heatmap as "User Distribution by Country" for the selected period, which is accurate and valuable for client reporting.
-
----
+Additionally, `oauth-callback/index.ts` line 69 has a stray `await handleLinkedIn(...)` chained after `handleTikTokAds` for `tiktok_ads`.
 
 ## Plan
 
-### 1. Expand sync-google-analytics edge function
-Add 5 new API calls (parallelized with `Promise.all`) to the existing sync:
+### 1. Fix CONNECT_FUNCTION_MAP in ConnectionDialog.tsx
+Swap the mappings:
+- `tiktok` → `tiktok-ads-connect` (this is correct — it's the Login Kit connect function despite the name)
+- `tiktok_ads` → `tiktok-business-connect` (this is correct — it's the Business API connect function)
 
-- **Geographic report:** dimension `country` + `countryId`, metrics `activeUsers`, `sessions` → top 50 countries
-- **City report:** dimension `city`, `country`, metrics `activeUsers`, `sessions` → top 30 cities  
-- **Device report:** dimension `deviceCategory`, metrics `activeUsers`, `sessions`
-- **New vs Returning:** dimension `newVsReturning`, metrics `activeUsers`, `sessions`
-- **Landing pages:** dimension `landingPagePlusQueryString`, metrics `sessions`, `bounceRate` → top 20
+**Actually, the connect functions are named misleadingly but work correctly** because `tiktok-ads-connect` uses `TIKTOK_APP_ID` (Login Kit) and `tiktok-business-connect` uses `TIKTOK_BUSINESS_APP_ID`. The connect flow is fine. The problem is purely in the **sync** routing.
 
-Add 3 new aggregate metrics to the main report request: `totalUsers`, `engagedSessions`, `engagementRate`
+### 2. Fix SYNC_FUNCTION_MAP in triggerSync.ts
+Swap the sync mappings:
+- `tiktok` → `sync-tiktok-business` (organic TikTok uses the Business/Content API for video stats)
+- `tiktok_ads` → `sync-tiktok-ads` (TikTok Ads uses the Ads reporting API)
 
-Store all new data in `raw_data` (geographic, devices, landing pages) and add new keys to `metrics_data` (total_users, engaged_sessions, engagement_rate).
+Wait — let me re-examine. `sync-tiktok-business` calls `business-api.tiktok.com` and `sync-tiktok-ads` also calls an ads API. Need to verify which sync function actually handles organic data.
 
-**File:** `supabase/functions/sync-google-analytics/index.ts`
+### Let me reconsider the actual function contents:
 
-### 2. Update metric definitions in database.ts
-Add new metric keys to the `google_analytics` available metrics array and add labels to `METRIC_LABELS`:
-- `total_users`, `engaged_sessions`, `engagement_rate`
-- `geo_countries` (table), `geo_cities` (table), `device_breakdown` (chart), `new_vs_returning` (chart), `landing_pages` (table)
+- **`sync-tiktok-ads/index.ts`** — calls the TikTok Ads reporting API, expects `account_id` (ad account). This is for **TikTok Ads**.
+- **`sync-tiktok-business/index.ts`** — calls `business-api.tiktok.com` which is the TikTok Business API. This is for **organic TikTok** (video stats, followers, etc.).
 
-**File:** `src/types/database.ts`
+So the correct mapping should be:
+- `tiktok` (organic) → `sync-tiktok-business`
+- `tiktok_ads` → `sync-tiktok-ads`
 
-### 3. Add world heatmap component
-Create a new `GeoHeatmap` component using an inline SVG world map (no heavy dependencies). Countries colored by user intensity on a gradient scale (light → brand color). Hover tooltip showing country name, users, sessions. Below the map, a sortable table of top 30 cities.
+But currently both `triggerSync.ts` and `scheduled-sync` have it **backwards**.
 
-**File:** `src/components/clients/dashboard/GeoHeatmap.tsx` (new)
+### 3. Fix scheduled-sync/index.ts
+Same swap + add the missing `tiktok_ads` entry:
+- `tiktok` → `sync-tiktok-business`
+- `tiktok_ads` → `sync-tiktok-ads`
 
-### 4. Add device breakdown chart
-Create a `DeviceBreakdown` component with a donut chart showing Desktop/Mobile/Tablet split, plus a "New vs Returning" mini donut beside it.
+### 4. Fix oauth-callback/index.ts line 69
+Remove the stray `await handleLinkedIn(...)` that's incorrectly chained after `handleTikTokAds` in the `tiktok_ads` branch. Add a proper `else if (platform === "linkedin")` branch (which likely already exists further down — need to verify it's not missing).
 
-**File:** `src/components/clients/dashboard/DeviceBreakdown.tsx` (new)
+### 5. Fix existing Black Steel Doors connection
+After deploying the code fix, the existing `platform_connections` row for Black Steel Doors has `platform = 'tiktok'` but was authenticated via Login Kit. The OAuth token and connection are valid — the only issue was the sync was routed to the wrong function. Once the mapping is fixed, re-triggering sync from the admin panel will call the correct `sync-tiktok-business` function and data will populate.
 
-### 5. Update PlatformSection to render new GA4 widgets
-When platform is `google_analytics`, render the new components (GeoHeatmap, DeviceBreakdown) below the existing metrics cards, using data from `raw_data`.
-
-**File:** `src/components/clients/dashboard/PlatformSection.tsx`
-
-### 6. Update portal-data edge function
-Ensure `raw_data` is included in the portal response for GA4 snapshots so client portal users also see the new visualizations.
-
-**File:** `supabase/functions/portal-data/index.ts`
+No database migration needed — the connection record is correct, only the code routing was wrong.
 
 ---
 
-## Technical Details
+## Files Modified
 
-- All new GA4 API calls use the same `runReport` endpoint with different dimension/metric combinations
-- New calls are wrapped in try/catch (non-blocking) so a failure in geographic data doesn't break the core sync
-- The world map SVG is ~15KB inline (standard 110-country simplified paths) — no external dependency
-- Country matching uses ISO 2-letter codes from GA4's `countryId` dimension
-- Geographic and device data stored in `raw_data.geoCountries`, `raw_data.geoCities`, `raw_data.devices`, `raw_data.newVsReturning`, `raw_data.landingPages`
-- No database migration needed — all new data fits in existing `metrics_data` (JSONB) and `raw_data` (JSONB) columns
-
-**Files modified:** 6 files (2 edge functions, 1 type file, 1 existing component, 2 new components)
+| File | Change |
+|---|---|
+| `src/lib/triggerSync.ts` | Swap `tiktok`↔`tiktok_ads` sync function names |
+| `src/components/clients/ConnectionDialog.tsx` | Swap `tiktok`↔`tiktok_ads` connect function names (for consistency, even though they happen to work) |
+| `supabase/functions/scheduled-sync/index.ts` | Swap `tiktok` mapping + add `tiktok_ads` entry |
+| `supabase/functions/oauth-callback/index.ts` | Remove stray `handleLinkedIn` from `tiktok_ads` branch |
 
