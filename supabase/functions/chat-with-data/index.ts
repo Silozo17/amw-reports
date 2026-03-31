@@ -44,6 +44,16 @@ Deno.serve(async (req) => {
     const snapshots = snapshotsRes.data ?? [];
     const prevSnapshots = prevSnapshotsRes.data ?? [];
 
+    const businessContext = [
+      client?.industry && `Industry: ${client.industry}`,
+      client?.target_audience && `Target Audience: ${client.target_audience}`,
+      client?.service_area_type && `Service Area: ${client.service_area_type}${client?.service_areas ? ` (${client.service_areas})` : ''}`,
+      client?.business_goals && `Business Goals: ${client.business_goals}`,
+      client?.competitors && `Competitors: ${client.competitors}`,
+      client?.unique_selling_points && `USPs: ${client.unique_selling_points}`,
+      client?.brand_voice && `Brand Voice: ${client.brand_voice}`,
+    ].filter(Boolean).join('\n');
+
     const dataContext = JSON.stringify({
       client_name: client?.company_name || "this client",
       period: `${MONTH_NAMES[month]} ${year}`,
