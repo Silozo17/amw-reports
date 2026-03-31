@@ -1715,7 +1715,7 @@ Deno.serve(async (req) => {
       y += 8;
 
       const summaryText = platformSummaries[section.platform];
-      if (summaryText && platformPageCount <= maxPlatformPages) {
+      if (summaryText && platformPageCount <= maxPlatformPages && client.enable_explanations !== false) {
         y = drawSectionLabel(T.whatThisMeans, y);
 
         doc.setFontSize(8.5);
