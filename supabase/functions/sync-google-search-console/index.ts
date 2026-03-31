@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
     if (existing) {
       await supabase
         .from("monthly_snapshots")
-        .update({ metrics_data: metricsData, top_content: topContent, raw_data: { topQueries, topPages } })
+        .update({ metrics_data: metricsData, top_content: topContent, raw_data: rawData })
         .eq("id", existing.id);
     } else {
       await supabase.from("monthly_snapshots").insert({
