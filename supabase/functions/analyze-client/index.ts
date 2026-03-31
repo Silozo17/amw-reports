@@ -110,6 +110,16 @@ Deno.serve(async (req) => {
       currency,
       platforms_connected: connections.filter((c: any) => c.is_connected && c.account_id).map((c: any) => c.platform),
       categories: categoryData,
+      business_context: {
+        industry: client.industry || null,
+        target_audience: client.target_audience || null,
+        service_area: client.service_area_type || "local",
+        service_areas: client.service_areas || null,
+        business_goals: client.business_goals || null,
+        competitors: client.competitors || null,
+        unique_selling_points: client.unique_selling_points || null,
+        brand_voice: client.brand_voice || null,
+      },
     });
 
     const activeCategories = Object.keys(categoryData);
