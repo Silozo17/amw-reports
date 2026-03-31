@@ -598,6 +598,51 @@ const PlatformSection = ({
             </CollapsibleContent>
           </Collapsible>
         )}
+
+        {/* GA4 Extended Widgets */}
+        {platform === 'google_analytics' && rawData && (
+          <>
+            {((rawData.geoCountries as any[])?.length > 0 || (rawData.geoCities as any[])?.length > 0) && (
+              <GeoHeatmap
+                countries={(rawData.geoCountries as any[]) || []}
+                cities={(rawData.geoCities as any[]) || []}
+              />
+            )}
+            {((rawData.devices as any[])?.length > 0 || (rawData.newVsReturning as any[])?.length > 0) && (
+              <DeviceBreakdown
+                devices={(rawData.devices as any[]) || []}
+                newVsReturning={(rawData.newVsReturning as any[]) || []}
+              />
+            )}
+            {(rawData.landingPages as any[])?.length > 0 && (
+              <Card>
+                <CardContent className="p-5 space-y-3">
+                  <h4 className="text-sm font-semibold font-body">Top Landing Pages</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Landing Page</TableHead>
+                          <TableHead className="text-right">Sessions</TableHead>
+                          <TableHead className="text-right">Bounce Rate</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(rawData.landingPages as any[]).slice(0, 15).map((lp: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-sm font-body max-w-[300px] truncate">{lp.page}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(lp.sessions ?? 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(lp.bounceRate ?? 0).toFixed(1)}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
