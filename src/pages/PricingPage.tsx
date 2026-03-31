@@ -103,7 +103,7 @@ const FeatureTooltip = ({ text }: { text: string }) => (
         <Info className="h-3.5 w-3.5" />
       </button>
     </TooltipTrigger>
-    <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+    <TooltipContent side="top" align="center" className="z-[9999] max-w-xs whitespace-normal break-words overflow-visible text-xs leading-relaxed">
       {text}
     </TooltipContent>
   </Tooltip>
