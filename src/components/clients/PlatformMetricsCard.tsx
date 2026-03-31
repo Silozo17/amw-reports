@@ -40,7 +40,8 @@ const formatValue = (key: string, value: number, currencySymbol: string): string
     return `${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   if (key === 'ctr' || key === 'engagement_rate' || key === 'conversion_rate' || key === 'audience_growth_rate') {
-    return `${value.toFixed(2)}%`;
+    const displayVal = key === 'ctr' && value <= 1 ? value * 100 : value;
+    return `${displayVal.toFixed(2)}%`;
   }
   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
   if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
