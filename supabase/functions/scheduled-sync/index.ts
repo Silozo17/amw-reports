@@ -232,19 +232,44 @@ Deno.serve(async (req) => {
           results.push(result.value);
         } else {
           const errorMsg = result.reason instanceof Error ? result.reason.message : "Unknown error";
-          results.push({
-            connection_id: task.conn.id,
-            platform: task.conn.platform,
-            month: task.month,
-            year: task.year,
-            success: false,
-            error: errorMsg,
-          });
 
-          // Fire-and-forget failure notification
-          const taskClientData = (task.conn as Record<string, unknown>).clients as { org_id: string };
-          const orgId = taskClientData.org_id;
-          notifySyncFailure(supabase, orgId, task.conn.client_id, task.conn.platform, errorMsg, task.month, task.year);
+          // Cross-check sync_logs before treating as failure — the sync
+          // function may have succeeded even if the invoke relay timed out.
+          const { data: lastLog } = await supabase
+            .from("sync_logs")
+            .select("status")
+            .eq("client_id", task.conn.client_id)
+            .eq("platform", task.conn.platform)
+            .eq("report_month", task.month)
+            .eq("report_year", task.year)
+            .order("started_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (lastLog?.status === "success" || lastLog?.status === "partial") {
+            // Sync actually succeeded — record as success, skip failure email
+            results.push({
+              connection_id: task.conn.id,
+              platform: task.conn.platform,
+              month: task.month,
+              year: task.year,
+              success: true,
+            });
+          } else {
+            results.push({
+              connection_id: task.conn.id,
+              platform: task.conn.platform,
+              month: task.month,
+              year: task.year,
+              success: false,
+              error: errorMsg,
+            });
+
+            // Fire-and-forget failure notification
+            const taskClientData = (task.conn as Record<string, unknown>).clients as { org_id: string };
+            const orgId = taskClientData.org_id;
+            notifySyncFailure(supabase, orgId, task.conn.client_id, task.conn.platform, errorMsg, task.month, task.year);
+          }
         }
       }
     }

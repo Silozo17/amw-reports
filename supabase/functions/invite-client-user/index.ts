@@ -99,10 +99,12 @@ Deno.serve(async (req) => {
     }
 
     // Generate magic link for the email
+    const redirectTo = `${req.headers.get("origin") || supabaseUrl}/client-portal`;
     const { data: linkData, error: linkErr } =
       await supabaseAdmin.auth.admin.generateLink({
         type: "magiclink",
         email: email.toLowerCase(),
+        options: { redirectTo },
       });
 
     if (linkErr) {
@@ -118,6 +120,7 @@ Deno.serve(async (req) => {
 
     // Get or create the user_id from the link response
     const invitedUserId = linkData.user?.id;
+    const magicLink = linkData.properties?.action_link;
 
     if (!invitedUserId) {
       return new Response(
@@ -151,17 +154,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send the magic link email via OTP (this actually sends the email)
-    const { error: otpErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "magiclink",
-      email: email.toLowerCase(),
-      options: {
-        redirectTo: `${req.headers.get("origin") || supabaseUrl}/client-portal`,
-      },
-    });
-
-    if (otpErr) {
-      console.error("OTP send error:", otpErr);
+    // Send the invite email via the branded email system
+    try {
+      await supabaseAdmin.functions.invoke("send-branded-email", {
+        body: {
+          template_name: "client_invite",
+          recipient_email: email.toLowerCase(),
+          org_id: client.org_id,
+          data: {
+            magic_link: magicLink,
+            client_name: client.company_name,
+            redirect_url: redirectTo,
+          },
+        },
+      });
+    } catch (emailErr) {
+      console.error("Failed to send invite email:", emailErr);
+      // Don't fail the whole invite — the client_user record was created
     }
 
     return new Response(
