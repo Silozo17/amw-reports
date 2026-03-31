@@ -225,8 +225,8 @@ const PlatformSection = ({
 
   // Top content for tables
   const socialPosts = (topContent ?? []).filter(p => p.message || p.caption || p.full_picture || p.permalink_url || p.likes || p.comments || p.shares);
-  const gscQueries = (topContent ?? []).filter(p => p.query);
-  const gscPages = (topContent ?? []).filter(p => p.page && !p.query);
+  const gscQueries = (topContent ?? []).filter(p => p.type === 'query' || (p.query && platform === 'google_search_console'));
+  const gscPages = (topContent ?? []).filter(p => p.type === 'page' && platform === 'google_search_console');
   const gaPages = (topContent ?? []).filter(p => p.page && !p.query && platform === 'google_analytics');
   const gaSources = (topContent ?? []).filter(p => p.source);
   const ytVideos = (topContent ?? []).filter(p => p.title);
