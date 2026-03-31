@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
     ]);
 
     const clientName = clientRes.data?.company_name || "your business";
+    const preferredCurrency = clientRes.data?.preferred_currency || "GBP";
     const snapshots = snapshotsRes.data ?? [];
     const prevSnapshots = prevSnapshotsRes.data ?? [];
 
