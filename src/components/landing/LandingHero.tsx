@@ -77,6 +77,8 @@ const LandingHero = () => {
               src={mascot}
               alt="AMW Media mascot"
               className="w-64 h-64 xl:w-[28rem] xl:h-[28rem] 2xl:w-[32rem] 2xl:h-[32rem] object-contain animate-hero-grow-in"
+              width={448}
+              height={448}
             />
           </div>
         </div>
