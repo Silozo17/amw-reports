@@ -35,6 +35,7 @@ const getPasswordStrength = (password: string) => {
 
 const AccountSection = () => {
   const { user, profile, refetchProfile } = useAuth();
+  const { allMemberships } = useOrg();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
@@ -43,6 +44,7 @@ const AccountSection = () => {
   const [position, setPosition] = useState(profile?.position ?? '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
   const [accountType, setAccountType] = useState(profile?.account_type ?? 'business');
+  const [defaultOrgId, setDefaultOrgId] = useState<string>((profile as any)?.default_org_id ?? 'auto');
 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
