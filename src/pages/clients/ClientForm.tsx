@@ -54,7 +54,16 @@ const ClientForm = () => {
     enable_yoy_comparison: true,
     enable_explanations: true,
     report_detail_level: 'standard',
+    industry: '',
+    target_audience: '',
+    service_area_type: 'local',
+    service_areas: '',
+    business_goals: '',
+    competitors: '',
+    unique_selling_points: '',
+    brand_voice: '',
   });
+  const [showBusinessContext, setShowBusinessContext] = useState(false);
 
   const handleChange = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
