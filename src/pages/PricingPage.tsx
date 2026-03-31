@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, X, ChevronDown, FileText, Share2, BarChart3, Mail } from 'lucide-react';
+import { ArrowRight, Check, X, ChevronDown, FileText, Share2, BarChart3, Mail, Info, Sparkles, Users, Clock, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
 
 const UNIVERSAL_FEATURES = [
-  { icon: FileText, label: 'Branded PDF Reports' },
-  { icon: Share2, label: 'Client Portal' },
-  { icon: BarChart3, label: '12 Platform Integrations' },
-  { icon: Mail, label: 'Monthly Reports' },
+  { icon: FileText, label: 'Branded PDF Reports', desc: 'Professional reports with your logo and colours, auto-generated every month.' },
+  { icon: Share2, label: 'Client Portal', desc: 'A shareable link for each client — no login needed for them to view their dashboard.' },
+  { icon: BarChart3, label: '12 Platform Integrations', desc: 'Connect Google Ads, Meta, Instagram, LinkedIn, TikTok, YouTube, Pinterest and more.' },
+  { icon: Mail, label: 'Monthly Reports', desc: 'Automated report generation delivered to your inbox or your clients\' inbox.' },
 ];
 
 const PLANS = [
@@ -18,6 +19,7 @@ const PLANS = [
     price: 'Free',
     period: '',
     desc: 'Perfect for trying out the platform with a single client.',
+    audience: 'Best for solo marketers testing the waters.',
     cta: 'Get Started Free',
     href: '/login?view=signup',
     highlight: false,
@@ -28,34 +30,49 @@ const PLANS = [
     price: '£29.99',
     period: '/month',
     desc: 'For freelancers and small teams managing multiple clients.',
+    audience: 'Best for freelancers with 2–10 clients.',
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: false,
-    features: ['5 clients included', '25 platform connections', 'Weekly data sync', 'Branded PDF reports', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
+    features: ['5 clients included', '25 platform connections', 'Weekly data sync', 'Branded PDF reports', 'Automated email delivery', 'AI-powered analysis', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
   },
   {
     name: 'Agency',
     price: '£49.99',
     period: '/month',
     desc: 'Full white-label branding and custom domain for your agency.',
+    audience: 'Best for agencies wanting full brand control.',
     cta: 'Get Started',
     href: '/login?view=signup',
     highlight: true,
-    features: ['5 clients included', '25 platform connections', 'Daily data sync', 'Full white-label branding', 'Custom domain support', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
+    features: ['5 clients included', '25 platform connections', 'Daily data sync', 'Full white-label branding', 'Custom domain support', 'AI-powered analysis', 'Automated email delivery', 'Add-on clients £9.99/mo each', 'Add-on connections £9.99/mo (5 pack)'],
   },
 ];
 
-const COMPARISON_ROWS = [
-  { feature: 'Clients included', starter: '1', freelance: '5', agency: '5' },
-  { feature: 'Connections included', starter: '5', freelance: '25', agency: '25' },
-  { feature: 'Branded PDF Reports', starter: true, freelance: true, agency: true },
-  { feature: 'Client Portal', starter: true, freelance: true, agency: true },
-  { feature: 'Automated Email Delivery', starter: false, freelance: true, agency: true },
-  { feature: 'White-Label Branding', starter: false, freelance: false, agency: true },
-  { feature: 'Custom Domain', starter: false, freelance: false, agency: true },
-  { feature: 'Additional Clients', starter: false, freelance: '£9.99/mo each', agency: '£9.99/mo each' },
-  { feature: 'Additional Connections', starter: false, freelance: '£9.99/mo (5 pack)', agency: '£9.99/mo (5 pack)' },
-  { feature: 'Data Sync Frequency', starter: 'Monthly', freelance: 'Weekly', agency: 'Daily' },
+interface ComparisonRow {
+  feature: string;
+  tooltip: string;
+  starter: boolean | string;
+  freelance: boolean | string;
+  agency: boolean | string;
+}
+
+const COMPARISON_ROWS: ComparisonRow[] = [
+  { feature: 'Clients Included', tooltip: 'A client is one of your customers. Each client has their own dashboard, connections, and reports.', starter: '1', freelance: '5', agency: '5' },
+  { feature: 'Connections Included', tooltip: 'A connection links one client to one platform. E.g. connecting Google Ads + Instagram for one client = 2 connections.', starter: '5', freelance: '25', agency: '25' },
+  { feature: 'Data Sync Frequency', tooltip: 'How often we pull fresh data from your connected platforms. More frequent = more up-to-date dashboards.', starter: 'Monthly', freelance: 'Weekly', agency: 'Daily' },
+  { feature: 'Branded PDF Reports', tooltip: 'Professionally designed PDF reports with your branding, generated automatically from your data.', starter: true, freelance: true, agency: true },
+  { feature: 'Client Portal', tooltip: 'A unique shareable link for each client to view their live dashboard — no login required for them.', starter: true, freelance: true, agency: true },
+  { feature: 'AI-Powered Analysis', tooltip: 'An AI assistant that analyses your marketing data and provides plain-English insights, trends, and recommendations.', starter: false, freelance: true, agency: true },
+  { feature: 'Automated Email Delivery', tooltip: 'Automatically send reports to your clients via email on a schedule you choose.', starter: false, freelance: true, agency: true },
+  { feature: 'Team Members', tooltip: 'Invite team members to your organisation to collaborate on client management and reporting.', starter: '1', freelance: 'Unlimited', agency: 'Unlimited' },
+  { feature: 'Report Customisation', tooltip: 'Choose which metrics appear per platform, reorder sections, and toggle features like month-over-month comparisons.', starter: 'Basic', freelance: 'Full', agency: 'Full' },
+  { feature: 'White-Label Branding', tooltip: 'Remove all AMW Reports branding. Your logo, colours, and fonts appear everywhere — reports, portal, and emails.', starter: false, freelance: false, agency: true },
+  { feature: 'Custom Domain', tooltip: 'Use your own domain (e.g. reports.youragency.com) for the client portal instead of our default URL.', starter: false, freelance: false, agency: true },
+  { feature: 'Data Retention', tooltip: 'How long we store your historical data. Longer retention means more trend analysis and year-over-year comparisons.', starter: '6 months', freelance: '24 months', agency: 'Unlimited' },
+  { feature: 'Email Support', tooltip: 'Priority and response time for email support queries.', starter: 'Community', freelance: 'Standard', agency: 'Priority' },
+  { feature: 'Additional Clients', tooltip: 'Add more clients beyond your plan\'s included amount. Each add-on client comes with 5 connections (3 reserved + 2 flexible).', starter: false, freelance: '£9.99/mo each', agency: '£9.99/mo each' },
+  { feature: 'Additional Connections', tooltip: 'Buy extra connections in packs of 5, usable across any client. Great for clients with many platforms.', starter: false, freelance: '£9.99/mo (5 pack)', agency: '£9.99/mo (5 pack)' },
 ];
 
 const FAQS = [
@@ -78,6 +95,19 @@ const CellValue = ({ value }: { value: boolean | string }) => {
   return value ? <Check className="h-4 w-4 text-accent mx-auto" aria-label="Included" /> : <X className="h-4 w-4 text-amw-offwhite/20 mx-auto" aria-label="Not included" />;
 };
 
+const FeatureTooltip = ({ text }: { text: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button type="button" className="inline-flex items-center ml-1.5 text-amw-offwhite/30 hover:text-primary transition-colors">
+        <Info className="h-3.5 w-3.5" />
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+      {text}
+    </TooltipContent>
+  </Tooltip>
+);
+
 const PricingPage = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   usePageMeta({
@@ -86,7 +116,7 @@ const PricingPage = () => {
   });
 
   return (
-    <>
+    <TooltipProvider delayDuration={200}>
       {/* Hero */}
       <section className="relative py-20 lg:py-28 text-center">
         <div className="absolute inset-0 pointer-events-none">
@@ -105,12 +135,18 @@ const PricingPage = () => {
       {/* Universal Features */}
       <section className="pb-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body text-center mb-6">What every plan includes</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {UNIVERSAL_FEATURES.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/30 border border-sidebar-border/30 hover:border-primary/50 transition-colors">
-                <Icon className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-xs font-body text-amw-offwhite/70">{label}</span>
+          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body text-center mb-2">What every plan includes</p>
+          <p className="text-sm text-amw-offwhite/50 font-body text-center mb-6 max-w-lg mx-auto">
+            Every plan — including the free one — comes with these core features out of the box.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {UNIVERSAL_FEATURES.map(({ icon: Icon, label, desc }) => (
+              <div key={label} className="flex flex-col gap-2 p-4 rounded-lg bg-sidebar-accent/30 border border-sidebar-border/30 hover:border-primary/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-xs font-body font-semibold text-amw-offwhite/90">{label}</span>
+                </div>
+                <span className="text-[11px] font-body text-amw-offwhite/50 leading-relaxed">{desc}</span>
               </div>
             ))}
           </div>
@@ -138,11 +174,12 @@ const PricingPage = () => {
                   </span>
                 )}
                 <h3 className="text-lg font-body font-semibold mb-1">{plan.name}</h3>
-                <div className="flex items-baseline gap-1 mb-2">
+                <div className="flex items-baseline gap-1 mb-1">
                   <span className="text-3xl font-heading">{plan.price}</span>
                   {plan.period && <span className="text-sm text-amw-offwhite/50 font-body">{plan.period}</span>}
                 </div>
-                <p className="text-sm text-amw-offwhite/50 font-body mb-6">{plan.desc}</p>
+                <p className="text-sm text-amw-offwhite/50 font-body mb-1">{plan.desc}</p>
+                <p className="text-xs text-primary/70 font-body italic mb-5">{plan.audience}</p>
                 <ul className="space-y-2 mb-6 flex-1">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm font-body text-amw-offwhite/80">
@@ -164,7 +201,10 @@ const PricingPage = () => {
       <section className="py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="font-accent text-lg text-primary text-center mb-2">Side by side</p>
-          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Compare Plans</h2>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-3">Compare Plans</h2>
+          <p className="text-sm text-amw-offwhite/50 font-body text-center mb-10 max-w-lg mx-auto">
+            Hover or tap the <Info className="h-3 w-3 inline-block mx-0.5 text-amw-offwhite/40" /> icons for a plain-English explanation of each feature.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -176,9 +216,12 @@ const PricingPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {COMPARISON_ROWS.map(({ feature, starter, freelance, agency }) => (
+                {COMPARISON_ROWS.map(({ feature, tooltip, starter, freelance, agency }) => (
                   <tr key={feature} className="border-b border-sidebar-border/20">
-                    <td className="py-3 pr-4 text-sm font-body text-amw-offwhite/70">{feature}</td>
+                    <td className="py-3 pr-4 text-sm font-body text-amw-offwhite/70 whitespace-nowrap">
+                      {feature}
+                      <FeatureTooltip text={tooltip} />
+                    </td>
                     <td className="py-3 px-4 text-center"><CellValue value={starter} /></td>
                     <td className="py-3 px-4 text-center"><CellValue value={freelance} /></td>
                     <td className="py-3 pl-4 text-center"><CellValue value={agency} /></td>
@@ -227,7 +270,7 @@ const PricingPage = () => {
           </Button>
         </div>
       </section>
-    </>
+    </TooltipProvider>
   );
 };
 

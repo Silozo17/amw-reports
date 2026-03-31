@@ -9,6 +9,12 @@ const corsHeaders = {
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 60_000;
 
+const PLATFORM_CATEGORIES: Record<string, string[]> = {
+  "Paid Advertising": ["google_ads", "meta_ads", "tiktok_ads"],
+  "Organic Social": ["facebook", "instagram", "tiktok", "linkedin", "youtube", "pinterest"],
+  "SEO & Web Analytics": ["google_search_console", "google_analytics", "google_business_profile"],
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -78,14 +84,31 @@ Deno.serve(async (req) => {
 
     const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+    // Build category-aware data context
+    const activePlatforms = snapshots.map((s: any) => s.platform);
+    const categoryData: Record<string, { current: any[]; previous: any[] }> = {};
+    for (const [cat, platforms] of Object.entries(PLATFORM_CATEGORIES)) {
+      const catCurrent = snapshots.filter((s: any) => platforms.includes(s.platform));
+      const catPrev = prevSnapshots.filter((s: any) => platforms.includes(s.platform));
+      if (catCurrent.length > 0) {
+        categoryData[cat] = {
+          current: catCurrent.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
+          previous: catPrev.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
+        };
+      }
+    }
+
     const dataContext = JSON.stringify({
       client_name: client.company_name,
       month: MONTH_NAMES[month],
       year,
       platforms_connected: connections.filter((c: any) => c.is_connected && c.account_id).map((c: any) => c.platform),
-      current: snapshots.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
-      previous: prevSnapshots.map((s: any) => ({ platform: s.platform, metrics: s.metrics_data })),
+      categories: categoryData,
     });
+
+    const categoryInstructions = Object.keys(categoryData).map(cat => 
+      `## ${cat}\nAnalyse only the ${cat.toLowerCase()} platforms in this section. Highlight key metrics, trends vs last month, and one actionable recommendation.`
+    ).join("\n\n");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -99,17 +122,24 @@ Deno.serve(async (req) => {
           role: "user",
           content: `You are an expert digital marketing analyst. Analyse the following marketing performance data for ${client.company_name} for ${MONTH_NAMES[month]} ${year}.
 
-Write a comprehensive but easy-to-understand analysis (4-6 paragraphs) covering:
-1. Overall performance summary — what's going well and what needs attention
-2. Platform-by-platform breakdown of key trends
-3. Month-over-month changes and what they mean
-4. Actionable recommendations for improvement
+Your response MUST use this exact markdown structure:
 
-Use plain English that a non-technical business owner would understand. Avoid jargon — explain any marketing terms. Be specific with numbers and percentages where available.
+## Overall Performance Summary
+Write 2-3 paragraphs covering the big picture: what's going well, what needs attention, and the most important month-over-month changes. Be specific with numbers and percentages.
+
+${categoryInstructions}
+
+Rules:
+- Use plain English that a non-technical business owner would understand
+- Avoid jargon — explain any marketing terms briefly
+- Be specific with numbers and percentages where available
+- Each category section should be 1-2 short paragraphs
+- Only include category sections that have data
+- Do NOT add any other ## headings beyond the ones specified above
 
 Data: ${dataContext}`
         }],
-        max_tokens: 1000,
+        max_tokens: 2000,
       }),
     });
 
