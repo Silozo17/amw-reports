@@ -6,12 +6,62 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3";
+const VIDEO_LIST_URL = "https://open.tiktokapis.com/v2/video/list/";
+const TOKEN_REFRESH_URL = "https://open.tiktokapis.com/v2/oauth/token/";
 
 interface SyncRequest {
   connection_id: string;
   month: number;
   year: number;
+}
+
+async function refreshAccessToken(
+  refreshToken: string,
+  clientKey: string,
+  clientSecret: string,
+): Promise<{ access_token: string; refresh_token: string; expires_in: number } | null> {
+  const res = await fetch(TOKEN_REFRESH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_key: clientKey,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+  const data = await res.json();
+  if (data.access_token) return data;
+  if (data.data?.access_token) return data.data;
+  console.error("Token refresh failed:", JSON.stringify(data));
+  return null;
+}
+
+async function fetchVideos(accessToken: string, cursor?: number): Promise<{ videos: unknown[]; cursor: number; has_more: boolean }> {
+  const body: Record<string, unknown> = { max_count: 20 };
+  if (cursor) body.cursor = cursor;
+
+  const res = await fetch(`${VIDEO_LIST_URL}?fields=id,title,create_time,cover_image_url,share_url,view_count,like_count,comment_count,share_count,duration`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+  if (data.error?.code === "access_token_invalid") {
+    throw new Error("TOKEN_EXPIRED");
+  }
+  if (data.error?.code) {
+    throw new Error(`TikTok API error: ${data.error.code} — ${data.error.message}`);
+  }
+  return {
+    videos: data.data?.videos ?? [],
+    cursor: data.data?.cursor ?? 0,
+    has_more: data.data?.has_more ?? false,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -34,7 +84,7 @@ Deno.serve(async (req) => {
     if (!connectionId || !month || !year) {
       return new Response(
         JSON.stringify({ error: "connection_id, month, and year are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -48,7 +98,7 @@ Deno.serve(async (req) => {
     if (connError || !conn) {
       return new Response(
         JSON.stringify({ error: "Connection not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -57,14 +107,7 @@ Deno.serve(async (req) => {
     if (!conn.is_connected || !conn.access_token) {
       return new Response(
         JSON.stringify({ error: "Connection is not authenticated. Please connect via OAuth first." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!conn.account_id) {
-      return new Response(
-        JSON.stringify({ error: "No advertiser account selected. Please select an account first." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -90,7 +133,7 @@ Deno.serve(async (req) => {
       .from("sync_logs")
       .insert({
         client_id: clientId,
-        platform: "tiktok_ads",
+        platform: "tiktok",
         status: "running",
         report_month: month,
         report_year: year,
@@ -99,81 +142,115 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
 
-    const accessToken = conn.access_token;
-    const advertiserId = conn.account_id;
+    let accessToken = conn.access_token;
 
-    // Build date range
-    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    // Build date range for target month
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+    const startTs = Math.floor(startOfMonth.getTime() / 1000);
+    const endTs = Math.floor(endOfMonth.getTime() / 1000);
 
-    // Fetch reporting data from TikTok Business API
-    const reportUrl = new URL(`${TIKTOK_API_BASE}/report/integrated/get/`);
-    reportUrl.searchParams.set("advertiser_id", advertiserId);
-    reportUrl.searchParams.set("report_type", "BASIC");
-    reportUrl.searchParams.set("data_level", "AUCTION_ADVERTISER");
-    reportUrl.searchParams.set("dimensions", JSON.stringify(["advertiser_id"]));
-    reportUrl.searchParams.set("metrics", JSON.stringify([
-      "spend", "impressions", "clicks", "ctr", "cpc", "cpm",
-      "conversion", "complete_payment_roas", "reach",
-      "video_play_actions", "total_complete_payment_rate",
-    ]));
-    reportUrl.searchParams.set("start_date", startDate);
-    reportUrl.searchParams.set("end_date", endDate);
+    // Fetch all videos, paginating, and filter by create_time within target month
+    let allVideos: Record<string, unknown>[] = [];
+    let cursor: number | undefined;
+    let hasMore = true;
+    let reachedOlderThanMonth = false;
 
-    const reportRes = await fetch(reportUrl.toString(), {
-      headers: {
-        "Access-Token": accessToken,
-        "Content-Type": "application/json",
-      },
-    });
+    const fetchWithRetry = async () => {
+      while (hasMore && !reachedOlderThanMonth) {
+        try {
+          const result = await fetchVideos(accessToken, cursor);
+          const videos = result.videos as Record<string, unknown>[];
 
-    const reportData = await reportRes.json();
-    console.log("TikTok Ads report response:", JSON.stringify(reportData));
+          for (const video of videos) {
+            const createTime = Number(video.create_time ?? 0);
+            if (createTime >= startTs && createTime <= endTs) {
+              allVideos.push(video);
+            }
+            if (createTime < startTs) {
+              reachedOlderThanMonth = true;
+              break;
+            }
+          }
 
-    if (reportData.code !== 0) {
-      throw new Error(`TikTok API error (${reportData.code}): ${reportData.message || "Unknown error"}`);
+          hasMore = result.has_more;
+          cursor = result.cursor;
+
+          if (videos.length === 0) break;
+        } catch (e) {
+          if (e instanceof Error && e.message === "TOKEN_EXPIRED" && conn.refresh_token) {
+            console.log("Access token expired, attempting refresh...");
+            const clientKey = Deno.env.get("TIKTOK_APP_ID") ?? "";
+            const clientSecret = Deno.env.get("TIKTOK_APP_SECRET") ?? "";
+            const refreshed = await refreshAccessToken(conn.refresh_token, clientKey, clientSecret);
+            if (!refreshed) throw new Error("Failed to refresh TikTok access token");
+
+            accessToken = refreshed.access_token;
+            await supabase.from("platform_connections").update({
+              access_token: refreshed.access_token,
+              refresh_token: refreshed.refresh_token,
+              token_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+            }).eq("id", connectionId);
+
+            // Retry this page
+            continue;
+          }
+          throw e;
+        }
+      }
+    };
+
+    await fetchWithRetry();
+    console.log(`Found ${allVideos.length} TikTok videos for ${year}-${month}`);
+
+    // Aggregate metrics
+    let totalViews = 0;
+    let totalLikes = 0;
+    let totalComments = 0;
+    let totalShares = 0;
+
+    const topContent: Record<string, unknown>[] = [];
+
+    for (const video of allVideos) {
+      const views = Number(video.view_count ?? 0);
+      const likes = Number(video.like_count ?? 0);
+      const comments = Number(video.comment_count ?? 0);
+      const shares = Number(video.share_count ?? 0);
+
+      totalViews += views;
+      totalLikes += likes;
+      totalComments += comments;
+      totalShares += shares;
+
+      topContent.push({
+        id: video.id,
+        title: video.title || "(No caption)",
+        message: video.title || "(No caption)",
+        permalink_url: video.share_url,
+        full_picture: video.cover_image_url,
+        created_time: video.create_time ? new Date(Number(video.create_time) * 1000).toISOString() : undefined,
+        likes,
+        comments,
+        shares,
+        engagement: likes + comments + shares,
+        views,
+      });
     }
 
-    // Parse metrics from response
-    const rows = reportData.data?.list || [];
-    let totalSpend = 0;
-    let totalImpressions = 0;
-    let totalClicks = 0;
-    let totalConversions = 0;
-    let totalReach = 0;
-    let totalVideoViews = 0;
-    let totalConversionsValue = 0;
+    // Sort top content by engagement descending
+    topContent.sort((a, b) => (Number(b.engagement) || 0) - (Number(a.engagement) || 0));
 
-    for (const row of rows) {
-      const metrics = row.metrics || {};
-      totalSpend += Number(metrics.spend || 0);
-      totalImpressions += Number(metrics.impressions || 0);
-      totalClicks += Number(metrics.clicks || 0);
-      totalConversions += Number(metrics.conversion || 0);
-      totalReach += Number(metrics.reach || 0);
-      totalVideoViews += Number(metrics.video_play_actions || 0);
-      // complete_payment_roas is a ratio, not a value to sum — calculate from spend
-      totalConversionsValue += Number(metrics.complete_payment_roas || 0) * Number(metrics.spend || 0);
-    }
-
-    const overallCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-    const overallCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
-    const overallCpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
-    const overallConversionRate = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
+    const totalEngagement = totalLikes + totalComments + totalShares;
+    const engagementRate = totalViews > 0 ? (totalEngagement / totalViews) * 100 : 0;
 
     const metricsData = {
-      spend: totalSpend,
-      impressions: totalImpressions,
-      clicks: totalClicks,
-      ctr: overallCtr,
-      cpc: overallCpc,
-      cpm: overallCpm,
-      conversions: totalConversions,
-      conversions_value: totalConversionsValue,
-      reach: totalReach,
-      video_views: totalVideoViews,
-      conversion_rate: overallConversionRate,
+      video_views: totalViews,
+      likes: totalLikes,
+      comments: totalComments,
+      shares: totalShares,
+      engagement: totalEngagement,
+      engagement_rate: engagementRate,
+      posts_published: allVideos.length,
     };
 
     // Upsert monthly snapshot
@@ -181,7 +258,7 @@ Deno.serve(async (req) => {
       .from("monthly_snapshots")
       .select("id, snapshot_locked")
       .eq("client_id", clientId)
-      .eq("platform", "tiktok_ads")
+      .eq("platform", "tiktok")
       .eq("report_month", month)
       .eq("report_year", year)
       .single();
@@ -195,19 +272,19 @@ Deno.serve(async (req) => {
         .from("monthly_snapshots")
         .update({
           metrics_data: metricsData,
-          top_content: [],
-          raw_data: { rows },
+          top_content: topContent.slice(0, 10),
+          raw_data: { videos: allVideos },
         })
         .eq("id", existing.id);
     } else {
       await supabase.from("monthly_snapshots").insert({
         client_id: clientId,
-        platform: "tiktok_ads",
+        platform: "tiktok",
         report_month: month,
         report_year: year,
         metrics_data: metricsData,
-        top_content: [],
-        raw_data: { rows },
+        top_content: topContent.slice(0, 10),
+        raw_data: { videos: allVideos },
       });
     }
 
@@ -230,14 +307,11 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        metrics: metricsData,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: true, metrics: metricsData }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
-    console.error("TikTok Ads sync error:", e);
+    console.error("TikTok organic sync error:", e);
 
     if (connectionId) {
       await supabase
@@ -251,7 +325,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
