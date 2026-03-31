@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
+import { SYNC_FUNCTION_MAP } from '@/lib/platformRouting';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
