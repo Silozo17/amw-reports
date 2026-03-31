@@ -69,17 +69,30 @@ const ClientDetail = () => {
       setSearchParams({}, { replace: true });
       supabase
         .from('platform_connections')
-        .select('platform, account_name')
+        .select('*')
         .eq('id', oauthConnected)
         .single()
-        .then(({ data }) => {
+        .then(async ({ data }) => {
           if (data) {
-            const label = PLATFORM_LABELS[data.platform as PlatformType];
-            toast.success(`${label} connected successfully${data.account_name ? ` — ${data.account_name}` : ''}`);
+            const conn = data as PlatformConnection;
+            const label = PLATFORM_LABELS[conn.platform];
+            toast.success(`${label} connected successfully${conn.account_name ? ` — ${conn.account_name}` : ''}`);
+            await fetchData();
+
+            // Auto-trigger 12-month sync for platforms that auto-select (e.g. TikTok organic)
+            if (conn.account_id && conn.is_connected) {
+              setSyncStartTime(Date.now());
+              setActiveSyncs(new Map([[conn.platform, { platform: conn.platform, completed: 0, total: 12, currentMonth: 0, currentYear: 0 }]]));
+              triggerInitialSync(conn.id, conn.platform, 12, (progress) => {
+                setActiveSyncs(prev => new Map(prev).set(conn.platform, progress));
+              }).then(() => {
+                fetchData();
+              });
+            }
           } else {
             toast.success('Platform connected successfully');
+            fetchData();
           }
-          fetchData();
         });
     }
 
