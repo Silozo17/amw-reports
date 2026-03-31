@@ -31,6 +31,7 @@ export function computeOpportunityAlerts(
   current: SnapshotLike[],
   previous: SnapshotLike[],
   currSymbol: string,
+  partialMonthRatio: number = 1,
 ): OpportunityAlert[] {
   const alerts: OpportunityAlert[] = [];
 
@@ -55,9 +56,12 @@ export function computeOpportunityAlerts(
       }
     }
 
+    // Scale factor for volume metrics when viewing a partial month
+    const r = partialMonthRatio > 0 && partialMonthRatio <= 1 ? partialMonthRatio : 1;
+
     // Engagement Spike (win)
     const curEng = (m.engagement || 0) + (m.likes || 0) + (m.comments || 0) + (m.shares || 0);
-    const prevEng = (pm.engagement || 0) + (pm.likes || 0) + (pm.comments || 0) + (pm.shares || 0);
+    const prevEng = ((pm.engagement || 0) + (pm.likes || 0) + (pm.comments || 0) + (pm.shares || 0)) * r;
     if (curEng > 0 && prevEng > 0) {
       const engChange = pctChange(curEng, prevEng);
       if (engChange >= 25) {
@@ -73,7 +77,7 @@ export function computeOpportunityAlerts(
 
     // Reach Decline (warning)
     const curReach = m.reach || m.views || 0;
-    const prevReach = pm.reach || pm.views || 0;
+    const prevReach = (pm.reach || pm.views || 0) * r;
     if (curReach > 0 && prevReach > 0) {
       const reachChange = pctChange(curReach, prevReach);
       if (reachChange <= -20) {
@@ -114,7 +118,7 @@ export function computeOpportunityAlerts(
       }
     }
 
-    // Follower growth (win)
+    // Follower growth (win) — followers are a cumulative total, not volume; don't scale
     const curFollowers = m.total_followers || 0;
     const prevFollowers = pm.total_followers || 0;
     if (curFollowers > 0 && prevFollowers > 0) {

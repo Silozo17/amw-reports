@@ -343,7 +343,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
           <HealthScore current={filtered} previous={filteredPrev} />
 
           {/* Opportunity Alerts */}
-          <OpportunityAlerts current={filtered} previous={filteredPrev} currSymbol={currSymbol} />
+          <OpportunityAlerts current={filtered} previous={filteredPrev} currSymbol={currSymbol} selectedPeriod={selectedPeriod} />
 
           <HeroKPIs kpis={kpis} currSymbol={currSymbol} sparklineMap={sparklineMap} />
           <PerformanceOverview
