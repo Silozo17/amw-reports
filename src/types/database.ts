@@ -444,3 +444,10 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'total_pins', 'total_boards', 'top_boards',
   ],
 };
+
+/** Platform categories for grouped dashboard display */
+export const PLATFORM_CATEGORIES: { label: string; platforms: PlatformType[] }[] = [
+  { label: 'Paid Advertising', platforms: ['google_ads', 'meta_ads', 'tiktok_ads'] },
+  { label: 'Organic Social', platforms: ['facebook', 'instagram', 'tiktok', 'linkedin', 'youtube', 'pinterest'] },
+  { label: 'SEO & Web Analytics', platforms: ['google_search_console', 'google_analytics', 'google_business_profile'] },
+];

@@ -7,14 +7,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ReactMarkdown from "react-markdown";
 import {
   Sparkles, BarChart3, PieChartIcon, AlertCircle, Clock, Loader2,
+  DollarSign, Share2, Search,
 } from "lucide-react";
-import { PLATFORM_LABELS } from "@/types/database";
+import { PLATFORM_LABELS, PLATFORM_CATEGORIES } from "@/types/database";
 import type { PlatformType } from "@/types/database";
 import DashboardHeader from "./DashboardHeader";
 import HeroKPIs from "./dashboard/HeroKPIs";
 import PlatformSection from "./dashboard/PlatformSection";
 import PerformanceOverview from "./dashboard/PerformanceOverview";
 import { useClientDashboard } from "@/hooks/useClientDashboard";
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  'Paid Advertising': DollarSign,
+  'Organic Social': Share2,
+  'SEO & Web Analytics': Search,
+};
 
 // ─── Dashboard Skeleton ────────────────────────────────────────
 const DashboardSkeleton = () => (
@@ -53,6 +60,22 @@ const DashboardSkeleton = () => (
   </div>
 );
 
+/** Parse AI analysis markdown into sections by ## headings */
+const parseAnalysisSections = (analysis: string): Map<string, string> => {
+  const sections = new Map<string, string>();
+  if (!analysis) return sections;
+  const parts = analysis.split(/^## /m);
+  for (const part of parts) {
+    if (!part.trim()) continue;
+    const newlineIdx = part.indexOf('\n');
+    if (newlineIdx === -1) continue;
+    const heading = part.slice(0, newlineIdx).trim();
+    const body = part.slice(newlineIdx + 1).trim();
+    if (body) sections.set(heading, body);
+  }
+  return sections;
+};
+
 interface ClientDashboardProps {
   clientId: string;
   clientName: string;
@@ -85,6 +108,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
     [trendData, selectedPlatform, matchesPlatformFilter]
   );
 
+  const analysisSections = useMemo(() => parseAnalysisSections(aiAnalysis), [aiAnalysis]);
+  const overallSummary = analysisSections.get("Overall Performance Summary") || "";
+
   return (
     <div className="space-y-8">
       {/* Header Controls */}
@@ -96,30 +122,28 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
           onPeriodChange={setSelectedPeriod}
           availablePlatforms={availablePlatforms}
         />
-        {!isPortal && (
-          <div className="flex items-center gap-2">
-            {lastSyncedAt && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                <span>Synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
-              </div>
-            )}
-            <Button
-              size="sm"
-              variant={aiAnalysis ? "outline" : "default"}
-              onClick={handleAnalyse}
-              disabled={isAnalysing || cooldownRemaining > 0}
-              className="gap-2"
-            >
-              {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {isAnalysing ? "Analysing..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? "Refresh Analysis" : "AI Analysis"}
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {!isPortal && lastSyncedAt && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
+            </div>
+          )}
+          <Button
+            size="sm"
+            variant={aiAnalysis ? "outline" : "default"}
+            onClick={handleAnalyse}
+            disabled={isAnalysing || cooldownRemaining > 0}
+            className="gap-2"
+          >
+            {isAnalysing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {isAnalysing ? "Analysing..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : aiAnalysis ? "Refresh Analysis" : "AI Analysis"}
+          </Button>
+        </div>
       </div>
 
-      {/* AI Analysis Card */}
-      {!isPortal && aiAnalysis && aiAnalysisDate && (
+      {/* AI Analysis Card — top-level summary */}
+      {aiAnalysis && aiAnalysisDate && overallSummary && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="flex items-center gap-2">
@@ -131,28 +155,26 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
           </CardHeader>
           <CardContent>
             <div className="text-sm text-muted-foreground line-clamp-3 prose prose-sm max-w-none">
-              <ReactMarkdown>{aiAnalysis.split('\n')[0]}</ReactMarkdown>
+              <ReactMarkdown>{overallSummary.split('\n')[0]}</ReactMarkdown>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* AI Analysis Dialog */}
-      {!isPortal && (
-        <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                AI Performance Analysis
-              </DialogTitle>
-            </DialogHeader>
-            <div className="prose prose-sm max-w-none text-foreground [&_strong]:font-bold [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
-              <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              AI Performance Analysis
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm max-w-none text-foreground [&_strong]:font-bold [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
+            <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Main Content */}
       {isLoading ? (
@@ -196,29 +218,62 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
             trendPlatforms={trendPlatforms}
             gscTrendData={(selectedPlatform === "all" || matchesPlatformFilter(selectedPlatform, "google_search_console")) ? gscTrendData as unknown as Array<Record<string, unknown>> : []}
           />
-          <div className="space-y-6">
+
+          {/* Platform Breakdown — grouped by category */}
+          <div className="space-y-8">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider font-body">Platform Breakdown</h2>
-            {filtered.map(snapshot => {
-              const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
-              const connection = isPortal ? undefined : connections.find(c => c.platform === snapshot.platform);
-              const config = platformConfigs.get(snapshot.platform);
-              const platformPosts = allPosts.filter(p => p.platform === snapshot.platform);
-              const platformTrend = platformTrendMap.get(snapshot.platform);
+            {PLATFORM_CATEGORIES.map(({ label, platforms }) => {
+              const categorySnapshots = filtered.filter(s => platforms.includes(s.platform));
+              if (categorySnapshots.length === 0) return null;
+
+              const CategoryIcon = CATEGORY_ICONS[label] || BarChart3;
+              const categoryAiSection = analysisSections.get(label);
+
               return (
-                <PlatformSection
-                  key={snapshot.platform}
-                  platform={snapshot.platform}
-                  metricsData={snapshot.metrics_data}
-                  prevMetricsData={prevSnapshot?.metrics_data}
-                  connection={connection}
-                  topContent={platformPosts}
-                  trendData={platformTrend}
-                  currSymbol={currSymbol}
-                  enabledMetrics={config?.enabled_metrics}
-                  reportMonth={selectedPeriod.month}
-                  reportYear={selectedPeriod.year}
-                  rawData={snapshot.raw_data}
-                />
+                <div key={label} className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <CategoryIcon className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold font-body text-foreground">{label}</h3>
+                  </div>
+
+                  {/* Per-category AI insight card */}
+                  {categoryAiSection && (
+                    <Card className="border-primary/10 bg-primary/[0.03]">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                          <div className="text-sm text-muted-foreground prose prose-sm max-w-none">
+                            <ReactMarkdown>{categoryAiSection}</ReactMarkdown>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {categorySnapshots.map(snapshot => {
+                    const prevSnapshot = filteredPrev.find(s => s.platform === snapshot.platform);
+                    const connection = isPortal ? undefined : connections.find(c => c.platform === snapshot.platform);
+                    const config = platformConfigs.get(snapshot.platform);
+                    const platformPosts = allPosts.filter(p => p.platform === snapshot.platform);
+                    const platformTrend = platformTrendMap.get(snapshot.platform);
+                    return (
+                      <PlatformSection
+                        key={snapshot.platform}
+                        platform={snapshot.platform}
+                        metricsData={snapshot.metrics_data}
+                        prevMetricsData={prevSnapshot?.metrics_data}
+                        connection={connection}
+                        topContent={platformPosts}
+                        trendData={platformTrend}
+                        currSymbol={currSymbol}
+                        enabledMetrics={config?.enabled_metrics}
+                        reportMonth={selectedPeriod.month}
+                        reportYear={selectedPeriod.year}
+                        rawData={snapshot.raw_data}
+                      />
+                    );
+                  })}
+                </div>
               );
             })}
           </div>
