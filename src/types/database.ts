@@ -426,9 +426,9 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'top_queries', 'gsc_top_pages',
   ],
   google_analytics: [
-    'sessions', 'active_users', 'new_users', 'ga_page_views',
+    'sessions', 'active_users', 'new_users', 'total_users', 'ga_page_views',
     'bounce_rate', 'avg_session_duration', 'pages_per_session',
-    'traffic_sources',
+    'engaged_sessions', 'ga_engagement_rate', 'traffic_sources',
   ],
   google_business_profile: [
     'gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests',
