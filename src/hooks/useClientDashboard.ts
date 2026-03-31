@@ -208,7 +208,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken }: UseC
     }
 
     // Authenticated mode
-    let query = supabase.from("monthly_snapshots").select("platform, metrics_data, top_content, report_month, report_year").eq("client_id", clientId);
+    let query = supabase.from("monthly_snapshots").select("platform, metrics_data, top_content, raw_data, report_month, report_year").eq("client_id", clientId);
     let isMultiMonth = false;
 
     if (type === "quarterly") {
