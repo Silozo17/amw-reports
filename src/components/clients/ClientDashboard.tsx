@@ -1,20 +1,24 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { formatDistanceToNow, format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import ReactMarkdown from "react-markdown";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sparkles, BarChart3, PieChartIcon, AlertCircle, Clock, Loader2,
-  DollarSign, Share2, Search,
+  DollarSign, Share2, Search, MessageCircle,
 } from "lucide-react";
 import { PLATFORM_LABELS, PLATFORM_CATEGORIES } from "@/types/database";
 import type { PlatformType } from "@/types/database";
 import DashboardHeader from "./DashboardHeader";
 import HeroKPIs from "./dashboard/HeroKPIs";
+import HealthScore from "./dashboard/HealthScore";
+import OpportunityAlerts from "./dashboard/OpportunityAlerts";
 import PlatformSection from "./dashboard/PlatformSection";
 import PerformanceOverview from "./dashboard/PerformanceOverview";
+import AiChatDrawer from "./dashboard/AiChatDrawer";
+import VoiceBriefing from "./dashboard/VoiceBriefing";
 import { useClientDashboard } from "@/hooks/useClientDashboard";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
@@ -60,20 +64,64 @@ const DashboardSkeleton = () => (
   </div>
 );
 
-/** Parse AI analysis markdown into sections by ## headings */
-const parseAnalysisSections = (analysis: string): Map<string, string> => {
-  const sections = new Map<string, string>();
-  if (!analysis) return sections;
+/** Parse structured AI analysis JSON or fall back to markdown sections */
+const parseAnalysis = (analysis: string): {
+  keyTakeaway: string;
+  sections: { heading: string; highlights: string[]; recommendation: string }[];
+  raw: string;
+} => {
+  // Try JSON parse first (new structured format)
+  try {
+    const parsed = JSON.parse(analysis);
+    if (parsed.key_takeaway && Array.isArray(parsed.sections)) {
+      return {
+        keyTakeaway: parsed.key_takeaway,
+        sections: parsed.sections.map((s: any) => ({
+          heading: s.heading || "",
+          highlights: Array.isArray(s.highlights) ? s.highlights : [],
+          recommendation: s.recommendation || "",
+        })),
+        raw: analysis,
+      };
+    }
+  } catch {
+    // Not JSON, fall back to markdown parsing
+  }
+
+  // Fallback: parse markdown ## sections
+  const sections: { heading: string; highlights: string[]; recommendation: string }[] = [];
+  let keyTakeaway = "";
   const parts = analysis.split(/^## /m);
+
   for (const part of parts) {
     if (!part.trim()) continue;
     const newlineIdx = part.indexOf('\n');
     if (newlineIdx === -1) continue;
     const heading = part.slice(0, newlineIdx).trim();
     const body = part.slice(newlineIdx + 1).trim();
-    if (body) sections.set(heading, body);
+
+    if (heading.toLowerCase().includes("overall") || heading.toLowerCase().includes("summary")) {
+      keyTakeaway = body.split('\n')[0] || body;
+      sections.push({
+        heading: "Overall Summary",
+        highlights: body.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('•')).map(l => l.replace(/^[-•]\s*/, '').trim()).slice(0, 4),
+        recommendation: "",
+      });
+    } else if (body) {
+      const lines = body.split('\n').filter(l => l.trim());
+      sections.push({
+        heading,
+        highlights: lines.filter(l => l.trim().startsWith('-') || l.trim().startsWith('•')).map(l => l.replace(/^[-•]\s*/, '').trim()).slice(0, 4),
+        recommendation: lines.find(l => l.toLowerCase().includes('recommend')) || "",
+      });
+    }
   }
-  return sections;
+
+  if (!keyTakeaway && analysis) {
+    keyTakeaway = analysis.split('\n').find(l => l.trim()) || analysis.slice(0, 200);
+  }
+
+  return { keyTakeaway, sections, raw: analysis };
 };
 
 interface ClientDashboardProps {
@@ -85,13 +133,14 @@ interface ClientDashboardProps {
 
 const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken }: ClientDashboardProps) => {
   const dashboard = useClientDashboard({ clientId, currencyCode, portalToken });
+  const [chatOpen, setChatOpen] = useState(false);
 
   const {
     selectedPlatform, setSelectedPlatform,
     selectedPeriod, setSelectedPeriod,
     isLoading, isPortal, currSymbol,
     availablePlatforms, connections, platformConfigs,
-    filtered, filteredPrev, trendData,
+    snapshots, filtered, filteredPrev, trendData,
     kpis, sparklineMap,
     spendByPlatform, totalSpend,
     engagementStackedData, impressionsByPlatform,
@@ -101,6 +150,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
     aiAnalysis, aiAnalysisDate, analysisDialogOpen, setAnalysisDialogOpen,
     isAnalysing, cooldownRemaining, handleAnalyse,
     matchesPlatformFilter,
+    prevSnapshots,
   } = dashboard;
 
   const trendPlatforms = useMemo(() =>
@@ -108,8 +158,21 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
     [trendData, selectedPlatform, matchesPlatformFilter]
   );
 
-  const analysisSections = useMemo(() => parseAnalysisSections(aiAnalysis), [aiAnalysis]);
-  const overallSummary = analysisSections.get("Overall Performance Summary") || "";
+  const analysisData = useMemo(() => parseAnalysis(aiAnalysis), [aiAnalysis]);
+
+  // Build a map of category heading -> analysis section for inline rendering
+  const categorySections = useMemo(() => {
+    const map = new Map<string, { highlights: string[]; recommendation: string }>();
+    for (const section of analysisData.sections) {
+      for (const cat of PLATFORM_CATEGORIES) {
+        if (section.heading.toLowerCase().includes(cat.label.toLowerCase()) ||
+            cat.label.toLowerCase().includes(section.heading.toLowerCase())) {
+          map.set(cat.label, { highlights: section.highlights, recommendation: section.recommendation });
+        }
+      }
+    }
+    return map;
+  }, [analysisData]);
 
   return (
     <div className="space-y-8">
@@ -122,13 +185,27 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
           onPeriodChange={setSelectedPeriod}
           availablePlatforms={availablePlatforms}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {!isPortal && lastSyncedAt && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />
               <span>Synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
             </div>
           )}
+          <VoiceBriefing
+            clientId={clientId}
+            month={selectedPeriod.month}
+            year={selectedPeriod.year}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setChatOpen(true)}
+            className="gap-2"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Ask AI
+          </Button>
           <Button
             size="sm"
             variant={aiAnalysis ? "outline" : "default"}
@@ -142,8 +219,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
         </div>
       </div>
 
-      {/* AI Analysis Card — top-level summary */}
-      {aiAnalysis && aiAnalysisDate && overallSummary && (
+      {/* AI Analysis Card — key takeaway */}
+      {aiAnalysis && aiAnalysisDate && analysisData.keyTakeaway && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div className="flex items-center gap-2">
@@ -154,14 +231,14 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
             <Button size="sm" variant="ghost" onClick={() => setAnalysisDialogOpen(true)}>View Full Analysis</Button>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground line-clamp-3 prose prose-sm max-w-none">
-              <ReactMarkdown>{overallSummary.split('\n')[0]}</ReactMarkdown>
-            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+              {analysisData.keyTakeaway}
+            </p>
           </CardContent>
         </Card>
       )}
 
-      {/* AI Analysis Dialog */}
+      {/* AI Analysis Dialog — structured cards with tabs */}
       <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -170,11 +247,66 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
               AI Performance Analysis
             </DialogTitle>
           </DialogHeader>
-          <div className="prose prose-sm max-w-none text-foreground [&_strong]:font-bold [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
-            <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
-          </div>
+
+          {analysisData.sections.length > 1 ? (
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="w-full justify-start">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                {analysisData.sections.filter(s => !s.heading.toLowerCase().includes("overall") && !s.heading.toLowerCase().includes("summary")).map(s => (
+                  <TabsTrigger key={s.heading} value={s.heading}>{s.heading}</TabsTrigger>
+                ))}
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-3 mt-4">
+                <p className="text-sm text-foreground leading-relaxed">
+                  {analysisData.keyTakeaway}
+                </p>
+                {analysisData.sections.find(s => s.heading.toLowerCase().includes("overall") || s.heading.toLowerCase().includes("summary"))?.highlights.map((h, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>{h}</span>
+                  </div>
+                ))}
+              </TabsContent>
+
+              {analysisData.sections.filter(s => !s.heading.toLowerCase().includes("overall") && !s.heading.toLowerCase().includes("summary")).map(section => (
+                <TabsContent key={section.heading} value={section.heading} className="space-y-3 mt-4">
+                  {section.highlights.map((h, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <span className="text-primary mt-0.5">•</span>
+                      <span>{h}</span>
+                    </div>
+                  ))}
+                  {section.recommendation && (
+                    <Card className="border-accent/20 bg-accent/5">
+                      <CardContent className="p-3">
+                        <p className="text-sm text-foreground">
+                          <span className="font-semibold text-accent">💡 Recommendation: </span>
+                          {section.recommendation}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <div className="prose prose-sm max-w-none text-foreground [&_strong]:font-bold [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
+              <p className="text-sm leading-relaxed">{analysisData.keyTakeaway}</p>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
+
+      {/* AI Chat Drawer */}
+      <AiChatDrawer
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+        clientId={clientId}
+        clientName={clientName}
+        month={selectedPeriod.month}
+        year={selectedPeriod.year}
+      />
 
       {/* Main Content */}
       {isLoading ? (
@@ -207,6 +339,12 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
         </Card>
       ) : (
         <div className="space-y-8">
+          {/* Health Score */}
+          <HealthScore current={filtered} previous={filteredPrev} />
+
+          {/* Opportunity Alerts */}
+          <OpportunityAlerts current={filtered} previous={filteredPrev} currSymbol={currSymbol} />
+
           <HeroKPIs kpis={kpis} currSymbol={currSymbol} sparklineMap={sparklineMap} />
           <PerformanceOverview
             spendByPlatform={spendByPlatform}
@@ -227,7 +365,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
               if (categorySnapshots.length === 0) return null;
 
               const CategoryIcon = CATEGORY_ICONS[label] || BarChart3;
-              const categoryAiSection = analysisSections.get(label);
+              const categoryAi = categorySections.get(label);
 
               return (
                 <div key={label} className="space-y-4">
@@ -236,14 +374,24 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
                     <h3 className="text-sm font-semibold font-body text-foreground">{label}</h3>
                   </div>
 
-                  {/* Per-category AI insight card */}
-                  {categoryAiSection && (
+                  {/* Per-category AI insight card — bullet points */}
+                  {categoryAi && categoryAi.highlights.length > 0 && (
                     <Card className="border-primary/10 bg-primary/[0.03]">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-2">
                           <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                          <div className="text-sm text-muted-foreground prose prose-sm max-w-none">
-                            <ReactMarkdown>{categoryAiSection}</ReactMarkdown>
+                          <div className="space-y-1.5">
+                            {categoryAi.highlights.map((h, i) => (
+                              <p key={i} className="text-sm text-muted-foreground flex items-start gap-1.5">
+                                <span className="text-primary shrink-0">•</span>
+                                <span>{h}</span>
+                              </p>
+                            ))}
+                            {categoryAi.recommendation && (
+                              <p className="text-sm text-foreground font-medium mt-2">
+                                💡 {categoryAi.recommendation}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </CardContent>

@@ -76,7 +76,10 @@ Deno.serve(async (req) => {
 
     if (snapshots.length === 0) {
       return new Response(JSON.stringify({ 
-        analysis: "No performance data available yet for this period. Sync platform data to generate an AI analysis." 
+        analysis: JSON.stringify({
+          key_takeaway: "No performance data available yet for this period. Sync platform data to generate an AI analysis.",
+          sections: [],
+        }),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -85,7 +88,6 @@ Deno.serve(async (req) => {
     const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
     // Build category-aware data context
-    const activePlatforms = snapshots.map((s: any) => s.platform);
     const categoryData: Record<string, { current: any[]; previous: any[] }> = {};
     for (const [cat, platforms] of Object.entries(PLATFORM_CATEGORIES)) {
       const catCurrent = snapshots.filter((s: any) => platforms.includes(s.platform));
@@ -106,9 +108,7 @@ Deno.serve(async (req) => {
       categories: categoryData,
     });
 
-    const categoryInstructions = Object.keys(categoryData).map(cat => 
-      `## ${cat}\nAnalyse only the ${cat.toLowerCase()} platforms in this section. Highlight key metrics, trends vs last month, and one actionable recommendation.`
-    ).join("\n\n");
+    const activeCategories = Object.keys(categoryData);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -122,23 +122,60 @@ Deno.serve(async (req) => {
           role: "user",
           content: `You are an expert digital marketing analyst. Analyse the following marketing performance data for ${client.company_name} for ${MONTH_NAMES[month]} ${year}.
 
-Your response MUST use this exact markdown structure:
+Return your analysis by calling the "deliver_analysis" function. Do NOT return plain text.
 
-## Overall Performance Summary
-Write 2-3 paragraphs covering the big picture: what's going well, what needs attention, and the most important month-over-month changes. Be specific with numbers and percentages.
-
-${categoryInstructions}
+Data: ${dataContext}
 
 Rules:
 - Use plain English that a non-technical business owner would understand
-- Avoid jargon — explain any marketing terms briefly
 - Be specific with numbers and percentages where available
-- Each category section should be 1-2 short paragraphs
-- Only include category sections that have data
-- Do NOT add any other ## headings beyond the ones specified above
-
-Data: ${dataContext}`
+- Compare to previous month data where available
+- Each highlight should be one clear, specific sentence
+- Recommendations should be actionable and specific
+- Only include category sections for categories that have data: ${activeCategories.join(", ")}`,
         }],
+        tools: [{
+          type: "function",
+          function: {
+            name: "deliver_analysis",
+            description: "Deliver the structured marketing analysis",
+            parameters: {
+              type: "object",
+              properties: {
+                key_takeaway: {
+                  type: "string",
+                  description: "One sentence summarising the most important finding this month (max 30 words)",
+                },
+                sections: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      heading: {
+                        type: "string",
+                        description: "Section heading: 'Overall Summary', 'Paid Advertising', 'Organic Social', or 'SEO & Web Analytics'",
+                      },
+                      highlights: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "3-4 bullet-point highlights, each one specific sentence with numbers",
+                      },
+                      recommendation: {
+                        type: "string",
+                        description: "One actionable recommendation for this category",
+                      },
+                    },
+                    required: ["heading", "highlights", "recommendation"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["key_takeaway", "sections"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "deliver_analysis" } },
         max_tokens: 2000,
       }),
     });
@@ -167,7 +204,18 @@ Data: ${dataContext}`
     }
 
     const aiResult = await response.json();
-    const analysis = aiResult.choices?.[0]?.message?.content ?? "Unable to generate analysis.";
+    
+    // Extract tool call arguments
+    const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
+    let analysis: string;
+    
+    if (toolCall?.function?.arguments) {
+      // Structured output via tool calling
+      analysis = toolCall.function.arguments;
+    } else {
+      // Fallback to content
+      analysis = aiResult.choices?.[0]?.message?.content ?? "Unable to generate analysis.";
+    }
 
     // Record successful call for rate limiting
     rateLimitMap.set(client_id, Date.now());
