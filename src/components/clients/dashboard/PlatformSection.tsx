@@ -28,6 +28,7 @@ import GeoHeatmap from '@/components/clients/dashboard/GeoHeatmap';
 import DeviceBreakdown from '@/components/clients/dashboard/DeviceBreakdown';
 
 interface TopContentItem {
+  type?: string;
   page_name?: string;
   message?: string;
   caption?: string;
@@ -60,6 +61,9 @@ interface TopContentItem {
   reaction_haha?: number;
   reaction_sorry?: number;
   reaction_anger?: number;
+  country?: string;
+  countryId?: string;
+  device?: string;
 }
 
 interface ConnectionInfo {
