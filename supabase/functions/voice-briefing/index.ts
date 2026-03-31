@@ -76,6 +76,8 @@ Deno.serve(async (req) => {
           role: "user",
           content: `Write a 200-word conversational voice briefing script for ${clientName}'s marketing performance in ${MONTH_NAMES[month]} ${year}.
 
+The client's currency is ${preferredCurrency}. Always use ${preferredCurrency} when mentioning any monetary values. Never use USD or dollars unless ${preferredCurrency} is USD.
+
 Tone: Professional but warm, like a trusted marketing advisor giving a quick morning update.
 
 Structure:
