@@ -50,11 +50,20 @@ const AlertCard = ({ alert }: { alert: OpportunityAlert }) => {
   );
 };
 
-const OpportunityAlerts = ({ current, previous, currSymbol }: OpportunityAlertsProps) => {
-  const alerts = useMemo(
-    () => computeOpportunityAlerts(current, previous, currSymbol),
-    [current, previous, currSymbol],
-  );
+const OpportunityAlerts = ({ current, previous, currSymbol, selectedPeriod }: OpportunityAlertsProps) => {
+  const alerts = useMemo(() => {
+    const now = new Date();
+    const isCurrentMonth =
+      selectedPeriod.type === "monthly" &&
+      selectedPeriod.month === now.getMonth() + 1 &&
+      selectedPeriod.year === now.getFullYear();
+
+    const ratio = isCurrentMonth
+      ? now.getDate() / getDaysInMonth(now)
+      : 1;
+
+    return computeOpportunityAlerts(current, previous, currSymbol, ratio);
+  }, [current, previous, currSymbol, selectedPeriod]);
 
   if (alerts.length === 0) return null;
 
