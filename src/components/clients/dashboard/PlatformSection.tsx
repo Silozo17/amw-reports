@@ -439,7 +439,7 @@ const PlatformSection = ({
             <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', contentOpen && 'rotate-180')} />
               {socialPosts.length > 0 ? 'Top Posts' :
-               gscQueries.length > 0 ? 'Top Search Queries' :
+               gscQueries.length > 0 ? 'Top Search Queries & Pages' :
                ytVideos.length > 0 ? 'Top Videos' :
                gaPages.length > 0 ? 'Top Pages' :
                gaSources.length > 0 ? 'Traffic Sources' : 'Details'}
