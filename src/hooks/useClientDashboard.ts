@@ -392,7 +392,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken }: UseC
     selectedPeriod, setSelectedPeriod,
     isLoading, isPortal, currSymbol,
     availablePlatforms, connections, platformConfigs,
-    snapshots, filtered, filteredPrev, trendData,
+    snapshots, prevSnapshots, filtered, filteredPrev, trendData,
     kpis, sparklineMap,
     spendByPlatform, totalSpend,
     engagementStackedData, impressionsByPlatform,
