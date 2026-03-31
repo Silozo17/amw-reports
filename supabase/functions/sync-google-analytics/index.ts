@@ -32,6 +32,29 @@ async function refreshAccessToken(
   return data;
 }
 
+async function runGA4Report(
+  propertyId: string,
+  accessToken: string,
+  body: Record<string, unknown>
+): Promise<any> {
+  const res = await fetch(
+    `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`GA4 API error (${res.status}): ${errText.substring(0, 300)}`);
+  }
+  return res.json();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -95,7 +118,6 @@ Deno.serve(async (req) => {
       }
     }
 
-
     const { data: syncLog } = await supabase
       .from("sync_logs")
       .insert({
@@ -129,40 +151,83 @@ Deno.serve(async (req) => {
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const dateRanges = [{ startDate, endDate }];
 
-    // Main metrics report
-    const reportRes = await fetch(
-      `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          dateRanges: [{ startDate, endDate }],
-          metrics: [
-            { name: "sessions" },
-            { name: "activeUsers" },
-            { name: "newUsers" },
-            { name: "screenPageViews" },
-            { name: "bounceRate" },
-            { name: "averageSessionDuration" },
-            { name: "screenPageViewsPerSession" },
-          ],
-        }),
-      }
-    );
+    // ── Run all reports in parallel ──────────────────────────────
+    const [mainReport, pagesReport, sourcesReport, geoReport, cityReport, deviceReport, newVsRetReport, landingReport] = await Promise.all([
+      // 1. Main metrics (expanded with 3 new metrics)
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        metrics: [
+          { name: "sessions" },
+          { name: "activeUsers" },
+          { name: "newUsers" },
+          { name: "screenPageViews" },
+          { name: "bounceRate" },
+          { name: "averageSessionDuration" },
+          { name: "screenPageViewsPerSession" },
+          { name: "totalUsers" },
+          { name: "engagedSessions" },
+          { name: "engagementRate" },
+        ],
+      }),
+      // 2. Top pages
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        dimensions: [{ name: "pagePath" }],
+        metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }],
+        limit: 20,
+        orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+      }).catch((e) => { console.warn("Top pages fetch failed:", e); return null; }),
+      // 3. Traffic sources
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        dimensions: [{ name: "sessionDefaultChannelGroup" }],
+        metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+        limit: 10,
+        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      }).catch((e) => { console.warn("Traffic sources fetch failed:", e); return null; }),
+      // 4. Geographic (country)
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        dimensions: [{ name: "country" }, { name: "countryId" }],
+        metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+        limit: 50,
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+      }).catch((e) => { console.warn("Geo country fetch failed:", e); return null; }),
+      // 5. Geographic (city)
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        dimensions: [{ name: "city" }, { name: "country" }],
+        metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+        limit: 30,
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+      }).catch((e) => { console.warn("Geo city fetch failed:", e); return null; }),
+      // 6. Device category
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        dimensions: [{ name: "deviceCategory" }],
+        metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+      }).catch((e) => { console.warn("Device fetch failed:", e); return null; }),
+      // 7. New vs Returning
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        dimensions: [{ name: "newVsReturning" }],
+        metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+      }).catch((e) => { console.warn("New vs returning fetch failed:", e); return null; }),
+      // 8. Landing pages
+      runGA4Report(propertyId, accessToken, {
+        dateRanges,
+        dimensions: [{ name: "landingPagePlusQueryString" }],
+        metrics: [{ name: "sessions" }, { name: "bounceRate" }],
+        limit: 20,
+        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      }).catch((e) => { console.warn("Landing pages fetch failed:", e); return null; }),
+    ]);
 
-    if (!reportRes.ok) {
-      const errText = await reportRes.text();
-      throw new Error(`GA4 API error (${reportRes.status}): ${errText.substring(0, 300)}`);
-    }
-
-    const reportData = await reportRes.json();
-    const values = reportData.rows?.[0]?.metricValues || [];
-
-    const metricsData = {
+    // ── Parse main metrics ───────────────────────────────────────
+    const values = mainReport.rows?.[0]?.metricValues || [];
+    const metricsData: Record<string, number> = {
       sessions: Number(values[0]?.value || 0),
       active_users: Number(values[1]?.value || 0),
       new_users: Number(values[2]?.value || 0),
@@ -170,72 +235,77 @@ Deno.serve(async (req) => {
       bounce_rate: Number(values[4]?.value || 0),
       avg_session_duration: Number(values[5]?.value || 0),
       pages_per_session: Number(values[6]?.value || 0),
+      total_users: Number(values[7]?.value || 0),
+      engaged_sessions: Number(values[8]?.value || 0),
+      ga_engagement_rate: Number(values[9]?.value || 0),
     };
 
-    // Top pages
-    let topPages: any[] = [];
-    try {
-      const pagesRes = await fetch(
-        `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            dateRanges: [{ startDate, endDate }],
-            dimensions: [{ name: "pagePath" }],
-            metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }],
-            limit: 20,
-            orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-          }),
-        }
-      );
-      const pagesData = await pagesRes.json();
-      topPages = (pagesData.rows || []).map((r: any) => ({
-        page: r.dimensionValues?.[0]?.value,
-        views: Number(r.metricValues?.[0]?.value || 0),
-        users: Number(r.metricValues?.[1]?.value || 0),
-      }));
-    } catch (e) {
-      console.warn("Could not fetch top pages:", e);
-    }
+    // ── Parse top pages ──────────────────────────────────────────
+    const topPages = (pagesReport?.rows || []).map((r: any) => ({
+      page: r.dimensionValues?.[0]?.value,
+      views: Number(r.metricValues?.[0]?.value || 0),
+      users: Number(r.metricValues?.[1]?.value || 0),
+    }));
 
-    // Traffic sources
-    let trafficSources: any[] = [];
-    try {
-      const srcRes = await fetch(
-        `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            dateRanges: [{ startDate, endDate }],
-            dimensions: [{ name: "sessionDefaultChannelGroup" }],
-            metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-            limit: 10,
-            orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-          }),
-        }
-      );
-      const srcData = await srcRes.json();
-      trafficSources = (srcData.rows || []).map((r: any) => ({
-        source: r.dimensionValues?.[0]?.value,
-        sessions: Number(r.metricValues?.[0]?.value || 0),
-        users: Number(r.metricValues?.[1]?.value || 0),
-      }));
-    } catch (e) {
-      console.warn("Could not fetch traffic sources:", e);
-    }
+    // ── Parse traffic sources ────────────────────────────────────
+    const trafficSources = (sourcesReport?.rows || []).map((r: any) => ({
+      source: r.dimensionValues?.[0]?.value,
+      sessions: Number(r.metricValues?.[0]?.value || 0),
+      users: Number(r.metricValues?.[1]?.value || 0),
+    }));
 
+    // ── Parse geographic data ────────────────────────────────────
+    const geoCountries = (geoReport?.rows || []).map((r: any) => ({
+      country: r.dimensionValues?.[0]?.value,
+      countryId: r.dimensionValues?.[1]?.value,
+      users: Number(r.metricValues?.[0]?.value || 0),
+      sessions: Number(r.metricValues?.[1]?.value || 0),
+    }));
+
+    const geoCities = (cityReport?.rows || []).map((r: any) => ({
+      city: r.dimensionValues?.[0]?.value,
+      country: r.dimensionValues?.[1]?.value,
+      users: Number(r.metricValues?.[0]?.value || 0),
+      sessions: Number(r.metricValues?.[1]?.value || 0),
+    }));
+
+    // ── Parse device data ────────────────────────────────────────
+    const devices = (deviceReport?.rows || []).map((r: any) => ({
+      device: r.dimensionValues?.[0]?.value,
+      users: Number(r.metricValues?.[0]?.value || 0),
+      sessions: Number(r.metricValues?.[1]?.value || 0),
+    }));
+
+    // ── Parse new vs returning ───────────────────────────────────
+    const newVsReturning = (newVsRetReport?.rows || []).map((r: any) => ({
+      type: r.dimensionValues?.[0]?.value,
+      users: Number(r.metricValues?.[0]?.value || 0),
+      sessions: Number(r.metricValues?.[1]?.value || 0),
+    }));
+
+    // ── Parse landing pages ──────────────────────────────────────
+    const landingPages = (landingReport?.rows || []).map((r: any) => ({
+      page: r.dimensionValues?.[0]?.value,
+      sessions: Number(r.metricValues?.[0]?.value || 0),
+      bounceRate: Number(r.metricValues?.[1]?.value || 0),
+    }));
+
+    // ── Build top_content (legacy format + new types) ────────────
     const topContent = [
       ...topPages.map((p: any) => ({ type: "page", ...p })),
       ...trafficSources.map((s: any) => ({ type: "source", ...s })),
     ];
+
+    // ── Build raw_data with all new dimension reports ────────────
+    const rawData: Record<string, unknown> = {
+      topPages,
+      trafficSources,
+      geoCountries,
+      geoCities,
+      devices,
+      newVsReturning,
+      landingPages,
+    };
 
     // Upsert snapshot
     const { data: existing } = await supabase
@@ -251,7 +321,7 @@ Deno.serve(async (req) => {
 
     if (existing) {
       await supabase.from("monthly_snapshots")
-        .update({ metrics_data: metricsData, top_content: topContent, raw_data: { topPages, trafficSources } })
+        .update({ metrics_data: metricsData, top_content: topContent, raw_data: rawData })
         .eq("id", existing.id);
     } else {
       await supabase.from("monthly_snapshots").insert({
@@ -261,7 +331,7 @@ Deno.serve(async (req) => {
         report_year: year,
         metrics_data: metricsData,
         top_content: topContent,
-        raw_data: { topPages, trafficSources },
+        raw_data: rawData,
       });
     }
 

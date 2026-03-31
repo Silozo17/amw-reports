@@ -24,6 +24,8 @@ import MetricTooltip from '@/components/clients/MetricTooltip';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { useChartColors } from '@/hooks/useChartColors';
+import GeoHeatmap from '@/components/clients/dashboard/GeoHeatmap';
+import DeviceBreakdown from '@/components/clients/dashboard/DeviceBreakdown';
 
 interface TopContentItem {
   page_name?: string;
@@ -77,6 +79,7 @@ interface PlatformSectionProps {
   enabledMetrics?: string[];
   reportMonth: number;
   reportYear: number;
+  rawData?: Record<string, unknown>;
 }
 
 /** Priority metrics per platform category */
@@ -84,7 +87,7 @@ const AD_PLATFORM_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc',
 const META_ADS_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'leads', 'cost_per_lead', 'reach'];
 const SOCIAL_KEY_METRICS = ['reach', 'impressions', 'engagement', 'likes', 'comments', 'shares', 'total_followers', 'follower_growth', 'profile_visits', 'website_clicks', 'video_views', 'saves', 'reel_count'];
 const FACEBOOK_KEY_METRICS = ['views', 'reach', 'engagement', 'reactions', 'comments', 'shares', 'total_followers', 'follower_growth', 'posts_published'];
-const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session'];
+const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'total_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session', 'engaged_sessions', 'ga_engagement_rate'];
 const GSC_KEY_METRICS = ['search_clicks', 'search_impressions', 'search_ctr', 'search_position'];
 const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating'];
 const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers', 'likes', 'comments', 'avg_view_duration'];
@@ -103,7 +106,7 @@ const PLATFORM_KEY_METRICS: Record<string, string[]> = {
 };
 
 const COST_METRICS = new Set(['spend', 'cpc', 'cpm', 'cost_per_conversion', 'cost_per_lead']);
-const PERCENT_METRICS = new Set(['ctr', 'engagement_rate', 'bounce_rate', 'search_ctr', 'conversion_rate', 'audience_growth_rate']);
+const PERCENT_METRICS = new Set(['ctr', 'engagement_rate', 'bounce_rate', 'search_ctr', 'conversion_rate', 'audience_growth_rate', 'ga_engagement_rate']);
 const DECIMAL_METRICS = new Set(['search_position', 'gbp_average_rating', 'pages_per_session', 'avg_session_duration', 'avg_view_duration', 'frequency']);
 
 const formatMetricValue = (key: string, value: number, currSymbol: string): string => {
@@ -170,6 +173,7 @@ const PlatformSection = ({
   enabledMetrics,
   reportMonth,
   reportYear,
+  rawData,
 }: PlatformSectionProps) => {
   const CHART_COLORS = useChartColors();
   const [contentOpen, setContentOpen] = useState(false);
@@ -593,6 +597,51 @@ const PlatformSection = ({
               )}
             </CollapsibleContent>
           </Collapsible>
+        )}
+
+        {/* GA4 Extended Widgets */}
+        {platform === 'google_analytics' && rawData && (
+          <>
+            {((rawData.geoCountries as any[])?.length > 0 || (rawData.geoCities as any[])?.length > 0) && (
+              <GeoHeatmap
+                countries={(rawData.geoCountries as any[]) || []}
+                cities={(rawData.geoCities as any[]) || []}
+              />
+            )}
+            {((rawData.devices as any[])?.length > 0 || (rawData.newVsReturning as any[])?.length > 0) && (
+              <DeviceBreakdown
+                devices={(rawData.devices as any[]) || []}
+                newVsReturning={(rawData.newVsReturning as any[]) || []}
+              />
+            )}
+            {(rawData.landingPages as any[])?.length > 0 && (
+              <Card>
+                <CardContent className="p-5 space-y-3">
+                  <h4 className="text-sm font-semibold font-body">Top Landing Pages</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Landing Page</TableHead>
+                          <TableHead className="text-right">Sessions</TableHead>
+                          <TableHead className="text-right">Bounce Rate</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(rawData.landingPages as any[]).slice(0, 15).map((lp: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-sm font-body max-w-[300px] truncate">{lp.page}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(lp.sessions ?? 0).toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(lp.bounceRate ?? 0).toFixed(1)}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     // Build current period query
     let currentQuery = supabase
       .from("monthly_snapshots")
-      .select("platform, metrics_data, top_content, report_month, report_year")
+      .select("platform, metrics_data, top_content, raw_data, report_month, report_year")
       .eq("client_id", client_id);
 
     let prevMonth = m === 1 ? 12 : m - 1;
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
         ? supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", client_id).eq("report_month", prevMonth).eq("report_year", prevYear)
         : Promise.resolve({ data: [], error: null }),
       supabase.from("monthly_snapshots")
-        .select("platform, metrics_data, top_content, report_month, report_year")
+        .select("platform, metrics_data, top_content, raw_data, report_month, report_year")
         .eq("client_id", client_id)
         .or(`report_year.gt.${startTrendYear},and(report_year.eq.${startTrendYear},report_month.gte.${startTrendMonth})`)
         .order("report_year", { ascending: true })
