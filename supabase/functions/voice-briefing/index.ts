@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     // Fetch data
     const [clientRes, snapshotsRes, prevSnapshotsRes] = await Promise.all([
-      supabase.from("clients").select("company_name").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, preferred_currency").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
     ]);
 
     const clientName = clientRes.data?.company_name || "your business";
+    const preferredCurrency = clientRes.data?.preferred_currency || "GBP";
     const snapshots = snapshotsRes.data ?? [];
     const prevSnapshots = prevSnapshotsRes.data ?? [];
 
@@ -74,6 +75,8 @@ Deno.serve(async (req) => {
         messages: [{
           role: "user",
           content: `Write a 200-word conversational voice briefing script for ${clientName}'s marketing performance in ${MONTH_NAMES[month]} ${year}.
+
+The client's currency is ${preferredCurrency}. Always use ${preferredCurrency} when mentioning any monetary values. Never use USD or dollars unless ${preferredCurrency} is USD.
 
 Tone: Professional but warm, like a trusted marketing advisor giving a quick morning update.
 

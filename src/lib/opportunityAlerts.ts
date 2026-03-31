@@ -88,7 +88,8 @@ export function computeOpportunityAlerts(
     }
 
     // CTR below threshold (warning)
-    const ctr = m.ctr || (m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0);
+    const rawCtr = m.ctr || (m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0);
+    const ctr = rawCtr <= 1 ? rawCtr * 100 : rawCtr;
     if (m.spend > 0 && ctr > 0 && ctr < 2) {
       alerts.push({
         id: `ctr-low-${snap.platform}`,

@@ -97,8 +97,8 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken }: UseC
   const isPortal = !!portalToken;
   const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
-  const defaultMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-  const defaultYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const defaultMonth = now.getMonth() + 1;
+  const defaultYear = now.getFullYear();
 
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformFilter>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod>({
