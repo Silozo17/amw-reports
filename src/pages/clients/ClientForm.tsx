@@ -54,7 +54,16 @@ const ClientForm = () => {
     enable_yoy_comparison: true,
     enable_explanations: true,
     report_detail_level: 'standard',
+    industry: '',
+    target_audience: '',
+    service_area_type: 'local',
+    service_areas: '',
+    business_goals: '',
+    competitors: '',
+    unique_selling_points: '',
+    brand_voice: '',
   });
+  const [showBusinessContext, setShowBusinessContext] = useState(false);
 
   const handleChange = (field: string, value: string | boolean) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -338,6 +347,77 @@ const ClientForm = () => {
                 <Switch checked={form.enable_upsell} onCheckedChange={v => handleChange('enable_upsell', v)} />
               </div>
             </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <button type="button" className="flex items-center gap-2 w-full text-left" onClick={() => setShowBusinessContext(!showBusinessContext)}>
+                <CardTitle className="font-display text-lg">Business Context</CardTitle>
+                <span className="text-xs text-muted-foreground ml-auto">{showBusinessContext ? '▲ Hide' : '▼ Optional'}</span>
+              </button>
+              <p className="text-xs text-muted-foreground">Helps AI generate more relevant insights</p>
+            </CardHeader>
+            {showBusinessContext && (
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Industry</Label>
+                    <Select value={form.industry} onValueChange={v => handleChange('industry', v)}>
+                      <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
+                      <SelectContent>
+                        {[
+                          'Automotive', 'Beauty & Wellness', 'Construction', 'Dental', 'E-commerce',
+                          'Education', 'Events & Entertainment', 'Finance & Insurance', 'Fitness & Gym',
+                          'Food & Beverage', 'Healthcare', 'Home Services', 'Hospitality & Hotels',
+                          'Legal', 'Manufacturing', 'Marketing & Agency', 'Non-Profit',
+                          'Professional Services', 'Real Estate', 'Recruitment', 'Retail',
+                          'SaaS & Technology', 'Sports', 'Travel & Tourism', 'Trades & Plumbing',
+                          'Veterinary', 'Other',
+                        ].map(ind => (
+                          <SelectItem key={ind} value={ind}>{ind}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Service Area</Label>
+                    <Select value={form.service_area_type} onValueChange={v => handleChange('service_area_type', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="local">Local</SelectItem>
+                        <SelectItem value="national">National</SelectItem>
+                        <SelectItem value="international">International</SelectItem>
+                        <SelectItem value="worldwide">Worldwide</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Service Areas (Specific)</Label>
+                  <Input value={form.service_areas} onChange={e => handleChange('service_areas', e.target.value)} placeholder="e.g. Greater Manchester, Leeds, Liverpool" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Target Audience</Label>
+                  <Textarea value={form.target_audience} onChange={e => handleChange('target_audience', e.target.value)} placeholder="e.g. First-time homebuyers aged 25-40 in London" rows={2} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Business Goals</Label>
+                  <Textarea value={form.business_goals} onChange={e => handleChange('business_goals', e.target.value)} placeholder="e.g. Increase leads by 30%, grow Instagram following" rows={2} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Competitors</Label>
+                  <Input value={form.competitors} onChange={e => handleChange('competitors', e.target.value)} placeholder="e.g. Competitor A, Competitor B" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Unique Selling Points</Label>
+                  <Textarea value={form.unique_selling_points} onChange={e => handleChange('unique_selling_points', e.target.value)} placeholder="e.g. 24/7 support, free consultations" rows={2} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Brand Voice</Label>
+                  <Input value={form.brand_voice} onChange={e => handleChange('brand_voice', e.target.value)} placeholder="e.g. Professional but friendly, avoid jargon" />
+                </div>
+              </CardContent>
+            )}
           </Card>
 
           <Card>

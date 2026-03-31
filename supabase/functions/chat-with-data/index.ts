@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
 
     // Fetch client data
     const [clientRes, snapshotsRes, prevSnapshotsRes] = await Promise.all([
-      supabase.from("clients").select("company_name").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, industry, target_audience, service_area_type, service_areas, business_goals, competitors, unique_selling_points, brand_voice").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
@@ -43,6 +43,16 @@ Deno.serve(async (req) => {
     const client = clientRes.data;
     const snapshots = snapshotsRes.data ?? [];
     const prevSnapshots = prevSnapshotsRes.data ?? [];
+
+    const businessContext = [
+      client?.industry && `Industry: ${client.industry}`,
+      client?.target_audience && `Target Audience: ${client.target_audience}`,
+      client?.service_area_type && `Service Area: ${client.service_area_type}${client?.service_areas ? ` (${client.service_areas})` : ''}`,
+      client?.business_goals && `Business Goals: ${client.business_goals}`,
+      client?.competitors && `Competitors: ${client.competitors}`,
+      client?.unique_selling_points && `USPs: ${client.unique_selling_points}`,
+      client?.brand_voice && `Brand Voice: ${client.brand_voice}`,
+    ].filter(Boolean).join('\n');
 
     const dataContext = JSON.stringify({
       client_name: client?.company_name || "this client",
@@ -61,6 +71,7 @@ Deno.serve(async (req) => {
 
 Here is their complete data:
 ${dataContext}
+${businessContext ? `\nBusiness Context:\n${businessContext}` : ''}
 
 Rules:
 - Answer in plain, jargon-free English that any business owner can understand
@@ -70,7 +81,9 @@ Rules:
 - Use bullet points for lists
 - Format currency values appropriately
 - Be encouraging but honest about areas needing improvement
-- Never make up data — only reference what's in the metrics above`;
+- Never make up data — only reference what's in the metrics above
+- If business context is available, tailor your answers to their industry, audience, goals, and service area
+- Consider their competitors and USPs when making suggestions`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

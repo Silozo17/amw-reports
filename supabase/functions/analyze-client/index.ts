@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     // Fetch client + snapshots
     const [clientRes, snapshotsRes, prevSnapshotsRes, connectionsRes] = await Promise.all([
-      supabase.from("clients").select("company_name, services_subscribed, preferred_currency").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, services_subscribed, preferred_currency, industry, target_audience, service_area_type, service_areas, business_goals, competitors, unique_selling_points, brand_voice").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data, top_content").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
@@ -110,6 +110,16 @@ Deno.serve(async (req) => {
       currency,
       platforms_connected: connections.filter((c: any) => c.is_connected && c.account_id).map((c: any) => c.platform),
       categories: categoryData,
+      business_context: {
+        industry: client.industry || null,
+        target_audience: client.target_audience || null,
+        service_area: client.service_area_type || "local",
+        service_areas: client.service_areas || null,
+        business_goals: client.business_goals || null,
+        competitors: client.competitors || null,
+        unique_selling_points: client.unique_selling_points || null,
+        brand_voice: client.brand_voice || null,
+      },
     });
 
     const activeCategories = Object.keys(categoryData);
@@ -137,7 +147,10 @@ Rules:
 - Compare to previous month data where available
 - Each highlight should be one clear, specific sentence
 - Recommendations should be actionable and specific
-- Only include category sections for categories that have data: ${activeCategories.join(", ")}`,
+- Only include category sections for categories that have data: ${activeCategories.join(", ")}
+- If business context is provided (industry, target audience, goals, service area), tailor your recommendations to be relevant to their specific industry, audience, and goals
+- Reference their competitors or USPs when making strategic suggestions
+- Consider their service area scope (local/national/international/worldwide) when recommending strategies`,
         }],
         tools: [{
           type: "function",

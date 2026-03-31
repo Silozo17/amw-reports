@@ -189,8 +189,11 @@ export type Database = {
       clients: {
         Row: {
           account_manager: string | null
+          brand_voice: string | null
           business_address: string | null
+          business_goals: string | null
           company_name: string
+          competitors: string | null
           created_at: string
           created_by: string | null
           email: string | null
@@ -205,6 +208,7 @@ export type Database = {
           enable_yoy_comparison: boolean | null
           full_name: string
           id: string
+          industry: string | null
           is_active: boolean
           logo_url: string | null
           notes: string | null
@@ -217,15 +221,22 @@ export type Database = {
           report_language: string
           reporting_start_date: string | null
           scheduled_deletion_at: string | null
+          service_area_type: string
+          service_areas: string | null
           services_subscribed: string[] | null
           social_handles: Json | null
+          target_audience: string | null
+          unique_selling_points: string | null
           updated_at: string
           website: string | null
         }
         Insert: {
           account_manager?: string | null
+          brand_voice?: string | null
           business_address?: string | null
+          business_goals?: string | null
           company_name: string
+          competitors?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -240,6 +251,7 @@ export type Database = {
           enable_yoy_comparison?: boolean | null
           full_name: string
           id?: string
+          industry?: string | null
           is_active?: boolean
           logo_url?: string | null
           notes?: string | null
@@ -252,15 +264,22 @@ export type Database = {
           report_language?: string
           reporting_start_date?: string | null
           scheduled_deletion_at?: string | null
+          service_area_type?: string
+          service_areas?: string | null
           services_subscribed?: string[] | null
           social_handles?: Json | null
+          target_audience?: string | null
+          unique_selling_points?: string | null
           updated_at?: string
           website?: string | null
         }
         Update: {
           account_manager?: string | null
+          brand_voice?: string | null
           business_address?: string | null
+          business_goals?: string | null
           company_name?: string
+          competitors?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -275,6 +294,7 @@ export type Database = {
           enable_yoy_comparison?: boolean | null
           full_name?: string
           id?: string
+          industry?: string | null
           is_active?: boolean
           logo_url?: string | null
           notes?: string | null
@@ -287,8 +307,12 @@ export type Database = {
           report_language?: string
           reporting_start_date?: string | null
           scheduled_deletion_at?: string | null
+          service_area_type?: string
+          service_areas?: string | null
           services_subscribed?: string[] | null
           social_handles?: Json | null
+          target_audience?: string | null
+          unique_selling_points?: string | null
           updated_at?: string
           website?: string | null
         }
