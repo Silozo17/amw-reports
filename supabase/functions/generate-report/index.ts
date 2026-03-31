@@ -1217,6 +1217,7 @@ Deno.serve(async (req) => {
       const topContent = Array.isArray(snapshot.top_content) ? snapshot.top_content : [];
 
       let enabledMetrics: string[];
+      const metricDefaults = (metricDefaultsRes?.data ?? []) as { platform: string; default_metrics: string[] }[];
       if (config?.enabled_metrics?.length > 0) {
         const configMetrics = (config.enabled_metrics as string[]).filter((k: string) => METRIC_LABELS[k] && !HIDDEN_METRICS.has(k));
         enabledMetrics = configMetrics.filter(k => {
@@ -1226,7 +1227,19 @@ Deno.serve(async (req) => {
           return curr !== 0 || prev !== 0;
         }).slice(0, 12);
       } else {
-        enabledMetrics = cleanMetricsForDisplay(snapshot.platform as string, metrics, hasPrevSnapshot ? prevMetrics : null);
+        // Fall back to org-level metric defaults if available
+        const platformDefault = metricDefaults.find(d => d.platform === snapshot.platform);
+        if (platformDefault?.default_metrics?.length > 0) {
+          const defaultMetrics = platformDefault.default_metrics.filter((k: string) => METRIC_LABELS[k] && !HIDDEN_METRICS.has(k));
+          enabledMetrics = defaultMetrics.filter(k => {
+            if (ALWAYS_SHOW_METRICS.has(k)) return true;
+            const curr = metrics[k] ?? 0;
+            const prev = prevMetrics[k] ?? 0;
+            return curr !== 0 || prev !== 0;
+          }).slice(0, 12);
+        } else {
+          enabledMetrics = cleanMetricsForDisplay(snapshot.platform as string, metrics, hasPrevSnapshot ? prevMetrics : null);
+        }
       }
 
       const hasAnyData = enabledMetrics.some(k => (metrics[k] ?? 0) !== 0);
