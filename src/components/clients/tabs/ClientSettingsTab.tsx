@@ -227,7 +227,7 @@ const ClientSettingsTab = ({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <p className="text-sm font-medium">Industry</p>
-              <Select value={client.industry ?? ''} onValueChange={v => onSettingChange('industry', v)}>
+              <Select value={draft.industry} onValueChange={v => handleDraftChange('industry', v)}>
                 <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
                 <SelectContent>
                   {[
@@ -246,7 +246,7 @@ const ClientSettingsTab = ({
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium">Service Area</p>
-              <Select value={client.service_area_type ?? 'local'} onValueChange={v => onSettingChange('service_area_type', v)}>
+              <Select value={draft.service_area_type} onValueChange={v => handleDraftChange('service_area_type', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="local">Local</SelectItem>
@@ -260,8 +260,8 @@ const ClientSettingsTab = ({
           <div className="space-y-2">
             <p className="text-sm font-medium">Service Areas (Specific)</p>
             <Input
-              value={client.service_areas ?? ''}
-              onChange={e => onSettingChange('service_areas', e.target.value)}
+              value={draft.service_areas}
+              onChange={e => handleDraftChange('service_areas', e.target.value)}
               placeholder="e.g. Greater Manchester, Leeds, Liverpool"
             />
           </div>
@@ -269,8 +269,8 @@ const ClientSettingsTab = ({
             <p className="text-sm font-medium">Target Audience</p>
             <textarea
               className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={client.target_audience ?? ''}
-              onChange={e => onSettingChange('target_audience', e.target.value)}
+              value={draft.target_audience}
+              onChange={e => handleDraftChange('target_audience', e.target.value)}
               placeholder="e.g. First-time homebuyers aged 25-40 in London"
               rows={2}
             />
@@ -279,8 +279,8 @@ const ClientSettingsTab = ({
             <p className="text-sm font-medium">Business Goals</p>
             <textarea
               className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={client.business_goals ?? ''}
-              onChange={e => onSettingChange('business_goals', e.target.value)}
+              value={draft.business_goals}
+              onChange={e => handleDraftChange('business_goals', e.target.value)}
               placeholder="e.g. Increase leads by 30%, grow Instagram following"
               rows={2}
             />
@@ -288,8 +288,8 @@ const ClientSettingsTab = ({
           <div className="space-y-2">
             <p className="text-sm font-medium">Competitors</p>
             <Input
-              value={client.competitors ?? ''}
-              onChange={e => onSettingChange('competitors', e.target.value)}
+              value={draft.competitors}
+              onChange={e => handleDraftChange('competitors', e.target.value)}
               placeholder="e.g. Competitor A, Competitor B"
             />
           </div>
@@ -297,8 +297,8 @@ const ClientSettingsTab = ({
             <p className="text-sm font-medium">Unique Selling Points</p>
             <textarea
               className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={client.unique_selling_points ?? ''}
-              onChange={e => onSettingChange('unique_selling_points', e.target.value)}
+              value={draft.unique_selling_points}
+              onChange={e => handleDraftChange('unique_selling_points', e.target.value)}
               placeholder="e.g. 24/7 support, free consultations, 20 years experience"
               rows={2}
             />
@@ -306,11 +306,19 @@ const ClientSettingsTab = ({
           <div className="space-y-2">
             <p className="text-sm font-medium">Brand Voice</p>
             <Input
-              value={client.brand_voice ?? ''}
-              onChange={e => onSettingChange('brand_voice', e.target.value)}
+              value={draft.brand_voice}
+              onChange={e => handleDraftChange('brand_voice', e.target.value)}
               placeholder="e.g. Professional but friendly, avoid jargon"
             />
           </div>
+          {isDirty && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <p className="text-sm text-amber-600 dark:text-amber-400">You have unsaved changes</p>
+              <Button onClick={handleSave} size="sm">
+                <Save className="h-4 w-4 mr-1" /> Save Changes
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
