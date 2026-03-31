@@ -110,8 +110,8 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < 12; i++) {
-      setProgress(`${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/12) — ${targets.length} connection${targets.length > 1 ? 's' : ''}`);
+    for (let i = 0; i < 24; i++) {
+      setProgress(`${MONTH_NAMES_SHORT[m]} ${y} (${i + 1}/24) — ${targets.length} connection${targets.length > 1 ? 's' : ''}`);
       for (const conn of targets) {
         const fn = SYNC_FUNCTION_MAP[conn.platform];
         if (!fn) continue;
@@ -132,7 +132,7 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
     if (failCount > 0) {
       toast.error(`Sync done: ${successCount} ok, ${failCount} failed`);
     } else {
-      toast.success(`Sync complete: ${successCount} syncs across 12 months`);
+      toast.success(`Sync complete: ${successCount} syncs across 24 months`);
     }
 
     setProgress('');
@@ -145,13 +145,13 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-2">
           <RefreshCw className="h-3.5 w-3.5" />
-          Sync (12 months)
+          Sync (24 months)
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display">Sync Data (12 months)</DialogTitle>
-          <DialogDescription>Choose what to sync. Data will be fetched for the last 12 months.</DialogDescription>
+          <DialogTitle className="font-display">Sync Data (24 months)</DialogTitle>
+          <DialogDescription>Choose what to sync. Data will be fetched for the last 24 months.</DialogDescription>
         </DialogHeader>
 
         {isSyncing ? (
@@ -236,7 +236,7 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
             {/* Summary */}
             {isReady() && (
               <p className="text-xs text-muted-foreground">
-                Will sync <strong>{getTargetConnections().length}</strong> connection{getTargetConnections().length !== 1 ? 's' : ''} × 12 months
+                Will sync <strong>{getTargetConnections().length}</strong> connection{getTargetConnections().length !== 1 ? 's' : ''} × 24 months
               </p>
             )}
           </div>

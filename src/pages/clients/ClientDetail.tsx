@@ -16,6 +16,7 @@ import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { triggerInitialSync, type SyncProgress } from '@/lib/triggerSync';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
 import UpsellTab from '@/components/clients/UpsellTab';
@@ -48,6 +49,8 @@ const ClientDetail = () => {
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const entitlements = useEntitlements();
+  const syncMonths = entitlements.plan?.slug === 'agency' ? 24 : 12;
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [reportYear, setReportYear] = useState<number | null>(null);
   const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
@@ -82,8 +85,8 @@ const ClientDetail = () => {
             // Auto-trigger 12-month sync for platforms that auto-select (e.g. TikTok organic)
             if (conn.account_id && conn.is_connected) {
               setSyncStartTime(Date.now());
-              setActiveSyncs(new Map([[conn.platform, { platform: conn.platform, completed: 0, total: 12, currentMonth: 0, currentYear: 0 }]]));
-              triggerInitialSync(conn.id, conn.platform, 12, (progress) => {
+              setActiveSyncs(new Map([[conn.platform, { platform: conn.platform, completed: 0, total: syncMonths, currentMonth: 0, currentYear: 0 }]]));
+              triggerInitialSync(conn.id, conn.platform, syncMonths, (progress) => {
                 setActiveSyncs(prev => new Map(prev).set(conn.platform, progress));
               }).then(() => {
                 fetchData();
@@ -268,7 +271,7 @@ const ClientDetail = () => {
 
     setSyncStartTime(Date.now());
     for (const conn of newPlatforms) {
-      triggerInitialSync(conn.id, conn.platform, 12, (progress) => {
+      triggerInitialSync(conn.id, conn.platform, syncMonths, (progress) => {
         setActiveSyncs(prev => { const next = new Map(prev); next.set(conn.platform, progress); return next; });
       }).then(results => {
         const failures = results.filter(r => !r.success);
