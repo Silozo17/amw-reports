@@ -1063,13 +1063,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [clientRes, snapshotsRes, configRes, prevSnapshotsRes] = await Promise.all([
+    const [clientRes, snapshotsRes, configRes, prevSnapshotsRes, metricDefaultsRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year),
       supabase.from("client_platform_config").select("*").eq("client_id", client_id).eq("is_enabled", true),
       supabase.from("monthly_snapshots").select("*").eq("client_id", client_id)
         .eq("report_month", report_month === 1 ? 12 : report_month - 1)
         .eq("report_year", report_month === 1 ? report_year - 1 : report_year),
+      supabase.from("metric_defaults").select("*"),
     ]);
 
     const client = clientRes.data;
