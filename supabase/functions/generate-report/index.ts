@@ -1746,7 +1746,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (showComparisonTable && hasPrev && gridMetrics.length > 0 && platformPageCount <= maxPlatformPages) {
+      if (showComparisonTable && client.enable_mom_comparison !== false && hasPrev && gridMetrics.length > 0 && platformPageCount <= maxPlatformPages) {
         const pageUsedPct = (y - 14) / (H - 30);
         const needsNewPage = pageUsedPct > 0.55 && platformPageCount < maxPlatformPages;
 
