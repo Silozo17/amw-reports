@@ -1,38 +1,25 @@
 
 
-# Partial-Month Normalization for Insights & Opportunities
+# Fix AI Analysis Currency & Health Score Label Overflow
 
-## Problem
-When viewing the current month (e.g. April 6th), the dashboard compares 6 days of April data against a full 30 days of March. Volume metrics (reach, engagement, clicks, spend) will always appear dramatically lower, triggering false "warning" alerts and suppressing "win" alerts.
+## Issue 1: AI Analysis uses wrong currency
 
-## Approach
-**Pro-rate the previous month's data** to match the number of elapsed days in the current month. This way, comparisons are apples-to-apples.
+The `analyze-client` edge function fetches only `company_name, services_subscribed` from the clients table. It never reads `preferred_currency`, so the AI prompt has no currency context and defaults to USD (`$`).
 
-- If the current period is the current calendar month, calculate `dayOfMonth / daysInMonth` as a scaling factor
-- Multiply previous month's volume metrics by this factor before comparing
-- Only apply scaling when viewing the current month (historical full months need no adjustment)
-- Rate/ratio metrics (CTR, CPC, CPL, engagement rate) are **not** scaled — they're already normalized by nature
+### Fix: `supabase/functions/analyze-client/index.ts`
+- Change the client select to include `preferred_currency`: `"company_name, services_subscribed, preferred_currency"`
+- Add currency context to the `dataContext` JSON: `currency: client.preferred_currency || "GBP"`
+- Add a rule to the AI prompt: `"Always use ${currencySymbol} for any monetary values. Never use $ or USD unless that is the client's selected currency."`
 
-## Changes
+## Issue 2: Health score label overflows inside the circle
 
-### File: `src/lib/opportunityAlerts.ts`
+The label text (e.g. "NEEDS ATTENTION") uses fixed `text-[10px]` inside a 128px SVG circle with no size constraints, causing overflow on longer labels.
 
-1. Add a new optional parameter `partialMonthRatio?: number` (0-1, e.g. `6/30 = 0.2` on April 6th)
-2. When provided and < 1, scale previous month's volume metrics down by this ratio before comparison:
-   - `prevEng * ratio`, `prevReach * ratio`, `prevFollowers * ratio`
-3. Do **not** scale rate metrics (CPC, CPL, CTR) — they're already per-unit
+### Fix: `src/components/clients/dashboard/HealthScore.tsx`
+- On the label `<span>` (line 48), add `max-w-[80%] leading-tight` and reduce font to `text-[9px]` to ensure longer labels like "NEEDS ATTENTION" fit within the circular gauge
+- Wrap the inner container div with `px-2` for breathing room
 
-### File: `src/components/clients/dashboard/OpportunityAlerts.tsx`
-
-1. Accept new prop `selectedPeriod` from the parent
-2. Calculate `partialMonthRatio`: if `selectedPeriod.type === "monthly"` and the month/year matches the current calendar month, compute `dayOfMonth / daysInCurrentMonth`; otherwise pass `1` (no scaling)
-3. Pass the ratio to `computeOpportunityAlerts`
-
-### File: `src/components/clients/ClientDashboard.tsx`
-
-1. Pass `selectedPeriod` to the `OpportunityAlerts` component (already available in scope)
-
-### Runtime error fix (same file batch)
-
-The `aiAnalysis is not defined` error at line 475 of `useClientDashboard.ts` will also be fixed — likely a stale reference from the refactor to `analysisMap`. This will be addressed in the same change set.
+## Files to change
+1. `supabase/functions/analyze-client/index.ts` — fetch and use `preferred_currency`
+2. `src/components/clients/dashboard/HealthScore.tsx` — constrain label text inside circle
 
