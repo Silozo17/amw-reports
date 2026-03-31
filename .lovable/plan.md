@@ -1,103 +1,92 @@
 
 
-# Update All SEO Content for 12 Platforms + AI Bot Access
+# PageSpeed Insights Performance Optimization
 
-## What Changed
-TikTok Ads was added as a separate platform (Business API), bringing the total from 11 to **12 platforms**. The SEO static HTML in `index.html`, React page content, `robots.txt`, and meta descriptions all reference outdated platform counts ("10+", "10", "11") and are missing "TikTok Ads" from platform lists. The `robots.txt` also lacks rules for AI crawlers.
+Based on the Lighthouse audit (Mobile: Performance 53, Accessibility 95, Best Practices 100, SEO 100), here are the issues and fixes.
 
-## Plan
+## Issues Identified from Screenshots
 
-### 1. Update `robots.txt` — AI bot access
-Add explicit rules for all major AI crawlers to ensure content is accessible:
-- `GPTBot`, `ChatGPT-User` (OpenAI)
-- `Google-Extended`, `Googlebot` (Google/Gemini)  
-- `anthropic-ai`, `Claude-Web` (Anthropic)
-- `Bytespider` (TikTok/Bytedance)
-- `PerplexityBot`, `YouBot`, `CCBot`, `Applebot-Extended`
-- All set to `Allow: /`
+### Performance (Score: 53)
+1. **FCP 4.5s / LCP 5.3s** — Slowdex.otf (37.83 KiB) is on the critical rendering path and blocks LCP. The LCP element is the hero `<h1>`.
+2. **CLS 0.256** — The WarpedGrid SVG (`w-[110%] h-[110%]`) causes massive layout shift (0.250 score). Web fonts (Slowdex, Google Fonts) also contribute.
+3. **Render-blocking resources (1,350ms)** — Google Fonts CSS `@import` in `index.html` `<style>` block blocks render. Also duplicated in `src/index.css`.
+4. **No cache headers** — All assets have `Cache TTL: None` (hosting config, not code — but we can add preconnect).
+5. **Unused JS (339 KiB)** — The entire app bundle loads on the landing page.
+6. **Images without width/height** — `dashboardSnapshot`, `perfOverview`, `amwLogo`, `mascot` images lack explicit dimensions.
 
-### 2. Update `index.html` SEO static content
-Every `data-seo-page` section needs these changes:
-
-**Global across all pages:**
-- Copyright `© 2025` → `© 2026`
-- All "10 platforms" / "10+" references → "12"
-- All "11 platforms" references → "12"
-
-**Home page (`/`):**
-- Platform pills: add `TikTok Ads` pill (currently only has `TikTok`)
-- "70+ Metrics Across 10 Platforms" → "12 Platforms"
-- "10 platforms in one dashboard" → "12 platforms"
-- "connects 10+ marketing platforms" → "connects 12 marketing platforms"
-
-**Features page (`/features`):**
-- "10 platforms, 70+ metrics" → "12 platforms"
-- Split TikTok card into **TikTok** (organic: followers, views, likes, comments, shares, video views) and **TikTok Ads** (paid: spend, impressions, clicks, CTR, CPC, CPM, conversions, conv. value, reach, video views, conversion rate)
-- FAQ "We currently support...TikTok..." → add "TikTok Ads"
-
-**Integrations page (`/integrations`):**
-- "Connect 11 marketing platforms" → "Connect 12 marketing platforms"
-- Platform pills already has TikTok Ads — confirmed correct
-
-**Social Media Reporting (`/social-media-reporting`):**
-- TikTok card currently shows ad metrics — rename to "TikTok Ads" or add a separate organic TikTok card
-- Add TikTok Ads as distinct platform card
-
-**PPC Reporting (`/ppc-reporting`):**
-- FAQ: "Google Ads, Meta Ads, and TikTok Ads" — already correct
-- Ensure TikTok Ads card is present with full metrics
-
-**For SMBs (`/for-smbs`):**
-- Platform pills: add `TikTok Ads`
-
-**For Creators (`/for-creators`):**
-- Platform pills: add `TikTok Ads` (creators may run ads too)
-
-**Pricing (`/pricing`):**
-- FAQ "What platforms are supported?": update to include TikTok Ads, say "12 platforms in total"
-
-### 3. Update `index.html` head meta tags
-- `<meta name="description">`: "Connect 10+ marketing platforms" → "Connect 12 marketing platforms"
-- OG/Twitter descriptions: same update
-
-### 4. Update React page meta descriptions + content
-Files to modify with "10+" → "12" and add "TikTok Ads" to platform arrays:
-
-| File | Changes |
-|---|---|
-| `HomePage.tsx` | PLATFORMS array: add `'TikTok Ads'`; FEATURES desc: "12"; WHY_POINTS: "12 platforms"; pageTitle desc: "12"; stat labels: "12 Platforms" |
-| `FeaturesPage.tsx` | usePageMeta desc: "12"; hero text: "12"; section title: "12" |
-| `IntegrationsPage.tsx` | usePageMeta title: "12"; already has TikTok Ads in PLATFORMS |
-| `HowItWorksPage.tsx` | PLATFORMS array: add `'TikTok Ads'`; step text: "12 platforms" |
-| `SocialMediaReportingPage.tsx` | Add TikTok Ads to PLATFORMS array with ad metrics; update TikTok entry to organic metrics |
-| `PpcReportingPage.tsx` | Verify TikTok Ads is listed |
-| `ForSmbsPage.tsx` | PLATFORMS array: add `'TikTok Ads'` |
-| `ForAgenciesPage.tsx` | "10 platforms" → "12 platforms" |
-| `PricingPage.tsx` | "10+ Platform Support" → "12 Platform Integrations"; FAQ answer: "12 platforms" |
-| `ForFreelancersPage.tsx` | "10 platforms" → "12 platforms" |
-| `LandingHero.tsx` | FEATURES desc: "12 platforms" if referenced |
-
-### 5. Update `LandingHero.tsx`
-- Feature card "Google, Meta, TikTok, LinkedIn & more" → "Google, Meta, TikTok Ads, LinkedIn & more"
+### Accessibility (Score: 95)
+7. **Contrast failures** — `text-amw-offwhite/30` on step numbers ("01", "02", "03") fails WCAG AA.
+8. **Heading order** — Footer uses `<h4>` without preceding `<h2>`/`<h3>`. Pages skip heading levels.
 
 ---
 
-## Technical Details
+## Plan
 
-**Files to modify:**
-- `public/robots.txt`
-- `index.html` (SEO static HTML + head meta tags)
-- `src/pages/HomePage.tsx`
-- `src/pages/FeaturesPage.tsx`
-- `src/pages/IntegrationsPage.tsx`
-- `src/pages/HowItWorksPage.tsx`
-- `src/pages/SocialMediaReportingPage.tsx`
-- `src/pages/PpcReportingPage.tsx`
-- `src/pages/ForSmbsPage.tsx`
-- `src/pages/ForAgenciesPage.tsx`
-- `src/pages/ForFreelancersPage.tsx`
-- `src/pages/PricingPage.tsx`
-- `src/components/landing/LandingHero.tsx`
+### 1. Fix render-blocking Google Fonts
+Remove the `@import` from the `<style>` block in `index.html` (line 24). Replace with a `<link rel="preload">` + `<link rel="stylesheet">` with `media="print" onload` swap pattern. Also add `<link rel="preconnect" href="https://fonts.googleapis.com">` and `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`.
 
-No new files. No database changes. No edge function changes.
+In `src/index.css`, change the `@import url(...)` on line 1 to use `font-display: swap` (already has it but it's duplicated from index.html — remove the one in index.html `<style>` block entirely since it's only for `#seo-static` which doesn't need real fonts).
+
+**Files:** `index.html`
+
+### 2. Preload Slowdex font
+Add `<link rel="preload" href="/fonts/Slowdex.otf" as="font" type="font/opentype" crossorigin>` in `index.html` `<head>`. This font is on the critical path (37.83 KiB) and causes 3,382ms delay.
+
+**Files:** `index.html`
+
+### 3. Fix CLS from WarpedGrid SVG
+The SVG with `w-[110%] h-[110%]` and `absolute -left-[5%] -top-[5%]` causes CLS of 0.250. Add explicit `width` and `height` attributes to the SVG element to prevent layout shift. Since it's `position: absolute` inside a relative container, it shouldn't shift — the issue is likely that the SVG renders before fonts load, then the section resizes. Fix by ensuring the hero section has a minimum height set from the start.
+
+In `HomePage.tsx`, add `min-h-[600px] lg:min-h-[700px]` to the hero section to prevent reflow when content renders.
+
+**Files:** `src/pages/HomePage.tsx`, `src/components/landing/WarpedGrid.tsx`
+
+### 4. Add explicit width/height to images
+Add `width` and `height` attributes to all landing page images to prevent CLS:
+- `amwLogo` images: `width={160} height={40}`
+- `dashboardSnapshot`: `width={576} height={400}` (approximate)
+- `perfOverview`: `width={1024} height={600}` (approximate)
+- `mascot` SVG: `width={448} height={448}`
+
+**Files:** `src/pages/HomePage.tsx`, `src/components/landing/LandingHero.tsx`, `src/components/landing/PublicNavbar.tsx`, `src/components/landing/PublicFooter.tsx`
+
+### 5. Add preconnect hints
+Add `<link rel="preconnect">` for Google Fonts origins in `index.html` `<head>`:
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+```
+
+**Files:** `index.html`
+
+### 6. Fix contrast for step numbers
+Change `text-amw-offwhite/30` to `text-amw-offwhite/50` on the "01", "02", "03" step indicators in `HomePage.tsx` (line 189) to meet WCAG AA 3:1 for large text.
+
+Also fix similar low-contrast instances across other pages where `text-amw-offwhite/30` is used on visible text.
+
+**Files:** `src/pages/HomePage.tsx` and other pages with step numbers
+
+### 7. Fix heading hierarchy in footer
+Change `<h4>` tags in `PublicFooter.tsx` to `<p>` with the same styling, since the footer column labels ("Product", "Solutions", etc.) are not semantic headings in the page structure.
+
+**Files:** `src/components/landing/PublicFooter.tsx`
+
+### 8. Lazy-load below-fold images
+Add `loading="lazy"` to `perfOverview` image (below the fold) in `HomePage.tsx`.
+
+**Files:** `src/pages/HomePage.tsx`
+
+---
+
+## Expected Impact
+
+| Metric | Before | After (estimated) |
+|---|---|---|
+| FCP | 4.5s | ~2.5s (font preload + no render-block) |
+| LCP | 5.3s | ~3.0s (font preload + preconnect) |
+| CLS | 0.256 | <0.1 (min-height + image dimensions) |
+| Accessibility | 95 | 100 (contrast + heading fixes) |
+| Performance | 53 | ~70-80 |
+
+Note: Cache headers and code-splitting are hosting/build-level concerns that cannot be fully resolved in source code alone.
 
