@@ -28,6 +28,7 @@ import GeoHeatmap from '@/components/clients/dashboard/GeoHeatmap';
 import DeviceBreakdown from '@/components/clients/dashboard/DeviceBreakdown';
 
 interface TopContentItem {
+  type?: string;
   page_name?: string;
   message?: string;
   caption?: string;
@@ -60,6 +61,9 @@ interface TopContentItem {
   reaction_haha?: number;
   reaction_sorry?: number;
   reaction_anger?: number;
+  country?: string;
+  countryId?: string;
+  device?: string;
 }
 
 interface ConnectionInfo {
@@ -221,8 +225,8 @@ const PlatformSection = ({
 
   // Top content for tables
   const socialPosts = (topContent ?? []).filter(p => p.message || p.caption || p.full_picture || p.permalink_url || p.likes || p.comments || p.shares);
-  const gscQueries = (topContent ?? []).filter(p => p.query);
-  const gscPages = (topContent ?? []).filter(p => p.page && !p.query);
+  const gscQueries = (topContent ?? []).filter(p => p.type === 'query' || (p.query && platform === 'google_search_console'));
+  const gscPages = (topContent ?? []).filter(p => p.type === 'page' && platform === 'google_search_console');
   const gaPages = (topContent ?? []).filter(p => p.page && !p.query && platform === 'google_analytics');
   const gaSources = (topContent ?? []).filter(p => p.source);
   const ytVideos = (topContent ?? []).filter(p => p.title);
@@ -435,7 +439,7 @@ const PlatformSection = ({
             <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', contentOpen && 'rotate-180')} />
               {socialPosts.length > 0 ? 'Top Posts' :
-               gscQueries.length > 0 ? 'Top Search Queries' :
+               gscQueries.length > 0 ? 'Top Search Queries & Pages' :
                ytVideos.length > 0 ? 'Top Videos' :
                gaPages.length > 0 ? 'Top Pages' :
                gaSources.length > 0 ? 'Traffic Sources' : 'Details'}
@@ -551,6 +555,31 @@ const PlatformSection = ({
                 </div>
               )}
 
+              {gscPages.length > 0 && (
+                <div className="rounded-lg border overflow-hidden mt-3">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Page</TableHead>
+                        <TableHead className="text-right">Clicks</TableHead>
+                        <TableHead className="text-right">Impressions</TableHead>
+                        <TableHead className="text-right">CTR</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {gscPages.slice(0, 10).map((p, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-sm max-w-[300px] truncate font-body">{p.page}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{(p.clicks ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{(p.impressions ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">{p.ctr != null ? `${(p.ctr * 100).toFixed(1)}%` : '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
               {ytVideos.length > 0 && (
                 <div className="rounded-lg border overflow-hidden">
                   <Table>
@@ -643,6 +672,33 @@ const PlatformSection = ({
                   </div>
                 </CardContent>
               </Card>
+            )}
+          </>
+        )}
+
+        {/* GSC Extended Widgets — Countries & Devices */}
+        {platform === 'google_search_console' && rawData && (
+          <>
+            {(rawData.topCountries as any[])?.length > 0 && (
+              <GeoHeatmap
+                countries={((rawData.topCountries as any[]) || []).map((c: any) => ({
+                  country: c.country || c.keys?.[0] || 'Unknown',
+                  countryId: c.countryId || c.keys?.[0] || '',
+                  users: c.clicks ?? 0,
+                  sessions: c.impressions ?? 0,
+                }))}
+                cities={[]}
+              />
+            )}
+            {(rawData.topDevices as any[])?.length > 0 && (
+              <DeviceBreakdown
+                devices={((rawData.topDevices as any[]) || []).map((d: any) => ({
+                  device: d.device || d.keys?.[0] || 'Unknown',
+                  users: d.clicks ?? 0,
+                  sessions: d.impressions ?? 0,
+                }))}
+                newVsReturning={[]}
+              />
             )}
           </>
         )}
