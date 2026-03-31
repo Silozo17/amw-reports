@@ -580,6 +580,7 @@ const PlatformSection = ({
                 </div>
               )}
 
+              {ytVideos.length > 0 && (
                 <div className="rounded-lg border overflow-hidden">
                   <Table>
                     <TableHeader>
