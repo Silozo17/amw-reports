@@ -257,6 +257,101 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Geographic breakdown query
+    const geoQuery = `
+      SELECT
+        geographic_view.country_criterion_id,
+        geographic_view.resource_name,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions
+      FROM geographic_view
+      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+      ORDER BY metrics.cost_micros DESC
+      LIMIT 30
+    `;
+
+    let geoBreakdown: any[] = [];
+    try {
+      const geoRes = await fetch(searchUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "developer-token": devToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: geoQuery }),
+      });
+
+      if (geoRes.ok) {
+        const geoData = await geoRes.json();
+        const geoResults = geoData.flatMap((batch: any) => batch.results || []);
+        geoBreakdown = geoResults.map((row: any) => ({
+          country_id: row.geographicView?.countryCriterionId || null,
+          resource_name: row.geographicView?.resourceName || null,
+          impressions: Number(row.metrics?.impressions || 0),
+          clicks: Number(row.metrics?.clicks || 0),
+          cost: Number(row.metrics?.costMicros || 0) / 1_000_000,
+          conversions: Number(row.metrics?.conversions || 0),
+        }));
+      } else {
+        console.warn("Geographic view query failed, skipping:", await geoRes.text().then(t => t.substring(0, 200)));
+      }
+    } catch (geoErr) {
+      console.warn("Geographic breakdown fetch failed, skipping:", geoErr);
+    }
+
+    // Device breakdown query
+    const deviceQuery = `
+      SELECT
+        segments.device,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions
+      FROM campaign
+      WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+        AND campaign.status != 'REMOVED'
+    `;
+
+    let deviceBreakdown: any[] = [];
+    try {
+      const deviceRes = await fetch(searchUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "developer-token": devToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: deviceQuery }),
+      });
+
+      if (deviceRes.ok) {
+        const deviceData = await deviceRes.json();
+        const deviceResults = deviceData.flatMap((batch: any) => batch.results || []);
+        // Aggregate by device
+        const deviceMap = new Map<string, { impressions: number; clicks: number; cost: number; conversions: number }>();
+        for (const row of deviceResults) {
+          const device = row.segments?.device || "UNKNOWN";
+          const existing = deviceMap.get(device) || { impressions: 0, clicks: 0, cost: 0, conversions: 0 };
+          existing.impressions += Number(row.metrics?.impressions || 0);
+          existing.clicks += Number(row.metrics?.clicks || 0);
+          existing.cost += Number(row.metrics?.costMicros || 0) / 1_000_000;
+          existing.conversions += Number(row.metrics?.conversions || 0);
+          deviceMap.set(device, existing);
+        }
+        deviceBreakdown = Array.from(deviceMap.entries()).map(([device, metrics]) => ({
+          device,
+          ...metrics,
+        })).sort((a, b) => b.cost - a.cost);
+      } else {
+        console.warn("Device breakdown query failed, skipping:", await deviceRes.text().then(t => t.substring(0, 200)));
+      }
+    } catch (devErr) {
+      console.warn("Device breakdown fetch failed, skipping:", devErr);
+    }
+
     const totalCost = totalCostMicros / 1_000_000;
     const overallCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
     const overallCpc = totalClicks > 0 ? totalCost / totalClicks : 0;
@@ -281,17 +376,24 @@ Deno.serve(async (req) => {
     };
 
     // Top campaigns by spend
-    const topContent = campaigns
-      .sort((a, b) => b.cost - a.cost)
-      .slice(0, 10)
-      .map((c) => ({
-        name: c.name,
-        spend: c.cost,
-        clicks: c.clicks,
-        impressions: c.impressions,
-        conversions: c.conversions,
-        ctr: c.ctr,
-      }));
+    const topContent = [
+      ...campaigns
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 10)
+        .map((c) => ({
+          type: "campaign",
+          name: c.name,
+          spend: c.cost,
+          clicks: c.clicks,
+          impressions: c.impressions,
+          conversions: c.conversions,
+          ctr: c.ctr,
+        })),
+      ...geoBreakdown.map((g) => ({ type: "geo", ...g })),
+      ...deviceBreakdown.map((d) => ({ type: "device", ...d })),
+    ];
+
+    const rawData = { campaigns, geoBreakdown, deviceBreakdown };
 
     // Upsert monthly snapshot
     const { data: existing } = await supabase
@@ -313,7 +415,7 @@ Deno.serve(async (req) => {
         .update({
           metrics_data: metricsData,
           top_content: topContent,
-          raw_data: { campaigns },
+          raw_data: rawData,
         })
         .eq("id", existing.id);
     } else {
@@ -324,7 +426,7 @@ Deno.serve(async (req) => {
         report_year: year,
         metrics_data: metricsData,
         top_content: topContent,
-        raw_data: { campaigns },
+        raw_data: rawData,
       });
     }
 
