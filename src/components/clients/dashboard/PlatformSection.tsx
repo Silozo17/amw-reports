@@ -106,7 +106,7 @@ const PLATFORM_KEY_METRICS: Record<string, string[]> = {
 };
 
 const COST_METRICS = new Set(['spend', 'cpc', 'cpm', 'cost_per_conversion', 'cost_per_lead']);
-const PERCENT_METRICS = new Set(['ctr', 'engagement_rate', 'bounce_rate', 'search_ctr', 'conversion_rate', 'audience_growth_rate']);
+const PERCENT_METRICS = new Set(['ctr', 'engagement_rate', 'bounce_rate', 'search_ctr', 'conversion_rate', 'audience_growth_rate', 'ga_engagement_rate']);
 const DECIMAL_METRICS = new Set(['search_position', 'gbp_average_rating', 'pages_per_session', 'avg_session_duration', 'avg_view_duration', 'frequency']);
 
 const formatMetricValue = (key: string, value: number, currSymbol: string): string => {
