@@ -60,7 +60,7 @@ const HomePage = () => {
   return (
     <>
       {/* ── HERO ── */}
-      <section className="relative overflow-hidden py-20 lg:py-32">
+      <section className="relative overflow-hidden py-20 lg:py-32 min-h-[600px] lg:min-h-[700px]">
         <WarpedGrid />
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px]" />
