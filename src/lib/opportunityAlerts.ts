@@ -77,7 +77,7 @@ export function computeOpportunityAlerts(
 
     // Reach Decline (warning)
     const curReach = m.reach || m.views || 0;
-    const prevReach = pm.reach || pm.views || 0;
+    const prevReach = (pm.reach || pm.views || 0) * r;
     if (curReach > 0 && prevReach > 0) {
       const reachChange = pctChange(curReach, prevReach);
       if (reachChange <= -20) {
