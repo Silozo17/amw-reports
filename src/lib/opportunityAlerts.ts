@@ -118,7 +118,7 @@ export function computeOpportunityAlerts(
       }
     }
 
-    // Follower growth (win)
+    // Follower growth (win) — followers are a cumulative total, not volume; don't scale
     const curFollowers = m.total_followers || 0;
     const prevFollowers = pm.total_followers || 0;
     if (curFollowers > 0 && prevFollowers > 0) {
