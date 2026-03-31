@@ -8,7 +8,7 @@ const PublicFooter = () => (
         {/* Brand */}
         <div className="col-span-2 md:col-span-1 space-y-3">
           <div className="flex items-center gap-2">
-            <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" />
+            <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" width={112} height={28} />
             <span className="text-xs tracking-[0.25em] text-amw-offwhite/50 uppercase font-body">Reports</span>
           </div>
           <p className="text-xs font-body leading-relaxed max-w-xs">
