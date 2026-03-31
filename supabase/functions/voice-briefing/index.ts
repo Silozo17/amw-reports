@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     // Fetch data
     const [clientRes, snapshotsRes, prevSnapshotsRes] = await Promise.all([
-      supabase.from("clients").select("company_name, preferred_currency").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, preferred_currency, industry, target_audience, service_area_type, service_areas, business_goals").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
