@@ -24,7 +24,7 @@ const PublicFooter = () => (
 
         {/* Product */}
         <div className="space-y-3">
-          <h4 className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Product</h4>
+          <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Product</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/features" className="hover:text-primary transition-colors">Features</Link>
             <Link to="/integrations" className="hover:text-primary transition-colors">Integrations</Link>
