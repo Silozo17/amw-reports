@@ -78,10 +78,12 @@ const ShareDialog = ({ clientId, orgId, clientName }: ShareDialogProps) => {
 
   const createToken = async () => {
     setIsLoading(true);
+    const token = generateSlugToken(clientName);
     const { error } = await supabase.from('client_share_tokens').insert({
       client_id: clientId,
       org_id: orgId,
       created_by: user?.id ?? null,
+      token,
     });
     if (error) {
       toast.error('Failed to create share link');
