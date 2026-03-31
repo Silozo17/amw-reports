@@ -188,7 +188,7 @@ const HomePage = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-6 w-6 text-primary" />
                 </div>
-                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/30">0{i + 1}</span>
+                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/50">0{i + 1}</span>
                 <h3 className="text-lg font-body font-semibold mb-2">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
