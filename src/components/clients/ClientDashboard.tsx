@@ -217,6 +217,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
                   enabledMetrics={config?.enabled_metrics}
                   reportMonth={selectedPeriod.month}
                   reportYear={selectedPeriod.year}
+                  rawData={snapshot.raw_data}
                 />
               );
             })}
