@@ -1,77 +1,105 @@
 
+Goal: reset the TikTok implementation so Organic TikTok and TikTok Ads are treated as two fully separate integrations with zero ambiguous naming, and fix the exact reason Black Steel Doors shows no TikTok data.
 
-# Fix TikTok Organic vs TikTok Ads — Complete Audit
+What I verified in the current code:
+- Organic TikTok connection currently uses `tiktok` and the Login Kit credentials:
+  - `src/components/clients/ConnectionDialog.tsx` maps `tiktok -> tiktok-ads-connect`
+  - `supabase/functions/tiktok-ads-connect/index.ts` actually uses `TIKTOK_APP_ID` / `TIKTOK_APP_SECRET`
+  - `oauth-callback` routes `tiktok -> handleTikTok()`
+  - `handleTikTok()` uses `open.tiktokapis.com` and stores `account_id = open_id`
+- TikTok Ads connection currently uses `tiktok_ads` and Business API credentials:
+  - `src/components/clients/ConnectionDialog.tsx` maps `tiktok_ads -> tiktok-business-connect`
+  - `supabase/functions/tiktok-business-connect/index.ts` uses `TIKTOK_BUSINESS_APP_ID` / `TIKTOK_BUSINESS_APP_SECRET`
+  - `oauth-callback` routes `tiktok_ads -> handleTikTokAds()`
+  - `handleTikTokAds()` uses `business-api.tiktok.com` and stores advertiser accounts
+- Sync routing is currently separated correctly:
+  - `tiktok -> sync-tiktok-business`
+  - `tiktok_ads -> sync-tiktok-ads`
 
-## Current State (fully mapped)
+Actual root cause for Black Steel Doors having no TikTok data:
+- `supabase/functions/sync-tiktok-business/index.ts` is throwing on successful TikTok Organic responses.
+- Current code does:
+  - `if (data.error?.code) throw ...`
+- Your logs prove TikTok Organic returns:
+  - `error.code = "ok"`
+- So every successful organic response is being treated as a failure.
+- That is why Black Steel Doors connected successfully, got `open_id`, but produced no snapshot data.
 
-### Edge Functions — Connect
-| Function | Credentials | OAuth URL | State platform | Purpose |
-|---|---|---|---|---|
-| `tiktok-ads-connect` | `TIKTOK_APP_ID` / `TIKTOK_APP_SECRET` | `tiktok.com/v2/auth/authorize/` (Login Kit) | `"tiktok"` | Organic TikTok |
-| `tiktok-business-connect` | `TIKTOK_BUSINESS_APP_ID` / `TIKTOK_BUSINESS_APP_SECRET` | `business-api.tiktok.com/portal/auth` | `"tiktok_ads"` | TikTok Ads |
+What I will change:
+1. Introduce explicit naming constants for platform routing
+- Add a shared platform-routing module for:
+  - platform keys
+  - connect function names
+  - sync function names
+- Keep database platform values as:
+  - `tiktok` = TikTok Organic
+  - `tiktok_ads` = TikTok Ads
+- But rename code-facing function constants so they are impossible to confuse.
 
-### CONNECT_FUNCTION_MAP (ConnectionDialog.tsx)
-- `tiktok` → `tiktok-ads-connect` ✅ (confusing name, but correctly uses Login Kit for organic)
-- `tiktok_ads` → `tiktok-business-connect` ✅ (confusing name, but correctly uses Business API for ads)
+2. Rename edge functions in code usage to match purpose clearly
+- Organic:
+  - connect function should be referenced as TikTok Organic connect
+  - sync function should be referenced as TikTok Organic sync
+- Ads:
+  - connect function should be referenced as TikTok Ads connect
+  - sync function should be referenced as TikTok Ads sync
+- If we keep existing deployed function filenames for compatibility, I’ll still centralize aliases so the app code never uses misleading names directly again.
 
-### OAuth Callback
-- `"tiktok"` → `handleTikTok()` → Login Kit v2 token exchange with `TIKTOK_APP_ID` ✅
-- `"tiktok_ads"` → `handleTikTokAds()` → Business API token exchange with `TIKTOK_BUSINESS_APP_ID` ✅
+3. Fix TikTok Organic sync error handling
+- In `sync-tiktok-business/index.ts`, only treat TikTok response as an error when:
+  - `error.code` exists and is not `"ok"`
+- This is the direct blocker for Black Steel Doors.
 
-### Edge Functions — Sync (THIS IS WHERE IT'S BROKEN)
-| Function | Actually calls | Credentials used | Purpose |
-|---|---|---|---|
-| `sync-tiktok-business` | `open.tiktokapis.com/v2/video/list/` | `TIKTOK_APP_ID` | Organic TikTok ✅ |
-| `sync-tiktok-ads` | `open.tiktokapis.com/v2/video/list/` + `user/info/` | `TIKTOK_APP_ID` | **ALSO Organic TikTok** ❌ |
+4. Audit and standardize Organic-only behavior
+- Ensure Organic TikTok uses only:
+  - `TIKTOK_APP_ID`
+  - `TIKTOK_APP_SECRET`
+  - `open.tiktokapis.com`
+  - organic metrics/content storage
+- Confirm it stores videos/top content under platform `tiktok`
+- Confirm dashboard rendering continues to treat it like Facebook/Instagram organic content
 
-### SYNC_FUNCTION_MAP (triggerSync.ts + scheduled-sync)
-- `tiktok` → `sync-tiktok-business` ✅
-- `tiktok_ads` → `sync-tiktok-ads` — but `sync-tiktok-ads` has **organic** code, not ads code ❌
+5. Audit and standardize Ads-only behavior
+- Ensure TikTok Ads uses only:
+  - `TIKTOK_BUSINESS_APP_ID`
+  - `TIKTOK_BUSINESS_APP_SECRET`
+  - `business-api.tiktok.com`
+  - ad metrics/top ads storage
+- Confirm it stores snapshots under platform `tiktok_ads`
 
-### AdminSyncDialog PLATFORM_LABELS (line 43)
-- `tiktok` → `'TikTok Ads'` ❌ — should be `'TikTok'`
-- `tiktok_ads` → **missing entirely** ❌
+6. Remove ambiguous frontend routing names
+- Update `ConnectionDialog.tsx` so the mapping source of truth reads clearly as:
+  - TikTok Organic connect
+  - TikTok Ads connect
+- Update `triggerSync.ts` and `scheduled-sync/index.ts` to use the same centralized routing constants rather than repeated handwritten maps.
 
----
+7. Verify all UI labels remain explicit
+- Keep labels as:
+  - `tiktok` => `TikTok`
+  - `tiktok_ads` => `TikTok Ads`
+- Re-check admin sync dialog and any picker/help text so nothing says “TikTok Ads” for an organic connection.
 
-## Problems Summary
+Files involved:
+- `src/components/clients/ConnectionDialog.tsx`
+- `src/lib/triggerSync.ts`
+- `supabase/functions/scheduled-sync/index.ts`
+- `supabase/functions/sync-tiktok-business/index.ts`
+- `supabase/functions/sync-tiktok-ads/index.ts`
+- `supabase/functions/tiktok-ads-connect/index.ts`
+- `supabase/functions/tiktok-business-connect/index.ts`
+- `supabase/functions/oauth-callback/index.ts`
+- likely one new shared mapping file, e.g. `src/lib/platformRouting.ts`
 
-1. **`sync-tiktok-ads/index.ts` contains organic TikTok code** instead of TikTok Ads (Business API) code. It needs to be rewritten to call `business-api.tiktok.com/open_api/v1.3/report/integrated/get/` with `advertiser_id` and the Business API access token.
+Technical notes:
+- No database migration is needed.
+- The OAuth connection for Black Steel Doors appears valid already:
+  - token exchange succeeded
+  - user info returned successfully
+  - `open_id` was received
+- The failure is in Organic sync response handling, not in secrets or OAuth setup.
+- Main safety improvement is to stop relying on misleading function filenames spread across multiple files.
 
-2. **AdminSyncDialog has wrong label** — `tiktok` is labeled `'TikTok Ads'` (line 43), which is why the screenshot shows "TikTok Ads — BLACK STEEL DOORS" for an organic TikTok connection. Also missing `tiktok_ads` entry.
-
-3. The connect functions, oauth callback, sync maps, and `sync-tiktok-business` are all correct. No changes needed there.
-
----
-
-## Plan
-
-### Step 1: Rewrite `sync-tiktok-ads/index.ts` for actual TikTok Ads
-Replace the current organic code with a proper TikTok Business API sync:
-- Call `business-api.tiktok.com/open_api/v1.3/report/integrated/get/` with the `advertiser_id` from `connection.account_id`
-- Use the Business API access token (long-lived, no refresh needed)
-- Fetch ad metrics: `spend`, `impressions`, `clicks`, `ctr`, `cpc`, `cpm`, `conversions`, `conversion_value`, `reach`, `video_views`, `conversion_rate`
-- Log platform as `tiktok_ads` in sync_logs and monthly_snapshots
-- No token refresh needed (Business API tokens are long-lived)
-
-### Step 2: Fix AdminSyncDialog PLATFORM_LABELS
-**File:** `src/components/admin/AdminSyncDialog.tsx`
-- Change `tiktok: 'TikTok Ads'` → `tiktok: 'TikTok'`
-- Add `tiktok_ads: 'TikTok Ads'`
-
-### No other changes needed
-- Connect functions: correct ✅
-- OAuth callback: correct ✅
-- SYNC_FUNCTION_MAP: correct ✅ (`tiktok` → `sync-tiktok-business`, `tiktok_ads` → `sync-tiktok-ads`)
-- `sync-tiktok-business`: correct ✅ (organic Login Kit API)
-- Global `PLATFORM_LABELS` in `database.ts`: correct ✅
-
----
-
-## Files Modified
-
-| File | Change |
-|---|---|
-| `supabase/functions/sync-tiktok-ads/index.ts` | Full rewrite — replace organic code with TikTok Business API ads reporting |
-| `src/components/admin/AdminSyncDialog.tsx` | Fix `tiktok` label from "TikTok Ads" to "TikTok", add `tiktok_ads` entry |
-
+Implementation outcome:
+- TikTok Organic = separate, explicit, organic-only path
+- TikTok Ads = separate, explicit, ads-only path
+- Black Steel Doors organic TikTok data should start syncing once the Organic sync success handling is fixed and the connection is re-synced
