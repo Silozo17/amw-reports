@@ -51,6 +51,8 @@ Deno.serve(async (req) => {
       );
     }
 
+    const normalizedEmail = email.toLowerCase();
+
     // Fetch the client to get org_id and verify user belongs to org
     const { data: client, error: clientErr } = await supabaseAdmin
       .from("clients")
@@ -83,27 +85,17 @@ Deno.serve(async (req) => {
     // Check if this email already has a client_user for this client
     const { data: existing } = await supabaseAdmin
       .from("client_users")
-      .select("id")
+      .select("id, user_id")
       .eq("client_id", client_id)
-      .eq("invited_email", email.toLowerCase())
+      .eq("invited_email", normalizedEmail)
       .maybeSingle();
-
-    if (existing) {
-      return new Response(
-        JSON.stringify({ error: "This email has already been invited" }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
 
     // Generate magic link for the email
     const redirectTo = `${req.headers.get("origin") || supabaseUrl}/client-portal`;
     const { data: linkData, error: linkErr } =
       await supabaseAdmin.auth.admin.generateLink({
         type: "magiclink",
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         options: { redirectTo },
       });
 
@@ -118,7 +110,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get or create the user_id from the link response
     const invitedUserId = linkData.user?.id;
     const magicLink = linkData.properties?.action_link;
 
@@ -132,34 +123,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Insert client_users record
-    const { error: insertErr } = await supabaseAdmin
-      .from("client_users")
-      .insert({
-        user_id: invitedUserId,
-        client_id,
-        org_id: client.org_id,
-        invited_by: user.id,
-        invited_email: email.toLowerCase(),
-      });
+    // Insert or update client_users record (allows resend for broken invites)
+    if (!existing) {
+      const { error: insertErr } = await supabaseAdmin
+        .from("client_users")
+        .insert({
+          user_id: invitedUserId,
+          client_id,
+          org_id: client.org_id,
+          invited_by: user.id,
+          invited_email: normalizedEmail,
+        });
 
-    if (insertErr) {
-      console.error("Insert client_user error:", insertErr);
-      return new Response(
-        JSON.stringify({ error: insertErr.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      if (insertErr) {
+        console.error("Insert client_user error:", insertErr);
+        return new Response(
+          JSON.stringify({ error: insertErr.message }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
     }
 
     // Send the invite email via the branded email system
-    try {
+    const { data: emailResp, error: emailInvokeErr } =
       await supabaseAdmin.functions.invoke("send-branded-email", {
         body: {
           template_name: "client_invite",
-          recipient_email: email.toLowerCase(),
+          recipient_email: normalizedEmail,
           org_id: client.org_id,
           data: {
             magic_link: magicLink,
@@ -168,15 +161,34 @@ Deno.serve(async (req) => {
           },
         },
       });
-    } catch (emailErr) {
-      console.error("Failed to send invite email:", emailErr);
-      // Don't fail the whole invite — the client_user record was created
+
+    if (emailInvokeErr) {
+      console.error("Email invoke error:", emailInvokeErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to send invitation email" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Check if the response body contains an error
+    if (emailResp?.error) {
+      console.error("Email send error:", emailResp.error);
+      return new Response(
+        JSON.stringify({ error: `Email delivery failed: ${emailResp.error}` }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Invitation sent to ${email}`,
+        message: `Invitation sent to ${normalizedEmail}`,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

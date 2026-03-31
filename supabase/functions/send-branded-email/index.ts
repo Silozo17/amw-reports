@@ -539,6 +539,26 @@ const failed_login_attempts: TemplateBuilder = (data, b) => ({
 });
 
 // ═══════════════════════════════════════════════════════════
+// CATEGORY 8 — CLIENT PORTAL
+// ═══════════════════════════════════════════════════════════
+
+const client_invite: TemplateBuilder = (data, b) => ({
+  subject: `You've been invited to manage your accounts for ${escapeHtml(data.client_name as string || "")}`,
+  html: wrapEmail(b, [
+    heading("You're Invited!"),
+    para(`You've been invited to connect and manage your own marketing accounts for <strong>${escapeHtml(data.client_name as string || "your company")}</strong>.`),
+    para("By accepting this invitation, you'll be able to:"),
+    `<ul style="font-size:14px;color:#241f21;line-height:1.8;margin:0 0 24px;padding-left:20px;">
+      <li>Connect your social media and ad platform accounts</li>
+      <li>View your marketing performance dashboard</li>
+      <li>Review monthly reports</li>
+    </ul>`,
+    buildButton("Accept Invitation", data.magic_link as string || "#", b),
+    smallNote("This link will sign you in automatically. If you didn't expect this invitation, you can safely ignore it."),
+  ].join("")),
+});
+
+// ═══════════════════════════════════════════════════════════
 // TEMPLATE REGISTRY
 // ═══════════════════════════════════════════════════════════
 
