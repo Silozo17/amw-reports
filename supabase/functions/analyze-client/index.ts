@@ -100,10 +100,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    const currency = client.preferred_currency || "GBP";
+    const currencySymbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : "£";
+
     const dataContext = JSON.stringify({
       client_name: client.company_name,
       month: MONTH_NAMES[month],
       year,
+      currency,
       platforms_connected: connections.filter((c: any) => c.is_connected && c.account_id).map((c: any) => c.platform),
       categories: categoryData,
     });
