@@ -386,6 +386,11 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken }: UseC
   const hasFilteredData = filtered.length > 0;
   const allZeros = hasFilteredData && kpis.every(k => k.value === 0);
 
+  const periodKey = `${selectedPeriod.type}-${selectedPeriod.month}-${selectedPeriod.year}`;
+  const currentAnalysis = analysisMap.get(periodKey);
+  const aiAnalysis = currentAnalysis?.text ?? "";
+  const aiAnalysisDate = currentAnalysis?.date ?? null;
+
   return {
     selectedPlatform, setSelectedPlatform,
     selectedPeriod, setSelectedPeriod,
