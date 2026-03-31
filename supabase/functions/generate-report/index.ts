@@ -1607,7 +1607,7 @@ Deno.serve(async (req) => {
     y += 18;
     tocIndex++;
 
-    if (upsellData) {
+    if (upsellData && client.enable_upsell !== false) {
       if (y + 16 > H - 16) { y = startNewPage(T.tableOfContents); }
       setF(C.offWhite); doc.roundedRect(M, y - 4, CW, 14, 2, 2, "F");
       setF(C.primary); doc.rect(M, y - 4, 3, 14, "F");
