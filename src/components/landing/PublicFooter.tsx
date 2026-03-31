@@ -35,7 +35,7 @@ const PublicFooter = () => (
 
         {/* Solutions */}
         <div className="space-y-3">
-          <h4 className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Solutions</h4>
+          <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Solutions</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/social-media-reporting" className="hover:text-primary transition-colors">Social Media Reporting</Link>
             <Link to="/seo-reporting" className="hover:text-primary transition-colors">SEO Reporting</Link>
