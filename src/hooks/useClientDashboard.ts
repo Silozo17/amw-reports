@@ -44,6 +44,7 @@ export interface SnapshotData {
   platform: PlatformType;
   metrics_data: Record<string, number>;
   top_content?: TopContentItem[];
+  raw_data?: Record<string, unknown>;
   report_month: number;
   report_year: number;
 }
