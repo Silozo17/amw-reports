@@ -1,24 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { PlatformType } from '@/types/database';
+import { SYNC_FUNCTION_MAP } from '@/lib/platformRouting';
 
-/**
- * Maps each platform to its corresponding sync edge function name.
- * This is the single source of truth for sync function routing.
- */
-export const SYNC_FUNCTION_MAP: Record<string, string> = {
-  google_ads: 'sync-google-ads',
-  meta_ads: 'sync-meta-ads',
-  facebook: 'sync-facebook-page',
-  instagram: 'sync-instagram',
-  tiktok: 'sync-tiktok-business',
-  tiktok_ads: 'sync-tiktok-ads',
-  linkedin: 'sync-linkedin',
-  google_search_console: 'sync-google-search-console',
-  google_analytics: 'sync-google-analytics',
-  google_business_profile: 'sync-google-business-profile',
-  youtube: 'sync-youtube',
-  pinterest: 'sync-pinterest',
-};
+// Re-export for backward compatibility
+export { SYNC_FUNCTION_MAP };
 
 interface SyncResult {
   month: number;

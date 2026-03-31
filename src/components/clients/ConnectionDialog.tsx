@@ -13,31 +13,13 @@ import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import ConnectionDisclaimer from './ConnectionDisclaimer';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UpgradePrompt from '@/components/entitlements/UpgradePrompt';
+import { ALL_PLATFORMS, OAUTH_SUPPORTED, CONNECT_FUNCTION_MAP } from '@/lib/platformRouting';
 
 interface ConnectionDialogProps {
   clientId: string;
   connections: PlatformConnection[];
   onUpdate: () => void;
 }
-
-const PLATFORMS: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'tiktok_ads', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
-
-const OAUTH_SUPPORTED: PlatformType[] = ['google_ads', 'meta_ads', 'facebook', 'instagram', 'tiktok', 'tiktok_ads', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest'];
-
-const CONNECT_FUNCTION_MAP: Record<string, string> = {
-  google_ads: 'google-ads-connect',
-  meta_ads: 'meta-ads-connect',
-  facebook: 'facebook-connect',
-  instagram: 'instagram-connect',
-  tiktok: 'tiktok-ads-connect',
-  tiktok_ads: 'tiktok-business-connect',
-  linkedin: 'linkedin-connect',
-  google_search_console: 'google-search-console-connect',
-  google_analytics: 'google-analytics-connect',
-  google_business_profile: 'google-business-connect',
-  youtube: 'youtube-connect',
-  pinterest: 'pinterest-connect',
-};
 
 const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogProps) => {
   const [open, setOpen] = useState(false);
@@ -48,7 +30,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
 
   // Filter out platforms that already have a connection
   const connectedPlatforms = new Set(connections.map(c => c.platform));
-  const availablePlatforms = PLATFORMS.filter(p => !connectedPlatforms.has(p));
+  const availablePlatforms = ALL_PLATFORMS.filter(p => !connectedPlatforms.has(p));
 
   const handleAddAndConnect = async () => {
     if (!platform) {
@@ -92,7 +74,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
 
   const triggerOAuth = async (conn: PlatformConnection) => {
     try {
-      const functionName = CONNECT_FUNCTION_MAP[conn.platform];
+      const functionName = CONNECT_FUNCTION_MAP[conn.platform as string];
       if (!functionName) {
         toast.info(`OAuth for ${PLATFORM_LABELS[conn.platform]} is not yet available.`);
         return;
