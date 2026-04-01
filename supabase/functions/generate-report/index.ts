@@ -2371,7 +2371,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true, pdf_path: storagePath,
-      message: `Report generated for ${client.company_name} - ${MONTH_NAMES[report_month]} ${report_year}`,
+      message: `Report generated for ${client.company_name} - ${periodLabel}`,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {
