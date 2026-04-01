@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
 
       await supabase
         .from("platform_connections")
-        .update({ access_token: accessToken, token_expires_at: newExpiry })
+        .update({ access_token: await encryptToken(accessToken), token_expires_at: newExpiry })
         .eq("id", connectionId);
     }
 

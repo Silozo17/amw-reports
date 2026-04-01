@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
       const refreshed = await refreshAccessToken(conn.refresh_token, googleClientId, googleClientSecret);
       accessToken = refreshed.access_token;
       const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
-      await supabase.from("platform_connections").update({ access_token: accessToken, token_expires_at: newExpiry }).eq("id", connectionId);
+      await supabase.from("platform_connections").update({ access_token: await encryptToken(accessToken), token_expires_at: newExpiry }).eq("id", connectionId);
     }
 
     const propertyId = conn.account_id;

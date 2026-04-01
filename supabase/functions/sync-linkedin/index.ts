@@ -109,8 +109,8 @@ Deno.serve(async (req) => {
       accessToken = refreshData.access_token;
       const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 5184000) * 1000).toISOString();
       await supabase.from("platform_connections").update({
-        access_token: accessToken,
-        refresh_token: refreshData.refresh_token || conn.refresh_token,
+        access_token: await encryptToken(accessToken),
+        refresh_token: await encryptToken(refreshData.refresh_token || conn.refresh_token),
         token_expires_at: newExpiresAt,
         last_error: null,
       }).eq("id", connectionId);
