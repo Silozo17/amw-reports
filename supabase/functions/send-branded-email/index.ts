@@ -185,7 +185,6 @@ const auth_magic_link: TemplateBuilder = (data, b) => ({
 
 const auth_welcome: TemplateBuilder = (data, b) => {
   const otpCode = data.otp_token as string || "";
-  const confirmUrl = data.confirmation_url as string || "";
 
   return {
     subject: `Verify your email for ${b.name}`,
@@ -197,10 +196,7 @@ const auth_welcome: TemplateBuilder = (data, b) => {
         ? `<div style="text-align:center;margin:24px 0;">
             <span style="display:inline-block;font-size:36px;font-weight:700;letter-spacing:10px;font-family:'Courier New',monospace;color:${b.primaryHex};background-color:${b.lightBg};padding:16px 28px;border-radius:8px;border:2px solid ${b.primaryHex};">${escapeHtml(otpCode)}</span>
           </div>`
-        : "",
-      confirmUrl
-        ? buildButton("Or click here to verify", confirmUrl, b)
-        : "",
+        : para("If you don't see a code above, please request a new one from the app."),
       infoBox("This code expires in 1 hour. If you didn't create an account, you can safely ignore this email.", b),
       smallNote(`Need help? Contact us at ${escapeHtml(data.support_email as string || "support@amwmedia.co.uk")}`),
     ].join("")),
