@@ -31,10 +31,10 @@ interface BackfillResult {
   error?: string;
 }
 
-function getMonthsRange(count: number): Array<{ month: number; year: number }> {
+function getMonthsRange(count: number, startOffset = 0): Array<{ month: number; year: number }> {
   const now = new Date();
   const result: Array<{ month: number; year: number }> = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = startOffset; i < startOffset + count; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     result.push({ month: d.getMonth() + 1, year: d.getFullYear() });
   }
