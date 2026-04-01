@@ -1,83 +1,90 @@
 
-What I checked:
-- `supabase/functions/auth-email-hook/index.ts`
-- `supabase/functions/send-branded-email/index.ts`
-- `src/pages/LandingPage.tsx`
-- recent auth and edge-function logs
 
-What the evidence shows:
-- The signup form is not the main problem. `LandingPage.tsx` already does the right thing: sign up, then `verifyOtp(...)` with a 6-digit code.
-- The backend is the break point:
-  - signup requests return `200`
-  - the auth hook runs
-  - then `send-branded-email` returns `400`
-- The resend `429` entries are secondary. Users are retrying because the first email path is already broken.
-- The current auth hook is still not aligned with the real auth email payload:
-  - it relies on `type/event_type` instead of prioritising `email_action_type`
-  - it assumes `confirmation_url` already exists
-  - logs show empty user/email in some hook executions
-  - logs also show `Unhandled auth event type: invite`
-- Result: the hook swallows auth mail, but fails to build/send valid emails for some actions, so users receive nothing usable.
+# Fix: OTP Codes Not Delivered — Users Get Verify Button Instead
 
-Root cause:
-This project is using a custom auth email pipeline, and that pipeline is parsing the auth webhook too loosely. It is not treating the auth email payload as the source of truth, and it is not handling all auth actions consistently. OTP/signup, magic link, recovery, and invite/email-change flows are therefore unreliable.
+## Root Cause
 
-Fix plan:
-1. Rebuild the auth hook around the real auth payload
-- Update `supabase/functions/auth-email-hook/index.ts`
-- Parse auth action from:
-  - `payload.email_action_type`
-  - then `payload.email_data?.email_action_type`
-  - then legacy fallbacks
-- Extract email, token, token hash, redirect target, and any new-email fields from all valid payload locations
-- Add strict validation so the hook fails loudly if required auth fields are missing instead of pretending the event succeeded
+The `auth-email-hook` edge function intercepts Supabase signup emails. For signup, the hook:
 
-2. Generate auth links explicitly instead of hoping `confirmation_url` exists
-- Add a small helper in the auth hook to build the verification/reset/magic-link URL from the auth payload when needed
-- Use OTP as the primary path for signup/reauthentication
-- Use full action links for magic link, recovery, and email-change flows
-- This removes the current “maybe there is a confirmation URL, maybe not” failure mode
+1. Extracts `token` (the 6-digit OTP) from the payload — this part works
+2. **Also** constructs a `confirmation_url` from `token_hash` — this is the problem
 
-3. Audit and cover every auth email type end-to-end
-- Support these actions explicitly:
-  - signup
-  - magiclink
-  - recovery
-  - email_change
-  - reauthentication
-  - invite
-- Stop returning success for unsupported auth actions
-- Either map each action to a real template or return a hard error during development so nothing is silently swallowed
+The `auth_welcome` template renders **both** the OTP code and a "Or click here to verify" button. When the user clicks the verify button, it consumes the one-time token. Then when they try the OTP code, Supabase returns "One-time token not found" (confirmed in auth logs). The button is a link-based verification flow that conflicts with the OTP flow.
 
-4. Clean up the branded auth templates so each action matches the app flow
-- Update `supabase/functions/send-branded-email/index.ts`
-- Keep signup as OTP-first
-- Ensure magic-link and recovery templates require a valid action URL
-- Ensure email-change handles old/new email correctly
-- Add validation for auth templates similar to the invite validation already added, so broken auth emails cannot be sent with empty links or empty recipients
+Additionally, if `token` happens to be empty (edge cases in payload parsing), only the verify button shows — no OTP code at all.
 
-5. Improve resend behavior on the OTP screen
-- Update `src/pages/LandingPage.tsx`
-- Show a resend cooldown / clearer message when auth returns rate-limit errors
-- Prevent users from hammering resend and hitting 429 immediately
-- This is not the root fix, but it removes the confusing “still broken” symptom after the backend is repaired
+## The Fix
 
-Files to update:
-- `supabase/functions/auth-email-hook/index.ts`
-- `supabase/functions/send-branded-email/index.ts`
-- `src/pages/LandingPage.tsx`
+Simple and surgical — two changes:
 
-What I will verify after the fix:
-- New signup for `biuro@timmy-studio.com` sends a real OTP email
-- OTP code matches the 6-digit code expected by `verifyOtp(...)`
-- “Resend code” works and shows sensible cooldown feedback
-- Password reset sends a valid reset link
-- Magic link sends a valid sign-in link
-- Email-change emails still work
-- No auth hook logs with:
-  - `Unhandled auth event type`
-  - empty recipient email
-  - `send-branded-email` 400s
+### 1. Auth-email-hook: strip `confirmation_url` for OTP actions
 
-Why this is the proper fix:
-This does not guess at one template. It fixes the auth email contract at the source: webhook payload parsing, action mapping, OTP/link construction, template validation, and resend handling. That is the only reliable way to stop signup users from getting stuck again.
+For `signup` and `reauthentication`, **never** pass `confirmation_url` to the template. These actions use OTP codes only. The verify link consumes the token and breaks the OTP flow.
+
+**File:** `supabase/functions/auth-email-hook/index.ts`
+
+In the template data section (~line 166-173), add a guard:
+```ts
+const templateData: Record<string, unknown> = {
+  otp_token: token,
+  recipient_name: recipientName,
+  device_info: req.headers.get("user-agent") ?? "Unknown device",
+  support_email: "support@amwmedia.co.uk",
+};
+
+// Only include confirmation_url for link-based actions (recovery, magiclink, email_change, invite)
+// For OTP actions (signup, reauthentication), the link consumes the token and breaks OTP verification
+if (action !== "signup" && action !== "reauthentication") {
+  templateData.confirmation_url = confirmationUrl;
+  templateData.token_hash = tokenHash;
+}
+```
+
+### 2. Auth-welcome template: make OTP the only path
+
+Remove the "Or click here to verify" fallback button from the signup template entirely. If OTP code is missing, show a clear error message instead of a broken link.
+
+**File:** `supabase/functions/send-branded-email/index.ts` (lines 186-208)
+
+```ts
+const auth_welcome: TemplateBuilder = (data, b) => {
+  const otpCode = data.otp_token as string || "";
+
+  return {
+    subject: `Verify your email for ${b.name}`,
+    html: wrapEmail(b, [
+      heading("Verify your email"),
+      para(`Hi ${escapeHtml(data.recipient_name as string || "there")},`),
+      para("Enter this 6-digit code to verify your account:"),
+      otpCode
+        ? `<div style="text-align:center;margin:24px 0;">
+            <span style="...">${escapeHtml(otpCode)}</span>
+          </div>`
+        : para("If you don't see a code above, please request a new one from the app."),
+      infoBox("This code expires in 1 hour. If you didn't create an account, you can safely ignore this email.", b),
+      smallNote(`Need help? Contact us at ${escapeHtml(data.support_email as string || "support@amwmedia.co.uk")}`),
+    ].join("")),
+  };
+};
+```
+
+Key change: No more `confirmation_url` button in this template. OTP is the only verification path for signup.
+
+### 3. Deploy both edge functions
+
+Redeploy `auth-email-hook` and `send-branded-email` so the changes take effect.
+
+## What This Fixes
+
+- Signup emails show **only** the 6-digit OTP code, no verify button
+- No more "One-time token not found" errors from users clicking the link before entering the code
+- Reauthentication also uses OTP-only
+- Recovery, magic link, and email change continue using link-based verification (unchanged)
+
+## Files to Edit
+
+| File | Change |
+|---|---|
+| `supabase/functions/auth-email-hook/index.ts` | Strip `confirmation_url` from template data for signup/reauth actions |
+| `supabase/functions/send-branded-email/index.ts` | Remove verify button from `auth_welcome` template |
+
