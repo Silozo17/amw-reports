@@ -13,6 +13,7 @@ interface SnapshotLike {
 interface HealthScoreProps {
   current: SnapshotLike[];
   previous: SnapshotLike[];
+  prePrevious?: SnapshotLike[];
 }
 
 const CircularGauge = ({ score, change }: { score: number; change?: number }) => {
