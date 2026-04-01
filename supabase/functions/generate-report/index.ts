@@ -2325,7 +2325,14 @@ Deno.serve(async (req) => {
     // Body text
     setC(C.textFaint);
     doc.setFontSize(8.5);
-    const endText = T.closingLine;
+    const contactParts: string[] = [];
+    if (orgEmail) contactParts.push(`email ${orgEmail}`);
+    if (orgPhone) contactParts.push(`call ${orgPhone}`);
+    const contactLine = contactParts.length > 0
+      ? ` Questions about this report? ${contactParts.join(" or ")}.`
+      : "";
+    const dashboardLine = dashboardUrl ? " Visit your dashboard anytime for the full picture." : "";
+    const endText = `This report gives you a quick snapshot of your marketing performance.${contactLine}${dashboardLine}`;
     const endLines = doc.splitTextToSize(endText, 110);
     doc.text(endLines, 14, 85);
 
