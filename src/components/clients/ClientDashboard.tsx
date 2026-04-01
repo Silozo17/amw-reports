@@ -131,6 +131,7 @@ interface ClientDashboardProps {
   portalToken?: string;
   initialMonth?: number;
   initialYear?: number;
+  showHealthScore?: boolean;
 }
 
 const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear }: ClientDashboardProps) => {
