@@ -120,7 +120,7 @@ export function computeSparklines(
     monthMap.set(key, existing);
   }
   const sortedFinal = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
-  for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions", "search_impressions", "search_clicks"]) {
+  for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions", "search_impressions", "search_clicks", "posts_published"]) {
     map[metricKey] = sortedFinal.map(([key, data]) => { const [y, m] = key.split("-"); return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` }; });
   }
   return map;
