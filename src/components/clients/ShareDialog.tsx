@@ -23,12 +23,19 @@ interface CustomDomain {
   is_active: boolean;
 }
 
+interface SelectedPeriod {
+  type: string;
+  month: number;
+  year: number;
+  startDate?: Date;
+  endDate?: Date;
+}
+
 interface ShareDialogProps {
   clientId: string;
   orgId: string;
   clientName: string;
-  selectedMonth?: number;
-  selectedYear?: number;
+  selectedPeriod?: SelectedPeriod | null;
 }
 
 const generateSlugToken = (name: string): string => {
