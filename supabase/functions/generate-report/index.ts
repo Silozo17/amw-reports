@@ -1296,9 +1296,86 @@ Deno.serve(async (req) => {
       textFaint: [180, 180, 180] as [number, number, number],
     };
 
-    const snapshots = snapshotsRes.data ?? [];
-    const prevSnapshots = prevSnapshotsRes.data ?? [];
+    const rawSnapshots = snapshotsRes.data ?? [];
+    const rawPrevSnapshots = prevSnapshotsRes.data ?? [];
     const configs = configRes.data ?? [];
+
+    // ── Aggregate multi-month snapshots per platform ──
+    const RATE_METRICS = new Set(["ctr", "engagement_rate", "conversion_rate", "audience_growth_rate", "search_ctr", "bounce_rate", "search_impression_share", "completion_rate", "cpc", "cpm", "cost_per_conversion", "cost_per_lead", "avg_session_duration", "pages_per_session", "avg_view_duration", "average_time_watched", "frequency", "gbp_average_rating", "search_position", "roas"]);
+    const CUMULATIVE_METRICS = new Set(["total_followers", "followers", "subscribers", "following", "total_pins", "total_boards", "total_video_count", "media_count"]);
+
+    const aggregateSnapshots = (snaps: typeof rawSnapshots): { platform: string; metrics_data: Record<string, number>; top_content: unknown[] }[] => {
+      const byPlatform = new Map<string, typeof rawSnapshots>();
+      for (const s of snaps) {
+        const p = s.platform as string;
+        if (!byPlatform.has(p)) byPlatform.set(p, []);
+        byPlatform.get(p)!.push(s);
+      }
+
+      const results: { platform: string; metrics_data: Record<string, number>; top_content: unknown[] }[] = [];
+      for (const [platform, platSnaps] of byPlatform) {
+        if (platSnaps.length === 1) {
+          results.push({
+            platform,
+            metrics_data: platSnaps[0].metrics_data as Record<string, number>,
+            top_content: Array.isArray(platSnaps[0].top_content) ? platSnaps[0].top_content : [],
+          });
+          continue;
+        }
+
+        // Sort by year/month ascending for cumulative logic (take latest)
+        platSnaps.sort((a, b) => a.report_year !== b.report_year ? a.report_year - b.report_year : a.report_month - b.report_month);
+
+        const aggregated: Record<string, number> = {};
+        const weightKeys: Record<string, number> = {}; // for weighted averages
+
+        for (const snap of platSnaps) {
+          const md = snap.metrics_data as Record<string, number>;
+          for (const [key, val] of Object.entries(md)) {
+            if (typeof val !== "number") continue;
+            if (CUMULATIVE_METRICS.has(key)) {
+              // Take latest value
+              aggregated[key] = val;
+            } else if (RATE_METRICS.has(key)) {
+              // Weighted average - weight by impressions or clicks
+              const weight = md.impressions ?? md.clicks ?? md.sessions ?? 1;
+              aggregated[key] = (aggregated[key] ?? 0) + val * weight;
+              weightKeys[key] = (weightKeys[key] ?? 0) + weight;
+            } else {
+              // Additive
+              aggregated[key] = (aggregated[key] ?? 0) + val;
+            }
+          }
+        }
+
+        // Finalize weighted averages
+        for (const key of Object.keys(weightKeys)) {
+          if (weightKeys[key] > 0) {
+            aggregated[key] = aggregated[key] / weightKeys[key];
+          }
+        }
+
+        // Merge top content from all months
+        const allTopContent: unknown[] = [];
+        for (const snap of platSnaps) {
+          if (Array.isArray(snap.top_content)) allTopContent.push(...snap.top_content);
+        }
+
+        results.push({ platform, metrics_data: aggregated, top_content: allTopContent });
+      }
+      return results;
+    };
+
+    const snapshots = isCustomRange ? aggregateSnapshots(rawSnapshots) : rawSnapshots.map(s => ({
+      platform: s.platform as string,
+      metrics_data: s.metrics_data as Record<string, number>,
+      top_content: Array.isArray(s.top_content) ? s.top_content : [],
+    }));
+    const prevSnapshots = isCustomRange ? aggregateSnapshots(rawPrevSnapshots) : rawPrevSnapshots.map(s => ({
+      platform: s.platform as string,
+      metrics_data: s.metrics_data as Record<string, number>,
+      top_content: Array.isArray(s.top_content) ? s.top_content : [],
+    }));
 
     const CURRENCY_SYMBOLS: Record<string, string> = {
       GBP: "\u00A3", EUR: "\u20AC", USD: "$", PLN: "zl", CAD: "C$", AUD: "A$", NZD: "NZ$",
@@ -1324,6 +1401,15 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Build period label for PDF
+    const periodLabel = isCustomRange
+      ? `${date_from} to ${date_to}`
+      : `${MONTH_NAMES[report_month]} ${report_year}`;
+
+    // Comparison labels — use "Previous Period" for custom range
+    const currentLabel = isCustomRange ? T.thisPeriod : T.thisMonth;
+    const previousLabel = isCustomRange ? T.previousPeriod : T.lastMonth;
+
     const { data: upsellData } = await supabase.from("report_upsells")
       .select("*").eq("client_id", client_id).eq("report_month", report_month)
       .eq("report_year", report_year).eq("is_active", true).limit(1).maybeSingle();
@@ -1334,7 +1420,7 @@ Deno.serve(async (req) => {
     for (const snapshot of snapshots) {
       const config = configs.find((c: Record<string, unknown>) => c.platform === snapshot.platform);
       const metrics = snapshot.metrics_data as Record<string, number>;
-      const prevSnapshot = prevSnapshots.find((s: Record<string, unknown>) => s.platform === snapshot.platform);
+      const prevSnapshot = prevSnapshots.find((s: { platform: string }) => s.platform === snapshot.platform);
       const prevMetrics = (prevSnapshot?.metrics_data ?? {}) as Record<string, number>;
       const hasPrevSnapshot = !!prevSnapshot;
       const topContent = Array.isArray(snapshot.top_content) ? snapshot.top_content : [];
