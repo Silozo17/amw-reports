@@ -245,6 +245,11 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
       const d = subMonths(new Date(year, month - 1), 3); prevMonth = d.getMonth() + 1; prevYear = d.getFullYear();
     } else { prevMonth = month === 1 ? 12 : month - 1; prevYear = month === 1 ? year - 1 : year; }
 
+    // N-2 month for accurate health score change indicator
+    const prePrevDate = subMonths(new Date(prevYear, prevMonth - 1), 1);
+    const prePrevMonth = prePrevDate.getMonth() + 1;
+    const prePrevYear = prePrevDate.getFullYear();
+
     const sixMonthsAgo = new Date(year, month - 1); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const startMonth = sixMonthsAgo.getMonth() + 1; const startYr = sixMonthsAgo.getFullYear();
 
