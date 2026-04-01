@@ -1854,6 +1854,21 @@ Deno.serve(async (req) => {
       y += 18;
     }
 
+    // "View Your Full Dashboard" button on TOC / executive summary page
+    if (dashboardUrl) {
+      y += 4;
+      if (y + 18 > H - 16) { y = startNewPage(T.tableOfContents); }
+      const btnW = 72;
+      const btnH = 12;
+      const btnX = (W - btnW) / 2;
+      setF(C.primary); doc.roundedRect(btnX, y, btnW, btnH, 3, 3, "F");
+      doc.setFontSize(9); setC(C.white); doc.setFont("helvetica", "bold");
+      doc.text("View Your Full Dashboard", W / 2, y + 7.5, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.link(btnX, y, btnW, btnH, { url: dashboardUrl });
+      y += btnH + 6;
+    }
+
     for (const section of platformSections) {
       const isOnePage = ONE_PAGE_PLATFORMS.has(section.platform);
       let platformPageCount = 0;
