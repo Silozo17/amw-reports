@@ -1501,19 +1501,21 @@ Deno.serve(async (req) => {
 
     const executiveSummary = (() => {
       const lines: string[] = [];
-      lines.push(`This report covers ${client.company_name}'s marketing performance for ${periodLabel}.`);
+      lines.push(`This report highlights ${client.company_name}'s key metrics for ${periodLabel}.`);
+      if (dashboardUrl) {
+        lines.push(`For real-time data, drill-downs, and historical trends, visit your dashboard.`);
+      }
       if (keyWins.length > 0) {
-        lines.push(`The highlight this month: ${keyWins[0]}.`);
+        lines.push(`The highlight: ${keyWins[0]}.`);
       }
       const strongPlatforms = platformSections.filter(s => getPlatformStatus(s.platform, s.metrics, s.hasPrevSnapshot ? s.prevMetrics : null) === "Strong");
       if (strongPlatforms.length > 0) {
         const names = strongPlatforms.map(s => s.label).join(", ");
-        lines.push(`${names} ${strongPlatforms.length === 1 ? "is" : "are"} performing strongly this month.`);
+        lines.push(`${names} ${strongPlatforms.length === 1 ? "is" : "are"} performing strongly.`);
       }
       if (worthWatching.length > 0) {
         lines.push(`There are some areas worth monitoring — see the details below.`);
       }
-      lines.push(`We look forward to building on these results next month.`);
       return lines.join(" ");
     })();
 
