@@ -1686,7 +1686,7 @@ Deno.serve(async (req) => {
     // Month/year in lighter brand colour
     coverY += 6;
     doc.setFontSize(14); setC(lighten(C.primary, 0.4));
-    doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, 14, coverY);
+    doc.text(periodLabel, 14, coverY);
     coverY += 12;
 
     // Prepared for
