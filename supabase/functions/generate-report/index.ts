@@ -1486,7 +1486,7 @@ Deno.serve(async (req) => {
 
     const executiveSummary = (() => {
       const lines: string[] = [];
-      lines.push(`This report covers ${client.company_name}'s marketing performance for ${MONTH_NAMES[report_month]} ${report_year}.`);
+      lines.push(`This report covers ${client.company_name}'s marketing performance for ${periodLabel}.`);
       if (keyWins.length > 0) {
         lines.push(`The highlight this month: ${keyWins[0]}.`);
       }
