@@ -344,7 +344,13 @@ const LandingPage = () => {
               </Button>
               <p className="text-sm text-muted-foreground font-body">
                 Didn't receive the code?{' '}
-                <button onClick={handleResendOtp} className="text-primary font-medium hover:underline">Resend</button>
+                <button
+                  onClick={handleResendOtp}
+                  disabled={resendCooldown > 0}
+                  className={`font-medium hover:underline ${resendCooldown > 0 ? 'text-muted-foreground cursor-not-allowed' : 'text-primary'}`}
+                >
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
+                </button>
               </p>
             </div>
           )}
