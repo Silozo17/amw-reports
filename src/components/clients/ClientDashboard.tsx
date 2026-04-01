@@ -132,10 +132,12 @@ interface ClientDashboardProps {
   initialMonth?: number;
   initialYear?: number;
   showHealthScore?: boolean;
-  onPeriodChange?: (month: number, year: number) => void;
+  initialPeriod?: SelectedPeriod;
+  disableAutoDetect?: boolean;
+  onPeriodChange?: (period: SelectedPeriod) => void;
 }
 
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
   const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear });
   const [chatOpen, setChatOpen] = useState(false);
 
