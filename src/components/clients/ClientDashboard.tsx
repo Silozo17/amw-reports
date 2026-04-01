@@ -157,6 +157,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
     prevSnapshots,
   } = dashboard;
 
+  // Notify parent when selected period changes
+  React.useEffect(() => {
+    onPeriodChange?.(selectedPeriod.month, selectedPeriod.year);
+  }, [selectedPeriod.month, selectedPeriod.year, onPeriodChange]);
+
   const trendPlatforms = useMemo(() =>
     [...new Set((selectedPlatform === "all" ? trendData : trendData.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))).map(s => s.platform))] as PlatformType[],
     [trendData, selectedPlatform, matchesPlatformFilter]
