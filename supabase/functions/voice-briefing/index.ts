@@ -21,21 +21,19 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (claimsError || !claimsData?.claims?.sub) {
+    // Extract user from JWT
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user?.id) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const callerId = claimsData.claims.sub;
+    const callerId = userData.user.id;
 
     const { client_id, month, year } = await req.json();
 
@@ -45,15 +43,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify caller belongs to the org that owns this client
+    // Verify caller has access: org_members OR client_users OR platform_admins
     const { data: clientOwner } = await supabase.from("clients").select("org_id").eq("id", client_id).single();
     if (!clientOwner) {
       return new Response(JSON.stringify({ error: "Client not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { data: membership } = await supabase.from("org_members").select("id").eq("user_id", callerId).eq("org_id", clientOwner.org_id).limit(1).single();
-    if (!membership) {
+
+    const [membershipRes, clientUserRes, platformAdminRes] = await Promise.all([
+      supabase.from("org_members").select("id").eq("user_id", callerId).eq("org_id", clientOwner.org_id).limit(1).maybeSingle(),
+      supabase.from("client_users").select("id").eq("user_id", callerId).eq("client_id", client_id).limit(1).maybeSingle(),
+      supabase.from("platform_admins").select("id").eq("user_id", callerId).limit(1).maybeSingle(),
+    ]);
+
+    const hasAccess = membershipRes.data || clientUserRes.data || platformAdminRes.data;
+    if (!hasAccess) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
