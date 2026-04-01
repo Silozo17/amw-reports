@@ -58,6 +58,7 @@ export function computeKpis(
   const conversionsPlatforms = platformsFor(m => m.conversions || 0);
   const pageViewsPlatforms = platformsFor(m => (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0));
   const websiteClicksPlatforms = platformsFor(m => (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0));
+  const postsPublishedPlatforms = platformsFor(m => m.posts_published || 0);
 
   const totalSearchImpressions = filtered.reduce((sum, s) => sum + (s.metrics_data.search_impressions || 0), 0);
   const totalSearchClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.search_clicks || 0), 0);
