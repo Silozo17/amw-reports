@@ -1,61 +1,83 @@
 
+What I checked:
+- `supabase/functions/auth-email-hook/index.ts`
+- `supabase/functions/send-branded-email/index.ts`
+- `src/pages/LandingPage.tsx`
+- recent auth and edge-function logs
 
-# Fix: OTP Verification Codes Not Delivered
+What the evidence shows:
+- The signup form is not the main problem. `LandingPage.tsx` already does the right thing: sign up, then `verifyOtp(...)` with a 6-digit code.
+- The backend is the break point:
+  - signup requests return `200`
+  - the auth hook runs
+  - then `send-branded-email` returns `400`
+- The resend `429` entries are secondary. Users are retrying because the first email path is already broken.
+- The current auth hook is still not aligned with the real auth email payload:
+  - it relies on `type/event_type` instead of prioritising `email_action_type`
+  - it assumes `confirmation_url` already exists
+  - logs show empty user/email in some hook executions
+  - logs also show `Unhandled auth event type: invite`
+- Result: the hook swallows auth mail, but fails to build/send valid emails for some actions, so users receive nothing usable.
 
-## Root Cause
+Root cause:
+This project is using a custom auth email pipeline, and that pipeline is parsing the auth webhook too loosely. It is not treating the auth email payload as the source of truth, and it is not handling all auth actions consistently. OTP/signup, magic link, recovery, and invite/email-change flows are therefore unreliable.
 
-The `auth-email-hook` intercepts ALL Supabase Auth emails — including signup confirmation. When it handles a `signup` event, it maps it to the `auth_welcome` template, which sends a **"Welcome to [org]"** email with a "Complete Your Profile" button. The actual **OTP code is never included** in the email.
+Fix plan:
+1. Rebuild the auth hook around the real auth payload
+- Update `supabase/functions/auth-email-hook/index.ts`
+- Parse auth action from:
+  - `payload.email_action_type`
+  - then `payload.email_data?.email_action_type`
+  - then legacy fallbacks
+- Extract email, token, token hash, redirect target, and any new-email fields from all valid payload locations
+- Add strict validation so the hook fails loudly if required auth fields are missing instead of pretending the event succeeded
 
-Since Supabase considers the email "handled" after the hook returns 200, it does **not** send its default OTP email either. Users are told "Check your email for a verification code" but receive a welcome email with no code.
+2. Generate auth links explicitly instead of hoping `confirmation_url` exists
+- Add a small helper in the auth hook to build the verification/reset/magic-link URL from the auth payload when needed
+- Use OTP as the primary path for signup/reauthentication
+- Use full action links for magic link, recovery, and email-change flows
+- This removes the current “maybe there is a confirmation URL, maybe not” failure mode
 
-Specifically:
+3. Audit and cover every auth email type end-to-end
+- Support these actions explicitly:
+  - signup
+  - magiclink
+  - recovery
+  - email_change
+  - reauthentication
+  - invite
+- Stop returning success for unsupported auth actions
+- Either map each action to a real template or return a hard error during development so nothing is silently swallowed
 
-1. **`auth-email-hook/index.ts` line 39**: Extracts `confirmation_url` from the payload, but **never extracts `token`** (the 6-digit OTP code that Supabase provides in the hook payload).
-2. **`auth_welcome` template (lines 186-200)**: Does not display the OTP code or the confirmation URL. It shows a generic welcome message with a "Complete Your Profile" button pointing to a profile page.
-3. The app's signup flow (`LandingPage.tsx` line 106) expects users to enter a 6-digit OTP via `verifyOtp({ type: 'signup' })`, but that code was never emailed to them.
+4. Clean up the branded auth templates so each action matches the app flow
+- Update `supabase/functions/send-branded-email/index.ts`
+- Keep signup as OTP-first
+- Ensure magic-link and recovery templates require a valid action URL
+- Ensure email-change handles old/new email correctly
+- Add validation for auth templates similar to the invite validation already added, so broken auth emails cannot be sent with empty links or empty recipients
 
-## Fix
+5. Improve resend behavior on the OTP screen
+- Update `src/pages/LandingPage.tsx`
+- Show a resend cooldown / clearer message when auth returns rate-limit errors
+- Prevent users from hammering resend and hitting 429 immediately
+- This is not the root fix, but it removes the confusing “still broken” symptom after the backend is repaired
 
-### 1. Update `auth-email-hook/index.ts` — Extract the OTP token from the payload
+Files to update:
+- `supabase/functions/auth-email-hook/index.ts`
+- `supabase/functions/send-branded-email/index.ts`
+- `src/pages/LandingPage.tsx`
 
-The Supabase Send Email Hook payload includes `token` (the 6-digit OTP) and `token_hash`. The hook must extract and pass these to the template.
+What I will verify after the fix:
+- New signup for `biuro@timmy-studio.com` sends a real OTP email
+- OTP code matches the 6-digit code expected by `verifyOtp(...)`
+- “Resend code” works and shows sensible cooldown feedback
+- Password reset sends a valid reset link
+- Magic link sends a valid sign-in link
+- Email-change emails still work
+- No auth hook logs with:
+  - `Unhandled auth event type`
+  - empty recipient email
+  - `send-branded-email` 400s
 
-```ts
-// Add after line 39
-const otpToken = payload.token ?? payload.email_data?.token ?? "";
-```
-
-Then add `otp_token` to `templateData`:
-```ts
-templateData.otp_token = otpToken;
-```
-
-### 2. Replace `auth_welcome` template with a proper signup confirmation template
-
-Change it from a generic "Welcome" email to one that prominently displays the OTP code and includes the confirmation URL as a fallback link:
-
-- Large, styled 6-digit OTP code display (monospace, spaced, easy to read)
-- Clear instruction: "Enter this code to verify your account"
-- Confirmation URL button as fallback ("Or click here to verify")
-- Keep the welcome tone but make the code the primary content
-- "This code expires in 1 hour" note
-
-### 3. No frontend changes needed
-
-The `LandingPage.tsx` OTP verification flow is already correct — it just needs the email to actually contain the code.
-
-## Files to Edit
-
-| File | Change |
-|---|---|
-| `supabase/functions/auth-email-hook/index.ts` | Extract `token` from hook payload, pass as `otp_token` in template data |
-| `supabase/functions/send-branded-email/index.ts` | Update `auth_welcome` template to display OTP code prominently + include confirmation URL |
-
-## Why This Fixes It
-
-After this change:
-1. User signs up → Supabase triggers the hook with `token` (6-digit code)
-2. Hook extracts the token and passes it to `auth_welcome`
-3. Template renders the OTP code prominently in a branded email
-4. User enters the code on the OTP screen → account verified
-
+Why this is the proper fix:
+This does not guess at one template. It fixes the auth email contract at the source: webhook payload parsing, action mapping, OTP/link construction, template validation, and resend handling. That is the only reliable way to stop signup users from getting stuck again.
