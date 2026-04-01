@@ -1,6 +1,6 @@
 import {
   Banknote, Eye, MousePointerClick, MessageCircle, Users,
-  Activity, Target, FileText, Link, Search, Crosshair, Hash,
+  Activity, Target, FileText, Link, Search, Crosshair, Hash, PenSquare,
 } from "lucide-react";
 import { PLATFORM_LABELS } from "@/types/database";
 import type { PlatformType } from "@/types/database";
