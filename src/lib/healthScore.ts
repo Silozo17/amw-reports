@@ -14,6 +14,7 @@ export interface SubScore {
 
 export interface HealthScoreResult {
   overall: number;
+  change?: number;
   subScores: SubScore[];
 }
 
