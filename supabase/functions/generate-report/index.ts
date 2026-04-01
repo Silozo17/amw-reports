@@ -2306,7 +2306,9 @@ Deno.serve(async (req) => {
     const pdfBuffer = doc.output("arraybuffer");
     const pdfUint8 = new Uint8Array(pdfBuffer);
 
-    const storagePath = `${client_id}/${report_year}-${String(report_month).padStart(2, "0")}.pdf`;
+    const storagePath = isCustomRange
+      ? `${client_id}/${date_from}_${date_to}.pdf`
+      : `${client_id}/${report_year}-${String(report_month).padStart(2, "0")}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from("reports")
       .upload(storagePath, pdfUint8, { contentType: "application/pdf", upsert: true });
