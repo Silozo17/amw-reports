@@ -2134,6 +2134,18 @@ Deno.serve(async (req) => {
           y += 2;
         }
       }
+
+      // "View detailed metrics in your dashboard" link at bottom of platform section
+      if (dashboardUrl && platformPageCount <= maxPlatformPages) {
+        if (y + 10 <= H - 16) {
+          const linkText = "View detailed metrics in your dashboard ->";
+          doc.setFontSize(7.5); setC(C.primary);
+          doc.text(linkText, M, y + 2);
+          const linkW = doc.getTextWidth(linkText);
+          doc.link(M, y - 1, linkW, 6, { url: dashboardUrl });
+          y += 8;
+        }
+      }
     }
 
     y = startNewPage(T.monthlySummary);
