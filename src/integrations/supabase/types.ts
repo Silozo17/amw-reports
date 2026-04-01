@@ -227,6 +227,7 @@ export type Database = {
           service_area_type: string
           service_areas: string | null
           services_subscribed: string[] | null
+          show_health_score: boolean
           social_handles: Json | null
           target_audience: string | null
           unique_selling_points: string | null
@@ -270,6 +271,7 @@ export type Database = {
           service_area_type?: string
           service_areas?: string | null
           services_subscribed?: string[] | null
+          show_health_score?: boolean
           social_handles?: Json | null
           target_audience?: string | null
           unique_selling_points?: string | null
@@ -313,6 +315,7 @@ export type Database = {
           service_area_type?: string
           service_areas?: string | null
           services_subscribed?: string[] | null
+          show_health_score?: boolean
           social_handles?: Json | null
           target_audience?: string | null
           unique_selling_points?: string | null

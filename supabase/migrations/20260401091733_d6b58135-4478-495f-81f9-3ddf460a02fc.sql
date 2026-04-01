@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN show_health_score boolean NOT NULL DEFAULT true;
