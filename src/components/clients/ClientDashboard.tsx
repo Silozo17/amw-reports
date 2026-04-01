@@ -20,6 +20,7 @@ import PerformanceOverview from "./dashboard/PerformanceOverview";
 import AiChatDrawer from "./dashboard/AiChatDrawer";
 import VoiceBriefing from "./dashboard/VoiceBriefing";
 import { useClientDashboard } from "@/hooks/useClientDashboard";
+import type { SelectedPeriod } from "@/components/clients/DashboardHeader";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   'Paid Advertising': DollarSign,
