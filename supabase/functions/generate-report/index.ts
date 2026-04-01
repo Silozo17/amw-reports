@@ -1978,7 +1978,7 @@ Deno.serve(async (req) => {
           y = drawSectionLabel(T.monthOnMonth, y);
 
           const colWidths = [CW * 0.30, CW * 0.22, CW * 0.22, CW * 0.26];
-          const tableHeaders = ["Metric", T.thisMonth, T.lastMonth, T.change];
+          const tableHeaders = ["Metric", currentLabel, previousLabel, T.change];
 
           // Table header row — brand primary background
           setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
