@@ -1232,6 +1232,16 @@ Deno.serve(async (req) => {
     earlyReportId = earlyReportQuery?.data?.id;
 
     const { data: org } = await supabase.from("organisations").select("*").eq("id", client.org_id).single();
+
+    // Fetch share token and custom domain for dashboard links in the PDF
+    const [shareTokenRes, customDomainRes] = await Promise.all([
+      supabase.from("client_share_tokens").select("token").eq("client_id", client_id).eq("is_active", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("custom_domains").select("domain").eq("org_id", client.org_id).eq("is_active", true).not("verified_at", "is", null).limit(1).maybeSingle(),
+    ]);
+    const shareToken = (shareTokenRes.data as { token: string } | null)?.token ?? null;
+    const portalDomain = (customDomainRes.data as { domain: string } | null)?.domain ?? "amw-reports.lovable.app";
+    const dashboardUrl: string | null = shareToken ? `https://${portalDomain}/portal/${shareToken}` : null;
+
     const orgName = org?.name ?? "Your Agency";
     const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
     const showLogo = reportSettings.show_logo !== false;
