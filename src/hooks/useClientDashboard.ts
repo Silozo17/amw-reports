@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { subMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles } from "lucide-react";
