@@ -1184,20 +1184,52 @@ Deno.serve(async (req) => {
     }
 
     // Upsert report record with "running" status immediately
-    const { data: runningReport } = await supabase.from("reports")
-      .upsert({
-        client_id,
-        report_month,
-        report_year,
-        org_id: client.org_id,
-        status: "running" as const,
-        generated_at: null,
-        pdf_storage_path: null,
-      }, { onConflict: "client_id,report_month,report_year", ignoreDuplicates: false })
-      .select("id")
-      .single();
+    let earlyReportQuery;
+    if (isCustomRange) {
+      // For custom range, find existing by date range or insert new
+      const { data: existingReport } = await supabase.from("reports")
+        .select("id")
+        .eq("client_id", client_id)
+        .eq("date_from", date_from)
+        .eq("date_to", date_to)
+        .maybeSingle();
 
-    earlyReportId = runningReport?.id;
+      if (existingReport) {
+        earlyReportQuery = await supabase.from("reports")
+          .update({ status: "running" as const, generated_at: null, pdf_storage_path: null })
+          .eq("id", existingReport.id)
+          .select("id")
+          .single();
+      } else {
+        earlyReportQuery = await supabase.from("reports")
+          .insert({
+            client_id,
+            report_month,
+            report_year,
+            org_id: client.org_id,
+            status: "running" as const,
+            date_from,
+            date_to,
+          })
+          .select("id")
+          .single();
+      }
+    } else {
+      earlyReportQuery = await supabase.from("reports")
+        .upsert({
+          client_id,
+          report_month,
+          report_year,
+          org_id: client.org_id,
+          status: "running" as const,
+          generated_at: null,
+          pdf_storage_path: null,
+        }, { onConflict: "client_id,report_month,report_year", ignoreDuplicates: false })
+        .select("id")
+        .single();
+    }
+
+    earlyReportId = earlyReportQuery?.data?.id;
 
     const { data: org } = await supabase.from("organisations").select("*").eq("id", client.org_id).single();
     const orgName = org?.name ?? "Your Agency";
