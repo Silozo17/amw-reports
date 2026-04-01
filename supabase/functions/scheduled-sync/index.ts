@@ -277,12 +277,70 @@ Deno.serve(async (req) => {
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
 
+    // --- Weekly gap detection (runs on Sundays) ---
+    let backfillTriggered = 0;
+    const MAX_BACKFILLS_PER_RUN = 50;
+    const BACKFILL_BATCH_SIZE = 2;
+
+    if (now.getDay() === 0) {
+      // Build list of months to check (last 12)
+      const checkMonths: Array<{ month: number; year: number }> = [];
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(currentYear, currentMonth - 1 - i, 1);
+        checkMonths.push({ month: d.getMonth() + 1, year: d.getFullYear() });
+      }
+
+      // For each active connection, check for missing snapshots
+      const connectionsToBackfill: string[] = [];
+
+      for (const conn of connections) {
+        if (connectionsToBackfill.length >= MAX_BACKFILLS_PER_RUN) break;
+
+        const fnName = SYNC_FUNCTION_MAP[conn.platform];
+        if (!fnName) continue;
+
+        const { data: snapshots } = await supabase
+          .from("monthly_snapshots")
+          .select("report_month, report_year")
+          .eq("client_id", conn.client_id)
+          .eq("platform", conn.platform);
+
+        const existingSet = new Set(
+          (snapshots || []).map((s: { report_month: number; report_year: number }) =>
+            `${s.report_month}-${s.report_year}`
+          )
+        );
+
+        const hasMissing = checkMonths.some(
+          ({ month, year }) => !existingSet.has(`${month}-${year}`)
+        );
+
+        if (hasMissing) {
+          connectionsToBackfill.push(conn.id);
+        }
+      }
+
+      // Invoke backfill-sync in small batches
+      for (let i = 0; i < connectionsToBackfill.length; i += BACKFILL_BATCH_SIZE) {
+        const batch = connectionsToBackfill.slice(i, i + BACKFILL_BATCH_SIZE);
+        await Promise.allSettled(
+          batch.map((connId) =>
+            supabase.functions.invoke("backfill-sync", {
+              body: { connection_id: connId, months: 12 },
+            })
+          )
+        );
+        backfillTriggered += batch.length;
+      }
+    }
+
     return new Response(
       JSON.stringify({
-        message: `Scheduled sync complete: ${successCount} succeeded, ${failCount} failed, ${skippedCount} skipped (plan schedule)`,
+        message: `Scheduled sync complete: ${successCount} succeeded, ${failCount} failed, ${skippedCount} skipped (plan schedule)${backfillTriggered > 0 ? `, ${backfillTriggered} backfills triggered` : ""}`,
         months_synced: monthsToSync,
         total_connections: connections.length,
         skipped_count: skippedCount,
+        backfill_triggered: backfillTriggered,
         results,
       }),
       { headers: { "Content-Type": "application/json" } }
