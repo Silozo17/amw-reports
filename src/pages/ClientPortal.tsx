@@ -148,6 +148,7 @@ const ClientPortal = () => {
           portalToken={token}
           initialMonth={initialMonth}
           initialYear={initialYear}
+          showHealthScore={client.show_health_score !== false}
         />
       </main>
 
