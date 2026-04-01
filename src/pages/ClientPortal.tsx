@@ -60,7 +60,7 @@ const ClientPortal = () => {
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
 
-  const { initialMonth, initialYear } = useMemo(() => {
+  const { initialMonth, initialYear } = useMemo<{ initialMonth?: number; initialYear?: number }>(() => {
     const raw = searchParams.get('period');
     if (raw === null) return {};
     const parsed = parseInt(raw, 10);
