@@ -113,6 +113,7 @@ export interface Client {
   competitors: string | null;
   unique_selling_points: string | null;
   brand_voice: string | null;
+  show_health_score: boolean;
 }
 
 export interface ClientRecipient {
