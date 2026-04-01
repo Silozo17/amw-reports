@@ -37,6 +37,7 @@ Deno.serve(async (req) => {
     const user = payload.user ?? {};
     const email = user.email ?? payload.email ?? "";
     const confirmationUrl = payload.confirmation_url ?? payload.action_link ?? "";
+    const otpToken = payload.token ?? payload.email_data?.token ?? "";
     const newEmail = payload.new_email ?? "";
 
     const templateName = AUTH_EVENT_TO_TEMPLATE[eventType];
@@ -94,6 +95,7 @@ Deno.serve(async (req) => {
     // Build data payload for the template
     const templateData: Record<string, unknown> = {
       confirmation_url: confirmationUrl,
+      otp_token: otpToken,
       recipient_name: user.user_metadata?.full_name ?? user.email ?? "",
       device_info: req.headers.get("user-agent") ?? "Unknown device",
       profile_url: `${supabaseUrl.replace(".supabase.co", ".lovable.app")}/settings`,

@@ -183,21 +183,29 @@ const auth_magic_link: TemplateBuilder = (data, b) => ({
   ].join("")),
 });
 
-const auth_welcome: TemplateBuilder = (data, b) => ({
-  subject: `Welcome to ${b.name}`,
-  html: wrapEmail(b, [
-    heading(`Welcome to ${escapeHtml(b.name)}!`),
-    para(`Hi ${escapeHtml(data.recipient_name as string || "there")},`),
-    para("Your account has been created successfully. Here's what you can do:"),
-    `<ul style="font-size:14px;color:#241f21;line-height:1.8;margin:0 0 24px;padding-left:20px;">
-      <li>Connect your marketing platforms</li>
-      <li>Track performance across all channels</li>
-      <li>Generate branded reports for your clients</li>
-    </ul>`,
-    buildButton("Complete Your Profile", data.profile_url as string || "#", b),
-    smallNote(`Need help? Contact us at ${escapeHtml(data.support_email as string || "support@amwmedia.co.uk")}`),
-  ].join("")),
-});
+const auth_welcome: TemplateBuilder = (data, b) => {
+  const otpCode = data.otp_token as string || "";
+  const confirmUrl = data.confirmation_url as string || "";
+
+  return {
+    subject: `Verify your email for ${b.name}`,
+    html: wrapEmail(b, [
+      heading("Verify your email"),
+      para(`Hi ${escapeHtml(data.recipient_name as string || "there")},`),
+      para("Enter this 6-digit code to verify your account:"),
+      otpCode
+        ? `<div style="text-align:center;margin:24px 0;">
+            <span style="display:inline-block;font-size:36px;font-weight:700;letter-spacing:10px;font-family:'Courier New',monospace;color:${b.primaryHex};background-color:${b.lightBg};padding:16px 28px;border-radius:8px;border:2px solid ${b.primaryHex};">${escapeHtml(otpCode)}</span>
+          </div>`
+        : "",
+      confirmUrl
+        ? buildButton("Or click here to verify", confirmUrl, b)
+        : "",
+      infoBox("This code expires in 1 hour. If you didn't create an account, you can safely ignore this email.", b),
+      smallNote(`Need help? Contact us at ${escapeHtml(data.support_email as string || "support@amwmedia.co.uk")}`),
+    ].join("")),
+  };
+};
 
 const auth_email_change: TemplateBuilder = (data, b) => ({
   subject: `Email address change — ${b.name}`,
