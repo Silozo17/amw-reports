@@ -15,7 +15,7 @@ interface HealthScoreProps {
   previous: SnapshotLike[];
 }
 
-const CircularGauge = ({ score }: { score: number }) => {
+const CircularGauge = ({ score, change }: { score: number; change?: number }) => {
   const color = getScoreColor(score);
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
@@ -48,6 +48,14 @@ const CircularGauge = ({ score }: { score: number }) => {
         <span className="max-w-[80%] text-center text-[9px] leading-tight text-muted-foreground uppercase tracking-wider font-body">
           {getScoreLabel(score)}
         </span>
+        {change !== undefined && (
+          <span className={cn(
+            "text-[10px] font-medium font-body",
+            change > 0 ? "text-accent" : change < 0 ? "text-destructive" : "text-muted-foreground"
+          )}>
+            {change > 0 ? "↑" : change < 0 ? "↓" : "→"} {Math.abs(change)} pts
+          </span>
+        )}
       </div>
     </div>
   );
@@ -94,7 +102,7 @@ const HealthScore = ({ current, previous }: HealthScoreProps) => {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center mb-3 font-body">
               Marketing Health Score
             </p>
-            <CircularGauge score={result.overall} />
+            <CircularGauge score={result.overall} change={result.change} />
           </div>
           <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-3 gap-2">
             {result.subScores.map(sub => (

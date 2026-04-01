@@ -14,6 +14,7 @@ export interface SubScore {
 
 export interface HealthScoreResult {
   overall: number;
+  change?: number;
   subScores: SubScore[];
 }
 
@@ -158,8 +159,22 @@ export function computeHealthScore(
     ? Math.round(activeScores.reduce((sum, s) => sum + s.score, 0) / activeScores.length)
     : 0;
 
+  // Compute previous overall by scoring previous snapshots with no "prior" baseline
+  let change: number | undefined;
+  if (previous.length > 0) {
+    const prevPaid = scorePaid(previous, []);
+    const prevOrganic = scoreOrganic(previous, []);
+    const prevSeo = scoreSeo(previous, []);
+    const prevActive = [prevPaid, prevOrganic, prevSeo].filter(s => s.hasData);
+    if (prevActive.length > 0) {
+      const previousOverall = Math.round(prevActive.reduce((sum, s) => sum + s.score, 0) / prevActive.length);
+      change = overall - previousOverall;
+    }
+  }
+
   return {
     overall,
+    change,
     subScores: [paid, organic, seo],
   };
 }
