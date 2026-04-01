@@ -1,32 +1,26 @@
 
 
-# Add "Posts Published" and "Stories" KPI Widgets to Dashboard
+# Fix Portal Period Selection Being Ignored
 
-## Summary
-Add a "Posts Published" hero KPI card that aggregates `posts_published` across all organic social platforms (Facebook, Instagram, LinkedIn, TikTok, Pinterest, YouTube) with month-over-month comparison. Stories data is **not currently synced** by any platform integration, so that cannot be added without new API work.
+## Problem
+When a portal link includes `?period=N`, the `resolveRelativePeriod` correctly calculates the target month/year, and `useClientDashboard` initialises `selectedPeriod` with those values. However, after data loads, the `autoDetectPeriod` function checks if the current period has data — and if the selected month happens to be empty, it overrides `selectedPeriod` to the latest month with data. This defeats the explicit period selection.
 
-## What exists today
-- `posts_published` is already synced and stored in `metrics_data` for Facebook, Instagram, LinkedIn, and TikTok organic.
-- The metric has labels, explanations, and report support already.
-- It is **not** included in the hero KPI cards in `computeKpis()` or sparklines in `computeSparklines()`.
-- No platform currently syncs a `stories_count` or equivalent metric.
+## Fix
 
-## Changes
+### `src/hooks/useClientDashboard.ts`
+- Skip `autoDetectPeriod` when `initialMonth` and `initialYear` were explicitly provided.
+- Add a simple guard: pass a flag or check if initial values were set, and if so, mark `hasAutoDetected = true` from the start so `autoDetectPeriod` becomes a no-op.
 
-### 1. `src/lib/dashboardCalcs.ts`
-- **computeKpis**: Add `totalPostsPublished` aggregation (sum `posts_published` across filtered snapshots), with previous-month comparison. Add a new KPI entry with label "Posts Published", icon `FileText` (or `PenSquare`), metricKey `posts_published`. Only show for organic social platforms when filter is "all" or includes an organic platform.
-- **computeSparklines**: Add `posts_published` to the monthly aggregation map and the sparkline output loop.
+Concretely, change the initial state of `hasAutoDetected` (line 110):
+```ts
+const [hasAutoDetected, setHasAutoDetected] = useState(
+  !!(initialMonth && initialYear)
+);
+```
 
-### 2. Icon import
-Add `PenSquare` (or reuse `FileText`) from lucide-react in the imports.
-
-### No other files need changes
-The KPI rendering in `HeroKPIs.tsx` is already generic and renders whatever `computeKpis` returns.
-
-## Stories — not possible yet
-None of the sync functions (Instagram, Facebook, TikTok) currently fetch story data from their APIs. Adding stories would require changes to the sync edge functions and potentially new API scopes. I'll skip this for now — let me know if you'd like me to scope that out separately.
+This single change ensures that when the portal resolves `?period=1` to e.g. March 2026, the dashboard stays on March 2026 and doesn't auto-jump to whatever month has data.
 
 | File | Change |
 |---|---|
-| `src/lib/dashboardCalcs.ts` | Add posts_published KPI + sparkline aggregation |
+| `src/hooks/useClientDashboard.ts` | Initialise `hasAutoDetected` to `true` when `initialMonth`/`initialYear` are provided |
 
