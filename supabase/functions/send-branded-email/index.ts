@@ -637,6 +637,17 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Hard validation: team_invitation MUST have a valid absolute invite_url
+    if (template_name === "team_invitation") {
+      const inviteUrl = String(data?.invite_url ?? "").trim();
+      if (!/^https?:\/\/\S+$/i.test(inviteUrl)) {
+        return new Response(
+          JSON.stringify({ error: "team_invitation requires a valid absolute invite_url in data" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const templateFn = TEMPLATES[template_name];
     if (!templateFn) {
       return new Response(
