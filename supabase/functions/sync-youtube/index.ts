@@ -39,6 +39,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Decrypt tokens
+    if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
+    if (conn.refresh_token) conn.refresh_token = await decryptToken(conn.refresh_token);
+
     // Get org_id from client
     const { data: client } = await supabase.from("clients").select("org_id").eq("id", conn.client_id).single();
     const orgId = client?.org_id;
