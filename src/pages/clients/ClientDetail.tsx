@@ -346,7 +346,7 @@ const ClientDetail = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2 ml-0">
             <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">{client.is_active ? 'Active' : 'Inactive'}</Badge>
-            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} selectedMonth={dashboardMonth} selectedYear={dashboardYear} />
+            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} selectedPeriod={dashboardPeriod} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
             {isDeletionPending ? (
               <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={() => setCancelDeletionDialogOpen(true)} disabled={isDeleting}>

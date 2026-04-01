@@ -131,14 +131,29 @@ const ShareDialog = ({ clientId, orgId, clientName, selectedPeriod }: ShareDialo
 
   const getShareUrl = (token: string) => {
     const base = customDomain ? `https://${customDomain}/portal/${token}` : `${window.location.origin}/portal/${token}`;
-    if (selectedMonth && selectedYear) {
+    if (!selectedPeriod) return base;
+
+    const params = new URLSearchParams();
+    const { type, month, year, startDate, endDate } = selectedPeriod;
+
+    // Always include type, month, year
+    params.set('type', type);
+    params.set('month', String(month));
+    params.set('year', String(year));
+
+    // For monthly, also include rolling period offset for backwards compat
+    if (type === 'monthly') {
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
-      const offset = (currentYear - selectedYear) * 12 + (currentMonth - selectedMonth);
-      if (offset > 0) return `${base}?period=${offset}`;
+      const offset = (currentYear - year) * 12 + (currentMonth - month);
+      params.set('period', String(Math.max(0, offset)));
     }
-    return base;
+
+    if (type === 'custom' && startDate) params.set('startDate', startDate.toISOString().slice(0, 10));
+    if (type === 'custom' && endDate) params.set('endDate', endDate.toISOString().slice(0, 10));
+
+    return `${base}?${params.toString()}`;
   };
 
   const copyLink = async (token: ShareToken) => {
