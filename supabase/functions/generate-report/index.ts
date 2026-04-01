@@ -348,6 +348,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MAATSTAF',
     thisMonth: 'DEZE MAAND',
     lastMonth: 'VORIGE MAAND',
+    thisPeriod: 'DEZE PERIODE',
+    previousPeriod: 'VORIGE PERIODE',
     change: 'WIJZIGING',
     monthlySummary: 'Maandoverzicht',
     platformStatus: 'Platform overzicht',
