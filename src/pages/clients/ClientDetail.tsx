@@ -54,6 +54,13 @@ const ClientDetail = () => {
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [reportYear, setReportYear] = useState<number | null>(null);
   const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
+  const [dashboardMonth, setDashboardMonth] = useState<number>(new Date().getMonth() + 1);
+  const [dashboardYear, setDashboardYear] = useState<number>(new Date().getFullYear());
+
+  const handlePeriodChange = useCallback((month: number, year: number) => {
+    setDashboardMonth(month);
+    setDashboardYear(year);
+  }, []);
 
   usePageMeta({ title: client ? `${client.company_name} — AMW Reports` : 'Client — AMW Reports', description: 'Client detail and performance dashboard' });
 
@@ -340,7 +347,7 @@ const ClientDetail = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2 ml-0">
             <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">{client.is_active ? 'Active' : 'Inactive'}</Badge>
-            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} />
+            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} selectedMonth={dashboardMonth} selectedYear={dashboardYear} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
             {isDeletionPending ? (
               <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={() => setCancelDeletionDialogOpen(true)} disabled={isDeleting}>
@@ -402,7 +409,7 @@ const ClientDetail = () => {
           </div>
 
           <TabsContent value="dashboard" className="mt-4">
-            <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} showHealthScore={client.show_health_score !== false} />
+            <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} showHealthScore={client.show_health_score !== false} onPeriodChange={handlePeriodChange} />
           </TabsContent>
 
           <TabsContent value="connections" className="mt-4">

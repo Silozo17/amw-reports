@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { formatDistanceToNow, format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -132,9 +132,10 @@ interface ClientDashboardProps {
   initialMonth?: number;
   initialYear?: number;
   showHealthScore?: boolean;
+  onPeriodChange?: (month: number, year: number) => void;
 }
 
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, showHealthScore = true }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
   const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear });
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -155,6 +156,11 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
     matchesPlatformFilter,
     prevSnapshots,
   } = dashboard;
+
+  // Notify parent when selected period changes
+  React.useEffect(() => {
+    onPeriodChange?.(selectedPeriod.month, selectedPeriod.year);
+  }, [selectedPeriod.month, selectedPeriod.year, onPeriodChange]);
 
   const trendPlatforms = useMemo(() =>
     [...new Set((selectedPlatform === "all" ? trendData : trendData.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))).map(s => s.platform))] as PlatformType[],
