@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
     // Build data payload for the template
     const templateData: Record<string, unknown> = {
       confirmation_url: confirmationUrl,
+      otp_token: otpToken,
       recipient_name: user.user_metadata?.full_name ?? user.email ?? "",
       device_info: req.headers.get("user-agent") ?? "Unknown device",
       profile_url: `${supabaseUrl.replace(".supabase.co", ".lovable.app")}/settings`,
