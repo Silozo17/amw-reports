@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { getCurrencySymbol } from '@/types/database';
@@ -49,9 +49,24 @@ const applyBranding = (org: PortalOrg) => {
   }
 };
 
+const resolveRelativePeriod = (period: number): { month: number; year: number } => {
+  const target = new Date();
+  target.setMonth(target.getMonth() - period);
+  return { month: target.getMonth() + 1, year: target.getFullYear() };
+};
+
 const ClientPortal = () => {
   usePageMeta({ title: 'Client Dashboard — AMW Reports', description: 'View your marketing performance dashboard.' });
   const { token } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
+
+  const { initialMonth, initialYear } = useMemo<{ initialMonth?: number; initialYear?: number }>(() => {
+    const raw = searchParams.get('period');
+    if (raw === null) return {};
+    const parsed = parseInt(raw, 10);
+    if (isNaN(parsed) || parsed < 0) return {};
+    return resolveRelativePeriod(parsed);
+  }, [searchParams]);
   const [client, setClient] = useState<PortalClient | null>(null);
   const [org, setOrg] = useState<PortalOrg | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +145,8 @@ const ClientPortal = () => {
           clientName={client.company_name}
           currencyCode={client.preferred_currency}
           portalToken={token}
+          initialMonth={initialMonth}
+          initialYear={initialYear}
         />
       </main>
 
