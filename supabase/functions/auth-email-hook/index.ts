@@ -37,6 +37,7 @@ Deno.serve(async (req) => {
     const user = payload.user ?? {};
     const email = user.email ?? payload.email ?? "";
     const confirmationUrl = payload.confirmation_url ?? payload.action_link ?? "";
+    const otpToken = payload.token ?? payload.email_data?.token ?? "";
     const newEmail = payload.new_email ?? "";
 
     const templateName = AUTH_EVENT_TO_TEMPLATE[eventType];
