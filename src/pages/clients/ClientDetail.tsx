@@ -11,6 +11,7 @@ import { ArrowLeft, FileText, Loader2, BarChart3, Trash2, Clock, XCircle, AlertT
 import DeleteClientDialog from '@/components/clients/DeleteClientDialog';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
+import type { SelectedPeriod } from '@/components/clients/DashboardHeader';
 import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
@@ -54,12 +55,10 @@ const ClientDetail = () => {
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [reportYear, setReportYear] = useState<number | null>(null);
   const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
-  const [dashboardMonth, setDashboardMonth] = useState<number>(new Date().getMonth() + 1);
-  const [dashboardYear, setDashboardYear] = useState<number>(new Date().getFullYear());
+  const [dashboardPeriod, setDashboardPeriod] = useState<SelectedPeriod | null>(null);
 
-  const handlePeriodChange = useCallback((month: number, year: number) => {
-    setDashboardMonth(month);
-    setDashboardYear(year);
+  const handlePeriodChange = useCallback((period: SelectedPeriod) => {
+    setDashboardPeriod(period);
   }, []);
 
   usePageMeta({ title: client ? `${client.company_name} — AMW Reports` : 'Client — AMW Reports', description: 'Client detail and performance dashboard' });
@@ -347,7 +346,7 @@ const ClientDetail = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2 ml-0">
             <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-sm">{client.is_active ? 'Active' : 'Inactive'}</Badge>
-            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} selectedMonth={dashboardMonth} selectedYear={dashboardYear} />
+            <ShareDialog clientId={client.id} orgId={client.org_id} clientName={client.company_name} selectedPeriod={dashboardPeriod} />
             <ClientEditDialog client={client} onUpdate={fetchData} />
             {isDeletionPending ? (
               <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive" onClick={() => setCancelDeletionDialogOpen(true)} disabled={isDeleting}>

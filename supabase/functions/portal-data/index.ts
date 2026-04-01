@@ -86,10 +86,10 @@ Deno.serve(async (req) => {
       .eq("id", tokenData.id)
       .then(() => {});
 
-    // Determine period
+    // Determine period — use supplied values exactly; default to current month
     const now = new Date();
-    const m = month ?? (now.getMonth() === 0 ? 12 : now.getMonth());
-    const y = year ?? (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+    const m = month ?? (now.getMonth() + 1);
+    const y = year ?? now.getFullYear();
     const periodType = type ?? "monthly";
 
     // Build current period query

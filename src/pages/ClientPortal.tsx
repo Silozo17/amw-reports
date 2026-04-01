@@ -6,6 +6,7 @@ import { getCurrencySymbol } from '@/types/database';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { hexToHsl } from '@/lib/colorUtils';
 import usePageMeta from '@/hooks/usePageMeta';
+import type { SelectedPeriod, PeriodType } from '@/components/clients/DashboardHeader';
 
 interface PortalOrg {
   id: string;
@@ -50,10 +51,46 @@ const applyBranding = (org: PortalOrg) => {
   }
 };
 
-const resolveRelativePeriod = (period: number): { month: number; year: number } => {
-  const target = new Date();
-  target.setMonth(target.getMonth() - period);
-  return { month: target.getMonth() + 1, year: target.getFullYear() };
+const VALID_PERIOD_TYPES = new Set<PeriodType>(['weekly', 'monthly', 'quarterly', 'ytd', 'last_year', 'maximum', 'custom']);
+
+/** Parse full period from URL query params. Returns null if no period info present. */
+const parsePeriodFromQuery = (searchParams: URLSearchParams): SelectedPeriod | null => {
+  const type = searchParams.get('type') as PeriodType | null;
+  const monthStr = searchParams.get('month');
+  const yearStr = searchParams.get('year');
+  const periodStr = searchParams.get('period');
+  const startDateStr = searchParams.get('startDate');
+  const endDateStr = searchParams.get('endDate');
+
+  // New explicit format: type + month + year
+  if (type && VALID_PERIOD_TYPES.has(type) && monthStr && yearStr) {
+    const month = parseInt(monthStr, 10);
+    const year = parseInt(yearStr, 10);
+    if (!isNaN(month) && !isNaN(year) && month >= 1 && month <= 12) {
+      const period: SelectedPeriod = { type, month, year };
+      if (type === 'custom' && startDateStr && endDateStr) {
+        period.startDate = new Date(startDateStr);
+        period.endDate = new Date(endDateStr);
+      }
+      return period;
+    }
+  }
+
+  // Legacy format: period=N (rolling monthly offset)
+  if (periodStr !== null) {
+    const offset = parseInt(periodStr, 10);
+    if (!isNaN(offset) && offset >= 0) {
+      const target = new Date();
+      target.setMonth(target.getMonth() - offset);
+      return {
+        type: 'monthly',
+        month: target.getMonth() + 1,
+        year: target.getFullYear(),
+      };
+    }
+  }
+
+  return null;
 };
 
 const ClientPortal = () => {
@@ -61,13 +98,8 @@ const ClientPortal = () => {
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
 
-  const { initialMonth, initialYear } = useMemo<{ initialMonth?: number; initialYear?: number }>(() => {
-    const raw = searchParams.get('period');
-    if (raw === null) return {};
-    const parsed = parseInt(raw, 10);
-    if (isNaN(parsed) || parsed < 0) return {};
-    return resolveRelativePeriod(parsed);
-  }, [searchParams]);
+  const initialPeriod = useMemo(() => parsePeriodFromQuery(searchParams), [searchParams]);
+
   const [client, setClient] = useState<PortalClient | null>(null);
   const [org, setOrg] = useState<PortalOrg | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +109,6 @@ const ClientPortal = () => {
     const load = async () => {
       if (!token) { setError('Invalid link'); setIsLoading(false); return; }
 
-      // Initial call just to validate token and get client/org info
       const { data, error: fnErr } = await supabase.functions.invoke('portal-data', {
         body: { token },
       });
@@ -121,7 +152,6 @@ const ClientPortal = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Portal header */}
       <header className="border-b bg-card px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -139,20 +169,20 @@ const ClientPortal = () => {
         </div>
       </header>
 
-      {/* Dashboard content — reusing the real ClientDashboard */}
       <main className="max-w-7xl mx-auto px-6 py-6">
         <ClientDashboard
           clientId={client.id}
           clientName={client.company_name}
           currencyCode={client.preferred_currency}
           portalToken={token}
-          initialMonth={initialMonth}
-          initialYear={initialYear}
+          initialMonth={initialPeriod?.month}
+          initialYear={initialPeriod?.year}
+          initialPeriod={initialPeriod ?? undefined}
+          disableAutoDetect={!!initialPeriod}
           showHealthScore={client.show_health_score !== false}
         />
       </main>
 
-      {/* Footer */}
       <footer className="border-t bg-card px-6 py-4 mt-8">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-xs text-muted-foreground">

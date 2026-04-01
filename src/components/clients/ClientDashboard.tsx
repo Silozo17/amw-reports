@@ -20,6 +20,7 @@ import PerformanceOverview from "./dashboard/PerformanceOverview";
 import AiChatDrawer from "./dashboard/AiChatDrawer";
 import VoiceBriefing from "./dashboard/VoiceBriefing";
 import { useClientDashboard } from "@/hooks/useClientDashboard";
+import type { SelectedPeriod } from "@/components/clients/DashboardHeader";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   'Paid Advertising': DollarSign,
@@ -132,11 +133,13 @@ interface ClientDashboardProps {
   initialMonth?: number;
   initialYear?: number;
   showHealthScore?: boolean;
-  onPeriodChange?: (month: number, year: number) => void;
+  initialPeriod?: SelectedPeriod;
+  disableAutoDetect?: boolean;
+  onPeriodChange?: (period: SelectedPeriod) => void;
 }
 
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
-  const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear });
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
+  const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect });
   const [chatOpen, setChatOpen] = useState(false);
 
   const {
@@ -159,8 +162,8 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
 
   // Notify parent when selected period changes
   React.useEffect(() => {
-    onPeriodChange?.(selectedPeriod.month, selectedPeriod.year);
-  }, [selectedPeriod.month, selectedPeriod.year, onPeriodChange]);
+    onPeriodChange?.(selectedPeriod);
+  }, [selectedPeriod, onPeriodChange]);
 
   const trendPlatforms = useMemo(() =>
     [...new Set((selectedPlatform === "all" ? trendData : trendData.filter(s => matchesPlatformFilter(selectedPlatform, s.platform))).map(s => s.platform))] as PlatformType[],
