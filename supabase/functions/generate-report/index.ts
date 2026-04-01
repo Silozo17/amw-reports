@@ -1484,12 +1484,16 @@ Deno.serve(async (req) => {
 
     const platformSummaries: Record<string, string> = {};
     for (const section of platformSections) {
-      platformSummaries[section.platform] = generatePlatformSummary(
+      let summary = generatePlatformSummary(
         section.platform,
         section.metrics,
         section.hasPrevSnapshot ? section.prevMetrics : null,
         currSymbol
       );
+      if (dashboardUrl) {
+        summary += " See your full dashboard for detailed breakdowns and trends.";
+      }
+      platformSummaries[section.platform] = summary;
     }
 
     const keyWins = getKeyWins(platformSections, currSymbol);
