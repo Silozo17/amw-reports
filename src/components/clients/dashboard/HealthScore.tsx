@@ -89,8 +89,8 @@ const SubScoreCard = ({ sub }: { sub: SubScore }) => {
   );
 };
 
-const HealthScore = ({ current, previous }: HealthScoreProps) => {
-  const result = useMemo(() => computeHealthScore(current, previous), [current, previous]);
+const HealthScore = ({ current, previous, prePrevious }: HealthScoreProps) => {
+  const result = useMemo(() => computeHealthScore(current, previous, prePrevious), [current, previous, prePrevious]);
   const activeSubScores = result.subScores.filter(s => s.hasData);
 
   if (activeSubScores.length === 0) return null;

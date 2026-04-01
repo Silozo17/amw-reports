@@ -350,7 +350,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
       ) : (
         <div className="space-y-8">
           {/* Health Score */}
-          {showHealthScore && <HealthScore current={filtered} previous={filteredPrev} />}
+          {showHealthScore && <HealthScore current={filtered} previous={filteredPrev} prePrevious={prePrevSnapshots} />}
 
           {/* Opportunity Alerts */}
           <OpportunityAlerts current={filtered} previous={filteredPrev} currSymbol={currSymbol} selectedPeriod={selectedPeriod} />
