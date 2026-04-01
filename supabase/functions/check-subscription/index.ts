@@ -36,7 +36,15 @@ serve(async (req) => {
     if (!authHeader) throw new Error("No authorization header provided");
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    // Use anon key client for proper JWT validation (service role bypasses token checks)
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const anonClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      anonKey,
+      { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } }
+    );
+    const { data: userData, error: userError } = await anonClient.auth.getUser();
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
