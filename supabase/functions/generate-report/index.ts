@@ -537,6 +537,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MÅLETAL',
     thisMonth: 'DENNE MÅNED',
     lastMonth: 'SIDSTE MÅNED',
+    thisPeriod: 'DENNE PERIODE',
+    previousPeriod: 'FORRIGE PERIODE',
     change: 'ÆNDRING',
     monthlySummary: 'Månedsoversigt',
     platformStatus: 'Platformsoversigt',
