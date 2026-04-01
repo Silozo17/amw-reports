@@ -11,6 +11,7 @@ import { ArrowLeft, FileText, Loader2, BarChart3, Trash2, Clock, XCircle, AlertT
 import DeleteClientDialog from '@/components/clients/DeleteClientDialog';
 import type { Client, ClientRecipient, PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS } from '@/types/database';
+import type { SelectedPeriod } from '@/components/clients/DashboardHeader';
 import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
