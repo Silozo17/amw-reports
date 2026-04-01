@@ -41,7 +41,7 @@ const generateSlugToken = (name: string): string => {
   return `${slug}-${suffix}`;
 };
 
-const ShareDialog = ({ clientId, orgId, clientName }: ShareDialogProps) => {
+const ShareDialog = ({ clientId, orgId, clientName, selectedMonth, selectedYear }: ShareDialogProps) => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [tokens, setTokens] = useState<ShareToken[]>([]);
