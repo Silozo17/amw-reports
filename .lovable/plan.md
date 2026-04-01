@@ -1,51 +1,42 @@
 
 
-# Fix AI Feature Access for All User Types + Rate Limiting
+# Hide Health Score from Portal & PDF Reports
 
-## Problem
+## What This Does
+Adds a toggle in the client settings (per-client) allowing org owners/managers to hide the Marketing Health Score from shareable portal links and PDF reports.
 
-Two edge functions (`chat-with-data` and `analyze-client`) have the same bugs previously fixed in `voice-briefing`:
-
-1. **`AiChatDrawer.tsx`** sends the Supabase anon key as the Authorization header instead of the user's session JWT — causes 401 for everyone
-2. **Both edge functions** only check `org_members` for authorization — blocks client portal users and platform admins
-3. **Share-link portal users** (unauthenticated) have no access path at all — they need to pass their portal share token as an alternative identity
+## Approach
+Since the health score is a **per-client** feature (some clients may want it, others not), the toggle belongs on the `clients` table — not the org-level `report_settings`.
 
 ## Changes
 
-### 1. `src/components/clients/dashboard/AiChatDrawer.tsx`
-- Import `supabase` client
-- Get user session via `supabase.auth.getSession()`
-- If session exists, send `access_token` as Bearer token
-- If no session (portal user), accept a `portalToken` prop and send it as `x-portal-token` header instead
-- Fall back gracefully if neither exists
+### 1. Database Migration
+Add a `show_health_score` boolean column to the `clients` table, defaulting to `true` (existing behaviour preserved).
 
-### 2. `src/components/clients/ClientDashboard.tsx`
-- Pass `portalToken` prop through to `AiChatDrawer`
+```sql
+ALTER TABLE public.clients ADD COLUMN show_health_score boolean NOT NULL DEFAULT true;
+```
 
-### 3. `supabase/functions/chat-with-data/index.ts`
-- Replace `getClaims` with `supabase.auth.getUser(token)` for JWT callers
-- Add `x-portal-token` header support: validate via `client_share_tokens` table (same pattern as `portal-data`)
-- Resolve actor as either `user.id` or `share_token_id`
-- Expand access check to: `org_members` OR `client_users` OR `platform_admins` OR valid portal token
-- Add in-memory rate limiting (30 requests per actor per 60s window) — keyed by resolved actor ID
+### 2. `src/components/clients/tabs/ClientSettingsTab.tsx`
+Add a "Show Health Score" toggle in the report/display settings area, wired to `onSettingChange('show_health_score', value)`.
 
-### 4. `supabase/functions/analyze-client/index.ts`
-- Same auth changes: `getUser()` + portal token fallback + three-way access check
-- Already has rate limiting — update to key by resolved actor ID instead of just `client_id`
+### 3. `src/components/clients/ClientDashboard.tsx`
+- Accept a `showHealthScore` prop (derived from client data)
+- Conditionally render `<HealthScore>` only when `showHealthScore` is true
 
-## Rate Limiting Strategy
+### 4. `src/pages/ClientPortal.tsx` & `src/pages/clients/ClientDetail.tsx`
+Pass `showHealthScore` from the client record through to `ClientDashboard`.
 
-All AI functions will use the same pattern:
-- In-memory map keyed by actor identifier (user ID or share token ID)
-- 30 requests per 60-second window
-- Returns 429 with human-readable wait time
+### 5. `supabase/functions/generate-report/index.ts`
+The health score is **not currently rendered** in the PDF report, so no changes needed there right now. If/when it gets added to reports, it will respect this flag.
 
 ## Files Changed
 
 | File | Change |
 |---|---|
-| `src/components/clients/dashboard/AiChatDrawer.tsx` | Use session JWT; accept + send portal token |
-| `src/components/clients/ClientDashboard.tsx` | Pass `portalToken` to AiChatDrawer |
-| `supabase/functions/chat-with-data/index.ts` | Dual auth (JWT + portal token), expanded access, rate limit |
-| `supabase/functions/analyze-client/index.ts` | Dual auth (JWT + portal token), expanded access |
+| Migration | Add `show_health_score` column to `clients` |
+| `src/components/clients/tabs/ClientSettingsTab.tsx` | Add toggle |
+| `src/components/clients/ClientDashboard.tsx` | Conditionally render HealthScore |
+| `src/pages/ClientPortal.tsx` | Pass flag to dashboard |
+| `src/pages/clients/ClientDetail.tsx` | Pass flag to dashboard |
 
