@@ -287,7 +287,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     setAvailablePlatforms(platforms);
     autoDetectPeriod(currentSnapshots, (trendRes.data ?? []) as SnapshotData[]);
     setIsLoading(false);
-  }, [clientId, selectedPeriod, hasAutoDetected, isPortal, portalToken]);
+  }, [clientId, selectedPeriod, isPortal, portalToken]);
 
   useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
 

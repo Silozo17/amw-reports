@@ -334,6 +334,8 @@ const InviteDialog = ({ orgId, onInvite }: { orgId: string; onInvite: () => void
         data: {
           invited_email: email.trim().toLowerCase(),
           role: inviteRole,
+          inviter_name: 'A team member',
+          invite_url: `${window.location.origin}/login?view=signup&invited_email=${encodeURIComponent(email.trim().toLowerCase())}`,
         },
       }).catch(err => console.error('Failed to send invite email:', err));
 

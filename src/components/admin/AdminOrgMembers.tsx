@@ -116,6 +116,17 @@ const AdminOrgMembers = ({ orgId, members, profileMap }: AdminOrgMembersProps) =
           org_id: orgId, invited_email: email, role: addMemberRole, invited_at: new Date().toISOString(),
         });
         if (error) throw error;
+        sendBrandedEmail({
+          templateName: 'team_invitation',
+          recipientEmail: email,
+          orgId,
+          data: {
+            invited_email: email,
+            role: addMemberRole,
+            inviter_name: 'An admin',
+            invite_url: `${window.location.origin}/login?view=signup&invited_email=${encodeURIComponent(email)}`,
+          },
+        }).catch(err => console.error('Failed to send invite email:', err));
         toast.success('Invite created — user will be linked on signup');
       }
       queryClient.invalidateQueries({ queryKey: ['admin-org-members', orgId] });

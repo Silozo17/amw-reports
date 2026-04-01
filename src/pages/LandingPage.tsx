@@ -115,7 +115,11 @@ const LandingPage = () => {
     // handle_new_user database trigger — no client-side writes needed.
 
     toast.success('Account verified! Welcome aboard.');
-    navigate('/onboarding');
+    if (isInvitedSignup) {
+      navigate('/dashboard');
+    } else {
+      navigate('/onboarding');
+    }
     setIsLoading(false);
   };
 
