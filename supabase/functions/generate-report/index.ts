@@ -2301,7 +2301,7 @@ Deno.serve(async (req) => {
     if (endFooterParts.length > 0) {
       doc.text(endFooterParts.join(" | "), W - 14, H - 12, { align: "right" });
     }
-    doc.text(`${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W - 14, H - 7, { align: "right" });
+    doc.text(`${orgName} | ${periodLabel}`, W - 14, H - 7, { align: "right" });
 
     const pdfBuffer = doc.output("arraybuffer");
     const pdfUint8 = new Uint8Array(pdfBuffer);
