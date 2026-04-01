@@ -122,7 +122,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [allPosts, setAllPosts] = useState<(TopContentItem & { platform: PlatformType })[]>([]);
 
-  useEffect(() => { setHasAutoDetected(false); }, [clientId]);
+  useEffect(() => { setHasAutoDetected(!!(initialMonth && initialYear)); }, [clientId, initialMonth, initialYear]);
 
   // ─── Aggregation helpers ───────────────────────────────────
   const aggregateMultiMonth = (snaps: SnapshotData[], month: number, year: number): SnapshotData[] => {
