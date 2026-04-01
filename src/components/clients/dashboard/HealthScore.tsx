@@ -48,6 +48,14 @@ const CircularGauge = ({ score, change }: { score: number; change?: number }) =>
         <span className="max-w-[80%] text-center text-[9px] leading-tight text-muted-foreground uppercase tracking-wider font-body">
           {getScoreLabel(score)}
         </span>
+        {change !== undefined && (
+          <span className={cn(
+            "text-[10px] font-medium font-body",
+            change > 0 ? "text-accent" : change < 0 ? "text-destructive" : "text-muted-foreground"
+          )}>
+            {change > 0 ? "↑" : change < 0 ? "↓" : "→"} {Math.abs(change)} pts
+          </span>
+        )}
       </div>
     </div>
   );
