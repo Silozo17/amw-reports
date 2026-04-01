@@ -551,8 +551,8 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: await encryptToken(accessToken),
+      refresh_token: refreshToken ? await encryptToken(refreshToken) : null,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
