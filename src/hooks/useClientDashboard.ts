@@ -164,7 +164,8 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
   };
 
   const autoDetectPeriod = (currentSnapshots: SnapshotData[], allTrendData: SnapshotData[]) => {
-    if (initialMonth && initialYear) return;
+    // Use the ref to guard — this can never be stale
+    if (initialPeriodRef.current.month && initialPeriodRef.current.year) return;
     const hasRealData = currentSnapshots.some((snapshot) =>
       Object.entries(snapshot.metrics_data).some(([key, v]) => typeof v === "number" && v > 0 && !HIDDEN_METRICS.has(key)),
     );
