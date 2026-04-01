@@ -51,7 +51,15 @@ export const generateReport = async (
       if (existing) {
         await supabase.from('reports').update({ status: 'pending' as const }).eq('id', existing.id);
       } else {
-        await supabase.from('reports').insert(reportRow);
+        await supabase.from('reports').insert({
+          client_id: clientId,
+          report_month: month,
+          report_year: year,
+          org_id: clientData.org_id,
+          status: 'pending' as const,
+          date_from: dateRange.dateFrom,
+          date_to: dateRange.dateTo,
+        });
       }
     } else {
       await supabase.from('reports').upsert(
