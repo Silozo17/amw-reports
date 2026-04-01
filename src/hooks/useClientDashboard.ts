@@ -107,7 +107,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     type: "monthly", month: defaultMonth, year: defaultYear,
   });
 
-  const [hasAutoDetected, setHasAutoDetected] = useState(false);
+  const [hasAutoDetected, setHasAutoDetected] = useState(!!(initialMonth && initialYear));
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
   const [trendData, setTrendData] = useState<SnapshotData[]>([]);
