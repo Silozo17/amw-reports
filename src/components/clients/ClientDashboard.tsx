@@ -138,7 +138,7 @@ interface ClientDashboardProps {
 }
 
 const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
-  const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear });
+  const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect });
   const [chatOpen, setChatOpen] = useState(false);
 
   const {
