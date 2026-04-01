@@ -10,6 +10,8 @@ interface ReportRequest {
   client_id: string;
   report_month: number;
   report_year: number;
+  date_from?: string; // ISO date e.g. "2026-01-01"
+  date_to?: string;   // ISO date e.g. "2026-03-15"
 }
 
 // ══════════════════════════════════════════════════════════════
