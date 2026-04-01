@@ -1080,7 +1080,8 @@ Deno.serve(async (req) => {
     }
     const callerId = claimsData.claims.sub;
 
-    const { client_id, report_month, report_year } = (await req.json()) as ReportRequest;
+    const { client_id, report_month, report_year, date_from, date_to } = (await req.json()) as ReportRequest;
+    const isCustomRange = !!(date_from && date_to);
 
     if (!client_id || !report_month || !report_year) {
       return new Response(JSON.stringify({ error: "Missing client_id, report_month, or report_year" }), {
@@ -1088,14 +1089,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if a report is already being generated for this client/month/year
-    const { data: existingRunning } = await supabase.from("reports")
+    // Check if a report is already being generated for this client/period
+    let existingRunningQuery = supabase.from("reports")
       .select("id, status")
       .eq("client_id", client_id)
-      .eq("report_month", report_month)
-      .eq("report_year", report_year)
-      .eq("status", "running")
-      .maybeSingle();
+      .eq("status", "running");
+
+    if (isCustomRange) {
+      existingRunningQuery = existingRunningQuery.eq("date_from", date_from).eq("date_to", date_to);
+    } else {
+      existingRunningQuery = existingRunningQuery.eq("report_month", report_month).eq("report_year", report_year);
+    }
+
+    const { data: existingRunning } = await existingRunningQuery.maybeSingle();
 
     if (existingRunning) {
       return new Response(JSON.stringify({ error: "Report is already being generated for this period" }), {
@@ -1103,13 +1109,64 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Compute month/year pairs for snapshot fetching ──
+    // For custom ranges, compute all months that overlap the range
+    // For monthly reports, just use the single month
+    interface MonthYear { month: number; year: number }
+    const currentMonths: MonthYear[] = [];
+    const prevMonths: MonthYear[] = [];
+
+    if (isCustomRange) {
+      const fromDate = new Date(date_from + "T00:00:00Z");
+      const toDate = new Date(date_to + "T00:00:00Z");
+      let m = fromDate.getMonth() + 1;
+      let yr = fromDate.getFullYear();
+      const endM = toDate.getMonth() + 1;
+      const endY = toDate.getFullYear();
+
+      while (yr < endY || (yr === endY && m <= endM)) {
+        currentMonths.push({ month: m, year: yr });
+        m++;
+        if (m > 12) { m = 1; yr++; }
+      }
+
+      // Previous period: same number of months immediately before
+      const periodLength = currentMonths.length;
+      const firstMonth = currentMonths[0];
+      let pm = firstMonth.month;
+      let py = firstMonth.year;
+      for (let i = 0; i < periodLength; i++) {
+        pm--;
+        if (pm < 1) { pm = 12; py--; }
+        prevMonths.unshift({ month: pm, year: py });
+      }
+    } else {
+      currentMonths.push({ month: report_month, year: report_year });
+      const pm = report_month === 1 ? 12 : report_month - 1;
+      const py = report_month === 1 ? report_year - 1 : report_year;
+      prevMonths.push({ month: pm, year: py });
+    }
+
+    // Build snapshot queries using OR filters for multi-month
+    const buildSnapshotQuery = (months: MonthYear[]) => {
+      if (months.length === 1) {
+        return supabase.from("monthly_snapshots").select("*")
+          .eq("client_id", client_id)
+          .eq("report_month", months[0].month)
+          .eq("report_year", months[0].year);
+      }
+      // For multiple months, use .or() filter
+      const orClauses = months.map(m => `and(report_month.eq.${m.month},report_year.eq.${m.year})`).join(",");
+      return supabase.from("monthly_snapshots").select("*")
+        .eq("client_id", client_id)
+        .or(orClauses);
+    };
+
     const [clientRes, snapshotsRes, configRes, prevSnapshotsRes, metricDefaultsRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", client_id).single(),
-      supabase.from("monthly_snapshots").select("*").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year),
+      buildSnapshotQuery(currentMonths),
       supabase.from("client_platform_config").select("*").eq("client_id", client_id).eq("is_enabled", true),
-      supabase.from("monthly_snapshots").select("*").eq("client_id", client_id)
-        .eq("report_month", report_month === 1 ? 12 : report_month - 1)
-        .eq("report_year", report_month === 1 ? report_year - 1 : report_year),
+      buildSnapshotQuery(prevMonths),
       supabase.from("metric_defaults").select("*"),
     ]);
 
