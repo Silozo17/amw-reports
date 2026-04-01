@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
     let timedOut = false;
 
     for (const page of pages) {
-      const pageToken = page.access_token;
+      const pageToken = page.access_token ? await decryptToken(page.access_token) : null;
       if (!pageToken) {
         console.error(`No Page Access Token for page ${page.id}.`);
         await supabaseClient.from("platform_connections")

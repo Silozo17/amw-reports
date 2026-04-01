@@ -108,7 +108,8 @@ Deno.serve(async (req) => {
     const globalMetricsMap: Record<string, number> = {};
 
     for (const ig of filteredAccounts) {
-      const { ig_id, page_token } = ig;
+      const { ig_id } = ig;
+      const page_token = await decryptToken(ig.page_token);
 
       // Fetch IG User Insights: reach (day period)
       try {
