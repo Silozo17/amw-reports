@@ -93,24 +93,31 @@ interface UseClientDashboardParams {
   portalToken?: string;
   initialMonth?: number;
   initialYear?: number;
+  initialPeriod?: SelectedPeriod;
+  disableAutoDetect?: boolean;
 }
 
-export const useClientDashboard = ({ clientId, currencyCode, portalToken, initialMonth, initialYear }: UseClientDashboardParams) => {
+export const useClientDashboard = ({ clientId, currencyCode, portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect }: UseClientDashboardParams) => {
   const isPortal = !!portalToken;
   const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
-  const defaultMonth = initialMonth ?? (now.getMonth() + 1);
-  const defaultYear = initialYear ?? now.getFullYear();
+
+  // Compute the starting period once: prefer full initialPeriod > legacy month/year > current month
+  const startingPeriod = useMemo<SelectedPeriod>(() => {
+    if (initialPeriod) return initialPeriod;
+    const m = initialMonth ?? (now.getMonth() + 1);
+    const y = initialYear ?? now.getFullYear();
+    return { type: "monthly", month: m, year: y };
+  }, []); // intentionally empty — compute only once on mount
 
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformFilter>("all");
-  const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod>({
-    type: "monthly", month: defaultMonth, year: defaultYear,
-  });
+  const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod>(startingPeriod);
 
-  // Store initial period in a ref so it can never be lost across renders
-  const initialPeriodRef = useRef({ month: initialMonth, year: initialYear });
+  // Whether the URL/caller supplied an explicit period — if so, auto-detect is blocked
+  const hasExplicitPeriod = !!(initialPeriod || (initialMonth && initialYear) || disableAutoDetect);
+  const initialPeriodRef = useRef({ month: initialMonth, year: initialYear, explicit: hasExplicitPeriod });
 
-  const [hasAutoDetected, setHasAutoDetected] = useState(!!(initialMonth && initialYear));
+  const [hasAutoDetected, setHasAutoDetected] = useState(hasExplicitPeriod);
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
   const [prePrevSnapshots, setPrePrevSnapshots] = useState<SnapshotData[]>([]);
