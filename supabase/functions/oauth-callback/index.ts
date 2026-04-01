@@ -392,7 +392,11 @@ async function handleFacebook(supabase: any, code: string, connectionId: string,
       console.log("Facebook pages discovery:", JSON.stringify(pagesData));
       if (pagesData.data?.length > 0) {
         for (const page of pagesData.data) {
-          pages.push({ id: page.id, name: page.name || page.id, access_token: page.access_token });
+          pages.push({
+            id: page.id,
+            name: page.name || page.id,
+            access_token: page.access_token ? await encryptToken(page.access_token) : undefined,
+          });
         }
       }
       nextUrl = pagesData.paging?.next || null;
