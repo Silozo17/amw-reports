@@ -631,7 +631,7 @@ async function handleTikTokAds(supabase: any, authCode: string, connectionId: st
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
+      access_token: await encryptToken(accessToken),
       refresh_token: null,
       token_expires_at: null, // Business API tokens are long-lived
       is_connected: true,
