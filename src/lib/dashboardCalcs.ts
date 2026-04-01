@@ -43,6 +43,7 @@ export function computeKpis(
   const prevConversions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
   const prevPageViews = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
   const prevWebsiteClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
+  const prevPostsPublished = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.posts_published || 0), 0);
 
   const platformsFor = (metricFn: (m: Record<string, number>) => number): PlatformType[] =>
     [...new Set(filtered.filter(s => metricFn(s.metrics_data) > 0).map(s => s.platform))];
