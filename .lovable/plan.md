@@ -1,42 +1,39 @@
 
 
-# Hide Health Score from Portal & PDF Reports
+# Fix Share Links to Include Selected Month
 
-## What This Does
-Adds a toggle in the client settings (per-client) allowing org owners/managers to hide the Marketing Health Score from shareable portal links and PDF reports.
+## Problem
+The `ShareDialog` component generates portal URLs without any period information. When a user is viewing a specific month and shares the link, the recipient sees the default (current) month instead of the selected one.
 
 ## Approach
-Since the health score is a **per-client** feature (some clients may want it, others not), the toggle belongs on the `clients` table — not the org-level `report_settings`.
+Use the `?period=N` rolling parameter we just built. The `ShareDialog` needs to know the currently selected month/year so it can calculate the offset from the current month and append `?period=N` to the URL.
 
 ## Changes
 
-### 1. Database Migration
-Add a `show_health_score` boolean column to the `clients` table, defaulting to `true` (existing behaviour preserved).
+### 1. `src/pages/clients/ClientDetail.tsx`
+- Lift the selected period out of the dashboard by adding local state (`selectedMonth`, `selectedYear`) at the page level
+- Pass these down to `ClientDashboard` as `initialMonth`/`initialYear` and also receive period changes via a new `onPeriodChange` callback
+- Pass `selectedMonth` and `selectedYear` to `ShareDialog`
 
-```sql
-ALTER TABLE public.clients ADD COLUMN show_health_score boolean NOT NULL DEFAULT true;
-```
+### 2. `src/components/clients/ClientDashboard.tsx`
+- Accept an optional `onPeriodChange?: (month: number, year: number) => void` prop
+- Call it whenever `selectedPeriod` changes (via a `useEffect`)
 
-### 2. `src/components/clients/tabs/ClientSettingsTab.tsx`
-Add a "Show Health Score" toggle in the report/display settings area, wired to `onSettingChange('show_health_score', value)`.
+### 3. `src/components/clients/ShareDialog.tsx`
+- Accept optional `selectedMonth` and `selectedYear` props
+- In `getShareUrl`, calculate the period offset: months between now and the selected month
+- Append `?period=N` to the URL (omit if `period=0`, i.e. current month)
 
-### 3. `src/components/clients/ClientDashboard.tsx`
-- Accept a `showHealthScore` prop (derived from client data)
-- Conditionally render `<HealthScore>` only when `showHealthScore` is true
+### 4. No backend changes needed
+The `?period=N` resolution already works in `ClientPortal.tsx`.
 
-### 4. `src/pages/ClientPortal.tsx` & `src/pages/clients/ClientDetail.tsx`
-Pass `showHealthScore` from the client record through to `ClientDashboard`.
-
-### 5. `supabase/functions/generate-report/index.ts`
-The health score is **not currently rendered** in the PDF report, so no changes needed there right now. If/when it gets added to reports, it will respect this flag.
-
-## Files Changed
+## Example
+User viewing March 2026 in April 2026 → `period=1` → URL becomes:
+`https://domain.com/portal/client-slug-1234?period=1`
 
 | File | Change |
 |---|---|
-| Migration | Add `show_health_score` column to `clients` |
-| `src/components/clients/tabs/ClientSettingsTab.tsx` | Add toggle |
-| `src/components/clients/ClientDashboard.tsx` | Conditionally render HealthScore |
-| `src/pages/ClientPortal.tsx` | Pass flag to dashboard |
-| `src/pages/clients/ClientDetail.tsx` | Pass flag to dashboard |
+| `src/pages/clients/ClientDetail.tsx` | Track selected period, pass to ShareDialog |
+| `src/components/clients/ClientDashboard.tsx` | Add `onPeriodChange` callback prop |
+| `src/components/clients/ShareDialog.tsx` | Accept month/year, append `?period=N` to URLs |
 
