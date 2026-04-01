@@ -135,9 +135,15 @@ interface ClientDashboardProps {
   onPeriodChange?: (month: number, year: number) => void;
 }
 
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, showHealthScore = true }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
   const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear });
   const [chatOpen, setChatOpen] = useState(false);
+
+  // Notify parent when selected period changes
+  const { selectedPeriod } = dashboard;
+  React.useEffect(() => {
+    onPeriodChange?.(selectedPeriod.month, selectedPeriod.year);
+  }, [selectedPeriod.month, selectedPeriod.year, onPeriodChange]);
 
   const {
     selectedPlatform, setSelectedPlatform,
