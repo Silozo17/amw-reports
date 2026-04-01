@@ -1749,16 +1749,24 @@ Deno.serve(async (req) => {
     let y = startNewPage(T.tableOfContents);
     y += 2;
 
-    const prevMonth = report_month === 1 ? 12 : report_month - 1;
-    const prevYear = report_month === 1 ? report_year - 1 : report_year;
-    const prevMonthName = MONTH_NAMES[prevMonth];
-    const daysInMonth = new Date(report_year, report_month, 0).getDate();
+    let prevPeriodLabel: string;
+    if (isCustomRange) {
+      prevPeriodLabel = T.previousPeriod;
+    } else {
+      const prevMonth = report_month === 1 ? 12 : report_month - 1;
+      const prevYear = report_month === 1 ? report_year - 1 : report_year;
+      prevPeriodLabel = `${MONTH_NAMES[prevMonth]} ${prevYear}`;
+    }
+
+    const reportCoversText = isCustomRange
+      ? `${T.reportCovers} ${date_from} to ${date_to}. ${T.allFigures} ${prevPeriodLabel} ${T.unlessStated}.`
+      : (() => {
+          const daysInMonth = new Date(report_year, report_month, 0).getDate();
+          return `${T.reportCovers} 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. ${T.allFigures} ${prevPeriodLabel} ${T.unlessStated}.`;
+        })();
 
     doc.setFontSize(9); setC(C.grey);
-    y = wrapText(
-      `${T.reportCovers} 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. ${T.allFigures} ${prevMonthName} ${prevYear} ${T.unlessStated}.`,
-      M, y, CW, 5
-    );
+    y = wrapText(reportCoversText, M, y, CW, 5);
     y += 8;
 
     let tocIndex = 1;
