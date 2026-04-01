@@ -1,39 +1,32 @@
 
 
-# Fix Share Links to Include Selected Month
+# Add "Posts Published" and "Stories" KPI Widgets to Dashboard
 
-## Problem
-The `ShareDialog` component generates portal URLs without any period information. When a user is viewing a specific month and shares the link, the recipient sees the default (current) month instead of the selected one.
+## Summary
+Add a "Posts Published" hero KPI card that aggregates `posts_published` across all organic social platforms (Facebook, Instagram, LinkedIn, TikTok, Pinterest, YouTube) with month-over-month comparison. Stories data is **not currently synced** by any platform integration, so that cannot be added without new API work.
 
-## Approach
-Use the `?period=N` rolling parameter we just built. The `ShareDialog` needs to know the currently selected month/year so it can calculate the offset from the current month and append `?period=N` to the URL.
+## What exists today
+- `posts_published` is already synced and stored in `metrics_data` for Facebook, Instagram, LinkedIn, and TikTok organic.
+- The metric has labels, explanations, and report support already.
+- It is **not** included in the hero KPI cards in `computeKpis()` or sparklines in `computeSparklines()`.
+- No platform currently syncs a `stories_count` or equivalent metric.
 
 ## Changes
 
-### 1. `src/pages/clients/ClientDetail.tsx`
-- Lift the selected period out of the dashboard by adding local state (`selectedMonth`, `selectedYear`) at the page level
-- Pass these down to `ClientDashboard` as `initialMonth`/`initialYear` and also receive period changes via a new `onPeriodChange` callback
-- Pass `selectedMonth` and `selectedYear` to `ShareDialog`
+### 1. `src/lib/dashboardCalcs.ts`
+- **computeKpis**: Add `totalPostsPublished` aggregation (sum `posts_published` across filtered snapshots), with previous-month comparison. Add a new KPI entry with label "Posts Published", icon `FileText` (or `PenSquare`), metricKey `posts_published`. Only show for organic social platforms when filter is "all" or includes an organic platform.
+- **computeSparklines**: Add `posts_published` to the monthly aggregation map and the sparkline output loop.
 
-### 2. `src/components/clients/ClientDashboard.tsx`
-- Accept an optional `onPeriodChange?: (month: number, year: number) => void` prop
-- Call it whenever `selectedPeriod` changes (via a `useEffect`)
+### 2. Icon import
+Add `PenSquare` (or reuse `FileText`) from lucide-react in the imports.
 
-### 3. `src/components/clients/ShareDialog.tsx`
-- Accept optional `selectedMonth` and `selectedYear` props
-- In `getShareUrl`, calculate the period offset: months between now and the selected month
-- Append `?period=N` to the URL (omit if `period=0`, i.e. current month)
+### No other files need changes
+The KPI rendering in `HeroKPIs.tsx` is already generic and renders whatever `computeKpis` returns.
 
-### 4. No backend changes needed
-The `?period=N` resolution already works in `ClientPortal.tsx`.
-
-## Example
-User viewing March 2026 in April 2026 → `period=1` → URL becomes:
-`https://domain.com/portal/client-slug-1234?period=1`
+## Stories — not possible yet
+None of the sync functions (Instagram, Facebook, TikTok) currently fetch story data from their APIs. Adding stories would require changes to the sync edge functions and potentially new API scopes. I'll skip this for now — let me know if you'd like me to scope that out separately.
 
 | File | Change |
 |---|---|
-| `src/pages/clients/ClientDetail.tsx` | Track selected period, pass to ShareDialog |
-| `src/components/clients/ClientDashboard.tsx` | Add `onPeriodChange` callback prop |
-| `src/components/clients/ShareDialog.tsx` | Accept month/year, append `?period=N` to URLs |
+| `src/lib/dashboardCalcs.ts` | Add posts_published KPI + sparkline aggregation |
 
