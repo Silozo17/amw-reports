@@ -25,6 +25,7 @@ interface PortalClient {
   logo_url: string | null;
   preferred_currency: string;
   org_id: string;
+  show_health_score?: boolean;
 }
 
 const applyBranding = (org: PortalOrg) => {
