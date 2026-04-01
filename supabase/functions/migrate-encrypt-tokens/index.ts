@@ -22,10 +22,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch all connections with tokens
+    // Fetch all connections with tokens or metadata
     const { data: connections, error } = await supabase
       .from("platform_connections")
-      .select("id, access_token, refresh_token")
+      .select("id, access_token, refresh_token, platform, metadata")
       .or("access_token.not.is.null,refresh_token.not.is.null");
 
     if (error) throw new Error(`Failed to fetch connections: ${error.message}`);
@@ -33,16 +33,49 @@ Deno.serve(async (req) => {
     let encrypted = 0;
     let skipped = 0;
     let errors = 0;
+    let metadataEncrypted = 0;
 
     for (const conn of connections || []) {
       try {
-        const updates: Record<string, string> = {};
+        const updates: Record<string, unknown> = {};
 
         if (conn.access_token && !conn.access_token.startsWith(ENCRYPTION_PREFIX)) {
           updates.access_token = await encryptToken(conn.access_token);
         }
         if (conn.refresh_token && !conn.refresh_token.startsWith(ENCRYPTION_PREFIX)) {
           updates.refresh_token = await encryptToken(conn.refresh_token);
+        }
+
+        // Encrypt page-level tokens in metadata for Facebook
+        if (conn.platform === "facebook" && conn.metadata?.pages) {
+          const pages = conn.metadata.pages as Array<{ access_token?: string; [k: string]: unknown }>;
+          let changed = false;
+          for (const page of pages) {
+            if (page.access_token && !page.access_token.startsWith(ENCRYPTION_PREFIX)) {
+              page.access_token = await encryptToken(page.access_token);
+              changed = true;
+            }
+          }
+          if (changed) {
+            updates.metadata = { ...conn.metadata, pages };
+            metadataEncrypted++;
+          }
+        }
+
+        // Encrypt page-level tokens in metadata for Instagram
+        if (conn.platform === "instagram" && conn.metadata?.ig_accounts) {
+          const igAccounts = conn.metadata.ig_accounts as Array<{ page_token?: string; [k: string]: unknown }>;
+          let changed = false;
+          for (const ig of igAccounts) {
+            if (ig.page_token && !ig.page_token.startsWith(ENCRYPTION_PREFIX)) {
+              ig.page_token = await encryptToken(ig.page_token);
+              changed = true;
+            }
+          }
+          if (changed) {
+            updates.metadata = { ...conn.metadata, ig_accounts: igAccounts };
+            metadataEncrypted++;
+          }
         }
 
         if (Object.keys(updates).length > 0) {
