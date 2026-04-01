@@ -411,6 +411,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MÉTRICA',
     thisMonth: 'ESTE MÊS',
     lastMonth: 'MÊS PASSADO',
+    thisPeriod: 'ESTE PERÍODO',
+    previousPeriod: 'PERÍODO ANTERIOR',
     change: 'VARIAÇÃO',
     monthlySummary: 'Resumo mensal',
     platformStatus: 'Visão geral das plataformas',
