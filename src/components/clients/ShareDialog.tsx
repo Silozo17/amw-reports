@@ -123,8 +123,15 @@ const ShareDialog = ({ clientId, orgId, clientName, selectedMonth, selectedYear 
   };
 
   const getShareUrl = (token: string) => {
-    if (customDomain) return `https://${customDomain}/portal/${token}`;
-    return `${window.location.origin}/portal/${token}`;
+    const base = customDomain ? `https://${customDomain}/portal/${token}` : `${window.location.origin}/portal/${token}`;
+    if (selectedMonth && selectedYear) {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const offset = (currentYear - selectedYear) * 12 + (currentMonth - selectedMonth);
+      if (offset > 0) return `${base}?period=${offset}`;
+    }
+    return base;
   };
 
   const copyLink = async (token: ShareToken) => {
