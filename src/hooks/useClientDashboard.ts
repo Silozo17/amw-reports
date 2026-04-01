@@ -110,6 +110,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
   const [hasAutoDetected, setHasAutoDetected] = useState(!!(initialMonth && initialYear));
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
+  const [prePrevSnapshots, setPrePrevSnapshots] = useState<SnapshotData[]>([]);
   const [trendData, setTrendData] = useState<SnapshotData[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<PlatformType[]>([]);
   const [connections, setConnections] = useState<ConnectionData[]>([]);
@@ -244,14 +245,20 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
       const d = subMonths(new Date(year, month - 1), 3); prevMonth = d.getMonth() + 1; prevYear = d.getFullYear();
     } else { prevMonth = month === 1 ? 12 : month - 1; prevYear = month === 1 ? year - 1 : year; }
 
+    // N-2 month for accurate health score change indicator
+    const prePrevDate = subMonths(new Date(prevYear, prevMonth - 1), 1);
+    const prePrevMonth = prePrevDate.getMonth() + 1;
+    const prePrevYear = prePrevDate.getFullYear();
+
     const sixMonthsAgo = new Date(year, month - 1); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const startMonth = sixMonthsAgo.getMonth() + 1; const startYr = sixMonthsAgo.getFullYear();
 
-    const [currentRes, prevRes, trendRes, connectionsRes, configRes] = await Promise.all([
+    const [currentRes, prevRes, prePrevRes, trendRes, connectionsRes, configRes] = await Promise.all([
       query,
       showComparison
         ? supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", clientId).eq("report_month", prevMonth).eq("report_year", prevYear)
         : Promise.resolve({ data: [], error: null }),
+      supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", clientId).eq("report_month", prePrevMonth).eq("report_year", prePrevYear),
       supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", clientId)
         .or(`report_year.gt.${startYr},and(report_year.eq.${startYr},report_month.gte.${startMonth})`)
         .order("report_year", { ascending: true }).order("report_month", { ascending: true }),
@@ -270,6 +277,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     setAllPosts(collectPosts((currentRes.data ?? []) as SnapshotData[]));
     setSnapshots(currentSnapshots);
     setPrevSnapshots((prevRes.data ?? []) as SnapshotData[]);
+    setPrePrevSnapshots((prePrevRes.data ?? []) as SnapshotData[]);
     setTrendData((trendRes.data ?? []) as SnapshotData[]);
     const platforms = [...new Set((connectionsRes.data ?? []).map((c: ConnectionData) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
@@ -399,7 +407,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     selectedPeriod, setSelectedPeriod,
     isLoading, isPortal, currSymbol,
     availablePlatforms, connections, platformConfigs,
-    snapshots, prevSnapshots, filtered, filteredPrev, trendData,
+    snapshots, prevSnapshots, prePrevSnapshots, filtered, filteredPrev, trendData,
     kpis, sparklineMap,
     spendByPlatform, totalSpend,
     engagementStackedData, impressionsByPlatform,
