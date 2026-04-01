@@ -141,10 +141,27 @@ const LandingPage = () => {
     setIsLoading(false);
   };
 
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
   const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setResendCooldown(60);
     const { error } = await supabase.auth.resend({ type: 'signup', email: signupEmail });
-    if (error) toast.error(error.message);
-    else toast.success('Verification code resent');
+    if (error) {
+      if (error.message?.includes('429') || error.status === 429) {
+        toast.error('Too many requests — please wait a minute before trying again');
+      } else {
+        toast.error(error.message);
+      }
+    } else {
+      toast.success('Verification code resent — check your inbox');
+    }
   };
 
   return (
@@ -327,7 +344,13 @@ const LandingPage = () => {
               </Button>
               <p className="text-sm text-muted-foreground font-body">
                 Didn't receive the code?{' '}
-                <button onClick={handleResendOtp} className="text-primary font-medium hover:underline">Resend</button>
+                <button
+                  onClick={handleResendOtp}
+                  disabled={resendCooldown > 0}
+                  className={`font-medium hover:underline ${resendCooldown > 0 ? 'text-muted-foreground cursor-not-allowed' : 'text-primary'}`}
+                >
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
+                </button>
               </p>
             </div>
           )}
