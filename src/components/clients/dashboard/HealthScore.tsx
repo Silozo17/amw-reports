@@ -15,7 +15,7 @@ interface HealthScoreProps {
   previous: SnapshotLike[];
 }
 
-const CircularGauge = ({ score }: { score: number }) => {
+const CircularGauge = ({ score, change }: { score: number; change?: number }) => {
   const color = getScoreColor(score);
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
