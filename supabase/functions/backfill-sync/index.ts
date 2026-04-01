@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     }
 
     // Get months range and check which already have snapshots
-    const monthsRange = getMonthsRange(months);
+    const monthsRange = getMonthsRange(months, start_offset);
 
     const { data: existingSnapshots } = await supabase
       .from("monthly_snapshots")
