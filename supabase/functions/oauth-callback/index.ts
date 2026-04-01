@@ -832,8 +832,8 @@ async function handleGoogleAnalytics(supabase: any, code: string, connectionId: 
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(tokenData.access_token),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: discoveryError ? false : true,
       last_error: discoveryError,
