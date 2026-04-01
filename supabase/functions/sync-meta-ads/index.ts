@@ -56,7 +56,8 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
-    if (!conn.is_connected || !conn.access_token) {
+    // Decrypt tokens
+    if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
       return new Response(
         JSON.stringify({ error: "Connection is not authenticated. Please connect via OAuth first." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -72,6 +72,9 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
+    // Decrypt tokens
+    if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
+    if (conn.refresh_token) conn.refresh_token = await decryptToken(conn.refresh_token);
     if (!conn.is_connected || !conn.refresh_token) {
       return new Response(
         JSON.stringify({ error: "Connection is not authenticated." }),
