@@ -103,6 +103,7 @@ Deno.serve(async (req) => {
         success: true,
         total: (connections || []).length,
         encrypted,
+        metadata_encrypted: metadataEncrypted,
         skipped,
         errors,
       }),
