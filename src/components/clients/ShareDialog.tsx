@@ -27,6 +27,8 @@ interface ShareDialogProps {
   clientId: string;
   orgId: string;
   clientName: string;
+  selectedMonth?: number;
+  selectedYear?: number;
 }
 
 const generateSlugToken = (name: string): string => {
