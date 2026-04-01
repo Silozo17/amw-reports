@@ -1,6 +1,6 @@
 import {
   Banknote, Eye, MousePointerClick, MessageCircle, Users,
-  Activity, Target, FileText, Link, Search, Crosshair, Hash,
+  Activity, Target, FileText, Link, Search, Crosshair, Hash, PenSquare,
 } from "lucide-react";
 import { PLATFORM_LABELS } from "@/types/database";
 import type { PlatformType } from "@/types/database";
@@ -32,6 +32,7 @@ export function computeKpis(
   const totalConversions = filtered.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
   const totalPageViews = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
   const totalWebsiteClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
+  const totalPostsPublished = filtered.reduce((sum, s) => sum + (s.metrics_data.posts_published || 0), 0);
 
   const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
   const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
@@ -42,6 +43,7 @@ export function computeKpis(
   const prevConversions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
   const prevPageViews = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
   const prevWebsiteClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
+  const prevPostsPublished = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.posts_published || 0), 0);
 
   const platformsFor = (metricFn: (m: Record<string, number>) => number): PlatformType[] =>
     [...new Set(filtered.filter(s => metricFn(s.metrics_data) > 0).map(s => s.platform))];
@@ -56,6 +58,7 @@ export function computeKpis(
   const conversionsPlatforms = platformsFor(m => m.conversions || 0);
   const pageViewsPlatforms = platformsFor(m => (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0));
   const websiteClicksPlatforms = platformsFor(m => (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0));
+  const postsPublishedPlatforms = platformsFor(m => m.posts_published || 0);
 
   const totalSearchImpressions = filtered.reduce((sum, s) => sum + (s.metrics_data.search_impressions || 0), 0);
   const totalSearchClicks = filtered.reduce((sum, s) => sum + (s.metrics_data.search_clicks || 0), 0);
@@ -89,6 +92,7 @@ export function computeKpis(
     ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
     ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views", platforms: pageViewsPlatforms }] : []),
     ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks", platforms: websiteClicksPlatforms }] : []),
+    ...(totalPostsPublished > 0 ? [{ label: "Posts Published", value: totalPostsPublished, change: cc(totalPostsPublished, prevPostsPublished), icon: PenSquare, metricKey: "posts_published", platforms: postsPublishedPlatforms }] : []),
   ] as KpiItem[];
 }
 
@@ -112,10 +116,11 @@ export function computeSparklines(
     existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
     existing.search_impressions = (existing.search_impressions || 0) + (s.metrics_data.search_impressions || 0);
     existing.search_clicks = (existing.search_clicks || 0) + (s.metrics_data.search_clicks || 0);
+    existing.posts_published = (existing.posts_published || 0) + (s.metrics_data.posts_published || 0);
     monthMap.set(key, existing);
   }
   const sortedFinal = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
-  for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions", "search_impressions", "search_clicks"]) {
+  for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions", "search_impressions", "search_clicks", "posts_published"]) {
     map[metricKey] = sortedFinal.map(([key, data]) => { const [y, m] = key.split("-"); return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` }; });
   }
   return map;

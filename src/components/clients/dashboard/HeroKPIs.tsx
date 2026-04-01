@@ -42,6 +42,7 @@ const ACCENT_COLORS: Record<string, string> = {
   search_clicks: 'hsl(var(--amw-orange))',
   search_ctr: 'hsl(var(--amw-green))',
   search_position: 'hsl(var(--amw-blue))',
+  posts_published: 'hsl(var(--amw-green))',
 };
 
 const formatValue = (val: number, isCost: boolean, currSymbol: string, isPercentage?: boolean, isDecimal?: boolean): string => {
