@@ -154,7 +154,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
     aiAnalysis, aiAnalysisDate, analysisDialogOpen, setAnalysisDialogOpen,
     isAnalysing, cooldownRemaining, handleAnalyse,
     matchesPlatformFilter,
-    prevSnapshots,
+    prevSnapshots, prePrevSnapshots,
   } = dashboard;
 
   // Notify parent when selected period changes
