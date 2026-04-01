@@ -55,12 +55,10 @@ const ClientDetail = () => {
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [reportYear, setReportYear] = useState<number | null>(null);
   const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
-  const [dashboardMonth, setDashboardMonth] = useState<number>(new Date().getMonth() + 1);
-  const [dashboardYear, setDashboardYear] = useState<number>(new Date().getFullYear());
+  const [dashboardPeriod, setDashboardPeriod] = useState<SelectedPeriod | null>(null);
 
-  const handlePeriodChange = useCallback((month: number, year: number) => {
-    setDashboardMonth(month);
-    setDashboardYear(year);
+  const handlePeriodChange = useCallback((period: SelectedPeriod) => {
+    setDashboardPeriod(period);
   }, []);
 
   usePageMeta({ title: client ? `${client.company_name} — AMW Reports` : 'Client — AMW Reports', description: 'Client detail and performance dashboard' });
