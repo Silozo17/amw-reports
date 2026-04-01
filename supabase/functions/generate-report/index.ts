@@ -2022,7 +2022,7 @@ Deno.serve(async (req) => {
           }
           y += 8;
 
-          const maxRows = isOnePage ? 8 : 15;
+          const maxRows = maxTableRows;
           let rowIdx = 0;
           for (const key of gridMetrics) {
             if (rowIdx >= maxRows) break;
