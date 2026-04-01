@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { encryptToken } from "../_shared/tokenCrypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -268,8 +269,8 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(tokenData.access_token),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
@@ -335,7 +336,7 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
+      access_token: await encryptToken(accessToken),
       refresh_token: null,
       token_expires_at: expiresAt,
       is_connected: true,
@@ -404,7 +405,7 @@ async function handleFacebook(supabase: any, code: string, connectionId: string,
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
+      access_token: await encryptToken(accessToken),
       refresh_token: null,
       token_expires_at: null,
       is_connected: true,
@@ -481,7 +482,7 @@ async function handleInstagram(supabase: any, code: string, connectionId: string
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
+      access_token: await encryptToken(accessToken),
       refresh_token: null,
       token_expires_at: null,
       is_connected: true,
@@ -550,8 +551,8 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: await encryptToken(accessToken),
+      refresh_token: refreshToken ? await encryptToken(refreshToken) : null,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
@@ -630,7 +631,7 @@ async function handleTikTokAds(supabase: any, authCode: string, connectionId: st
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
+      access_token: await encryptToken(accessToken),
       refresh_token: null,
       token_expires_at: null, // Business API tokens are long-lived
       is_connected: true,
@@ -700,8 +701,8 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(accessToken),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
@@ -753,8 +754,8 @@ async function handleGoogleSearchConsole(supabase: any, code: string, connection
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(tokenData.access_token),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
@@ -831,8 +832,8 @@ async function handleGoogleAnalytics(supabase: any, code: string, connectionId: 
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(tokenData.access_token),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: discoveryError ? false : true,
       last_error: discoveryError,
@@ -924,8 +925,8 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(tokenData.access_token),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: discoveryError ? false : true,
       last_error: discoveryError,
@@ -993,8 +994,8 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(tokenData.access_token),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: discoveryError ? false : true,
       last_error: discoveryError,
@@ -1056,8 +1057,8 @@ async function handlePinterest(supabase: any, code: string, connectionId: string
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: await encryptToken(accessToken),
+      refresh_token: refreshToken ? await encryptToken(refreshToken) : null,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,

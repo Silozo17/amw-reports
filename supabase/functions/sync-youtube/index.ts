@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { encryptToken, decryptToken } from "../_shared/tokenCrypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +38,10 @@ Deno.serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Decrypt tokens
+    if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
+    if (conn.refresh_token) conn.refresh_token = await decryptToken(conn.refresh_token);
 
     // Get org_id from client
     const { data: client } = await supabase.from("clients").select("org_id").eq("id", conn.client_id).single();
@@ -96,7 +101,7 @@ Deno.serve(async (req) => {
 
         await supabase
           .from("platform_connections")
-          .update({ access_token: accessToken, token_expires_at: expiresAt })
+          .update({ access_token: await encryptToken(accessToken), token_expires_at: expiresAt })
           .eq("id", connection_id);
       }
 

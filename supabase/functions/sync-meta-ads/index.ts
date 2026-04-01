@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { encryptToken, decryptToken } from "../_shared/tokenCrypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,6 +55,9 @@ Deno.serve(async (req) => {
     }
 
     clientId = conn.client_id;
+
+    // Decrypt tokens
+    if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
 
     if (!conn.is_connected || !conn.access_token) {
       return new Response(
@@ -118,7 +122,7 @@ Deno.serve(async (req) => {
             accessToken = reExchangeData.access_token;
             const newExpiresAt = new Date(Date.now() + (reExchangeData.expires_in || 5184000) * 1000).toISOString();
             await supabase.from("platform_connections").update({
-              access_token: accessToken,
+              access_token: await encryptToken(accessToken),
               token_expires_at: newExpiresAt,
               last_error: null,
             }).eq("id", connectionId);

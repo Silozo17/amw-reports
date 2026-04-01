@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { encryptToken, decryptToken } from "../_shared/tokenCrypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -72,6 +73,9 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
+    // Decrypt tokens
+    if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
+    if (conn.refresh_token) conn.refresh_token = await decryptToken(conn.refresh_token);
     if (!conn.is_connected || !conn.refresh_token) {
       return new Response(
         JSON.stringify({ error: "Connection is not authenticated. Please connect via OAuth first." }),
@@ -125,7 +129,7 @@ Deno.serve(async (req) => {
 
       await supabase
         .from("platform_connections")
-        .update({ access_token: accessToken, token_expires_at: newExpiry })
+        .update({ access_token: await encryptToken(accessToken), token_expires_at: newExpiry })
         .eq("id", connectionId);
     }
 
