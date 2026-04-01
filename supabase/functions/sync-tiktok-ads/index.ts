@@ -50,6 +50,8 @@ Deno.serve(async (req) => {
 
     // Decrypt token
     if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
+
+    if (!conn.is_connected || !conn.access_token) {
       throw new Error("Connection is not authenticated. Please connect via OAuth first.");
     }
 
