@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { subMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles } from "lucide-react";
@@ -107,6 +107,9 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     type: "monthly", month: defaultMonth, year: defaultYear,
   });
 
+  // Store initial period in a ref so it can never be lost across renders
+  const initialPeriodRef = useRef({ month: initialMonth, year: initialYear });
+
   const [hasAutoDetected, setHasAutoDetected] = useState(!!(initialMonth && initialYear));
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
@@ -161,7 +164,8 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
   };
 
   const autoDetectPeriod = (currentSnapshots: SnapshotData[], allTrendData: SnapshotData[]) => {
-    if (initialMonth && initialYear) return;
+    // Use the ref to guard — this can never be stale
+    if (initialPeriodRef.current.month && initialPeriodRef.current.year) return;
     const hasRealData = currentSnapshots.some((snapshot) =>
       Object.entries(snapshot.metrics_data).some(([key, v]) => typeof v === "number" && v > 0 && !HIDDEN_METRICS.has(key)),
     );
@@ -283,7 +287,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     setAvailablePlatforms(platforms);
     autoDetectPeriod(currentSnapshots, (trendRes.data ?? []) as SnapshotData[]);
     setIsLoading(false);
-  }, [clientId, selectedPeriod, hasAutoDetected, isPortal, portalToken]);
+  }, [clientId, selectedPeriod, isPortal, portalToken]);
 
   useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
 

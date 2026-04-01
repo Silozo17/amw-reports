@@ -23,10 +23,19 @@ const LandingPage = () => {
   const navigate = useNavigate();
   usePageMeta({ title: 'Log In — AMW Reports', description: 'Sign in to your AMW Reports account or create a new one. Automated marketing reports for agencies.' });
 
+  // Track if this signup was from an org invite link
+  const invitedEmail = searchParams.get('invited_email');
+  const [isInvitedSignup] = useState(() => !!invitedEmail);
+
   useEffect(() => {
     const v = searchParams.get('view');
     if (v === 'signup') setView('signup');
-  }, [searchParams]);
+    // Pre-fill signup email from invite link
+    if (invitedEmail) {
+      setView('signup');
+      setSignupEmail(invitedEmail);
+    }
+  }, [searchParams, invitedEmail]);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -106,7 +115,11 @@ const LandingPage = () => {
     // handle_new_user database trigger — no client-side writes needed.
 
     toast.success('Account verified! Welcome aboard.');
-    navigate('/onboarding');
+    if (isInvitedSignup) {
+      navigate('/dashboard');
+    } else {
+      navigate('/onboarding');
+    }
     setIsLoading(false);
   };
 

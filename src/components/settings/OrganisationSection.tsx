@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/contexts/OrgContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -333,6 +334,8 @@ const InviteDialog = ({ orgId, onInvite }: { orgId: string; onInvite: () => void
         data: {
           invited_email: email.trim().toLowerCase(),
           role: inviteRole,
+          inviter_name: 'A team member',
+          invite_url: `${window.location.origin}/login?view=signup&invited_email=${encodeURIComponent(email.trim().toLowerCase())}`,
         },
       }).catch(err => console.error('Failed to send invite email:', err));
 
