@@ -164,13 +164,18 @@ Deno.serve(async (req) => {
       user.user_metadata?.full_name ?? user.email ?? email;
 
     const templateData: Record<string, unknown> = {
-      confirmation_url: confirmationUrl,
       otp_token: token,
-      token_hash: tokenHash,
       recipient_name: recipientName,
       device_info: req.headers.get("user-agent") ?? "Unknown device",
       support_email: "support@amwmedia.co.uk",
     };
+
+    // Only include confirmation_url for link-based actions (recovery, magiclink, email_change, invite)
+    // For OTP actions (signup, reauthentication), the link consumes the token and breaks OTP verification
+    if (action !== "signup" && action !== "reauthentication") {
+      templateData.confirmation_url = confirmationUrl;
+      templateData.token_hash = tokenHash;
+    }
 
     if (action === "email_change") {
       templateData.old_email = email;
