@@ -482,7 +482,7 @@ async function handleInstagram(supabase: any, code: string, connectionId: string
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
+      access_token: await encryptToken(accessToken),
       refresh_token: null,
       token_expires_at: null,
       is_connected: true,
