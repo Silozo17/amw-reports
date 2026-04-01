@@ -107,6 +107,9 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     type: "monthly", month: defaultMonth, year: defaultYear,
   });
 
+  // Store initial period in a ref so it can never be lost across renders
+  const initialPeriodRef = useRef({ month: initialMonth, year: initialYear });
+
   const [hasAutoDetected, setHasAutoDetected] = useState(!!(initialMonth && initialYear));
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
