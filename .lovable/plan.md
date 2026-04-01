@@ -1,62 +1,73 @@
 
 
-# Remaining Security Fixes
+# Custom Date Range Reports
 
-Three vulnerabilities from the audit were not addressed in the previous implementation.
+## Problem
+Reports are currently locked to single calendar months. The system needs to support arbitrary date ranges (e.g. 1 Jan – 15 Mar) for PDF generation.
 
----
+## Key Constraint
+The underlying data source (`monthly_snapshots`) stores metrics per calendar month. A custom-range report must aggregate across multiple monthly snapshots. Partial-month precision (e.g. "1st–15th March") is not possible at the data level — the system will include full months that fall within the selected range.
 
-## 1. OAuth Tokens Stored in Plain Text (HIGH)
-
-**Problem:** `platform_connections.access_token` and `refresh_token` are stored as unencrypted text. Any RLS bypass or SQL injection would expose every connected platform's OAuth tokens.
-
-**Fix:** Use Supabase Vault (`pgsodium`) to encrypt tokens at rest via a database trigger. A `BEFORE INSERT OR UPDATE` trigger on `platform_connections` will encrypt `access_token` and `refresh_token` using `pgsodium.crypto_aead_det_encrypt()`. A helper function `decrypt_token()` will be created for Edge Functions to decrypt when needed. The columns remain `text` type, but store ciphertext instead of plaintext.
-
-**Changes:**
-- Database migration: create encryption key, add encrypt trigger, add `decrypt_token()` function, migrate existing plaintext tokens
-- Update all Edge Functions that read `access_token`/`refresh_token` to call `decrypt_token()` (all sync-* functions, all *-connect functions, oauth-callback, check-expiring-tokens)
-
-**Risk note:** This is a large, high-risk change touching every OAuth flow. A phased approach is recommended — encrypt new tokens first, then migrate existing ones. However, given that Supabase Vault/pgsodium availability needs to be confirmed for this Lovable Cloud project, an alternative is to encrypt/decrypt in the Edge Functions using a shared secret stored as a Supabase secret. This is simpler and guaranteed to work.
-
-**Recommended approach (Edge Function encryption):**
-- Add a new secret `TOKEN_ENCRYPTION_KEY` (32-byte hex string)
-- Create a shared utility that encrypts/decrypts using AES-256-GCM
-- Update all Edge Functions that write tokens to encrypt before storing
-- Update all Edge Functions that read tokens to decrypt after fetching
-- One-time migration script to encrypt all existing plaintext tokens
+## Approach
+Add optional `date_from` / `date_to` fields alongside the existing `report_month` / `report_year` fields. When a date range is provided, the system aggregates all monthly snapshots that fall within the range. The existing single-month flow remains unchanged as the default.
 
 ---
 
-## 2. `portal-data` — No Rate Limiting (HIGH)
+## Database Changes
 
-**Problem:** The portal-data function accepts a share token and returns all client data using the service role key. There's no rate limiting — a leaked token allows unlimited data exfiltration.
+**Migration — `reports` table:**
+- Add `date_from` (date, nullable) and `date_to` (date, nullable)
+- Add a new unique constraint on `client_id, date_from, date_to` for custom-range reports
+- Keep existing `client_id, report_month, report_year` constraint for standard monthly reports
 
-**Fix:** Add IP-based rate limiting using a lightweight in-memory approach (Deno KV or a database counter). Limit to 60 requests per minute per IP. Also add a `last_accessed_at` column to `client_share_tokens` so org owners can see when tokens are being used.
+## UI Changes — `ClientReportsTab.tsx`
 
-**Changes:**
-- `supabase/functions/portal-data/index.ts` — add rate limiting logic at the top of the function, update `last_accessed_at` on each valid request
-- Database migration: add `last_accessed_at` column to `client_share_tokens`
+- Add a toggle: "Monthly" (default) vs "Custom Range"
+- In "Custom Range" mode, show two date pickers (from/to) instead of month/year selects
+- Display custom-range reports in the list with formatted date range labels (e.g. "1 Jan – 15 Mar 2026") instead of "Jan 2026"
+- Pass `date_from` / `date_to` to the generate function when in custom mode
 
----
+## Client Library — `src/lib/reports.ts`
 
-## 3. `check-subscription` — `getUser()` with Service Role Key (LOW)
+- Update `generateReport` to accept an optional `{ dateFrom, dateTo }` parameter
+- When custom dates provided: insert report with `date_from`/`date_to` (and set `report_month`/`report_year` to the end-date month for ordering)
+- Pass dates through to the edge function
 
-**Problem:** Line 39 calls `supabase.auth.getUser(token)` using the service role client. With the service role key, `getUser` may not properly validate token expiry/revocation.
+## Edge Function — `generate-report/index.ts`
 
-**Fix:** Create a separate anon-key client for user verification, then continue using the service role client for privileged operations.
+**Request interface:** Add optional `date_from` and `date_to` (ISO date strings).
 
-**Changes:**
-- `supabase/functions/check-subscription/index.ts` — create anon client for `getUser()`, keep service role client for DB operations
+**Data fetching:** When custom dates are provided:
+- Compute the list of month/year pairs that fall within the range
+- Fetch all `monthly_snapshots` for those months
+- Aggregate metrics: sum additive metrics (clicks, impressions, spend), average rate metrics (CTR, bounce_rate), take latest for cumulative metrics (followers)
+- For comparison, fetch the same-length period immediately prior
 
----
+**PDF rendering:**
+- Cover page shows date range instead of single month
+- Intro text: "This report covers performance from {date_from} to {date_to}"
+- Header/footer shows date range
+- Comparison labels change from "Last Month" → "Previous Period"
+- Storage path: `{client_id}/{date_from}_{date_to}.pdf`
 
 ## Files Changed
 
 | File | Change |
 |---|---|
-| Database migration | Add `last_accessed_at` to `client_share_tokens` |
-| `supabase/functions/portal-data/index.ts` | Add IP-based rate limiting (60/min), update `last_accessed_at` |
-| `supabase/functions/check-subscription/index.ts` | Use anon client for `getUser()` |
+| Migration | Add `date_from`, `date_to` to `reports` table |
+| `src/components/clients/ClientReportsTab.tsx` | Add monthly/custom toggle, date pickers, display logic |
+| `src/lib/reports.ts` | Accept optional date range params, pass to edge function |
+| `supabase/functions/generate-report/index.ts` | Accept date range, aggregate multi-month snapshots, update PDF labels |
 
-**Deferred (separate task):** OAuth token encryption — this is a large cross-cutting change affecting 20+ Edge Functions. Recommend implementing as a dedicated follow-up to avoid breaking all OAuth flows in one deployment.
+## Metrics Aggregation Strategy
+
+| Metric Type | Examples | Aggregation |
+|---|---|---|
+| Additive | clicks, impressions, spend, conversions | Sum |
+| Rate/Average | CTR, bounce_rate, engagement_rate, CPC | Weighted average |
+| Cumulative/Snapshot | followers, subscribers | Take latest month's value |
+| Count | posts_published, videos_published | Sum |
+
+## Translation Updates
+Add new translation keys: `customPeriod`, `previousPeriod`, `thisPeriod` across all supported languages (en, fr, de, es, it, nl, pt, pl, da).
 
