@@ -33,6 +33,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'METRIC',
     thisMonth: 'THIS MONTH',
     lastMonth: 'LAST MONTH',
+    thisPeriod: 'THIS PERIOD',
+    previousPeriod: 'PREVIOUS PERIOD',
     change: 'CHANGE',
     monthlySummary: 'Monthly Summary',
     platformStatus: 'Platform Status Overview',
