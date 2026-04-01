@@ -5,12 +5,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// In-memory rate limiting: IP -> { count, resetAt }
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 60;
+const RATE_WINDOW_MS = 60_000;
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now >= entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+
+  entry.count++;
+  if (entry.count > RATE_LIMIT) {
+    return true;
+  }
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
+    // Rate limiting by IP
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("cf-connecting-ip") ||
+      "unknown";
+
+    if (isRateLimited(clientIp)) {
+      return new Response(JSON.stringify({ error: "Too many requests. Please try again later." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -26,7 +60,7 @@ Deno.serve(async (req) => {
     // Validate token
     const { data: tokenData, error: tokenErr } = await supabase
       .from("client_share_tokens")
-      .select("client_id, org_id, is_active, expires_at")
+      .select("id, client_id, org_id, is_active, expires_at")
       .eq("token", token)
       .eq("is_active", true)
       .single();
@@ -44,6 +78,13 @@ Deno.serve(async (req) => {
     }
 
     const { client_id, org_id } = tokenData;
+
+    // Update last_accessed_at (fire and forget)
+    supabase
+      .from("client_share_tokens")
+      .update({ last_accessed_at: new Date().toISOString() })
+      .eq("id", tokenData.id)
+      .then(() => {});
 
     // Determine period
     const now = new Date();
@@ -64,7 +105,6 @@ Deno.serve(async (req) => {
     if (periodType === "quarterly") {
       const qStart = Math.floor((m - 1) / 3) * 3 + 1;
       currentQuery = currentQuery.in("report_month", [qStart, qStart + 1, qStart + 2]).eq("report_year", y);
-      // Previous quarter
       const pqDate = new Date(y, m - 1);
       pqDate.setMonth(pqDate.getMonth() - 3);
       prevMonth = pqDate.getMonth() + 1;
@@ -77,7 +117,6 @@ Deno.serve(async (req) => {
       currentQuery = currentQuery.eq("report_year", y);
       showComparison = false;
     } else if (periodType === "maximum") {
-      // No filters — get all
       showComparison = false;
     } else if (periodType === "custom" && startDate && endDate) {
       const sDate = new Date(startDate);
@@ -93,7 +132,6 @@ Deno.serve(async (req) => {
       }
       showComparison = false;
     } else {
-      // monthly (default)
       currentQuery = currentQuery.eq("report_month", m).eq("report_year", y);
     }
 
