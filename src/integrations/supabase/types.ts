@@ -1062,6 +1062,8 @@ export type Database = {
           ai_upsell_recommendations: string | null
           client_id: string
           created_at: string
+          date_from: string | null
+          date_to: string | null
           generated_at: string | null
           id: string
           org_id: string
@@ -1077,6 +1079,8 @@ export type Database = {
           ai_upsell_recommendations?: string | null
           client_id: string
           created_at?: string
+          date_from?: string | null
+          date_to?: string | null
           generated_at?: string | null
           id?: string
           org_id: string
@@ -1092,6 +1096,8 @@ export type Database = {
           ai_upsell_recommendations?: string | null
           client_id?: string
           created_at?: string
+          date_from?: string | null
+          date_to?: string | null
           generated_at?: string | null
           id?: string
           org_id?: string

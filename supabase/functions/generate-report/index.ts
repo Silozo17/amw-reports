@@ -10,6 +10,8 @@ interface ReportRequest {
   client_id: string;
   report_month: number;
   report_year: number;
+  date_from?: string; // ISO date e.g. "2026-01-01"
+  date_to?: string;   // ISO date e.g. "2026-03-15"
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -31,6 +33,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'METRIC',
     thisMonth: 'THIS MONTH',
     lastMonth: 'LAST MONTH',
+    thisPeriod: 'THIS PERIOD',
+    previousPeriod: 'PREVIOUS PERIOD',
     change: 'CHANGE',
     monthlySummary: 'Monthly Summary',
     platformStatus: 'Platform Status Overview',
@@ -92,6 +96,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MÉTRIQUE',
     thisMonth: 'CE MOIS',
     lastMonth: 'MOIS DERNIER',
+    thisPeriod: 'CETTE PÉRIODE',
+    previousPeriod: 'PÉRIODE PRÉCÉDENTE',
     change: 'VARIATION',
     monthlySummary: 'Résumé mensuel',
     platformStatus: 'Vue d\'ensemble des plateformes',
@@ -153,6 +159,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'KENNZAHL',
     thisMonth: 'DIESEN MONAT',
     lastMonth: 'LETZTEN MONAT',
+    thisPeriod: 'DIESER ZEITRAUM',
+    previousPeriod: 'VORHERIGER ZEITRAUM',
     change: 'ÄNDERUNG',
     monthlySummary: 'Monatszusammenfassung',
     platformStatus: 'Plattformübersicht',
@@ -214,6 +222,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MÉTRICA',
     thisMonth: 'ESTE MES',
     lastMonth: 'MES PASADO',
+    thisPeriod: 'ESTE PERÍODO',
+    previousPeriod: 'PERÍODO ANTERIOR',
     change: 'CAMBIO',
     monthlySummary: 'Resumen mensual',
     platformStatus: 'Resumen de plataformas',
@@ -275,6 +285,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'METRICA',
     thisMonth: 'QUESTO MESE',
     lastMonth: 'MESE SCORSO',
+    thisPeriod: 'QUESTO PERIODO',
+    previousPeriod: 'PERIODO PRECEDENTE',
     change: 'VARIAZIONE',
     monthlySummary: 'Riepilogo mensile',
     platformStatus: 'Panoramica piattaforme',
@@ -336,6 +348,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MAATSTAF',
     thisMonth: 'DEZE MAAND',
     lastMonth: 'VORIGE MAAND',
+    thisPeriod: 'DEZE PERIODE',
+    previousPeriod: 'VORIGE PERIODE',
     change: 'WIJZIGING',
     monthlySummary: 'Maandoverzicht',
     platformStatus: 'Platform overzicht',
@@ -397,6 +411,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MÉTRICA',
     thisMonth: 'ESTE MÊS',
     lastMonth: 'MÊS PASSADO',
+    thisPeriod: 'ESTE PERÍODO',
+    previousPeriod: 'PERÍODO ANTERIOR',
     change: 'VARIAÇÃO',
     monthlySummary: 'Resumo mensal',
     platformStatus: 'Visão geral das plataformas',
@@ -458,6 +474,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'WSKAŹNIK',
     thisMonth: 'TEN MIESIĄC',
     lastMonth: 'POPRZEDNI MIESIĄC',
+    thisPeriod: 'TEN OKRES',
+    previousPeriod: 'POPRZEDNI OKRES',
     change: 'ZMIANA',
     monthlySummary: 'Podsumowanie miesięczne',
     platformStatus: 'Przegląd platform',
@@ -519,6 +537,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'MÅLETAL',
     thisMonth: 'DENNE MÅNED',
     lastMonth: 'SIDSTE MÅNED',
+    thisPeriod: 'DENNE PERIODE',
+    previousPeriod: 'FORRIGE PERIODE',
     change: 'ÆNDRING',
     monthlySummary: 'Månedsoversigt',
     platformStatus: 'Platformsoversigt',
@@ -1060,7 +1080,8 @@ Deno.serve(async (req) => {
     }
     const callerId = claimsData.claims.sub;
 
-    const { client_id, report_month, report_year } = (await req.json()) as ReportRequest;
+    const { client_id, report_month, report_year, date_from, date_to } = (await req.json()) as ReportRequest;
+    const isCustomRange = !!(date_from && date_to);
 
     if (!client_id || !report_month || !report_year) {
       return new Response(JSON.stringify({ error: "Missing client_id, report_month, or report_year" }), {
@@ -1068,14 +1089,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if a report is already being generated for this client/month/year
-    const { data: existingRunning } = await supabase.from("reports")
+    // Check if a report is already being generated for this client/period
+    let existingRunningQuery = supabase.from("reports")
       .select("id, status")
       .eq("client_id", client_id)
-      .eq("report_month", report_month)
-      .eq("report_year", report_year)
-      .eq("status", "running")
-      .maybeSingle();
+      .eq("status", "running");
+
+    if (isCustomRange) {
+      existingRunningQuery = existingRunningQuery.eq("date_from", date_from).eq("date_to", date_to);
+    } else {
+      existingRunningQuery = existingRunningQuery.eq("report_month", report_month).eq("report_year", report_year);
+    }
+
+    const { data: existingRunning } = await existingRunningQuery.maybeSingle();
 
     if (existingRunning) {
       return new Response(JSON.stringify({ error: "Report is already being generated for this period" }), {
@@ -1083,13 +1109,64 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Compute month/year pairs for snapshot fetching ──
+    // For custom ranges, compute all months that overlap the range
+    // For monthly reports, just use the single month
+    interface MonthYear { month: number; year: number }
+    const currentMonths: MonthYear[] = [];
+    const prevMonths: MonthYear[] = [];
+
+    if (isCustomRange) {
+      const fromDate = new Date(date_from + "T00:00:00Z");
+      const toDate = new Date(date_to + "T00:00:00Z");
+      let m = fromDate.getMonth() + 1;
+      let yr = fromDate.getFullYear();
+      const endM = toDate.getMonth() + 1;
+      const endY = toDate.getFullYear();
+
+      while (yr < endY || (yr === endY && m <= endM)) {
+        currentMonths.push({ month: m, year: yr });
+        m++;
+        if (m > 12) { m = 1; yr++; }
+      }
+
+      // Previous period: same number of months immediately before
+      const periodLength = currentMonths.length;
+      const firstMonth = currentMonths[0];
+      let pm = firstMonth.month;
+      let py = firstMonth.year;
+      for (let i = 0; i < periodLength; i++) {
+        pm--;
+        if (pm < 1) { pm = 12; py--; }
+        prevMonths.unshift({ month: pm, year: py });
+      }
+    } else {
+      currentMonths.push({ month: report_month, year: report_year });
+      const pm = report_month === 1 ? 12 : report_month - 1;
+      const py = report_month === 1 ? report_year - 1 : report_year;
+      prevMonths.push({ month: pm, year: py });
+    }
+
+    // Build snapshot queries using OR filters for multi-month
+    const buildSnapshotQuery = (months: MonthYear[]) => {
+      if (months.length === 1) {
+        return supabase.from("monthly_snapshots").select("*")
+          .eq("client_id", client_id)
+          .eq("report_month", months[0].month)
+          .eq("report_year", months[0].year);
+      }
+      // For multiple months, use .or() filter
+      const orClauses = months.map(m => `and(report_month.eq.${m.month},report_year.eq.${m.year})`).join(",");
+      return supabase.from("monthly_snapshots").select("*")
+        .eq("client_id", client_id)
+        .or(orClauses);
+    };
+
     const [clientRes, snapshotsRes, configRes, prevSnapshotsRes, metricDefaultsRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", client_id).single(),
-      supabase.from("monthly_snapshots").select("*").eq("client_id", client_id).eq("report_month", report_month).eq("report_year", report_year),
+      buildSnapshotQuery(currentMonths),
       supabase.from("client_platform_config").select("*").eq("client_id", client_id).eq("is_enabled", true),
-      supabase.from("monthly_snapshots").select("*").eq("client_id", client_id)
-        .eq("report_month", report_month === 1 ? 12 : report_month - 1)
-        .eq("report_year", report_month === 1 ? report_year - 1 : report_year),
+      buildSnapshotQuery(prevMonths),
       supabase.from("metric_defaults").select("*"),
     ]);
 
@@ -1107,20 +1184,52 @@ Deno.serve(async (req) => {
     }
 
     // Upsert report record with "running" status immediately
-    const { data: runningReport } = await supabase.from("reports")
-      .upsert({
-        client_id,
-        report_month,
-        report_year,
-        org_id: client.org_id,
-        status: "running" as const,
-        generated_at: null,
-        pdf_storage_path: null,
-      }, { onConflict: "client_id,report_month,report_year", ignoreDuplicates: false })
-      .select("id")
-      .single();
+    let earlyReportQuery;
+    if (isCustomRange) {
+      // For custom range, find existing by date range or insert new
+      const { data: existingReport } = await supabase.from("reports")
+        .select("id")
+        .eq("client_id", client_id)
+        .eq("date_from", date_from)
+        .eq("date_to", date_to)
+        .maybeSingle();
 
-    earlyReportId = runningReport?.id;
+      if (existingReport) {
+        earlyReportQuery = await supabase.from("reports")
+          .update({ status: "running" as const, generated_at: null, pdf_storage_path: null })
+          .eq("id", existingReport.id)
+          .select("id")
+          .single();
+      } else {
+        earlyReportQuery = await supabase.from("reports")
+          .insert({
+            client_id,
+            report_month,
+            report_year,
+            org_id: client.org_id,
+            status: "running" as const,
+            date_from,
+            date_to,
+          })
+          .select("id")
+          .single();
+      }
+    } else {
+      earlyReportQuery = await supabase.from("reports")
+        .upsert({
+          client_id,
+          report_month,
+          report_year,
+          org_id: client.org_id,
+          status: "running" as const,
+          generated_at: null,
+          pdf_storage_path: null,
+        }, { onConflict: "client_id,report_month,report_year", ignoreDuplicates: false })
+        .select("id")
+        .single();
+    }
+
+    earlyReportId = earlyReportQuery?.data?.id;
 
     const { data: org } = await supabase.from("organisations").select("*").eq("id", client.org_id).single();
     const orgName = org?.name ?? "Your Agency";
@@ -1187,9 +1296,86 @@ Deno.serve(async (req) => {
       textFaint: [180, 180, 180] as [number, number, number],
     };
 
-    const snapshots = snapshotsRes.data ?? [];
-    const prevSnapshots = prevSnapshotsRes.data ?? [];
+    const rawSnapshots = snapshotsRes.data ?? [];
+    const rawPrevSnapshots = prevSnapshotsRes.data ?? [];
     const configs = configRes.data ?? [];
+
+    // ── Aggregate multi-month snapshots per platform ──
+    const RATE_METRICS = new Set(["ctr", "engagement_rate", "conversion_rate", "audience_growth_rate", "search_ctr", "bounce_rate", "search_impression_share", "completion_rate", "cpc", "cpm", "cost_per_conversion", "cost_per_lead", "avg_session_duration", "pages_per_session", "avg_view_duration", "average_time_watched", "frequency", "gbp_average_rating", "search_position", "roas"]);
+    const CUMULATIVE_METRICS = new Set(["total_followers", "followers", "subscribers", "following", "total_pins", "total_boards", "total_video_count", "media_count"]);
+
+    const aggregateSnapshots = (snaps: typeof rawSnapshots): { platform: string; metrics_data: Record<string, number>; top_content: unknown[] }[] => {
+      const byPlatform = new Map<string, typeof rawSnapshots>();
+      for (const s of snaps) {
+        const p = s.platform as string;
+        if (!byPlatform.has(p)) byPlatform.set(p, []);
+        byPlatform.get(p)!.push(s);
+      }
+
+      const results: { platform: string; metrics_data: Record<string, number>; top_content: unknown[] }[] = [];
+      for (const [platform, platSnaps] of byPlatform) {
+        if (platSnaps.length === 1) {
+          results.push({
+            platform,
+            metrics_data: platSnaps[0].metrics_data as Record<string, number>,
+            top_content: Array.isArray(platSnaps[0].top_content) ? platSnaps[0].top_content : [],
+          });
+          continue;
+        }
+
+        // Sort by year/month ascending for cumulative logic (take latest)
+        platSnaps.sort((a, b) => a.report_year !== b.report_year ? a.report_year - b.report_year : a.report_month - b.report_month);
+
+        const aggregated: Record<string, number> = {};
+        const weightKeys: Record<string, number> = {}; // for weighted averages
+
+        for (const snap of platSnaps) {
+          const md = snap.metrics_data as Record<string, number>;
+          for (const [key, val] of Object.entries(md)) {
+            if (typeof val !== "number") continue;
+            if (CUMULATIVE_METRICS.has(key)) {
+              // Take latest value
+              aggregated[key] = val;
+            } else if (RATE_METRICS.has(key)) {
+              // Weighted average - weight by impressions or clicks
+              const weight = md.impressions ?? md.clicks ?? md.sessions ?? 1;
+              aggregated[key] = (aggregated[key] ?? 0) + val * weight;
+              weightKeys[key] = (weightKeys[key] ?? 0) + weight;
+            } else {
+              // Additive
+              aggregated[key] = (aggregated[key] ?? 0) + val;
+            }
+          }
+        }
+
+        // Finalize weighted averages
+        for (const key of Object.keys(weightKeys)) {
+          if (weightKeys[key] > 0) {
+            aggregated[key] = aggregated[key] / weightKeys[key];
+          }
+        }
+
+        // Merge top content from all months
+        const allTopContent: unknown[] = [];
+        for (const snap of platSnaps) {
+          if (Array.isArray(snap.top_content)) allTopContent.push(...snap.top_content);
+        }
+
+        results.push({ platform, metrics_data: aggregated, top_content: allTopContent });
+      }
+      return results;
+    };
+
+    const snapshots = isCustomRange ? aggregateSnapshots(rawSnapshots) : rawSnapshots.map(s => ({
+      platform: s.platform as string,
+      metrics_data: s.metrics_data as Record<string, number>,
+      top_content: Array.isArray(s.top_content) ? s.top_content : [],
+    }));
+    const prevSnapshots = isCustomRange ? aggregateSnapshots(rawPrevSnapshots) : rawPrevSnapshots.map(s => ({
+      platform: s.platform as string,
+      metrics_data: s.metrics_data as Record<string, number>,
+      top_content: Array.isArray(s.top_content) ? s.top_content : [],
+    }));
 
     const CURRENCY_SYMBOLS: Record<string, string> = {
       GBP: "\u00A3", EUR: "\u20AC", USD: "$", PLN: "zl", CAD: "C$", AUD: "A$", NZD: "NZ$",
@@ -1215,6 +1401,15 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Build period label for PDF
+    const periodLabel = isCustomRange
+      ? `${date_from} to ${date_to}`
+      : `${MONTH_NAMES[report_month]} ${report_year}`;
+
+    // Comparison labels — use "Previous Period" for custom range
+    const currentLabel = isCustomRange ? T.thisPeriod : T.thisMonth;
+    const previousLabel = isCustomRange ? T.previousPeriod : T.lastMonth;
+
     const { data: upsellData } = await supabase.from("report_upsells")
       .select("*").eq("client_id", client_id).eq("report_month", report_month)
       .eq("report_year", report_year).eq("is_active", true).limit(1).maybeSingle();
@@ -1225,7 +1420,7 @@ Deno.serve(async (req) => {
     for (const snapshot of snapshots) {
       const config = configs.find((c: Record<string, unknown>) => c.platform === snapshot.platform);
       const metrics = snapshot.metrics_data as Record<string, number>;
-      const prevSnapshot = prevSnapshots.find((s: Record<string, unknown>) => s.platform === snapshot.platform);
+      const prevSnapshot = prevSnapshots.find((s: { platform: string }) => s.platform === snapshot.platform);
       const prevMetrics = (prevSnapshot?.metrics_data ?? {}) as Record<string, number>;
       const hasPrevSnapshot = !!prevSnapshot;
       const topContent = Array.isArray(snapshot.top_content) ? snapshot.top_content : [];
@@ -1291,7 +1486,7 @@ Deno.serve(async (req) => {
 
     const executiveSummary = (() => {
       const lines: string[] = [];
-      lines.push(`This report covers ${client.company_name}'s marketing performance for ${MONTH_NAMES[report_month]} ${report_year}.`);
+      lines.push(`This report covers ${client.company_name}'s marketing performance for ${periodLabel}.`);
       if (keyWins.length > 0) {
         lines.push(`The highlight this month: ${keyWins[0]}.`);
       }
@@ -1406,7 +1601,7 @@ Deno.serve(async (req) => {
       }
 
       doc.setFontSize(6.5); setC(C.grey);
-      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year} | ${T.page} ${pageCount}`, W - M, 9, { align: "right" });
+      doc.text(`${client.company_name} — ${periodLabel} | ${T.page} ${pageCount}`, W - M, 9, { align: "right" });
 
       // Brand colour line under header
       setF(C.primary); doc.rect(0, 14, W, 0.5, 'F');
@@ -1491,7 +1686,7 @@ Deno.serve(async (req) => {
     // Month/year in lighter brand colour
     coverY += 6;
     doc.setFontSize(14); setC(lighten(C.primary, 0.4));
-    doc.text(`${MONTH_NAMES[report_month]} ${report_year}`, 14, coverY);
+    doc.text(periodLabel, 14, coverY);
     coverY += 12;
 
     // Prepared for
@@ -1554,16 +1749,24 @@ Deno.serve(async (req) => {
     let y = startNewPage(T.tableOfContents);
     y += 2;
 
-    const prevMonth = report_month === 1 ? 12 : report_month - 1;
-    const prevYear = report_month === 1 ? report_year - 1 : report_year;
-    const prevMonthName = MONTH_NAMES[prevMonth];
-    const daysInMonth = new Date(report_year, report_month, 0).getDate();
+    let prevPeriodLabel: string;
+    if (isCustomRange) {
+      prevPeriodLabel = T.previousPeriod;
+    } else {
+      const prevMonth = report_month === 1 ? 12 : report_month - 1;
+      const prevYear = report_month === 1 ? report_year - 1 : report_year;
+      prevPeriodLabel = `${MONTH_NAMES[prevMonth]} ${prevYear}`;
+    }
+
+    const reportCoversText = isCustomRange
+      ? `${T.reportCovers} ${date_from} to ${date_to}. ${T.allFigures} ${prevPeriodLabel} ${T.unlessStated}.`
+      : (() => {
+          const daysInMonth = new Date(report_year, report_month, 0).getDate();
+          return `${T.reportCovers} 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. ${T.allFigures} ${prevPeriodLabel} ${T.unlessStated}.`;
+        })();
 
     doc.setFontSize(9); setC(C.grey);
-    y = wrapText(
-      `${T.reportCovers} 1 ${MONTH_NAMES[report_month]} ${report_year} to ${daysInMonth} ${MONTH_NAMES[report_month]} ${report_year}. ${T.allFigures} ${prevMonthName} ${prevYear} ${T.unlessStated}.`,
-      M, y, CW, 5
-    );
+    y = wrapText(reportCoversText, M, y, CW, 5);
     y += 8;
 
     let tocIndex = 1;
@@ -1775,7 +1978,7 @@ Deno.serve(async (req) => {
           y = drawSectionLabel(T.monthOnMonth, y);
 
           const colWidths = [CW * 0.30, CW * 0.22, CW * 0.22, CW * 0.26];
-          const tableHeaders = ["Metric", T.thisMonth, T.lastMonth, T.change];
+          const tableHeaders = ["Metric", currentLabel, previousLabel, T.change];
 
           // Table header row — brand primary background
           setF(C.primary); doc.roundedRect(M, y - 3.5, CW, 8, 1, 1, "F");
@@ -2098,12 +2301,14 @@ Deno.serve(async (req) => {
     if (endFooterParts.length > 0) {
       doc.text(endFooterParts.join(" | "), W - 14, H - 12, { align: "right" });
     }
-    doc.text(`${orgName} | ${MONTH_NAMES[report_month]} ${report_year}`, W - 14, H - 7, { align: "right" });
+    doc.text(`${orgName} | ${periodLabel}`, W - 14, H - 7, { align: "right" });
 
     const pdfBuffer = doc.output("arraybuffer");
     const pdfUint8 = new Uint8Array(pdfBuffer);
 
-    const storagePath = `${client_id}/${report_year}-${String(report_month).padStart(2, "0")}.pdf`;
+    const storagePath = isCustomRange
+      ? `${client_id}/${date_from}_${date_to}.pdf`
+      : `${client_id}/${report_year}-${String(report_month).padStart(2, "0")}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from("reports")
       .upload(storagePath, pdfUint8, { contentType: "application/pdf", upsert: true });
@@ -2166,7 +2371,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true, pdf_path: storagePath,
-      message: `Report generated for ${client.company_name} - ${MONTH_NAMES[report_month]} ${report_year}`,
+      message: `Report generated for ${client.company_name} - ${periodLabel}`,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {

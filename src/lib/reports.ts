@@ -2,7 +2,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { sendBrandedEmail } from '@/lib/sendBrandedEmail';
 
-export const generateReport = async (clientId: string, month: number, year: number) => {
+interface GenerateReportOptions {
+  clientId: string;
+  month: number;
+  year: number;
+  dateFrom?: string; // ISO date e.g. "2026-01-01"
+  dateTo?: string;   // ISO date e.g. "2026-03-15"
+}
+
+export const generateReport = async (
+  clientId: string,
+  month: number,
+  year: number,
+  dateRange?: { dateFrom: string; dateTo: string }
+) => {
   // Insert a pending report record immediately so the UI can show it
   const { data: clientData } = await supabase
     .from('clients')
@@ -11,22 +24,65 @@ export const generateReport = async (clientId: string, month: number, year: numb
     .single();
 
   if (clientData?.org_id) {
-    await supabase.from('reports').upsert(
-      {
-        client_id: clientId,
-        report_month: month,
-        report_year: year,
-        org_id: clientData.org_id,
-        status: 'pending' as const,
-      },
-      { onConflict: 'client_id,report_month,report_year', ignoreDuplicates: false }
-    );
+    const reportRow: Record<string, unknown> = {
+      client_id: clientId,
+      report_month: month,
+      report_year: year,
+      org_id: clientData.org_id,
+      status: 'pending' as const,
+    };
+
+    if (dateRange) {
+      reportRow.date_from = dateRange.dateFrom;
+      reportRow.date_to = dateRange.dateTo;
+    }
+
+    // For custom range reports, we can't use the monthly unique constraint
+    if (dateRange) {
+      // Check if a report with this exact date range already exists
+      const { data: existing } = await supabase
+        .from('reports')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('date_from', dateRange.dateFrom)
+        .eq('date_to', dateRange.dateTo)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from('reports').update({ status: 'pending' as const }).eq('id', existing.id);
+      } else {
+        await supabase.from('reports').insert({
+          client_id: clientId,
+          report_month: month,
+          report_year: year,
+          org_id: clientData.org_id,
+          status: 'pending' as const,
+          date_from: dateRange.dateFrom,
+          date_to: dateRange.dateTo,
+        });
+      }
+    } else {
+      await supabase.from('reports').upsert(
+        reportRow as {
+          client_id: string;
+          report_month: number;
+          report_year: number;
+          org_id: string;
+          status: 'pending';
+        },
+        { onConflict: 'client_id,report_month,report_year', ignoreDuplicates: false }
+      );
+    }
   }
 
-  // Invoke the edge function (which will update status to running → success/failed)
-  const { data, error } = await supabase.functions.invoke('generate-report', {
-    body: { client_id: clientId, report_month: month, report_year: year },
-  });
+  // Invoke the edge function
+  const body: Record<string, unknown> = { client_id: clientId, report_month: month, report_year: year };
+  if (dateRange) {
+    body.date_from = dateRange.dateFrom;
+    body.date_to = dateRange.dateTo;
+  }
+
+  const { data, error } = await supabase.functions.invoke('generate-report', { body });
 
   if (error) {
     toast.error(`Report generation failed: ${error.message}`);
