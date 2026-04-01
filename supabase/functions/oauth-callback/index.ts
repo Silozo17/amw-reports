@@ -701,8 +701,8 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
-      access_token: accessToken,
-      refresh_token: tokenData.refresh_token || null,
+      access_token: await encryptToken(accessToken),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
