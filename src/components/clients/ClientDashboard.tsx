@@ -132,6 +132,7 @@ interface ClientDashboardProps {
   initialMonth?: number;
   initialYear?: number;
   showHealthScore?: boolean;
+  onPeriodChange?: (month: number, year: number) => void;
 }
 
 const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, showHealthScore = true }: ClientDashboardProps) => {
