@@ -253,11 +253,12 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     const sixMonthsAgo = new Date(year, month - 1); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const startMonth = sixMonthsAgo.getMonth() + 1; const startYr = sixMonthsAgo.getFullYear();
 
-    const [currentRes, prevRes, trendRes, connectionsRes, configRes] = await Promise.all([
+    const [currentRes, prevRes, prePrevRes, trendRes, connectionsRes, configRes] = await Promise.all([
       query,
       showComparison
         ? supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", clientId).eq("report_month", prevMonth).eq("report_year", prevYear)
         : Promise.resolve({ data: [], error: null }),
+      supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", clientId).eq("report_month", prePrevMonth).eq("report_year", prePrevYear),
       supabase.from("monthly_snapshots").select("platform, metrics_data, report_month, report_year").eq("client_id", clientId)
         .or(`report_year.gt.${startYr},and(report_year.eq.${startYr},report_month.gte.${startMonth})`)
         .order("report_year", { ascending: true }).order("report_month", { ascending: true }),
