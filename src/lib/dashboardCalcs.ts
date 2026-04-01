@@ -116,6 +116,7 @@ export function computeSparklines(
     existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
     existing.search_impressions = (existing.search_impressions || 0) + (s.metrics_data.search_impressions || 0);
     existing.search_clicks = (existing.search_clicks || 0) + (s.metrics_data.search_clicks || 0);
+    existing.posts_published = (existing.posts_published || 0) + (s.metrics_data.posts_published || 0);
     monthMap.set(key, existing);
   }
   const sortedFinal = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
