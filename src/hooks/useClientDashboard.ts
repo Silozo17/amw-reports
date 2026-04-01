@@ -407,7 +407,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     selectedPeriod, setSelectedPeriod,
     isLoading, isPortal, currSymbol,
     availablePlatforms, connections, platformConfigs,
-    snapshots, prevSnapshots, filtered, filteredPrev, trendData,
+    snapshots, prevSnapshots, prePrevSnapshots, filtered, filteredPrev, trendData,
     kpis, sparklineMap,
     spendByPlatform, totalSpend,
     engagementStackedData, impressionsByPlatform,
