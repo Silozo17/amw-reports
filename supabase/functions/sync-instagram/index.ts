@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { decryptToken } from "../_shared/tokenCrypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,7 +108,8 @@ Deno.serve(async (req) => {
     const globalMetricsMap: Record<string, number> = {};
 
     for (const ig of filteredAccounts) {
-      const { ig_id, page_token } = ig;
+      const { ig_id } = ig;
+      const page_token = await decryptToken(ig.page_token);
 
       // Fetch IG User Insights: reach (day period)
       try {

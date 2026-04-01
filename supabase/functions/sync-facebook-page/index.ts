@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { decryptToken } from "../_shared/tokenCrypto.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -243,7 +244,7 @@ Deno.serve(async (req) => {
     let timedOut = false;
 
     for (const page of pages) {
-      const pageToken = page.access_token;
+      const pageToken = page.access_token ? await decryptToken(page.access_token) : null;
       if (!pageToken) {
         console.error(`No Page Access Token for page ${page.id}.`);
         await supabaseClient.from("platform_connections")
