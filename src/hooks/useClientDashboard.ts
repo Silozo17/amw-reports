@@ -277,6 +277,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
     setAllPosts(collectPosts((currentRes.data ?? []) as SnapshotData[]));
     setSnapshots(currentSnapshots);
     setPrevSnapshots((prevRes.data ?? []) as SnapshotData[]);
+    setPrePrevSnapshots((prePrevRes.data ?? []) as SnapshotData[]);
     setTrendData((trendRes.data ?? []) as SnapshotData[]);
     const platforms = [...new Set((connectionsRes.data ?? []).map((c: ConnectionData) => c.platform as PlatformType))];
     setAvailablePlatforms(platforms);
