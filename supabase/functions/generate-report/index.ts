@@ -1601,7 +1601,7 @@ Deno.serve(async (req) => {
       }
 
       doc.setFontSize(6.5); setC(C.grey);
-      doc.text(`${client.company_name} — ${MONTH_NAMES[report_month]} ${report_year} | ${T.page} ${pageCount}`, W - M, 9, { align: "right" });
+      doc.text(`${client.company_name} — ${periodLabel} | ${T.page} ${pageCount}`, W - M, 9, { align: "right" });
 
       // Brand colour line under header
       setF(C.primary); doc.rect(0, 14, W, 0.5, 'F');
