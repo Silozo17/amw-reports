@@ -103,36 +103,28 @@ const AdminOrgMembers = ({ orgId, members, profileMap }: AdminOrgMembersProps) =
     if (!email) return;
     setIsAddingMember(true);
     try {
-      const { data: existingProfile } = await supabase.from('profiles').select('user_id').eq('email', email).maybeSingle();
-      if (existingProfile) {
-        const { error } = await supabase.from('org_members').insert({
-          org_id: orgId, user_id: existingProfile.user_id, role: addMemberRole, accepted_at: new Date().toISOString(),
-        });
-        if (error) throw error;
-        await supabase.from('profiles').update({ org_id: orgId }).eq('user_id', existingProfile.user_id);
-        toast.success('User linked to organisation');
+      const { data: result, error } = await supabase.functions.invoke('invite-org-member', {
+        body: {
+          org_id: orgId,
+          email,
+          role: addMemberRole,
+          inviter_name: 'An admin',
+          origin: window.location.origin,
+        },
+      });
+
+      if (error) {
+        toast.error('Failed to add member');
+        console.error('invite-org-member error:', error);
+      } else if (result?.error) {
+        toast.error(result.error);
       } else {
-        const { error } = await supabase.from('org_members').insert({
-          org_id: orgId, invited_email: email, role: addMemberRole, invited_at: new Date().toISOString(),
-        });
-        if (error) throw error;
-        sendBrandedEmail({
-          templateName: 'team_invitation',
-          recipientEmail: email,
-          orgId,
-          data: {
-            invited_email: email,
-            role: addMemberRole,
-            inviter_name: 'An admin',
-            invite_url: `${window.location.origin}/login?view=signup&invited_email=${encodeURIComponent(email)}`,
-          },
-        }).catch(err => console.error('Failed to send invite email:', err));
-        toast.success('Invite created — user will be linked on signup');
+        toast.success(result?.message ?? 'Member added');
+        queryClient.invalidateQueries({ queryKey: ['admin-org-members', orgId] });
+        setAddMemberEmail('');
+        setAddMemberRole('manager');
+        setShowAddMember(false);
       }
-      queryClient.invalidateQueries({ queryKey: ['admin-org-members', orgId] });
-      setAddMemberEmail('');
-      setAddMemberRole('manager');
-      setShowAddMember(false);
     } catch (err) {
       console.error(err);
       toast.error('Failed to add member');

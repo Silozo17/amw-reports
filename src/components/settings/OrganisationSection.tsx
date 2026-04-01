@@ -317,32 +317,31 @@ const InviteDialog = ({ orgId, onInvite }: { orgId: string; onInvite: () => void
     }
     setIsLoading(true);
 
-    const { error } = await supabase.from('org_members').insert({
-      org_id: orgId,
-      invited_email: email.trim().toLowerCase(),
-      role: inviteRole,
-      invited_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      toast.error(error.message.includes('unique') ? 'This email has already been invited' : 'Failed to send invite');
-    } else {
-      sendBrandedEmail({
-        templateName: 'team_invitation',
-        recipientEmail: email.trim().toLowerCase(),
-        orgId,
-        data: {
-          invited_email: email.trim().toLowerCase(),
+    try {
+      const { data: result, error } = await supabase.functions.invoke('invite-org-member', {
+        body: {
+          org_id: orgId,
+          email: email.trim().toLowerCase(),
           role: inviteRole,
           inviter_name: 'A team member',
-          invite_url: `${window.location.origin}/login?view=signup&invited_email=${encodeURIComponent(email.trim().toLowerCase())}`,
+          origin: window.location.origin,
         },
-      }).catch(err => console.error('Failed to send invite email:', err));
+      });
 
-      toast.success(`Invite sent to ${email}`);
-      setEmail('');
-      setOpen(false);
-      onInvite();
+      if (error) {
+        toast.error('Failed to send invite');
+        console.error('invite-org-member error:', error);
+      } else if (result?.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(result?.message ?? `Invite sent to ${email}`);
+        setEmail('');
+        setOpen(false);
+        onInvite();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to send invite');
     }
     setIsLoading(false);
   };
