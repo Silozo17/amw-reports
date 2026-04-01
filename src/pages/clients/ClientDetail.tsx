@@ -409,7 +409,7 @@ const ClientDetail = () => {
           </div>
 
           <TabsContent value="dashboard" className="mt-4">
-            <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} showHealthScore={client.show_health_score !== false} />
+            <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} showHealthScore={client.show_health_score !== false} onPeriodChange={handlePeriodChange} />
           </TabsContent>
 
           <TabsContent value="connections" className="mt-4">
