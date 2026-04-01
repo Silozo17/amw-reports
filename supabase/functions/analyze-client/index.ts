@@ -2,10 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-portal-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// In-memory rate limit: 60s cooldown per client_id
+// In-memory rate limit: 60s cooldown per actor
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 60_000;
 
@@ -19,61 +19,82 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // ── Auth verification ──
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (claimsError || !claimsData?.claims?.sub) {
+    // ── Resolve caller identity ──
+    let callerId: string | null = null;
+    let portalClientId: string | null = null;
+
+    const authHeader = req.headers.get("Authorization");
+    const portalToken = req.headers.get("x-portal-token");
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (!userError && userData?.user?.id) {
+        callerId = userData.user.id;
+      }
+    }
+
+    if (!callerId && portalToken) {
+      const { data: tokenData } = await supabase.rpc("validate_share_token", { _token: portalToken });
+      if (tokenData && tokenData.length > 0) {
+        portalClientId = tokenData[0].client_id;
+        callerId = `portal:${portalToken.slice(0, 16)}`;
+        await supabase.from("client_share_tokens").update({ last_accessed_at: new Date().toISOString() }).eq("token", portalToken);
+      }
+    }
+
+    if (!callerId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const callerId = claimsData.claims.sub;
 
     const { client_id, month, year } = await req.json();
 
     if (!client_id || !month || !year) {
       return new Response(JSON.stringify({ error: "Missing client_id, month, or year" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Verify caller belongs to the org that owns this client
+    // ── Access check ──
     const { data: clientOwner } = await supabase.from("clients").select("org_id").eq("id", client_id).single();
     if (!clientOwner) {
       return new Response(JSON.stringify({ error: "Client not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { data: membership } = await supabase.from("org_members").select("id").eq("user_id", callerId).eq("org_id", clientOwner.org_id).limit(1).single();
-    if (!membership) {
+
+    let hasAccess = false;
+
+    if (portalClientId) {
+      hasAccess = portalClientId === client_id;
+    } else {
+      const [memberRes, clientUserRes, adminRes] = await Promise.all([
+        supabase.from("org_members").select("id").eq("user_id", callerId).eq("org_id", clientOwner.org_id).limit(1).single(),
+        supabase.from("client_users").select("id").eq("user_id", callerId).eq("client_id", client_id).limit(1).single(),
+        supabase.from("platform_admins").select("id").eq("user_id", callerId).limit(1).single(),
+      ]);
+      hasAccess = !!(memberRes.data || clientUserRes.data || adminRes.data);
+    }
+
+    if (!hasAccess) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Server-side rate limit check
-    const lastCall = rateLimitMap.get(client_id);
+    // ── Rate limit (per actor) ──
+    const lastCall = rateLimitMap.get(callerId);
     const now = Date.now();
     if (lastCall && now - lastCall < RATE_LIMIT_MS) {
       const waitSec = Math.ceil((RATE_LIMIT_MS - (now - lastCall)) / 1000);
       return new Response(JSON.stringify({ error: `Rate limited. Please wait ${waitSec}s.` }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -81,8 +102,7 @@ Deno.serve(async (req) => {
 
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "AI not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -104,8 +124,7 @@ Deno.serve(async (req) => {
 
     if (!client) {
       return new Response(JSON.stringify({ error: "Client not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -239,20 +258,17 @@ Rules:
 
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       return new Response(JSON.stringify({ error: "AI analysis failed" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -263,15 +279,13 @@ Rules:
     let analysis: string;
     
     if (toolCall?.function?.arguments) {
-      // Structured output via tool calling
       analysis = toolCall.function.arguments;
     } else {
-      // Fallback to content
       analysis = aiResult.choices?.[0]?.message?.content ?? "Unable to generate analysis.";
     }
 
     // Record successful call for rate limiting
-    rateLimitMap.set(client_id, Date.now());
+    rateLimitMap.set(callerId, Date.now());
 
     return new Response(JSON.stringify({ analysis }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -279,8 +293,7 @@ Rules:
   } catch (e) {
     console.error("analyze-client error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

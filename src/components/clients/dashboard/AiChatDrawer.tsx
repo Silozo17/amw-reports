@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Send, Loader2, Sparkles, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -18,11 +19,12 @@ interface AiChatDrawerProps {
   clientName: string;
   month: number;
   year: number;
+  portalToken?: string;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-data`;
 
-const AiChatDrawer = ({ open, onOpenChange, clientId, clientName, month, year }: AiChatDrawerProps) => {
+const AiChatDrawer = ({ open, onOpenChange, clientId, clientName, month, year, portalToken }: AiChatDrawerProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -47,12 +49,21 @@ const AiChatDrawer = ({ open, onOpenChange, clientId, clientName, month, year }:
     let assistantSoFar = "";
 
     try {
+      // Build auth headers: prefer session JWT, fall back to portal token
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      } else if (portalToken) {
+        headers["x-portal-token"] = portalToken;
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers,
         body: JSON.stringify({
           client_id: clientId,
           month,
@@ -135,7 +146,7 @@ const AiChatDrawer = ({ open, onOpenChange, clientId, clientName, month, year }:
     } finally {
       setIsStreaming(false);
     }
-  }, [input, isStreaming, messages, clientId, month, year]);
+  }, [input, isStreaming, messages, clientId, month, year, portalToken]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

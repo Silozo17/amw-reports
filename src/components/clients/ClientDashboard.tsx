@@ -308,6 +308,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
         clientName={clientName}
         month={selectedPeriod.month}
         year={selectedPeriod.year}
+        portalToken={portalToken}
       />
 
       {/* Main Content */}

@@ -2,39 +2,70 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-portal-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+// In-memory rate limit: 30 requests per 60s window per actor
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 30;
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkRateLimit(actorId: string): { allowed: boolean; waitSec?: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(actorId);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(actorId, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+  if (entry.count >= RATE_LIMIT_MAX) {
+    const waitSec = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - entry.windowStart)) / 1000);
+    return { allowed: false, waitSec };
+  }
+  entry.count++;
+  return { allowed: true };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // ── Auth verification ──
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (claimsError || !claimsData?.claims?.sub) {
+    // ── Resolve caller identity ──
+    let callerId: string | null = null;
+    let portalClientId: string | null = null;
+
+    const authHeader = req.headers.get("Authorization");
+    const portalToken = req.headers.get("x-portal-token");
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (!userError && userData?.user?.id) {
+        callerId = userData.user.id;
+      }
+    }
+
+    if (!callerId && portalToken) {
+      const { data: tokenData } = await supabase.rpc("validate_share_token", { _token: portalToken });
+      if (tokenData && tokenData.length > 0) {
+        portalClientId = tokenData[0].client_id;
+        callerId = `portal:${portalToken.slice(0, 16)}`;
+        // Track usage
+        await supabase.from("client_share_tokens").update({ last_accessed_at: new Date().toISOString() }).eq("token", portalToken);
+      }
+    }
+
+    if (!callerId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const callerId = claimsData.claims.sub;
 
     const { client_id, month, year, messages } = await req.json();
 
@@ -44,17 +75,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify caller belongs to the org that owns this client
+    // ── Access check ──
     const { data: clientOwner } = await supabase.from("clients").select("org_id").eq("id", client_id).single();
     if (!clientOwner) {
       return new Response(JSON.stringify({ error: "Client not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { data: membership } = await supabase.from("org_members").select("id").eq("user_id", callerId).eq("org_id", clientOwner.org_id).limit(1).single();
-    if (!membership) {
+
+    let hasAccess = false;
+
+    if (portalClientId) {
+      // Portal user: only allow access to the client their token grants
+      hasAccess = portalClientId === client_id;
+    } else {
+      // Authenticated user: check org_members, client_users, or platform_admins
+      const [memberRes, clientUserRes, adminRes] = await Promise.all([
+        supabase.from("org_members").select("id").eq("user_id", callerId).eq("org_id", clientOwner.org_id).limit(1).single(),
+        supabase.from("client_users").select("id").eq("user_id", callerId).eq("client_id", client_id).limit(1).single(),
+        supabase.from("platform_admins").select("id").eq("user_id", callerId).limit(1).single(),
+      ]);
+      hasAccess = !!(memberRes.data || clientUserRes.data || adminRes.data);
+    }
+
+    if (!hasAccess) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Rate limit ──
+    const rl = checkRateLimit(callerId);
+    if (!rl.allowed) {
+      return new Response(JSON.stringify({ error: `Rate limited. Please wait ${rl.waitSec}s.` }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
