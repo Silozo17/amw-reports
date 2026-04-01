@@ -474,6 +474,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     metric: 'WSKAŹNIK',
     thisMonth: 'TEN MIESIĄC',
     lastMonth: 'POPRZEDNI MIESIĄC',
+    thisPeriod: 'TEN OKRES',
+    previousPeriod: 'POPRZEDNI OKRES',
     change: 'ZMIANA',
     monthlySummary: 'Podsumowanie miesięczne',
     platformStatus: 'Przegląd platform',
