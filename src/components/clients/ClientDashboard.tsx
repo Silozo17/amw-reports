@@ -139,12 +139,6 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
   const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear });
   const [chatOpen, setChatOpen] = useState(false);
 
-  // Notify parent when selected period changes
-  const { selectedPeriod } = dashboard;
-  React.useEffect(() => {
-    onPeriodChange?.(selectedPeriod.month, selectedPeriod.year);
-  }, [selectedPeriod.month, selectedPeriod.year, onPeriodChange]);
-
   const {
     selectedPlatform, setSelectedPlatform,
     selectedPeriod, setSelectedPeriod,
