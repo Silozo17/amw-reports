@@ -102,7 +102,7 @@ const HealthScore = ({ current, previous }: HealthScoreProps) => {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center mb-3 font-body">
               Marketing Health Score
             </p>
-            <CircularGauge score={result.overall} />
+            <CircularGauge score={result.overall} change={result.change} />
           </div>
           <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-3 gap-2">
             {result.subScores.map(sub => (
