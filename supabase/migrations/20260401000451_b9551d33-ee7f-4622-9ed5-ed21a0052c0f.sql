@@ -1,0 +1,1 @@
+ALTER TABLE public.client_share_tokens ADD COLUMN IF NOT EXISTS last_accessed_at timestamptz;
