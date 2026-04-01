@@ -1398,8 +1398,9 @@ Deno.serve(async (req) => {
 
     const detailLevel = (client.report_detail_level as string) ?? 'standard';
     const maxMetricCards = detailLevel === 'summary' ? 5 : detailLevel === 'detailed' ? 15 : 9;
-    const maxTopPosts = detailLevel === 'summary' ? 0 : detailLevel === 'detailed' ? 10 : 5;
+    const maxTopPosts = detailLevel === 'summary' ? 0 : detailLevel === 'detailed' ? 5 : 3;
     const showComparisonTable = detailLevel !== 'summary';
+    const maxTableRows = detailLevel === 'summary' ? 6 : 8;
 
     const reportLanguage = (client.report_language as string) ?? 'en';
     const T = TRANSLATIONS[reportLanguage] ?? TRANSLATIONS['en'];
