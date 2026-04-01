@@ -91,14 +91,16 @@ interface UseClientDashboardParams {
   clientId: string;
   currencyCode: string;
   portalToken?: string;
+  initialMonth?: number;
+  initialYear?: number;
 }
 
-export const useClientDashboard = ({ clientId, currencyCode, portalToken }: UseClientDashboardParams) => {
+export const useClientDashboard = ({ clientId, currencyCode, portalToken, initialMonth, initialYear }: UseClientDashboardParams) => {
   const isPortal = !!portalToken;
   const currSymbol = getCurrencySymbol(currencyCode);
   const now = new Date();
-  const defaultMonth = now.getMonth() + 1;
-  const defaultYear = now.getFullYear();
+  const defaultMonth = initialMonth ?? (now.getMonth() + 1);
+  const defaultYear = initialYear ?? now.getFullYear();
 
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformFilter>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod>({

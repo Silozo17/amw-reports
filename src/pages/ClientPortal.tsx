@@ -145,6 +145,8 @@ const ClientPortal = () => {
           clientName={client.company_name}
           currencyCode={client.preferred_currency}
           portalToken={token}
+          initialMonth={initialMonth}
+          initialYear={initialYear}
         />
       </main>
 

@@ -129,10 +129,12 @@ interface ClientDashboardProps {
   clientName: string;
   currencyCode?: string;
   portalToken?: string;
+  initialMonth?: number;
+  initialYear?: number;
 }
 
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken }: ClientDashboardProps) => {
-  const dashboard = useClientDashboard({ clientId, currencyCode, portalToken });
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear }: ClientDashboardProps) => {
+  const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear });
   const [chatOpen, setChatOpen] = useState(false);
 
   const {
