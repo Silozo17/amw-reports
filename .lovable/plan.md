@@ -1,31 +1,47 @@
 
 
-# Fix Voice Briefing Access
+# Rolling Period Links for Portal Share URLs
 
-## Root Cause
+## What This Does
+Adds DashThis-style `?period=N` query parameter support to portal share links, where:
+- `period=0` = current month
+- `period=1` = last month
+- `period=2` = two months ago
+- etc.
 
-**Bug 1 — Wrong token (frontend):** `VoiceBriefing.tsx` sends the Supabase anon key as the Authorization header instead of the user's session JWT. The edge function then calls `getClaims()` on the anon key, which has no `sub` claim → 401 for everyone, or gets a nonsensical caller ID.
+These links are **rolling** — they always resolve relative to the current date, so `?period=1` always shows "last month" regardless of when the link was shared.
 
-**Bug 2 — Incomplete access check (edge function):** Even if the token were correct, the function only checks `org_members`. Client portal users (in `client_users` table) and platform admins are denied.
+## Why It Matters
+Agencies can create bookmarkable/emailable links that always show a specific relative month — e.g. a monthly email can always include `?period=1` to show last month's results without updating the URL each time.
 
 ## Changes
 
-### 1. `src/components/clients/dashboard/VoiceBriefing.tsx`
-- Import `supabase` client and get the user's session token via `supabase.auth.getSession()`
-- Send `session.access_token` as the Authorization Bearer token instead of the anon key
+### 1. `src/pages/ClientPortal.tsx`
+- Read `?period=N` from URL search params using `useSearchParams`
+- Calculate the target month/year by subtracting N months from the current date
+- Pass the resolved `initialMonth` and `initialYear` as new props to `ClientDashboard`
 
-### 2. `supabase/functions/voice-briefing/index.ts`
-- Replace the `getClaims` approach with `supabase.auth.getUser(token)` which reliably extracts the user from a JWT
-- Replace the single `org_members` check with a three-way access check:
-  1. `org_members` — org owners/managers
-  2. `client_users` — client portal users for this specific client
-  3. `platform_admins` — platform admins (full access)
-- If none match → 403
+### 2. `src/components/clients/ClientDashboard.tsx`
+- Accept optional `initialMonth` / `initialYear` props
+- Pass them through to `useClientDashboard`
+
+### 3. `src/hooks/useClientDashboard.ts`
+- Accept optional `initialMonth` / `initialYear` in params
+- Use them (if provided) instead of `defaultMonth` / `defaultYear` for the initial `selectedPeriod` state
+
+### 4. `supabase/functions/portal-data/index.ts`
+No changes needed — it already accepts `month` and `year` in the request body, and the frontend already sends `selectedPeriod.month` / `selectedPeriod.year`.
+
+## Example URLs
+- `https://reports.amwmedia.co.uk/portal/client-name-1234?period=0` → current month
+- `https://reports.amwmedia.co.uk/portal/client-name-1234?period=1` → last month
+- `https://reports.amwmedia.co.uk/portal/client-name-1234` → current month (default, unchanged)
 
 ## Files Changed
 
 | File | Change |
 |---|---|
-| `src/components/clients/dashboard/VoiceBriefing.tsx` | Use session JWT instead of anon key |
-| `supabase/functions/voice-briefing/index.ts` | Use `getUser()`, add client_users + platform_admins access checks |
+| `src/pages/ClientPortal.tsx` | Parse `?period=N`, compute month/year, pass to dashboard |
+| `src/components/clients/ClientDashboard.tsx` | Accept & forward `initialMonth`/`initialYear` props |
+| `src/hooks/useClientDashboard.ts` | Use initial month/year when provided |
 
