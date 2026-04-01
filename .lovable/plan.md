@@ -1,89 +1,66 @@
 
+Fix only the org invite flow first.
 
-# Fix Org Invitations for New Users + Fix Shared Link Period (3rd attempt)
+What I found:
+- The current source already adds `invite_url` in both invite entry points:
+  - `src/components/settings/OrganisationSection.tsx`
+  - `src/components/admin/AdminOrgMembers.tsx`
+- The email template in `supabase/functions/send-branded-email/index.ts` renders the CTA from `data.invite_url`.
+- Your screenshot shows Apple Mail trying to open `x-webdoc://...#`, which is what happens when the email button link is effectively `href="#"`.
+- So the real problem is not just “add invite_url in the UI” anymore. The system is still allowing a `team_invitation` email to be sent without a valid URL, and then silently falls back to `#`.
 
-## Bug 1: Org Invite Link Broken for New Users
+Plan:
+1. Harden the email sender so broken invites cannot be sent
+- Update `supabase/functions/send-branded-email/index.ts`
+- For `team_invitation`, require a real absolute `invite_url`
+- Remove the `"#"` fallback for the Accept Invitation button
+- If `invite_url` is missing/invalid, return an error instead of sending a dead email
 
-**Root cause:** The `InviteDialog` in `OrganisationSection.tsx` sends a `team_invitation` email but does NOT pass `invite_url` in the email data. The email template falls back to `#` for the button link — so the recipient has nowhere to click.
+2. Centralise invite creation + invite email sending in one backend function
+- Add a dedicated backend function for org invites
+- This function will:
+  - validate the caller can invite members
+  - create/update the pending `org_members` row
+  - generate the final invite URL in one place
+  - send the `team_invitation` email
+  - fail atomically if the email payload is invalid
+- This avoids relying on browser-side invite assembly in multiple places
 
-The `handle_new_user` database trigger already auto-links invited users on signup (it runs `UPDATE org_members SET user_id = NEW.id WHERE invited_email = NEW.email`). So the backend is fine — the problem is purely that the invite email has no working link.
+3. Update both invite UIs to use the same backend invite flow
+- `src/components/settings/OrganisationSection.tsx`
+- `src/components/admin/AdminOrgMembers.tsx`
+- Replace the current “insert row + send email from browser” pattern with one shared backend call
+- Only show success if the invite row and email both succeed
+- Show a visible error if invite sending fails, instead of silently creating a broken invite
 
-Additionally, invited users who sign up should skip onboarding and go straight to the dashboard.
+4. Keep the current invited-signup behavior
+- Preserve the existing invited signup flow in `src/pages/LandingPage.tsx`
+- Keep:
+  - prefilled `invited_email`
+  - signup for new users
+  - redirect to dashboard after verification
+  - automatic org linking via `handle_new_user`
 
-### Changes
+Files involved:
+- `supabase/functions/send-branded-email/index.ts`
+- new backend invite function under `supabase/functions/...`
+- `src/components/settings/OrganisationSection.tsx`
+- `src/components/admin/AdminOrgMembers.tsx`
+- possibly `src/lib/sendBrandedEmail.ts` only if shared validation/types are needed
 
-**`src/components/settings/OrganisationSection.tsx`** — Pass `invite_url` in email data:
-```ts
-sendBrandedEmail({
-  templateName: 'team_invitation',
-  recipientEmail: email.trim().toLowerCase(),
-  orgId,
-  data: {
-    invited_email: email.trim().toLowerCase(),
-    role: inviteRole,
-    inviter_name: profile?.full_name ?? 'A team member',
-    invite_url: `${window.location.origin}/login?view=signup&invited_email=${encodeURIComponent(email.trim().toLowerCase())}`,
-  },
-});
-```
+Why this approach:
+- It fixes the actual failure mode shown in the screenshot
+- It keeps your current setup intact
+- It prevents future dead-link invites instead of masking them
+- It removes duplicate invite logic from two separate UI surfaces
 
-**`src/pages/LandingPage.tsx`** — Pre-fill email from `invited_email` query param:
-- Read `invited_email` from URL search params on mount
-- If present, pre-fill the signup email field and switch to signup view
-- Store a flag (`isInvitedSignup`) so we know to skip onboarding
-
-**`src/pages/LandingPage.tsx`** — After OTP verification, redirect invited users to `/dashboard` instead of `/onboarding`:
-```ts
-// In handleVerifyOtp:
-if (isInvitedSignup) {
-  navigate('/dashboard');
-} else {
-  navigate('/onboarding');
-}
-```
-
-**`src/components/admin/AdminOrgMembers.tsx`** — Same fix for the admin invite flow (no invite_url currently passed either).
-
----
-
-## Bug 2: Shared Portal Links Still Ignore `?period=`
-
-**Root cause analysis:** The previous fix added an early return in `autoDetectPeriod` and correct `hasAutoDetected` initialization. The logic *should* work, but it hasn't. After extensive code tracing, the most likely cause is a stale closure: `autoDetectPeriod` is a plain function (not memoized) that captures `initialMonth`/`initialYear` from the current render, but `fetchSnapshots` is a `useCallback` that may capture a stale version of `autoDetectPeriod` where those values are undefined during an intermediate render.
-
-### Fix: Make it bulletproof with a ref
-
-**`src/hooks/useClientDashboard.ts`** — Three changes:
-
-1. **Store initial period in a ref** so it can never be lost:
-```ts
-const initialPeriodRef = useRef({ month: initialMonth, year: initialYear });
-```
-
-2. **Guard autoDetectPeriod using the ref** instead of closure variables:
-```ts
-const autoDetectPeriod = (currentSnapshots, allTrendData) => {
-  if (initialPeriodRef.current.month && initialPeriodRef.current.year) return;
-  // ... rest unchanged
-};
-```
-
-3. **Remove `hasAutoDetected` from `fetchSnapshots` dependencies.** It's only used inside `autoDetectPeriod` and doesn't affect what data is fetched — only whether auto-detect runs. This prevents unnecessary re-fetches:
-```ts
-const fetchSnapshots = useCallback(async () => {
-  // ...
-}, [clientId, selectedPeriod, isPortal, portalToken]); // removed hasAutoDetected
-```
-
-4. **Move autoDetect out of fetchSnapshots** into a separate effect that runs after data is set, preventing stale closures entirely.
-
----
-
-## Files to edit
-
-| File | Change |
-|---|---|
-| `src/components/settings/OrganisationSection.tsx` | Pass `invite_url` and `inviter_name` in email data |
-| `src/pages/LandingPage.tsx` | Read `invited_email` param, pre-fill signup, skip onboarding for invited users |
-| `src/components/admin/AdminOrgMembers.tsx` | Pass `invite_url` in admin invite email data |
-| `src/hooks/useClientDashboard.ts` | Use ref for initial period, decouple autoDetect from fetchSnapshots |
-
+QA after implementation:
+- Re-send invite to `marine@amwmedia.co.uk`
+- Confirm the email button opens a normal `https://.../login?view=signup&invited_email=...` URL, not `x-webdoc://...#`
+- Test a brand-new invited user:
+  - click invite
+  - create account
+  - verify email
+  - land on dashboard
+  - confirm they are joined to the org
+- Test inviting from both team settings and admin org members, since both currently send invites
