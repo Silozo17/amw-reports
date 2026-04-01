@@ -1232,6 +1232,16 @@ Deno.serve(async (req) => {
     earlyReportId = earlyReportQuery?.data?.id;
 
     const { data: org } = await supabase.from("organisations").select("*").eq("id", client.org_id).single();
+
+    // Fetch share token and custom domain for dashboard links in the PDF
+    const [shareTokenRes, customDomainRes] = await Promise.all([
+      supabase.from("client_share_tokens").select("token").eq("client_id", client_id).eq("is_active", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("custom_domains").select("domain").eq("org_id", client.org_id).eq("is_active", true).not("verified_at", "is", null).limit(1).maybeSingle(),
+    ]);
+    const shareToken = (shareTokenRes.data as { token: string } | null)?.token ?? null;
+    const portalDomain = (customDomainRes.data as { domain: string } | null)?.domain ?? "amw-reports.lovable.app";
+    const dashboardUrl: string | null = shareToken ? `https://${portalDomain}/portal/${shareToken}` : null;
+
     const orgName = org?.name ?? "Your Agency";
     const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
     const showLogo = reportSettings.show_logo !== false;
@@ -1388,8 +1398,9 @@ Deno.serve(async (req) => {
 
     const detailLevel = (client.report_detail_level as string) ?? 'standard';
     const maxMetricCards = detailLevel === 'summary' ? 5 : detailLevel === 'detailed' ? 15 : 9;
-    const maxTopPosts = detailLevel === 'summary' ? 0 : detailLevel === 'detailed' ? 10 : 5;
+    const maxTopPosts = detailLevel === 'summary' ? 0 : detailLevel === 'detailed' ? 5 : 3;
     const showComparisonTable = detailLevel !== 'summary';
+    const maxTableRows = detailLevel === 'summary' ? 6 : 8;
 
     const reportLanguage = (client.report_language as string) ?? 'en';
     const T = TRANSLATIONS[reportLanguage] ?? TRANSLATIONS['en'];
@@ -1473,12 +1484,16 @@ Deno.serve(async (req) => {
 
     const platformSummaries: Record<string, string> = {};
     for (const section of platformSections) {
-      platformSummaries[section.platform] = generatePlatformSummary(
+      let summary = generatePlatformSummary(
         section.platform,
         section.metrics,
         section.hasPrevSnapshot ? section.prevMetrics : null,
         currSymbol
       );
+      if (dashboardUrl) {
+        summary += " See your full dashboard for detailed breakdowns and trends.";
+      }
+      platformSummaries[section.platform] = summary;
     }
 
     const keyWins = getKeyWins(platformSections, currSymbol);
@@ -1486,19 +1501,21 @@ Deno.serve(async (req) => {
 
     const executiveSummary = (() => {
       const lines: string[] = [];
-      lines.push(`This report covers ${client.company_name}'s marketing performance for ${periodLabel}.`);
+      lines.push(`This report highlights ${client.company_name}'s key metrics for ${periodLabel}.`);
+      if (dashboardUrl) {
+        lines.push(`For real-time data, drill-downs, and historical trends, visit your dashboard.`);
+      }
       if (keyWins.length > 0) {
-        lines.push(`The highlight this month: ${keyWins[0]}.`);
+        lines.push(`The highlight: ${keyWins[0]}.`);
       }
       const strongPlatforms = platformSections.filter(s => getPlatformStatus(s.platform, s.metrics, s.hasPrevSnapshot ? s.prevMetrics : null) === "Strong");
       if (strongPlatforms.length > 0) {
         const names = strongPlatforms.map(s => s.label).join(", ");
-        lines.push(`${names} ${strongPlatforms.length === 1 ? "is" : "are"} performing strongly this month.`);
+        lines.push(`${names} ${strongPlatforms.length === 1 ? "is" : "are"} performing strongly.`);
       }
       if (worthWatching.length > 0) {
         lines.push(`There are some areas worth monitoring — see the details below.`);
       }
-      lines.push(`We look forward to building on these results next month.`);
       return lines.join(" ");
     })();
 
@@ -1837,6 +1854,21 @@ Deno.serve(async (req) => {
       y += 18;
     }
 
+    // "View Your Full Dashboard" button on TOC / executive summary page
+    if (dashboardUrl) {
+      y += 4;
+      if (y + 18 > H - 16) { y = startNewPage(T.tableOfContents); }
+      const btnW = 72;
+      const btnH = 12;
+      const btnX = (W - btnW) / 2;
+      setF(C.primary); doc.roundedRect(btnX, y, btnW, btnH, 3, 3, "F");
+      doc.setFontSize(9); setC(C.white); doc.setFont("helvetica", "bold");
+      doc.text("View Your Full Dashboard", W / 2, y + 7.5, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.link(btnX, y, btnW, btnH, { url: dashboardUrl });
+      y += btnH + 6;
+    }
+
     for (const section of platformSections) {
       const isOnePage = ONE_PAGE_PLATFORMS.has(section.platform);
       let platformPageCount = 0;
@@ -1990,7 +2022,7 @@ Deno.serve(async (req) => {
           }
           y += 8;
 
-          const maxRows = isOnePage ? 8 : 15;
+          const maxRows = maxTableRows;
           let rowIdx = 0;
           for (const key of gridMetrics) {
             if (rowIdx >= maxRows) break;
@@ -2100,6 +2132,18 @@ Deno.serve(async (req) => {
             y += 14;
           }
           y += 2;
+        }
+      }
+
+      // "View detailed metrics in your dashboard" link at bottom of platform section
+      if (dashboardUrl && platformPageCount <= maxPlatformPages) {
+        if (y + 10 <= H - 16) {
+          const linkText = "View detailed metrics in your dashboard ->";
+          doc.setFontSize(7.5); setC(C.primary);
+          doc.text(linkText, M, y + 2);
+          const linkW = doc.getTextWidth(linkText);
+          doc.link(M, y - 1, linkW, 6, { url: dashboardUrl });
+          y += 8;
         }
       }
     }
@@ -2281,7 +2325,14 @@ Deno.serve(async (req) => {
     // Body text
     setC(C.textFaint);
     doc.setFontSize(8.5);
-    const endText = T.closingLine;
+    const contactParts: string[] = [];
+    if (orgEmail) contactParts.push(`email ${orgEmail}`);
+    if (orgPhone) contactParts.push(`call ${orgPhone}`);
+    const contactLine = contactParts.length > 0
+      ? ` Questions about this report? ${contactParts.join(" or ")}.`
+      : "";
+    const dashboardLine = dashboardUrl ? " Visit your dashboard anytime for the full picture." : "";
+    const endText = `This report gives you a quick snapshot of your marketing performance.${contactLine}${dashboardLine}`;
     const endLines = doc.splitTextToSize(endText, 110);
     doc.text(endLines, 14, 85);
 
