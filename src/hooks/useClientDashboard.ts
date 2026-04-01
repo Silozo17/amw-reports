@@ -110,6 +110,7 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
   const [hasAutoDetected, setHasAutoDetected] = useState(!!(initialMonth && initialYear));
   const [snapshots, setSnapshots] = useState<SnapshotData[]>([]);
   const [prevSnapshots, setPrevSnapshots] = useState<SnapshotData[]>([]);
+  const [prePrevSnapshots, setPrePrevSnapshots] = useState<SnapshotData[]>([]);
   const [trendData, setTrendData] = useState<SnapshotData[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<PlatformType[]>([]);
   const [connections, setConnections] = useState<ConnectionData[]>([]);
