@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const appId = "1556588";
+    const appId = Deno.env.get("PINTEREST_APP_ID")!;
     const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
     const state = btoa(
