@@ -1014,7 +1014,7 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
 
 // ── Pinterest ──
 async function handlePinterest(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
-  const appId = "1556588";
+  const appId = Deno.env.get("PINTEREST_APP_ID")!;
   const appSecret = Deno.env.get("PINTEREST_APP_SECRET")!;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
   const basicAuth = btoa(`${appId}:${appSecret}`);
