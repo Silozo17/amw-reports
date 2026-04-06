@@ -150,8 +150,8 @@ Deno.serve(async (req) => {
     const analyticsUrl = new URL("https://api.pinterest.com/v5/user_account/analytics");
     analyticsUrl.searchParams.set("start_date", startDate);
     analyticsUrl.searchParams.set("end_date", endDate);
-    analyticsUrl.searchParams.set("metric_types", "ORGANIC");
-    analyticsUrl.searchParams.set("columns", "IMPRESSION,SAVE,PIN_CLICK,OUTBOUND_CLICK,ENGAGEMENT,ENGAGEMENT_RATE");
+    analyticsUrl.searchParams.set("content_type", "ORGANIC");
+    analyticsUrl.searchParams.set("metric_types", "ENGAGEMENT,ENGAGEMENT_RATE,IMPRESSION,OUTBOUND_CLICK,PIN_CLICK,SAVE");
 
     let impressions = 0;
     let saves = 0;
