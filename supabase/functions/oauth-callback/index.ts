@@ -721,6 +721,80 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
 }
 
+// ── LinkedIn Ads ──
+async function handleLinkedInAds(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const clientId = Deno.env.get("LINKEDIN_ADS_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("LINKEDIN_ADS_CLIENT_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) {
+    throw new Error(tokenData.error_description || tokenData.error);
+  }
+
+  const accessToken = tokenData.access_token;
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
+
+  // Discover ad accounts the user has access to
+  const adAccounts: Array<{ id: string; name: string }> = [];
+  try {
+    const adAccountsRes = await fetch(
+      "https://api.linkedin.com/rest/adAccounts?q=search&search=(status:(values:List(ACTIVE,DRAFT)))&count=100",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "LinkedIn-Version": "202601",
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+      }
+    );
+    const adAccountsData = await adAccountsRes.json();
+    console.log("LinkedIn Ads accounts discovery:", JSON.stringify(adAccountsData));
+
+    if (adAccountsData.elements?.length > 0) {
+      for (const el of adAccountsData.elements) {
+        adAccounts.push({
+          id: String(el.id),
+          name: el.name || `Ad Account ${el.id}`,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Could not discover LinkedIn ad accounts:", e);
+  }
+
+  // Auto-select if exactly one ad account
+  const autoSelect = adAccounts.length === 1;
+
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: await encryptToken(accessToken),
+      refresh_token: tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_name: autoSelect ? adAccounts[0].name : null,
+      account_id: autoSelect ? adAccounts[0].id : null,
+      metadata: { ad_accounts: adAccounts, token_type: "bearer" },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
 // ── Google Search Console ──
 async function handleGoogleSearchConsole(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
