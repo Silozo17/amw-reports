@@ -25,6 +25,11 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
 const DELAY_BETWEEN_SYNCS_MS = 1_500;
 const DEFAULT_MONTHS = 12;
 
+/** Platform-specific caps — Pinterest API limits analytics to 90 days. */
+const PLATFORM_MAX_MONTHS: Record<string, number> = {
+  pinterest: 3,
+};
+
 interface BackfillResult {
   month: number;
   year: number;
@@ -94,8 +99,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Cap months to platform-specific limit
+    const cappedMonths = Math.min(months, PLATFORM_MAX_MONTHS[conn.platform] ?? months);
+
     // Get months range and check which already have snapshots
-    const monthsRange = getMonthsRange(months, start_offset);
+    const monthsRange = getMonthsRange(cappedMonths, start_offset);
 
     const { data: existingSnapshots } = await supabase
       .from("monthly_snapshots")

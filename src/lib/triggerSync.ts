@@ -5,6 +5,11 @@ import { SYNC_FUNCTION_MAP } from '@/lib/platformRouting';
 // Re-export for backward compatibility
 export { SYNC_FUNCTION_MAP };
 
+/** Platform-specific caps on how many months of history can be synced. */
+const PLATFORM_MAX_MONTHS: Partial<Record<PlatformType, number>> = {
+  pinterest: 3, // Pinterest API limits analytics to 90 days
+};
+
 interface SyncResult {
   month: number;
   year: number;
@@ -63,18 +68,19 @@ export async function triggerInitialSync(
 ): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
   const now = new Date();
+  const effectiveMonths = Math.min(months, PLATFORM_MAX_MONTHS[platform] ?? months);
 
-  for (let i = 0; i < months; i++) {
+  for (let i = 0; i < effectiveMonths; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const month = d.getMonth() + 1;
     const year = d.getFullYear();
 
-    onProgress?.({ platform, completed: i, total: months, currentMonth: month, currentYear: year });
+    onProgress?.({ platform, completed: i, total: effectiveMonths, currentMonth: month, currentYear: year });
 
     const result = await triggerSync(connectionId, platform, month, year);
     results.push(result);
 
-    onProgress?.({ platform, completed: i + 1, total: months, currentMonth: month, currentYear: year });
+    onProgress?.({ platform, completed: i + 1, total: effectiveMonths, currentMonth: month, currentYear: year });
   }
 
   return results;
