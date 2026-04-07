@@ -100,9 +100,10 @@ const ClientDetail = () => {
 
             // Auto-trigger 12-month sync for platforms that auto-select (e.g. TikTok organic)
             if (conn.account_id && conn.is_connected) {
+              const months = await getSyncMonths();
               setSyncStartTime(Date.now());
-              setActiveSyncs(new Map([[conn.platform, { platform: conn.platform, completed: 0, total: syncMonths, currentMonth: 0, currentYear: 0 }]]));
-              triggerInitialSync(conn.id, conn.platform, syncMonths, (progress) => {
+              setActiveSyncs(new Map([[conn.platform, { platform: conn.platform, completed: 0, total: months, currentMonth: 0, currentYear: 0 }]]));
+              triggerInitialSync(conn.id, conn.platform, months, (progress) => {
                 setActiveSyncs(prev => new Map(prev).set(conn.platform, progress));
               }).then(() => {
                 fetchData();
