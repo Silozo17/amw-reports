@@ -14,6 +14,7 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
   tiktok: "sync-tiktok-business",
   tiktok_ads: "sync-tiktok-ads",
   linkedin: "sync-linkedin",
+  linkedin_ads: "sync-linkedin-ads",
   google_search_console: "sync-google-search-console",
   google_analytics: "sync-google-analytics",
   google_business_profile: "sync-google-business-profile",
