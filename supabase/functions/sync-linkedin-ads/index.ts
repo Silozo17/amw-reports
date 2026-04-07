@@ -15,6 +15,32 @@ const LI_HEADERS = (token: string) => ({
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
+const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValue,videoViews,leads,landingPageClicks,shares,likes";
+const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValue,shares,likes";
+
+function buildAnalyticsUrl(
+  pivot: string,
+  adAccountId: string,
+  month: number,
+  year: number,
+  lastDay: number,
+  fields: string,
+): string {
+  const params = new URLSearchParams();
+  params.set("q", "analytics");
+  params.set("pivot", pivot);
+  params.set("dateRange.start.day", "1");
+  params.set("dateRange.start.month", String(month));
+  params.set("dateRange.start.year", String(year));
+  params.set("dateRange.end.day", String(lastDay));
+  params.set("dateRange.end.month", String(month));
+  params.set("dateRange.end.year", String(year));
+  params.set("timeGranularity", "MONTHLY");
+
+  const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${adAccountId}`);
+  return `https://api.linkedin.com/rest/adAnalytics?${params.toString()}&accounts=List(${accountUrn})&fields=${fields}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,7 +79,6 @@ Deno.serve(async (req) => {
 
     clientId = conn.client_id;
 
-    // Decrypt tokens
     if (conn.access_token) conn.access_token = await decryptToken(conn.access_token);
     if (conn.refresh_token) conn.refresh_token = await decryptToken(conn.refresh_token);
 
@@ -61,11 +86,9 @@ Deno.serve(async (req) => {
       throw new Error("Connection is not authenticated. Please connect via OAuth first.");
     }
 
-    // Get org_id from client
     const { data: clientData } = await supabase.from("clients").select("org_id").eq("id", clientId).single();
     const orgId = clientData?.org_id;
 
-    // Verify requesting user belongs to the client's org
     const authHeader = req.headers.get("Authorization");
     if (authHeader && orgId) {
       const token = authHeader.replace("Bearer ", "");
@@ -120,34 +143,18 @@ Deno.serve(async (req) => {
       console.log("LinkedIn Ads token refreshed successfully.");
     }
 
-    // The selected ad account ID (e.g. "123456789")
     const adAccountId = conn.account_id;
     if (!adAccountId) {
       throw new Error("No ad account selected. Please select an ad account first.");
     }
 
-    // Build date range for the target month
-    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
     // ── Fetch Ad Analytics (account-level aggregated) ──
-    const analyticsUrl = new URL("https://api.linkedin.com/rest/adAnalytics");
-    analyticsUrl.searchParams.set("q", "analytics");
-    analyticsUrl.searchParams.set("pivot", "ACCOUNT");
-    analyticsUrl.searchParams.set("dateRange.start.day", "1");
-    analyticsUrl.searchParams.set("dateRange.start.month", String(month));
-    analyticsUrl.searchParams.set("dateRange.start.year", String(year));
-    analyticsUrl.searchParams.set("dateRange.end.day", String(lastDay));
-    analyticsUrl.searchParams.set("dateRange.end.month", String(month));
-    analyticsUrl.searchParams.set("dateRange.end.year", String(year));
-    analyticsUrl.searchParams.set("timeGranularity", "MONTHLY");
-    analyticsUrl.searchParams.set("accounts", `urn:li:sponsoredAccount:${adAccountId}`);
-    analyticsUrl.searchParams.set("fields", "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,externalWebsitePostClickConversions,externalWebsitePostViewConversions,dateRange,pivotValue,videoViews,videoCompletions,leads,landingPageClicks,oneClickLeads,totalEngagements");
+    const analyticsUrlStr = buildAnalyticsUrl("ACCOUNT", adAccountId, month, year, lastDay, ACCOUNT_FIELDS);
+    console.log("LinkedIn Ads analytics URL:", analyticsUrlStr);
 
-    console.log("LinkedIn Ads analytics URL:", analyticsUrl.toString());
-
-    const analyticsRes = await fetch(analyticsUrl.toString(), { headers: LI_HEADERS(accessToken) });
+    const analyticsRes = await fetch(analyticsUrlStr, { headers: LI_HEADERS(accessToken) });
     const analyticsData = await analyticsRes.json();
 
     if (!analyticsRes.ok) {
@@ -155,7 +162,6 @@ Deno.serve(async (req) => {
       throw new Error(`LinkedIn Ads API error (${analyticsRes.status}): ${analyticsData.message || JSON.stringify(analyticsData).substring(0, 300)}`);
     }
 
-    // Aggregate metrics from elements
     let totalImpressions = 0;
     let totalClicks = 0;
     let totalSpend = 0;
@@ -163,20 +169,19 @@ Deno.serve(async (req) => {
     let totalVideoViews = 0;
     let totalLeads = 0;
     let totalLandingPageClicks = 0;
-    let totalEngagements = 0;
+    let totalLikes = 0;
+    let totalShares = 0;
 
     for (const el of analyticsData.elements || []) {
       totalImpressions += Number(el.impressions || 0);
       totalClicks += Number(el.clicks || 0);
-      // costInLocalCurrency is in micro-currency (1/1,000,000th)
       totalSpend += Number(el.costInLocalCurrency || 0) / 1_000_000;
-      totalConversions += Number(el.externalWebsiteConversions || 0)
-        + Number(el.externalWebsitePostClickConversions || 0)
-        + Number(el.externalWebsitePostViewConversions || 0);
+      totalConversions += Number(el.externalWebsiteConversions || 0);
       totalVideoViews += Number(el.videoViews || 0);
-      totalLeads += Number(el.leads || 0) + Number(el.oneClickLeads || 0);
+      totalLeads += Number(el.leads || 0);
       totalLandingPageClicks += Number(el.landingPageClicks || 0);
-      totalEngagements += Number(el.totalEngagements || 0);
+      totalLikes += Number(el.likes || 0);
+      totalShares += Number(el.shares || 0);
     }
 
     const overallCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
@@ -185,22 +190,11 @@ Deno.serve(async (req) => {
     const costPerConversion = totalConversions > 0 ? totalSpend / totalConversions : 0;
     const conversionRate = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
     const costPerLead = totalLeads > 0 ? totalSpend / totalLeads : 0;
+    const totalEngagements = totalLikes + totalShares + totalClicks;
 
-    // ── Fetch Campaign-level analytics for top campaigns ──
-    const campaignUrl = new URL("https://api.linkedin.com/rest/adAnalytics");
-    campaignUrl.searchParams.set("q", "analytics");
-    campaignUrl.searchParams.set("pivot", "CAMPAIGN");
-    campaignUrl.searchParams.set("dateRange.start.day", "1");
-    campaignUrl.searchParams.set("dateRange.start.month", String(month));
-    campaignUrl.searchParams.set("dateRange.start.year", String(year));
-    campaignUrl.searchParams.set("dateRange.end.day", String(lastDay));
-    campaignUrl.searchParams.set("dateRange.end.month", String(month));
-    campaignUrl.searchParams.set("dateRange.end.year", String(year));
-    campaignUrl.searchParams.set("timeGranularity", "MONTHLY");
-    campaignUrl.searchParams.set("accounts", `urn:li:sponsoredAccount:${adAccountId}`);
-    campaignUrl.searchParams.set("fields", "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValue,totalEngagements");
-
-    const campaignRes = await fetch(campaignUrl.toString(), { headers: LI_HEADERS(accessToken) });
+    // ── Fetch Campaign-level analytics ──
+    const campaignUrlStr = buildAnalyticsUrl("CAMPAIGN", adAccountId, month, year, lastDay, CAMPAIGN_FIELDS);
+    const campaignRes = await fetch(campaignUrlStr, { headers: LI_HEADERS(accessToken) });
     const campaignData = await campaignRes.json();
 
     interface CampaignRow {
@@ -219,7 +213,6 @@ Deno.serve(async (req) => {
     if (campaignRes.ok && campaignData.elements) {
       for (const el of campaignData.elements) {
         const pivotValue = el.pivotValue || "";
-        // pivotValue is like "urn:li:sponsoredCampaign:12345"
         const campaignId = pivotValue.replace("urn:li:sponsoredCampaign:", "");
         const impressions = Number(el.impressions || 0);
         const clicks = Number(el.clicks || 0);
@@ -240,7 +233,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Try to resolve campaign names
     for (const campaign of campaigns) {
       try {
         const nameRes = await fetch(
@@ -254,7 +246,7 @@ Deno.serve(async (req) => {
           }
         }
       } catch {
-        // non-blocking — keep default name
+        // non-blocking
       }
     }
 
@@ -271,13 +263,12 @@ Deno.serve(async (req) => {
       leads: totalLeads,
       cost_per_lead: Math.round(costPerLead * 100) / 100,
       video_views: totalVideoViews,
-      reach: totalImpressions, // LinkedIn doesn't separate reach from impressions at account level
+      reach: totalImpressions,
       landing_page_clicks: totalLandingPageClicks,
       engagement: totalEngagements,
       campaign_count: campaigns.length,
     };
 
-    // Top campaigns by spend
     const topContent = campaigns
       .sort((a, b) => b.spend - a.spend)
       .slice(0, 10)
@@ -291,7 +282,6 @@ Deno.serve(async (req) => {
         ctr: Math.round(c.ctr * 100) / 100,
       }));
 
-    // Upsert monthly snapshot
     const { data: existing } = await supabase
       .from("monthly_snapshots")
       .select("id, snapshot_locked")
