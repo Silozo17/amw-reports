@@ -51,7 +51,17 @@ const ClientDetail = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const entitlements = useEntitlements();
-  const syncMonths = entitlements.plan?.slug === 'agency' ? 24 : 12;
+
+  const getSyncMonths = useCallback(async (): Promise<number> => {
+    if (entitlements.plan?.slug === 'agency') return 24;
+    const { data: sub } = await supabase
+      .from('org_subscriptions')
+      .select('subscription_plans(slug)')
+      .eq('org_id', client?.org_id ?? '')
+      .single();
+    const slug = (sub?.subscription_plans as unknown as { slug: string } | null)?.slug;
+    return slug === 'agency' ? 24 : 12;
+  }, [entitlements.plan, client?.org_id]);
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [reportYear, setReportYear] = useState<number | null>(null);
   const [reportPickerLoaded, setReportPickerLoaded] = useState(false);
