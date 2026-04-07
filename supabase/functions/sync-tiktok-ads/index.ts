@@ -118,8 +118,7 @@ Deno.serve(async (req) => {
       "ctr",
       "cpc",
       "cpm",
-      "conversions",
-      "conversion_rate",
+      "conversion",
       "cost_per_conversion",
       "reach",
       "video_views_p25",
@@ -162,15 +161,17 @@ Deno.serve(async (req) => {
     const rows = reportData.data?.list || [];
     const row = rows.length > 0 ? rows[0].metrics : {};
 
+    const conversions = Number(row.conversion || 0);
+    const clicks = Number(row.clicks || 0);
     const metricsData = {
       spend: Number(row.spend || 0),
       impressions: Number(row.impressions || 0),
-      clicks: Number(row.clicks || 0),
+      clicks,
       ctr: Number(row.ctr || 0),
       cpc: Number(row.cpc || 0),
       cpm: Number(row.cpm || 0),
-      conversions: Number(row.conversions || 0),
-      conversion_rate: Number(row.conversion_rate || 0),
+      conversions,
+      conversion_rate: clicks > 0 ? conversions / clicks : 0,
       cost_per_conversion: Number(row.cost_per_conversion || 0),
       reach: Number(row.reach || 0),
       video_views_p25: Number(row.video_views_p25 || 0),
@@ -184,7 +185,7 @@ Deno.serve(async (req) => {
     // ── Fetch ad-level breakdown for top content ──
     let topContent: Record<string, unknown>[] = [];
     try {
-      const adMetrics = ["ad_name", "spend", "impressions", "clicks", "conversions", "ctr", "cpc", "cpm"];
+      const adMetrics = ["ad_name", "spend", "impressions", "clicks", "conversion", "ctr", "cpc", "cpm"];
       const adParams = new URLSearchParams({
         advertiser_id: advertiserId,
         report_type: "BASIC",
@@ -212,7 +213,7 @@ Deno.serve(async (req) => {
           spend: Number(item.metrics?.spend || 0),
           impressions: Number(item.metrics?.impressions || 0),
           clicks: Number(item.metrics?.clicks || 0),
-          conversions: Number(item.metrics?.conversions || 0),
+          conversions: Number(item.metrics?.conversion || 0),
           ctr: Number(item.metrics?.ctr || 0),
           cpc: Number(item.metrics?.cpc || 0),
           cpm: Number(item.metrics?.cpm || 0),
