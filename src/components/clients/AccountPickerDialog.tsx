@@ -76,6 +76,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
       case 'instagram': return ((metadata.ig_accounts as Array<{ id: string; username?: string; page_name?: string }>) || []).map(ig => ({ id: ig.id, name: ig.username ? `@${ig.username} (${ig.page_name})` : ig.id }));
       case 'tiktok': return (metadata.accounts as DiscoveredAccount[]) || [];
       case 'linkedin': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
+      case 'linkedin_ads': return (metadata.ad_accounts as DiscoveredAccount[]) || [];
       case 'google_search_console': return (metadata.sites as DiscoveredAccount[]) || [];
       case 'google_analytics': return (metadata.properties as DiscoveredAccount[]) || [];
       case 'google_business_profile': return (metadata.locations as DiscoveredAccount[]) || [];
@@ -367,6 +368,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                    platform === 'tiktok' ? 'Select a TikTok Account:' :
                    platform === 'facebook' ? 'Select a Facebook Page:' :
                    platform === 'instagram' ? 'Select an Instagram Account:' :
+                   platform === 'linkedin_ads' ? 'Select a LinkedIn Ad Account:' :
                    platform === 'google_search_console' ? 'Select a verified site:' :
                    platform === 'google_analytics' ? 'Select a GA4 property:' :
                    platform === 'google_business_profile' ? 'Select a business location:' :

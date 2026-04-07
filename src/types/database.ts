@@ -12,7 +12,7 @@ import youtubeLogo from '@/assets/logos/youtube.webp';
 import pinterestLogo from '@/assets/logos/pinterest.webp';
 
 export type AppRole = 'owner' | 'manager';
-export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'tiktok_ads' | 'linkedin' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube' | 'pinterest';
+export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'tiktok_ads' | 'linkedin' | 'linkedin_ads' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube' | 'pinterest';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
 
 export interface Organisation {
@@ -204,6 +204,7 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   tiktok: 'TikTok',
   tiktok_ads: 'TikTok Ads',
   linkedin: 'LinkedIn',
+  linkedin_ads: 'LinkedIn Ads',
   google_search_console: 'Google Search Console',
   google_analytics: 'Google Analytics',
   google_business_profile: 'Google Business Profile',
@@ -220,6 +221,7 @@ export const PLATFORM_LOGOS: Record<string, string> = {
   tiktok: tiktokLogo,
   tiktok_ads: tiktokLogo,
   linkedin: linkedinLogo,
+  linkedin_ads: linkedinLogo,
   google_search_console: gscLogo,
   google_analytics: gaLogo,
   google_business_profile: gbpLogo,
@@ -435,6 +437,11 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'shares', 'clicks', 'posts_published', 'video_views',
     'organic_impressions',
   ],
+  linkedin_ads: [
+    'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm',
+    'conversions', 'conversion_rate', 'cost_per_conversion',
+    'leads', 'cost_per_lead', 'video_views', 'reach',
+  ],
   google_search_console: [
     'search_clicks', 'search_impressions', 'search_ctr', 'search_position',
     'top_queries', 'gsc_top_pages',
@@ -461,7 +468,7 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
 
 /** Platform categories for grouped dashboard display */
 export const PLATFORM_CATEGORIES: { label: string; platforms: PlatformType[] }[] = [
-  { label: 'Paid Advertising', platforms: ['google_ads', 'meta_ads', 'tiktok_ads'] },
+  { label: 'Paid Advertising', platforms: ['google_ads', 'meta_ads', 'tiktok_ads', 'linkedin_ads'] },
   { label: 'Organic Social', platforms: ['facebook', 'instagram', 'tiktok', 'linkedin', 'youtube', 'pinterest'] },
   { label: 'SEO & Web Analytics', platforms: ['google_search_console', 'google_analytics', 'google_business_profile'] },
 ];
