@@ -437,6 +437,11 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'shares', 'clicks', 'posts_published', 'video_views',
     'organic_impressions',
   ],
+  linkedin_ads: [
+    'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm',
+    'conversions', 'conversion_rate', 'cost_per_conversion',
+    'leads', 'cost_per_lead', 'video_views', 'reach',
+  ],
   google_search_console: [
     'search_clicks', 'search_impressions', 'search_ctr', 'search_position',
     'top_queries', 'gsc_top_pages',
