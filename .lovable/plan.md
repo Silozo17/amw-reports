@@ -1,38 +1,73 @@
 
+I checked the actual code, live logs, LinkedIn docs, and your screenshot. The issue is not your credentials.
 
-# Limit Pinterest Sync to 3 Months
-
-## Problem
-Pinterest API only allows 90 days of historical data. Currently, the system tries to sync 12-24 months for all platforms including Pinterest, which wastes API calls and likely fails silently for older months.
-
-## Changes
-
-### 1. `src/lib/triggerSync.ts` — Add platform-aware month cap
-Add a constant map for platform sync limits and apply it in `triggerInitialSync`:
-
-```ts
-const PLATFORM_MAX_MONTHS: Partial<Record<PlatformType, number>> = {
-  pinterest: 3,
-};
+What I found
+- OAuth is already working:
+  - `oauth-callback` successfully exchanged the auth code
+  - it discovered two ad accounts
+  - the current connection already has `account_id = 513337793` and `account_name = AMW Media LTD`
+- Your screenshot confirms the correct setup is present:
+  - redirect URL matches `/functions/v1/oauth-callback`
+  - scopes include `r_ads` and `r_ads_reporting`
+- The real failure is in the reporting request format:
+  - LinkedIn is returning `QUERY_PARAM_NOT_ALLOWED` for:
+    - `dateRange.start.day`
+    - `dateRange.start.month`
+    - `dateRange.start.year`
+    - `dateRange.end.day`
+    - `dateRange.end.month`
+    - `dateRange.end.year`
+- The official Reporting docs show `adAnalytics` expects one single Rest.li-style `dateRange` parameter:
+```text
+dateRange=(start:(year:2024,month:5,day:28),end:(year:2024,month:9,day:30))
 ```
+  not separate nested query params.
+- So the bug is in `sync-linkedin-ads` request serialization, not in the Client ID / Primary Client Secret.
+- The extra “App ID” is not the blocker here. Since token exchange and account discovery already succeed, I would not add it.
 
-In `triggerInitialSync`, cap `months` to the platform limit:
-```ts
-const maxMonths = PLATFORM_MAX_MONTHS[platform] ?? months;
-const effectiveMonths = Math.min(months, maxMonths);
+What I will change
+1. Fix `buildAnalyticsUrl` in `supabase/functions/sync-linkedin-ads/index.ts`
+   - stop building `dateRange` as separate params
+   - build the query manually so LinkedIn receives:
+```text
+q=analytics
+pivot=ACCOUNT or CAMPAIGN
+dateRange=(start:(year:YYYY,month:M,day:1),end:(year:YYYY,month:M,day:lastDay))
+timeGranularity=MONTHLY
+accounts=List(urn%3Ali%3AsponsoredAccount%3A...)
+fields=...
 ```
+   - keep `fields` raw comma-separated
+   - keep `accounts=List(...)` in the format LinkedIn expects
 
-Use `effectiveMonths` in the loop and progress reporting. This automatically handles all call sites (ClientDetail, ClientPortalAuth, AdminSyncDialog).
+2. Leave OAuth setup unchanged
+   - no secret changes
+   - no App ID changes
+   - no scope changes unless later logs show a real permission error
 
-### 2. `supabase/functions/backfill-sync/index.ts` — Same cap server-side
-Add the same `PLATFORM_MAX_MONTHS` map and cap the `months` variable after reading it from the request body, before generating the months range.
+3. Improve LinkedIn error logging
+   - log the exact final analytics URL
+   - log the full LinkedIn `errorDetails`
+   - make future failures clearly show whether they are formatting, permission, or access-tier issues
 
-### 3. `supabase/functions/scheduled-sync/index.ts` — Verify
-The scheduled sync only syncs the current month (and optionally previous month in first 7 days). No change needed — it never requests historical data beyond 1-2 months.
+4. Re-test only the LinkedIn Ads sync path
+   - no changes to organic LinkedIn
+   - no database changes
+   - no UI changes unless a later failure proves account selection is involved
 
-### Files to update
-- `src/lib/triggerSync.ts` — add platform month cap
-- `supabase/functions/backfill-sync/index.ts` — add platform month cap
+Files to update
+- `supabase/functions/sync-linkedin-ads/index.ts`
 
-No other platforms have documented sync period limits that would require capping below 24 months. Google, Meta, TikTok, LinkedIn, YouTube, and Facebook all support multi-year historical data retrieval.
+Expected outcome
+- LinkedIn Ads sync should stop failing on parameter validation
+- the existing connected ad account should start producing monthly snapshot data
+- if anything still fails after this, it will be a real provider limitation or permission issue, not malformed requests
 
+Technical note
+```text
+Current broken request:
+...&dateRange.start.day=1&dateRange.start.month=5&dateRange.start.year=2024...
+
+Correct LinkedIn request:
+...&dateRange=(start:(year:2024,month:5,day:1),end:(year:2024,month:5,day:31))...
+```
