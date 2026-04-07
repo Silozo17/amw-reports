@@ -99,8 +99,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Cap months to platform-specific limit
+    const cappedMonths = Math.min(months, PLATFORM_MAX_MONTHS[conn.platform] ?? months);
+
     // Get months range and check which already have snapshots
-    const monthsRange = getMonthsRange(months, start_offset);
+    const monthsRange = getMonthsRange(cappedMonths, start_offset);
 
     const { data: existingSnapshots } = await supabase
       .from("monthly_snapshots")

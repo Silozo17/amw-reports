@@ -75,12 +75,12 @@ export async function triggerInitialSync(
     const month = d.getMonth() + 1;
     const year = d.getFullYear();
 
-    onProgress?.({ platform, completed: i, total: months, currentMonth: month, currentYear: year });
+    onProgress?.({ platform, completed: i, total: effectiveMonths, currentMonth: month, currentYear: year });
 
     const result = await triggerSync(connectionId, platform, month, year);
     results.push(result);
 
-    onProgress?.({ platform, completed: i + 1, total: months, currentMonth: month, currentYear: year });
+    onProgress?.({ platform, completed: i + 1, total: effectiveMonths, currentMonth: month, currentYear: year });
   }
 
   return results;
