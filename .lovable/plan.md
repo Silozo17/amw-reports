@@ -1,68 +1,42 @@
 
 
-# Fix TikTok Ads Sync + 24-Month Agency Sync
+# Fix: Agency Plan Always Gets 24-Month Sync
 
-## Issue 1: TikTok Ads API — Invalid Metric Fields
+## Problem
 
-The error `Invalid metric fields: ['conversions']` (code 40002) occurs because the TikTok Ads Reporting API v1.3 uses **`conversion`** (singular), not `conversions`. Same applies to `conversion_rate` → `cost_per_result` and `cost_per_conversion` → `cost_per_result`.
+`syncMonths` on line 54 of `ClientDetail.tsx` reads `entitlements.plan?.slug` which is `null` while the subscription query is still loading. When OAuth redirects back and auto-triggers a sync, the entitlements haven't resolved yet, so `syncMonths` evaluates to `12`.
 
-### File: `supabase/functions/sync-tiktok-ads/index.ts`
+The same race condition exists in the `handlePickerComplete` handler and the `handleNewPlatforms` flow — they all capture `syncMonths` at call time, which may be before entitlements load.
 
-**Change 1 — Lines 114-129**: Fix advertiser-level metrics array:
+## Fix
+
+### File: `src/pages/clients/ClientDetail.tsx`
+
+**Change**: Instead of using `syncMonths` directly (which is derived from potentially-unloaded entitlements), create a helper function that fetches the plan slug from the database on demand — the same pattern already used in `ClientPortalAuth.tsx`:
+
 ```ts
-const metrics = [
-  "spend",
-  "impressions",
-  "clicks",
-  "ctr",
-  "cpc",
-  "cpm",
-  "conversion",        // was "conversions"
-  "cost_per_conversion",
-  "reach",
-  "video_views_p25",
-  "video_views_p50",
-  "video_views_p75",
-  "video_views_p100",
-];
+const getSyncMonths = useCallback(async (): Promise<number> => {
+  // If entitlements already loaded, use them
+  if (entitlements.plan?.slug === 'agency') return 24;
+  
+  // Fallback: query the subscription directly to avoid race
+  const { data: sub } = await supabase
+    .from('org_subscriptions')
+    .select('subscription_plans(slug)')
+    .eq('org_id', client?.org_id ?? '')
+    .single();
+  const slug = (sub?.subscription_plans as unknown as { slug: string } | null)?.slug;
+  return slug === 'agency' ? 24 : 12;
+}, [entitlements.plan, client?.org_id]);
 ```
-Remove `conversion_rate` (not a valid v1.3 metric at AUCTION_ADVERTISER level).
 
-**Change 2 — Lines 165-180**: Update metricsData mapping to match corrected field names:
-```ts
-conversions: Number(row.conversion || 0),        // field is "conversion"
-cost_per_conversion: Number(row.cost_per_conversion || 0),
-```
-Remove `conversion_rate` from the output (derive it from conversion/clicks if needed).
+Then update all three call sites (OAuth auto-sync ~line 92, picker complete, and new platforms) to `await getSyncMonths()` before calling `triggerInitialSync`.
 
-**Change 3 — Line 187**: Fix ad-level metrics array similarly — replace `"conversions"` with `"conversion"`.
+### Call sites to update
 
-Redeploy `sync-tiktok-ads`.
+1. **Line ~92** (OAuth callback auto-sync): `const months = await getSyncMonths();` then use `months` for both `total` in progress state and the `triggerInitialSync` call.
+2. **Line ~278** (`handleNewPlatforms`): Same pattern.
+3. **Line ~250** (`handlePickerComplete`): Same pattern.
 
----
-
-## Issue 2: Agency Plan Should Sync 24 Months
-
-`ClientDetail.tsx` (line 54) already has:
-```ts
-const syncMonths = entitlements.plan?.slug === 'agency' ? 24 : 12;
-```
-This is correct for the main client page. However, **`ClientPortalAuth.tsx` (line 182)** calls `triggerInitialSync` with no months argument, defaulting to 12.
-
-### File: `src/pages/ClientPortalAuth.tsx`
-
-**Line 182**: Pass the correct months count based on plan. This requires importing `useEntitlements` and computing `syncMonths` the same way.
-
-### File: `src/lib/triggerSync.ts`
-
-No change needed — the default parameter of 12 is fine since callers should pass the correct value.
-
----
-
-## Summary of Changes
-
-| File | Change |
-|---|---|
-| `supabase/functions/sync-tiktok-ads/index.ts` | Fix `conversions` → `conversion`, remove invalid `conversion_rate` metric, update mapping |
-| `src/pages/ClientPortalAuth.tsx` | Use plan-aware `syncMonths` instead of default 12 |
+This ensures the sync depth is always correct regardless of whether entitlements have loaded.
 
