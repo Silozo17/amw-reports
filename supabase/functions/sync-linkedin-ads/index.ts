@@ -268,7 +268,6 @@ Deno.serve(async (req) => {
         clicks: c.clicks,
         impressions: c.impressions,
         conversions: c.conversions,
-        leads: c.leads,
         ctr: Math.round(c.ctr * 100) / 100,
       }));
 
