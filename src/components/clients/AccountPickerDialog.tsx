@@ -368,6 +368,7 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
                    platform === 'tiktok' ? 'Select a TikTok Account:' :
                    platform === 'facebook' ? 'Select a Facebook Page:' :
                    platform === 'instagram' ? 'Select an Instagram Account:' :
+                   platform === 'linkedin_ads' ? 'Select a LinkedIn Ad Account:' :
                    platform === 'google_search_console' ? 'Select a verified site:' :
                    platform === 'google_analytics' ? 'Select a GA4 property:' :
                    platform === 'google_business_profile' ? 'Select a business location:' :
