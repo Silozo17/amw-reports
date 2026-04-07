@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
 
     if (campaignRes.ok && campaignData.elements) {
       for (const el of campaignData.elements) {
-        const pivotValue = el.pivotValue || "";
+        const pivotValue = (el.pivotValues && el.pivotValues[0]) || "";
         const campaignId = pivotValue.replace("urn:li:sponsoredCampaign:", "");
         const impressions = Number(el.impressions || 0);
         const clicks = Number(el.clicks || 0);
