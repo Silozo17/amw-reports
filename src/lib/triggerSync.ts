@@ -5,6 +5,11 @@ import { SYNC_FUNCTION_MAP } from '@/lib/platformRouting';
 // Re-export for backward compatibility
 export { SYNC_FUNCTION_MAP };
 
+/** Platform-specific caps on how many months of history can be synced. */
+const PLATFORM_MAX_MONTHS: Partial<Record<PlatformType, number>> = {
+  pinterest: 3, // Pinterest API limits analytics to 90 days
+};
+
 interface SyncResult {
   month: number;
   year: number;
