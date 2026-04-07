@@ -15,8 +15,8 @@ const LI_HEADERS = (token: string) => ({
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
-const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValue,videoViews,leads,landingPageClicks,shares,likes";
-const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValue,shares,likes";
+const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValues,videoViews,leads,landingPageClicks,shares,likes";
+const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValues,shares,likes";
 
 function buildAnalyticsUrl(
   pivot: string,
