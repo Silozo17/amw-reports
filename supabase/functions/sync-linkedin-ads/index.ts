@@ -15,8 +15,8 @@ const LI_HEADERS = (token: string) => ({
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
-const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValue,videoViews,leads,landingPageClicks,shares,likes";
-const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValue,shares,likes";
+const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValues,videoViews,leads,landingPageClicks,shares,likes";
+const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValues,shares,likes";
 
 function buildAnalyticsUrl(
   pivot: string,
@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
 
     if (campaignRes.ok && campaignData.elements) {
       for (const el of campaignData.elements) {
-        const pivotValue = el.pivotValue || "";
+        const pivotValue = (el.pivotValues && el.pivotValues[0]) || "";
         const campaignId = pivotValue.replace("urn:li:sponsoredCampaign:", "");
         const impressions = Number(el.impressions || 0);
         const clicks = Number(el.clicks || 0);
