@@ -214,7 +214,6 @@ Deno.serve(async (req) => {
         const clicks = Number(el.clicks || 0);
         const spend = Number(el.costInLocalCurrency || 0) / 1_000_000;
         const conversions = Number(el.externalWebsiteConversions || 0);
-        const leads = Number(el.leads || 0);
 
         campaigns.push({
           name: `Campaign ${campaignId}`,
@@ -223,7 +222,6 @@ Deno.serve(async (req) => {
           impressions,
           clicks,
           conversions,
-          leads,
           ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
         });
       }
