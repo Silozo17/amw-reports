@@ -201,7 +201,6 @@ Deno.serve(async (req) => {
       impressions: number;
       clicks: number;
       conversions: number;
-      leads: number;
       ctr: number;
     }
 
