@@ -151,7 +151,8 @@ Deno.serve(async (req) => {
 
     if (!analyticsRes.ok) {
       console.error("LinkedIn Ads analytics error:", JSON.stringify(analyticsData));
-      throw new Error(`LinkedIn Ads API error (${analyticsRes.status}): ${analyticsData.message || JSON.stringify(analyticsData).substring(0, 300)}`);
+      const errorDetails = analyticsData.errorDetails ? JSON.stringify(analyticsData.errorDetails) : "";
+      throw new Error(`LinkedIn Ads API error (${analyticsRes.status}): ${analyticsData.message || analyticsData.error || ""} ${errorDetails}`.trim());
     }
 
     let totalImpressions = 0;
