@@ -28,19 +28,9 @@ function buildAnalyticsUrl(
   lastDay: number,
   fields: string,
 ): string {
-  const params = new URLSearchParams();
-  params.set("q", "analytics");
-  params.set("pivot", pivot);
-  params.set("dateRange.start.day", "1");
-  params.set("dateRange.start.month", String(month));
-  params.set("dateRange.start.year", String(year));
-  params.set("dateRange.end.day", String(lastDay));
-  params.set("dateRange.end.month", String(month));
-  params.set("dateRange.end.year", String(year));
-  params.set("timeGranularity", "MONTHLY");
-
+  const dateRange = `(start:(year:${year},month:${month},day:1),end:(year:${year},month:${month},day:${lastDay}))`;
   const accountUrn = encodeURIComponent(`urn:li:sponsoredAccount:${adAccountId}`);
-  return `https://api.linkedin.com/rest/adAnalytics?${params.toString()}&accounts=List(${accountUrn})&fields=${fields}`;
+  return `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=${pivot}&dateRange=${dateRange}&timeGranularity=MONTHLY&accounts=List(${accountUrn})&fields=${fields}`;
 }
 
 Deno.serve(async (req) => {
