@@ -287,8 +287,9 @@ const ClientDetail = () => {
     if (newPlatforms.length === 0) return;
 
     setSyncStartTime(Date.now());
+    const months = await getSyncMonths();
     for (const conn of newPlatforms) {
-      triggerInitialSync(conn.id, conn.platform, syncMonths, (progress) => {
+      triggerInitialSync(conn.id, conn.platform, months, (progress) => {
         setActiveSyncs(prev => { const next = new Map(prev); next.set(conn.platform, progress); return next; });
       }).then(results => {
         const failures = results.filter(r => !r.success);
