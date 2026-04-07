@@ -181,11 +181,11 @@ const ClientPortalAuth = () => {
       toast.info('Starting initial data sync...');
       // Fetch org's plan to determine sync depth
       let syncMonths = 12;
-      if (client?.org_id) {
+      if (org?.id) {
         const { data: sub } = await supabase
           .from('org_subscriptions')
           .select('subscription_plans(slug)')
-          .eq('org_id', client.org_id)
+          .eq('org_id', org.id)
           .single();
         const planSlug = (sub?.subscription_plans as unknown as { slug: string } | null)?.slug;
         if (planSlug === 'agency') syncMonths = 24;
