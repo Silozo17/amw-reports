@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
           spend: Number(item.metrics?.spend || 0),
           impressions: Number(item.metrics?.impressions || 0),
           clicks: Number(item.metrics?.clicks || 0),
-          conversions: Number(item.metrics?.conversions || 0),
+          conversions: Number(item.metrics?.conversion || 0),
           ctr: Number(item.metrics?.ctr || 0),
           cpc: Number(item.metrics?.cpc || 0),
           cpm: Number(item.metrics?.cpm || 0),

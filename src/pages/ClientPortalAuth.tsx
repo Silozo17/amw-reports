@@ -179,7 +179,18 @@ const ClientPortalAuth = () => {
 
     if (SYNC_FUNCTION_MAP[conn.platform]) {
       toast.info('Starting initial data sync...');
-      await triggerInitialSync(conn.id, conn.platform);
+      // Fetch org's plan to determine sync depth
+      let syncMonths = 12;
+      if (client?.org_id) {
+        const { data: sub } = await supabase
+          .from('org_subscriptions')
+          .select('subscription_plans(slug)')
+          .eq('org_id', client.org_id)
+          .single();
+        const planSlug = (sub?.subscription_plans as unknown as { slug: string } | null)?.slug;
+        if (planSlug === 'agency') syncMonths = 24;
+      }
+      await triggerInitialSync(conn.id, conn.platform, syncMonths);
     }
     fetchData();
   };
