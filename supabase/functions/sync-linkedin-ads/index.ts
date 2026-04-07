@@ -15,8 +15,10 @@ const LI_HEADERS = (token: string) => ({
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
-const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValues,videoViews,leads,landingPageClicks,shares,likes";
-const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValues,shares,likes";
+// Only fields documented as valid in AdAnalyticsV8 finder (q=analytics)
+// See: https://learn.microsoft.com/en-gb/linkedin/marketing/integrations/ads/reporting/ads-reporting
+const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValues,landingPageClicks,shares,likes";
+const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues,shares,likes";
 
 function buildAnalyticsUrl(
   pivot: string,
@@ -166,8 +168,6 @@ Deno.serve(async (req) => {
     let totalClicks = 0;
     let totalSpend = 0;
     let totalConversions = 0;
-    let totalVideoViews = 0;
-    let totalLeads = 0;
     let totalLandingPageClicks = 0;
     let totalLikes = 0;
     let totalShares = 0;
@@ -177,8 +177,6 @@ Deno.serve(async (req) => {
       totalClicks += Number(el.clicks || 0);
       totalSpend += Number(el.costInLocalCurrency || 0) / 1_000_000;
       totalConversions += Number(el.externalWebsiteConversions || 0);
-      totalVideoViews += Number(el.videoViews || 0);
-      totalLeads += Number(el.leads || 0);
       totalLandingPageClicks += Number(el.landingPageClicks || 0);
       totalLikes += Number(el.likes || 0);
       totalShares += Number(el.shares || 0);
@@ -189,7 +187,6 @@ Deno.serve(async (req) => {
     const overallCpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
     const costPerConversion = totalConversions > 0 ? totalSpend / totalConversions : 0;
     const conversionRate = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
-    const costPerLead = totalLeads > 0 ? totalSpend / totalLeads : 0;
     const totalEngagements = totalLikes + totalShares + totalClicks;
 
     // ── Fetch Campaign-level analytics ──
@@ -204,7 +201,6 @@ Deno.serve(async (req) => {
       impressions: number;
       clicks: number;
       conversions: number;
-      leads: number;
       ctr: number;
     }
 
@@ -218,7 +214,6 @@ Deno.serve(async (req) => {
         const clicks = Number(el.clicks || 0);
         const spend = Number(el.costInLocalCurrency || 0) / 1_000_000;
         const conversions = Number(el.externalWebsiteConversions || 0);
-        const leads = Number(el.leads || 0);
 
         campaigns.push({
           name: `Campaign ${campaignId}`,
@@ -227,7 +222,6 @@ Deno.serve(async (req) => {
           impressions,
           clicks,
           conversions,
-          leads,
           ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
         });
       }
@@ -260,10 +254,6 @@ Deno.serve(async (req) => {
       conversions: totalConversions,
       conversion_rate: Math.round(conversionRate * 100) / 100,
       cost_per_conversion: Math.round(costPerConversion * 100) / 100,
-      leads: totalLeads,
-      cost_per_lead: Math.round(costPerLead * 100) / 100,
-      video_views: totalVideoViews,
-      reach: totalImpressions,
       landing_page_clicks: totalLandingPageClicks,
       engagement: totalEngagements,
       campaign_count: campaigns.length,
@@ -278,7 +268,6 @@ Deno.serve(async (req) => {
         clicks: c.clicks,
         impressions: c.impressions,
         conversions: c.conversions,
-        leads: c.leads,
         ctr: Math.round(c.ctr * 100) / 100,
       }));
 
