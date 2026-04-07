@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
     // ── Fetch ad-level breakdown for top content ──
     let topContent: Record<string, unknown>[] = [];
     try {
-      const adMetrics = ["ad_name", "spend", "impressions", "clicks", "conversions", "ctr", "cpc", "cpm"];
+      const adMetrics = ["ad_name", "spend", "impressions", "clicks", "conversion", "ctr", "cpc", "cpm"];
       const adParams = new URLSearchParams({
         advertiser_id: advertiserId,
         report_type: "BASIC",
