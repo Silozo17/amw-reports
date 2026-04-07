@@ -161,15 +161,17 @@ Deno.serve(async (req) => {
     const rows = reportData.data?.list || [];
     const row = rows.length > 0 ? rows[0].metrics : {};
 
+    const conversions = Number(row.conversion || 0);
+    const clicks = Number(row.clicks || 0);
     const metricsData = {
       spend: Number(row.spend || 0),
       impressions: Number(row.impressions || 0),
-      clicks: Number(row.clicks || 0),
+      clicks,
       ctr: Number(row.ctr || 0),
       cpc: Number(row.cpc || 0),
       cpm: Number(row.cpm || 0),
-      conversions: Number(row.conversions || 0),
-      conversion_rate: Number(row.conversion_rate || 0),
+      conversions,
+      conversion_rate: clicks > 0 ? conversions / clicks : 0,
       cost_per_conversion: Number(row.cost_per_conversion || 0),
       reach: Number(row.reach || 0),
       video_views_p25: Number(row.video_views_p25 || 0),
