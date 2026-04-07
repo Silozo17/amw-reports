@@ -204,6 +204,7 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   tiktok: 'TikTok',
   tiktok_ads: 'TikTok Ads',
   linkedin: 'LinkedIn',
+  linkedin_ads: 'LinkedIn Ads',
   google_search_console: 'Google Search Console',
   google_analytics: 'Google Analytics',
   google_business_profile: 'Google Business Profile',
