@@ -1,41 +1,68 @@
 
 
-# Fix Pinterest Sync Errors
+# Fix TikTok Ads Sync + 24-Month Agency Sync
 
-## Problem
+## Issue 1: TikTok Ads API — Invalid Metric Fields
 
-The Pinterest sync function has two bugs:
+The error `Invalid metric fields: ['conversions']` (code 40002) occurs because the TikTok Ads Reporting API v1.3 uses **`conversion`** (singular), not `conversions`. Same applies to `conversion_rate` → `cost_per_result` and `cost_per_conversion` → `cost_per_result`.
 
-1. **Wrong API parameter**: Line 153 passes `metric_types=ORGANIC`, but per the Pinterest API docs, `ORGANIC` is a value for the `content_type` parameter — not `metric_types`. Valid `metric_types` values are: `ENGAGEMENT`, `ENGAGEMENT_RATE`, `IMPRESSION`, `OUTBOUND_CLICK`, `OUTBOUND_CLICK_RATE`, `PIN_CLICK`, `PIN_CLICK_RATE`, `SAVE`, `SAVE_RATE`.
+### File: `supabase/functions/sync-tiktok-ads/index.ts`
 
-2. **Hardcoded App ID**: Line 14 still uses the hardcoded `"1556588"` instead of reading from the `PINTEREST_APP_ID` environment variable (the connect function was already fixed, but the sync function was missed).
-
-## Fix
-
-### File: `supabase/functions/sync-pinterest/index.ts`
-
-**Change 1** — Line 14: Replace hardcoded App ID with env var:
+**Change 1 — Lines 114-129**: Fix advertiser-level metrics array:
 ```ts
-// Before
-const appId = "1556588";
-// After
-const appId = Deno.env.get("PINTEREST_APP_ID")!;
+const metrics = [
+  "spend",
+  "impressions",
+  "clicks",
+  "ctr",
+  "cpc",
+  "cpm",
+  "conversion",        // was "conversions"
+  "cost_per_conversion",
+  "reach",
+  "video_views_p25",
+  "video_views_p50",
+  "video_views_p75",
+  "video_views_p100",
+];
 ```
+Remove `conversion_rate` (not a valid v1.3 metric at AUCTION_ADVERTISER level).
 
-**Change 2** — Lines 150-154: Fix the analytics API call parameters:
+**Change 2 — Lines 165-180**: Update metricsData mapping to match corrected field names:
 ```ts
-// Before
-analyticsUrl.searchParams.set("metric_types", "ORGANIC");
-analyticsUrl.searchParams.set("columns", "IMPRESSION,SAVE,...");
-
-// After — remove metric_types=ORGANIC, add content_type=ORGANIC instead
-analyticsUrl.searchParams.set("content_type", "ORGANIC");
-analyticsUrl.searchParams.set("metric_types", "ENGAGEMENT,IMPRESSION,OUTBOUND_CLICK,PIN_CLICK,SAVE");
+conversions: Number(row.conversion || 0),        // field is "conversion"
+cost_per_conversion: Number(row.cost_per_conversion || 0),
 ```
+Remove `conversion_rate` from the output (derive it from conversion/clicks if needed).
 
-Remove the `columns` parameter (not a valid v5 param) and let `metric_types` specify which metrics to return.
+**Change 3 — Line 187**: Fix ad-level metrics array similarly — replace `"conversions"` with `"conversion"`.
 
-### Deployment
+Redeploy `sync-tiktok-ads`.
 
-Redeploy `sync-pinterest` edge function after the fix.
+---
+
+## Issue 2: Agency Plan Should Sync 24 Months
+
+`ClientDetail.tsx` (line 54) already has:
+```ts
+const syncMonths = entitlements.plan?.slug === 'agency' ? 24 : 12;
+```
+This is correct for the main client page. However, **`ClientPortalAuth.tsx` (line 182)** calls `triggerInitialSync` with no months argument, defaulting to 12.
+
+### File: `src/pages/ClientPortalAuth.tsx`
+
+**Line 182**: Pass the correct months count based on plan. This requires importing `useEntitlements` and computing `syncMonths` the same way.
+
+### File: `src/lib/triggerSync.ts`
+
+No change needed — the default parameter of 12 is fine since callers should pass the correct value.
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|---|---|
+| `supabase/functions/sync-tiktok-ads/index.ts` | Fix `conversions` → `conversion`, remove invalid `conversion_rate` metric, update mapping |
+| `src/pages/ClientPortalAuth.tsx` | Use plan-aware `syncMonths` instead of default 12 |
 
