@@ -15,8 +15,10 @@ const LI_HEADERS = (token: string) => ({
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
-const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValues,videoViews,leads,landingPageClicks,shares,likes";
-const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,leads,pivotValues,shares,likes";
+// Only fields documented as valid in AdAnalyticsV8 finder (q=analytics)
+// See: https://learn.microsoft.com/en-gb/linkedin/marketing/integrations/ads/reporting/ads-reporting
+const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValues,landingPageClicks,shares,likes";
+const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues,shares,likes";
 
 function buildAnalyticsUrl(
   pivot: string,
