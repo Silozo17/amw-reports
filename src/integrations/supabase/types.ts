@@ -1244,6 +1244,54 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_briefings: {
+        Row: {
+          client_id: string
+          generated_at: string
+          generated_by: string | null
+          id: string
+          org_id: string
+          report_month: number
+          report_year: number
+          storage_path: string
+        }
+        Insert: {
+          client_id: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          org_id: string
+          report_month: number
+          report_year: number
+          storage_path: string
+        }
+        Update: {
+          client_id?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          org_id?: string
+          report_month?: number
+          report_year?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_briefings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_briefings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
