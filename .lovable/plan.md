@@ -1,76 +1,55 @@
 
 
-# Fix Voice Briefing: Per-Month State, Storage Persistence, Daily Rate Limit
+# Fix: Scope Initial Sync to Only the Newly Connected Platform
 
 ## Problem
-1. **Stuck audio**: Component holds a single `audioUrl` in state. When user switches month/year, the old audio persists — they can't generate a new briefing for a different period.
-2. **No persistence**: Generated audio lives only as a browser blob URL. Refreshing the page loses it.
-3. **No rate limiting**: Users can regenerate unlimited times, wasting ElevenLabs credits.
+`handlePickerComplete` in `ClientDetail.tsx` (line 278-301) runs after account selection in the AccountPickerDialog. It queries **all** connected platforms for the client, then filters to those without existing snapshots. This means if you just connected Instagram but Facebook and Meta Ads also have no snapshots yet (e.g. they're still syncing), the system triggers sync for all three — causing duplicate/runaway syncs every time a new platform is added.
 
-## Solution
+The same issue exists in the `oauthConnected` handler (line 87-117) but is less severe since it only syncs the single connection that just completed OAuth.
 
-### 1. New database table: `voice_briefings`
-Stores generated recordings metadata and controls rate limiting.
+## Root Cause
+`handlePickerComplete` has no knowledge of **which** connection just had its account selected. It broadly checks all connections missing data.
 
-```sql
-CREATE TABLE public.voice_briefings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid NOT NULL,
-  org_id uuid NOT NULL,
-  report_month integer NOT NULL,
-  report_year integer NOT NULL,
-  storage_path text NOT NULL,
-  generated_by uuid,
-  generated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(client_id, report_month, report_year)
-);
+## Fix
 
-ALTER TABLE public.voice_briefings ENABLE ROW LEVEL SECURITY;
+### `src/pages/clients/ClientDetail.tsx`
+1. Pass the `pickerConnection` (the specific connection that was just configured) into `handlePickerComplete` so it knows exactly which platform to sync.
+2. Change `handlePickerComplete` to only sync **that one connection** instead of scanning all connections for missing snapshots.
 
--- Org members can view/manage
-CREATE POLICY "Org members can manage voice briefings" ON public.voice_briefings
-  FOR ALL TO authenticated
-  USING (user_belongs_to_org(auth.uid(), org_id));
-
--- Client users can view
-CREATE POLICY "Client users can view voice briefings" ON public.voice_briefings
-  FOR SELECT TO authenticated
-  USING (is_client_user(auth.uid(), client_id));
+Before:
+```ts
+const handlePickerComplete = async () => {
+  await fetchData();
+  const { data: updatedConns } = await supabase
+    .from('platform_connections').select('*').eq('client_id', id!)
+    .eq('is_connected', true).not('account_id', 'is', null);
+  // ... finds ALL platforms without snapshots and syncs them all
+};
 ```
 
-The UNIQUE constraint on `(client_id, report_month, report_year)` means each month gets exactly one recording. Regenerating replaces it (upsert), but the old file stays in storage with a timestamped path for history.
-
-### 2. Update edge function: `voice-briefing/index.ts`
-- **Check for existing recording**: Before generating, query `voice_briefings` for the requested month.
-- **Rate limit**: If a recording exists and `generated_at` is within the last 24 hours (adjusted: regeneration allowed 1 hour after last sync), return 429.
-- **Store audio**: Upload the MP3 to the `reports` storage bucket at path `voice-briefings/{client_id}/{year}-{month}/{timestamp}.mp3`.
-- **Upsert metadata**: Insert/update the `voice_briefings` row with the new storage path.
-- **Return audio**: Still return the MP3 binary directly.
-- **New `GET` mode**: Accept a query param or body flag `check_existing=true` that returns metadata (storage path, generated_at) without generating — so the frontend can load existing recordings instantly.
-
-Rate limit logic:
-```text
-can_regenerate = no existing recording
-  OR generated_at < (last_sync_at + 1 hour)  -- sync happened, wait 1h, then allow
-  OR generated_at is older than 24 hours       -- fallback daily reset
+After:
+```ts
+const handlePickerComplete = async () => {
+  await fetchData();
+  if (!pickerConnection) return;
+  // Re-fetch the specific connection to get updated account_id
+  const { data: conn } = await supabase
+    .from('platform_connections').select('*')
+    .eq('id', pickerConnection.id).single();
+  if (!conn || !conn.account_id || !conn.is_connected) return;
+  const months = await getSyncMonths();
+  setSyncStartTime(Date.now());
+  triggerInitialSync(conn.id, conn.platform, months, (progress) => {
+    setActiveSyncs(prev => new Map(prev).set(conn.platform, progress));
+  }).then(results => {
+    const failures = results.filter(r => !r.success);
+    if (failures.length > 0) console.error(`Sync errors for ${conn.platform}:`, failures);
+    setActiveSyncs(prev => { const next = new Map(prev); next.delete(conn.platform); return next; });
+    fetchData();
+  });
+  toast.success('Historical data sync started — progress shown below');
+};
 ```
 
-### 3. Rewrite frontend component: `VoiceBriefing.tsx`
-- **Reset state on month/year change**: Use `useEffect` watching `month` and `year` to clear audio state and check for existing recordings.
-- **Load existing on mount**: On mount or period change, query `voice_briefings` table via Supabase client to check if a recording already exists for this month.
-- **If exists**: Fetch audio from storage, set up playback immediately (show "Play" not "Generate").
-- **If not**: Show "Voice Briefing" button to generate.
-- **Rate limit feedback**: If the edge function returns 429, show a toast with when regeneration will be available.
-- **Cleanup**: Revoke old blob URLs on unmount or period change.
-
-### 4. Storage bucket
-Use the existing `reports` bucket (private). Voice briefing files stored under `voice-briefings/` prefix.
-
-## Files to create/update
-- **Migration**: Create `voice_briefings` table with RLS
-- `supabase/functions/voice-briefing/index.ts` — add storage, rate limiting, existing-check
-- `src/components/clients/dashboard/VoiceBriefing.tsx` — reset on period change, load existing, rate limit UX
-
-## How old recordings are kept
-Each generation writes a new timestamped file (`{timestamp}.mp3`). The `voice_briefings` row points to the latest. Old files remain in storage but aren't referenced — they serve as an archive. The UNIQUE constraint ensures only one "current" recording per month.
+This ensures only the platform whose account was just selected gets synced. No other files need changes.
 
