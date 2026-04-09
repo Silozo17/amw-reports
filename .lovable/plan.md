@@ -1,73 +1,76 @@
 
-I checked the actual code, live logs, LinkedIn docs, and your screenshot. The issue is not your credentials.
 
-What I found
-- OAuth is already working:
-  - `oauth-callback` successfully exchanged the auth code
-  - it discovered two ad accounts
-  - the current connection already has `account_id = 513337793` and `account_name = AMW Media LTD`
-- Your screenshot confirms the correct setup is present:
-  - redirect URL matches `/functions/v1/oauth-callback`
-  - scopes include `r_ads` and `r_ads_reporting`
-- The real failure is in the reporting request format:
-  - LinkedIn is returning `QUERY_PARAM_NOT_ALLOWED` for:
-    - `dateRange.start.day`
-    - `dateRange.start.month`
-    - `dateRange.start.year`
-    - `dateRange.end.day`
-    - `dateRange.end.month`
-    - `dateRange.end.year`
-- The official Reporting docs show `adAnalytics` expects one single Rest.li-style `dateRange` parameter:
-```text
-dateRange=(start:(year:2024,month:5,day:28),end:(year:2024,month:9,day:30))
+# Fix Voice Briefing: Per-Month State, Storage Persistence, Daily Rate Limit
+
+## Problem
+1. **Stuck audio**: Component holds a single `audioUrl` in state. When user switches month/year, the old audio persists — they can't generate a new briefing for a different period.
+2. **No persistence**: Generated audio lives only as a browser blob URL. Refreshing the page loses it.
+3. **No rate limiting**: Users can regenerate unlimited times, wasting ElevenLabs credits.
+
+## Solution
+
+### 1. New database table: `voice_briefings`
+Stores generated recordings metadata and controls rate limiting.
+
+```sql
+CREATE TABLE public.voice_briefings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id uuid NOT NULL,
+  org_id uuid NOT NULL,
+  report_month integer NOT NULL,
+  report_year integer NOT NULL,
+  storage_path text NOT NULL,
+  generated_by uuid,
+  generated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(client_id, report_month, report_year)
+);
+
+ALTER TABLE public.voice_briefings ENABLE ROW LEVEL SECURITY;
+
+-- Org members can view/manage
+CREATE POLICY "Org members can manage voice briefings" ON public.voice_briefings
+  FOR ALL TO authenticated
+  USING (user_belongs_to_org(auth.uid(), org_id));
+
+-- Client users can view
+CREATE POLICY "Client users can view voice briefings" ON public.voice_briefings
+  FOR SELECT TO authenticated
+  USING (is_client_user(auth.uid(), client_id));
 ```
-  not separate nested query params.
-- So the bug is in `sync-linkedin-ads` request serialization, not in the Client ID / Primary Client Secret.
-- The extra “App ID” is not the blocker here. Since token exchange and account discovery already succeed, I would not add it.
 
-What I will change
-1. Fix `buildAnalyticsUrl` in `supabase/functions/sync-linkedin-ads/index.ts`
-   - stop building `dateRange` as separate params
-   - build the query manually so LinkedIn receives:
+The UNIQUE constraint on `(client_id, report_month, report_year)` means each month gets exactly one recording. Regenerating replaces it (upsert), but the old file stays in storage with a timestamped path for history.
+
+### 2. Update edge function: `voice-briefing/index.ts`
+- **Check for existing recording**: Before generating, query `voice_briefings` for the requested month.
+- **Rate limit**: If a recording exists and `generated_at` is within the last 24 hours (adjusted: regeneration allowed 1 hour after last sync), return 429.
+- **Store audio**: Upload the MP3 to the `reports` storage bucket at path `voice-briefings/{client_id}/{year}-{month}/{timestamp}.mp3`.
+- **Upsert metadata**: Insert/update the `voice_briefings` row with the new storage path.
+- **Return audio**: Still return the MP3 binary directly.
+- **New `GET` mode**: Accept a query param or body flag `check_existing=true` that returns metadata (storage path, generated_at) without generating — so the frontend can load existing recordings instantly.
+
+Rate limit logic:
 ```text
-q=analytics
-pivot=ACCOUNT or CAMPAIGN
-dateRange=(start:(year:YYYY,month:M,day:1),end:(year:YYYY,month:M,day:lastDay))
-timeGranularity=MONTHLY
-accounts=List(urn%3Ali%3AsponsoredAccount%3A...)
-fields=...
+can_regenerate = no existing recording
+  OR generated_at < (last_sync_at + 1 hour)  -- sync happened, wait 1h, then allow
+  OR generated_at is older than 24 hours       -- fallback daily reset
 ```
-   - keep `fields` raw comma-separated
-   - keep `accounts=List(...)` in the format LinkedIn expects
 
-2. Leave OAuth setup unchanged
-   - no secret changes
-   - no App ID changes
-   - no scope changes unless later logs show a real permission error
+### 3. Rewrite frontend component: `VoiceBriefing.tsx`
+- **Reset state on month/year change**: Use `useEffect` watching `month` and `year` to clear audio state and check for existing recordings.
+- **Load existing on mount**: On mount or period change, query `voice_briefings` table via Supabase client to check if a recording already exists for this month.
+- **If exists**: Fetch audio from storage, set up playback immediately (show "Play" not "Generate").
+- **If not**: Show "Voice Briefing" button to generate.
+- **Rate limit feedback**: If the edge function returns 429, show a toast with when regeneration will be available.
+- **Cleanup**: Revoke old blob URLs on unmount or period change.
 
-3. Improve LinkedIn error logging
-   - log the exact final analytics URL
-   - log the full LinkedIn `errorDetails`
-   - make future failures clearly show whether they are formatting, permission, or access-tier issues
+### 4. Storage bucket
+Use the existing `reports` bucket (private). Voice briefing files stored under `voice-briefings/` prefix.
 
-4. Re-test only the LinkedIn Ads sync path
-   - no changes to organic LinkedIn
-   - no database changes
-   - no UI changes unless a later failure proves account selection is involved
+## Files to create/update
+- **Migration**: Create `voice_briefings` table with RLS
+- `supabase/functions/voice-briefing/index.ts` — add storage, rate limiting, existing-check
+- `src/components/clients/dashboard/VoiceBriefing.tsx` — reset on period change, load existing, rate limit UX
 
-Files to update
-- `supabase/functions/sync-linkedin-ads/index.ts`
+## How old recordings are kept
+Each generation writes a new timestamped file (`{timestamp}.mp3`). The `voice_briefings` row points to the latest. Old files remain in storage but aren't referenced — they serve as an archive. The UNIQUE constraint ensures only one "current" recording per month.
 
-Expected outcome
-- LinkedIn Ads sync should stop failing on parameter validation
-- the existing connected ad account should start producing monthly snapshot data
-- if anything still fails after this, it will be a real provider limitation or permission issue, not malformed requests
-
-Technical note
-```text
-Current broken request:
-...&dateRange.start.day=1&dateRange.start.month=5&dateRange.start.year=2024...
-
-Correct LinkedIn request:
-...&dateRange=(start:(year:2024,month:5,day:1),end:(year:2024,month:5,day:31))...
-```
