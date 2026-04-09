@@ -277,27 +277,25 @@ const ClientDetail = () => {
 
   const handlePickerComplete = async () => {
     await fetchData();
-    const { data: updatedConns } = await supabase
-      .from('platform_connections').select('*').eq('client_id', id!).eq('is_connected', true).not('account_id', 'is', null);
-    if (!updatedConns || updatedConns.length === 0) return;
+    if (!pickerConnection) return;
 
-    const { data: existingSnapshots } = await supabase.from('monthly_snapshots').select('platform').eq('client_id', id!).limit(100);
-    const platformsWithData = new Set((existingSnapshots ?? []).map(s => s.platform));
-    const newPlatforms = (updatedConns as PlatformConnection[]).filter(c => !platformsWithData.has(c.platform));
-    if (newPlatforms.length === 0) return;
+    // Re-fetch only the specific connection that was just configured
+    const { data: conn } = await supabase
+      .from('platform_connections').select('*')
+      .eq('id', pickerConnection.id).single();
+    if (!conn || !conn.account_id || !conn.is_connected) return;
 
+    const typedConn = conn as PlatformConnection;
     setSyncStartTime(Date.now());
     const months = await getSyncMonths();
-    for (const conn of newPlatforms) {
-      triggerInitialSync(conn.id, conn.platform, months, (progress) => {
-        setActiveSyncs(prev => { const next = new Map(prev); next.set(conn.platform, progress); return next; });
-      }).then(results => {
-        const failures = results.filter(r => !r.success);
-        if (failures.length > 0) console.error(`Auto-sync errors for ${conn.platform}:`, failures);
-        setActiveSyncs(prev => { const next = new Map(prev); next.delete(conn.platform); return next; });
-        fetchData();
-      });
-    }
+    triggerInitialSync(typedConn.id, typedConn.platform, months, (progress) => {
+      setActiveSyncs(prev => { const next = new Map(prev); next.set(typedConn.platform, progress); return next; });
+    }).then(results => {
+      const failures = results.filter(r => !r.success);
+      if (failures.length > 0) console.error(`Sync errors for ${typedConn.platform}:`, failures);
+      setActiveSyncs(prev => { const next = new Map(prev); next.delete(typedConn.platform); return next; });
+      fetchData();
+    });
     toast.success('Historical data sync started — progress shown below');
   };
 
