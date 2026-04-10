@@ -7,11 +7,214 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const LI_HEADERS = (token: string) => ({
+const LI_VERSION = "202603";
+
+const liHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
-  "LinkedIn-Version": "202503",
+  "LinkedIn-Version": LI_VERSION,
   "X-Restli-Protocol-Version": "2.0.0",
 });
+
+async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<string, string>) {
+  const res = await fetch(url, { headers: { ...liHeaders(token), ...extraHeaders } });
+  const body = await res.json();
+  if (!res.ok) {
+    console.error(`LinkedIn API error [${res.status}] for ${url}:`, JSON.stringify(body));
+    throw new Error(`LinkedIn API ${res.status}: ${body.message || body.error || JSON.stringify(body)}`);
+  }
+  return body;
+}
+
+async function getFollowerCount(orgId: string, token: string): Promise<number> {
+  try {
+    const data = await fetchLinkedIn(
+      `https://api.linkedin.com/rest/networkSizes/urn:li:organization:${orgId}?edgeType=COMPANY_FOLLOWED_BY_MEMBER`,
+      token
+    );
+    return Number(data.firstDegreeSize || 0);
+  } catch (e) {
+    console.warn(`Failed to get follower count for org ${orgId}:`, e);
+    return 0;
+  }
+}
+
+interface FollowerGains {
+  organic: number;
+  paid: number;
+}
+
+async function getFollowerGains(orgId: string, token: string, startMs: number, endMs: number): Promise<FollowerGains> {
+  try {
+    const timeIntervals = `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:MONTH)`;
+    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${orgId}&timeIntervals=${timeIntervals}`;
+    const data = await fetchLinkedIn(url, token);
+
+    let organic = 0;
+    let paid = 0;
+    for (const el of data.elements || []) {
+      organic += Number(el.followerGains?.organicFollowerGain || 0);
+      paid += Number(el.followerGains?.paidFollowerGain || 0);
+    }
+    return { organic, paid };
+  } catch (e) {
+    console.warn(`Failed to get follower gains for org ${orgId}:`, e);
+    return { organic: 0, paid: 0 };
+  }
+}
+
+interface ShareStats {
+  clicks: number;
+  comments: number;
+  likes: number;
+  shares: number;
+  impressions: number;
+  uniqueImpressions: number;
+  engagement: number;
+}
+
+async function getShareStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
+  const result: ShareStats = { clicks: 0, comments: 0, likes: 0, shares: 0, impressions: 0, uniqueImpressions: 0, engagement: 0 };
+  try {
+    const timeIntervals = `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:MONTH)`;
+    const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${orgId}&timeIntervals=${timeIntervals}`;
+    const data = await fetchLinkedIn(url, token);
+
+    for (const el of data.elements || []) {
+      const s = el.totalShareStatistics || {};
+      result.clicks += Number(s.clickCount || 0);
+      result.comments += Number(s.commentCount || 0);
+      result.likes += Number(s.likeCount || 0);
+      result.shares += Number(s.shareCount || 0);
+      result.impressions += Number(s.impressionCount || 0);
+      result.uniqueImpressions += Number(s.uniqueImpressionsCount || 0);
+      result.engagement += Number(s.engagement || 0);
+    }
+  } catch (e) {
+    console.warn(`Failed to get share stats for org ${orgId}:`, e);
+  }
+  return result;
+}
+
+interface PageViews {
+  total: number;
+  desktop: number;
+  mobile: number;
+}
+
+async function getPageStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
+  const result: PageViews = { total: 0, desktop: 0, mobile: 0 };
+  try {
+    const timeIntervals = `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:MONTH)`;
+    const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=urn:li:organization:${orgId}&timeIntervals=${timeIntervals}`;
+    const data = await fetchLinkedIn(url, token);
+
+    for (const el of data.elements || []) {
+      const views = el.totalPageStatistics?.views || {};
+      result.total += Number(views.allPageViews || 0);
+      result.desktop += Number(views.allDesktopPageViews || 0);
+      result.mobile += Number(views.allMobilePageViews || 0);
+    }
+  } catch (e) {
+    console.warn(`Failed to get page stats for org ${orgId}:`, e);
+  }
+  return result;
+}
+
+interface LinkedInPost {
+  id: string;
+  text: string;
+  permalink: string;
+  created_time: string;
+  likes: number;
+  comments: number;
+  shares: number;
+  impressions: number;
+  clicks: number;
+  total_engagement: number;
+}
+
+async function getTopContent(
+  orgId: string,
+  token: string,
+  monthStartMs: number,
+  monthEndMs: number
+): Promise<LinkedInPost[]> {
+  const posts: LinkedInPost[] = [];
+
+  try {
+    const url = `https://api.linkedin.com/rest/posts?author=urn:li:organization:${orgId}&q=author&count=100&sortBy=CREATED`;
+    const data = await fetchLinkedIn(url, token, { "X-RestLi-Method": "FINDER" });
+
+    const monthPosts: Array<{ id: string; text: string; createdAt: number }> = [];
+
+    for (const post of data.elements || []) {
+      const createdAt = post.publishedAt || post.createdAt;
+      if (!createdAt) continue;
+      const postTime = typeof createdAt === "number" ? createdAt : new Date(createdAt).getTime();
+      if (postTime < monthStartMs || postTime > monthEndMs) continue;
+
+      monthPosts.push({
+        id: post.id,
+        text: post.commentary || "",
+        createdAt: postTime,
+      });
+    }
+
+    if (monthPosts.length === 0) return posts;
+
+    // Batch fetch stats for all posts using ugcPosts param (LinkedIn still accepts post URNs here)
+    const postUrnList = monthPosts.map((p) => p.id).join(",");
+    try {
+      const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${orgId}&ugcPosts=List(${postUrnList})`;
+      const statsData = await fetchLinkedIn(statsUrl, token);
+
+      const statsMap = new Map<string, { likes: number; comments: number; shares: number; impressions: number; clicks: number }>();
+      for (const el of statsData.elements || []) {
+        const postId = el.ugcPost || el.share;
+        if (!postId) continue;
+        const s = el.totalShareStatistics || {};
+        statsMap.set(postId, {
+          likes: Number(s.likeCount || 0),
+          comments: Number(s.commentCount || 0),
+          shares: Number(s.shareCount || 0),
+          impressions: Number(s.impressionCount || 0),
+          clicks: Number(s.clickCount || 0),
+        });
+      }
+
+      for (const mp of monthPosts) {
+        const s = statsMap.get(mp.id) || { likes: 0, comments: 0, shares: 0, impressions: 0, clicks: 0 };
+        posts.push({
+          id: mp.id,
+          text: mp.text,
+          permalink: `https://www.linkedin.com/feed/update/${mp.id}`,
+          created_time: new Date(mp.createdAt).toISOString(),
+          likes: s.likes,
+          comments: s.comments,
+          shares: s.shares,
+          impressions: s.impressions,
+          clicks: s.clicks,
+          total_engagement: s.likes + s.comments + s.shares,
+        });
+      }
+    } catch (e) {
+      console.warn(`Failed to get per-post stats for org ${orgId}, returning posts without stats:`, e);
+      for (const mp of monthPosts) {
+        posts.push({
+          id: mp.id,
+          text: mp.text,
+          permalink: `https://www.linkedin.com/feed/update/${mp.id}`,
+          created_time: new Date(mp.createdAt).toISOString(),
+          likes: 0, comments: 0, shares: 0, impressions: 0, clicks: 0, total_engagement: 0,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn(`Failed to fetch posts for org ${orgId}:`, e);
+  }
+
+  return posts;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -76,7 +279,6 @@ Deno.serve(async (req) => {
       }
     }
 
-
     const { data: syncLog } = await supabase
       .from("sync_logs")
       .insert({ client_id: clientId, platform: "linkedin", status: "running", report_month: month, report_year: year, org_id: orgId })
@@ -128,107 +330,55 @@ Deno.serve(async (req) => {
     const monthStartMs = monthStart.getTime();
     const monthEndMs = monthEnd.getTime();
 
-    // ── Fetch follower stats for each organization ──
+    // ── Aggregate metrics across all organizations ──
     let totalFollowers = 0;
-
-    for (const org of organizations) {
-      try {
-        const followerUrl = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${org.id}`;
-        const followerRes = await fetch(followerUrl, { headers: LI_HEADERS(accessToken) });
-        const followerData = await followerRes.json();
-
-        if (followerData.elements?.[0]) {
-          const el = followerData.elements[0];
-          totalFollowers += Number(el.followerCounts?.organicFollowerCount || 0) + Number(el.followerCounts?.paidFollowerCount || 0);
-        }
-      } catch (e) {
-        console.warn(`LinkedIn follower stats error for org ${org.id}:`, e);
-      }
-    }
-
-    // ── Fetch organic post engagement for each organization (filtered by month) ──
-    let totalLikes = 0;
+    let followerGainsOrganic = 0;
+    let followerGainsPaid = 0;
+    let totalClicks = 0;
     let totalComments = 0;
+    let totalLikes = 0;
     let totalShares = 0;
     let totalImpressions = 0;
-    let totalClicks = 0;
-
-    interface LinkedInPost {
-      id: string;
-      text: string;
-      permalink: string;
-      created_time: string;
-      likes: number;
-      comments: number;
-      shares: number;
-      impressions: number;
-      clicks: number;
-      total_engagement: number;
-    }
-
+    let totalUniqueImpressions = 0;
+    let totalEngagement = 0;
+    let totalPageViews = 0;
+    let totalPageViewsDesktop = 0;
+    let totalPageViewsMobile = 0;
     const allPostsData: LinkedInPost[] = [];
 
     for (const org of organizations) {
-      try {
-        const postsUrl = `https://api.linkedin.com/rest/ugcPosts?q=authors&authors=List(urn:li:organization:${org.id})&count=100`;
-        const postsRes = await fetch(postsUrl, { headers: LI_HEADERS(accessToken) });
-        const postsData = await postsRes.json();
+      if (!org.id) continue;
 
-        for (const post of postsData.elements || []) {
-          // Filter by creation date — only include posts from the target month
-          const createdAt = post.created?.time || post.firstPublishedAt;
-          if (!createdAt) continue;
-          const postTime = typeof createdAt === "number" ? createdAt : new Date(createdAt).getTime();
-          if (postTime < monthStartMs || postTime > monthEndMs) continue;
+      // All four data fetches are independent per org — run in parallel
+      const [followers, gains, shareStats, pageStats] = await Promise.all([
+        getFollowerCount(org.id, accessToken),
+        getFollowerGains(org.id, accessToken, monthStartMs, monthEndMs),
+        getShareStatistics(org.id, accessToken, monthStartMs, monthEndMs),
+        getPageStatistics(org.id, accessToken, monthStartMs, monthEndMs),
+      ]);
 
-          // Fetch stats for this post
-          try {
-            const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${org.id}&ugcPosts=List(${post.id})`;
-            const statsRes = await fetch(statsUrl, { headers: LI_HEADERS(accessToken) });
-            const statsData = await statsRes.json();
+      totalFollowers += followers;
+      followerGainsOrganic += gains.organic;
+      followerGainsPaid += gains.paid;
+      totalClicks += shareStats.clicks;
+      totalComments += shareStats.comments;
+      totalLikes += shareStats.likes;
+      totalShares += shareStats.shares;
+      totalImpressions += shareStats.impressions;
+      totalUniqueImpressions += shareStats.uniqueImpressions;
+      totalEngagement += shareStats.engagement;
+      totalPageViews += pageStats.total;
+      totalPageViewsDesktop += pageStats.desktop;
+      totalPageViewsMobile += pageStats.mobile;
 
-            let postLikes = 0, postComments = 0, postShares = 0, postImpressions = 0, postClicks = 0;
-
-            for (const stat of statsData.elements || []) {
-              const s = stat.totalShareStatistics || {};
-              postLikes += Number(s.likeCount || 0);
-              postComments += Number(s.commentCount || 0);
-              postShares += Number(s.shareCount || 0);
-              postImpressions += Number(s.impressionCount || 0);
-              postClicks += Number(s.clickCount || 0);
-            }
-
-            totalLikes += postLikes;
-            totalComments += postComments;
-            totalShares += postShares;
-            totalImpressions += postImpressions;
-            totalClicks += postClicks;
-
-            // Extract post text
-            const specificContent = post.specificContent?.["com.linkedin.ugc.ShareContent"];
-            const postText = specificContent?.shareCommentary?.text || "";
-            const postPermalink = `https://www.linkedin.com/feed/update/${post.id}`;
-
-            allPostsData.push({
-              id: post.id,
-              text: postText,
-              permalink: postPermalink,
-              created_time: new Date(postTime).toISOString(),
-              likes: postLikes,
-              comments: postComments,
-              shares: postShares,
-              impressions: postImpressions,
-              clicks: postClicks,
-              total_engagement: postLikes + postComments + postShares,
-            });
-          } catch {} // non-blocking per post
-        }
-      } catch (e) {
-        console.warn(`LinkedIn org posts error for ${org.id}:`, e);
-      }
+      // Fetch top content (separate call — Posts API)
+      const orgPosts = await getTopContent(org.id, accessToken, monthStartMs, monthEndMs);
+      allPostsData.push(...orgPosts);
     }
 
-    const totalEngagement = totalLikes + totalComments + totalShares;
+    const engagementRate = totalImpressions > 0
+      ? (totalEngagement / totalImpressions) * 100
+      : 0;
 
     // Sort top content by engagement descending, keep top 10
     allPostsData.sort((a, b) => b.total_engagement - a.total_engagement);
@@ -246,15 +396,21 @@ Deno.serve(async (req) => {
 
     const metricsData = {
       total_followers: totalFollowers,
+      follower_gains_organic: followerGainsOrganic,
+      follower_gains_paid: followerGainsPaid,
       impressions: totalImpressions,
+      unique_impressions: totalUniqueImpressions,
       clicks: totalClicks,
       likes: totalLikes,
       comments: totalComments,
       shares: totalShares,
       engagement: totalEngagement,
-      engagement_rate: totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0,
-      organizations_count: organizations.length,
+      engagement_rate: engagementRate,
+      page_views: totalPageViews,
+      page_views_desktop: totalPageViewsDesktop,
+      page_views_mobile: totalPageViewsMobile,
       posts_published: allPostsData.length,
+      organizations_count: organizations.length,
     };
 
     // Select-then-update/insert pattern
