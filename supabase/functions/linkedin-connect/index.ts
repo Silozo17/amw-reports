@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         connection_id,
         platform: "linkedin",
-        redirect_url: redirect_url || "https://amw-reports.lovable.app",
+        redirect_url: redirect_url || "https://reports.amwmedia.co.uk",
       })
     );
 
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("client_id", clientId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
-    authUrl.searchParams.set("scope", "openid r_organization_social r_organization_social_feed rw_organization_admin");
+    authUrl.searchParams.set("scope", "r_organization_social r_organization_social_feed rw_organization_admin r_member_profileAnalytics");
     authUrl.searchParams.set("state", state);
 
     return new Response(
