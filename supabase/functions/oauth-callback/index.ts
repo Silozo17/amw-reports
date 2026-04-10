@@ -679,25 +679,45 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   // Discover ALL organization pages (NO ad accounts — pages only)
   const organizations: Array<{ id: string; name: string }> = [];
   try {
+    // Step 1: Get org URNs the user administers (no projection — forbidden on newer API versions)
     const orgRes = await fetch(
-      "https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&projection=(elements*(organization~(id,localizedName)))",
+      "https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR",
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "LinkedIn-Version": "202503",
+          "LinkedIn-Version": "202603",
           "X-Restli-Protocol-Version": "2.0.0",
         },
       }
     );
     const orgData = await orgRes.json();
-    console.log("LinkedIn organizations:", JSON.stringify(orgData));
-    if (orgData.elements?.length > 0) {
-      for (const el of orgData.elements) {
-        const org = el["organization~"];
-        if (org) {
-          organizations.push({ id: String(org.id), name: org.localizedName || String(org.id) });
+    console.log("LinkedIn organizationAcls:", JSON.stringify(orgData));
+
+    // Step 2: Fetch each org's name individually
+    for (const el of orgData.elements || []) {
+      const orgUrn = el.organization; // "urn:li:organization:12345"
+      if (!orgUrn) continue;
+      const orgId = orgUrn.split(":").pop();
+      let name = orgId;
+      try {
+        const detailRes = await fetch(
+          `https://api.linkedin.com/rest/organizations/${orgId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "LinkedIn-Version": "202603",
+              "X-Restli-Protocol-Version": "2.0.0",
+            },
+          }
+        );
+        if (detailRes.ok) {
+          const detail = await detailRes.json();
+          name = detail.localizedName || orgId;
         }
+      } catch {
+        // Fall back to orgId as name
       }
+      organizations.push({ id: orgId!, name: name! });
     }
   } catch (e) {
     console.warn("Could not discover LinkedIn organizations:", e);
