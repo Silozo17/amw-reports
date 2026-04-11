@@ -16,13 +16,31 @@ const liHeaders = (token: string) => ({
 });
 
 async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<string, string>) {
-  const res = await fetch(url, { headers: { ...liHeaders(token), ...extraHeaders } });
-  const body = await res.json();
-  if (!res.ok) {
-    console.error(`LinkedIn API error [${res.status}] for ${url}:`, JSON.stringify(body));
-    throw new Error(`LinkedIn API ${res.status}: ${body.message || body.error || JSON.stringify(body)}`);
+  const doFetch = async () => {
+    const res = await fetch(url, { headers: { ...liHeaders(token), ...extraHeaders } });
+    const body = await res.json();
+    if (!res.ok) {
+      if (res.status === 429) {
+        return { _retry: true, body, status: res.status };
+      }
+      console.error(`LinkedIn API error [${res.status}] for ${url}:`, JSON.stringify(body));
+      throw new Error(`LinkedIn API ${res.status}: ${body.message || body.error || JSON.stringify(body)}`);
+    }
+    return body;
+  };
+
+  const first = await doFetch();
+  if (first?._retry) {
+    console.warn(`LinkedIn 429 for ${url}, retrying after 3s...`);
+    await new Promise((r) => setTimeout(r, 3000));
+    const retry = await doFetch();
+    if (retry?._retry) {
+      console.error(`LinkedIn API error [429] for ${url} after retry:`, JSON.stringify(retry.body));
+      throw new Error(`LinkedIn API 429: ${retry.body.message || "Rate limit exceeded"}`);
+    }
+    return retry;
   }
-  return body;
+  return first;
 }
 
 async function getFollowerCount(orgId: string, token: string): Promise<number> {
@@ -324,7 +342,12 @@ Deno.serve(async (req) => {
     }
 
     const metadata = conn.metadata as Record<string, unknown> | null;
-    const organizations = ((metadata?.organizations) as Array<{ id?: string; name?: string }>) || [];
+    // Sync only the selected organization (account_id) to minimize API calls
+    const selectedOrgId = conn.account_id;
+    const selectedOrgMeta = metadata?.selected_organization as { id?: string; name?: string } | undefined;
+    const organizations: Array<{ id?: string; name?: string }> = selectedOrgId
+      ? [{ id: selectedOrgId, name: selectedOrgMeta?.name || selectedOrgId }]
+      : ((metadata?.organizations) as Array<{ id?: string; name?: string }>) || [];
 
     // Date range for the target month
     const monthStart = new Date(year, month - 1, 1);
