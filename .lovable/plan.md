@@ -1,29 +1,39 @@
 
 
-# Categorise Platform Filter Dropdown
+# Fix: LinkedIn Sync — Rate Limiting and Single-Org Scope
 
-## What changes
-Single file: `src/components/clients/DashboardHeader.tsx` (lines 232-257)
+## Problem
+All LinkedIn API calls return **429 — daily rate limit exceeded**. Two contributing factors:
 
-Replace the flat `availablePlatforms.map(...)` list with grouped sections using category headers and a defined display order.
+1. The sync loops over **all 5 organisations** in `metadata.organizations` instead of only the one the user selected (`metadata.selected_organization` / `account_id`).
+2. Each org triggers 5 parallel API calls (followers, gains, shares, page stats, posts). With 5 orgs × 5 endpoints = 25 calls per sync invocation. The backfill triggered 12+ months of syncs, exhausting LinkedIn's daily quota.
 
-## Categories and order
+## Fix (single file: `supabase/functions/sync-linkedin/index.ts`)
 
-| Category | Platforms (in order) |
-|---|---|
-| **Organic Social** | Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest |
-| **Paid Advertising** | Google Ads, Meta Ads, TikTok Ads, LinkedIn Ads |
-| **SEO & Web Analytics** | Google Search Console, Google Analytics, Google Business Profile |
+### Change 1 — Sync only the selected organization
+Replace the loop over `metadata.organizations` (line 327) with a single-org lookup using `conn.account_id` (which stores the selected org ID).
 
-## Implementation
+```typescript
+// Instead of iterating all organizations:
+const selectedOrg = conn.account_id;
+const selectedOrgName = (metadata?.selected_organization as any)?.name || selectedOrg;
+const organizations = [{ id: selectedOrg, name: selectedOrgName }];
+```
 
-1. Define a `PLATFORM_CATEGORIES` array of `{ label, platforms[] }` objects at the top of the file (or inline).
-2. Replace lines 232-257 (the separator + flat map) with a loop over categories:
-   - For each category, filter `availablePlatforms` to only those in that category (skip categories with zero available platforms).
-   - Render a small muted category label (`text-xs text-muted-foreground px-2 pt-2 pb-1`).
-   - Render each platform checkbox button (same markup as current).
-   - Add a `h-px bg-border` separator between categories.
-3. The "All Platforms" toggle at the top remains unchanged.
+This reduces API calls from 25+ down to 5 per sync invocation.
 
-No other files change. Pure UI reordering.
+### Change 2 — Add retry-with-backoff for 429 errors
+Update `fetchLinkedIn` to retry once after a short delay when it receives a 429, instead of immediately throwing.
+
+### Change 3 — Sequential org processing (safety net)
+Even though we'll only have 1 org now, if in future someone has multiple, process orgs sequentially (already the case) but add a small delay between API calls to avoid burst throttling.
+
+## Rate Limit Recovery
+LinkedIn's daily quota resets at midnight UTC. The data **will sync correctly once the quota resets** — the API calls themselves are correctly formed (the `posts_published` count from earlier syncs proves data flows when the API responds). No need to re-connect.
+
+## Summary
+- Only `supabase/functions/sync-linkedin/index.ts` changes
+- Reduces API calls by 80% (1 org instead of 5)
+- Adds 429 retry logic
+- Data will populate after LinkedIn's daily limit resets (midnight UTC)
 
