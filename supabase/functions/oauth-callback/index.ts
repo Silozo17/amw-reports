@@ -681,7 +681,7 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   try {
     // Step 1: Get org URNs the user administers (no projection — forbidden on newer API versions)
     const orgRes = await fetch(
-      "https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR",
+      "https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED",
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
