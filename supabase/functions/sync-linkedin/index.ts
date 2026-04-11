@@ -27,8 +27,9 @@ async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<s
 
 async function getFollowerCount(orgId: string, token: string): Promise<number> {
   try {
+    const urn = encodeURIComponent(`urn:li:organization:${orgId}`);
     const data = await fetchLinkedIn(
-      `https://api.linkedin.com/rest/networkSizes/urn:li:organization:${orgId}?edgeType=COMPANY_FOLLOWED_BY_MEMBER`,
+      `https://api.linkedin.com/rest/networkSizes/${urn}?edgeType=CompanyFollowedByMember`,
       token
     );
     return Number(data.firstDegreeSize || 0);
@@ -45,8 +46,8 @@ interface FollowerGains {
 
 async function getFollowerGains(orgId: string, token: string, startMs: number, endMs: number): Promise<FollowerGains> {
   try {
-    const timeIntervals = `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:MONTH)`;
-    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${orgId}&timeIntervals=${timeIntervals}`;
+    const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
     const data = await fetchLinkedIn(url, token);
 
     let organic = 0;
@@ -75,8 +76,8 @@ interface ShareStats {
 async function getShareStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
   const result: ShareStats = { clicks: 0, comments: 0, likes: 0, shares: 0, impressions: 0, uniqueImpressions: 0, engagement: 0 };
   try {
-    const timeIntervals = `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:MONTH)`;
-    const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${orgId}&timeIntervals=${timeIntervals}`;
+    const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+    const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
     const data = await fetchLinkedIn(url, token);
 
     for (const el of data.elements || []) {
@@ -104,8 +105,8 @@ interface PageViews {
 async function getPageStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
   const result: PageViews = { total: 0, desktop: 0, mobile: 0 };
   try {
-    const timeIntervals = `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:MONTH)`;
-    const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=urn:li:organization:${orgId}&timeIntervals=${timeIntervals}`;
+    const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+    const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
     const data = await fetchLinkedIn(url, token);
 
     for (const el of data.elements || []) {
@@ -142,7 +143,8 @@ async function getTopContent(
   const posts: LinkedInPost[] = [];
 
   try {
-    const url = `https://api.linkedin.com/rest/posts?author=urn:li:organization:${orgId}&q=author&count=100&sortBy=CREATED`;
+    const authorUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+    const url = `https://api.linkedin.com/rest/posts?author=${authorUrn}&q=author&count=100&sortBy=LAST_MODIFIED`;
     const data = await fetchLinkedIn(url, token, { "X-RestLi-Method": "FINDER" });
 
     const monthPosts: Array<{ id: string; text: string; createdAt: number }> = [];
@@ -162,10 +164,10 @@ async function getTopContent(
 
     if (monthPosts.length === 0) return posts;
 
-    // Batch fetch stats for all posts using ugcPosts param (LinkedIn still accepts post URNs here)
-    const postUrnList = monthPosts.map((p) => p.id).join(",");
+    const encodedPostUrns = monthPosts.map((p) => encodeURIComponent(p.id)).join(",");
+    const encodedOrgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
     try {
-      const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${orgId}&ugcPosts=List(${postUrnList})`;
+      const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedOrgUrn}&ugcPosts=List(${encodedPostUrns})`;
       const statsData = await fetchLinkedIn(statsUrl, token);
 
       const statsMap = new Map<string, { likes: number; comments: number; shares: number; impressions: number; clicks: number }>();
