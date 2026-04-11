@@ -1,61 +1,54 @@
 
 
-# Fix: LinkedIn Organization Discovery in OAuth Callback
+# Fix LinkedIn Sync — URL-Encode URNs in All API Calls
+
+## Problem
+Every LinkedIn sync API call returns 400 errors. The logs show five different endpoints all failing:
+- `networkSizes` — "Syntax exception in path variables"
+- `organizationalEntityFollowerStatistics` — "Invalid query parameters"
+- `organizationalEntityShareStatistics` — "Invalid query parameters"
+- `organizationPageStatistics` — "Invalid query parameters"
+- `posts` finder — "Invalid query parameters"
 
 ## Root Cause
-The edge function logs show the exact error:
+The LinkedIn REST API docs explicitly state: **"URNs included in the URL params must be URL encoded."** For example, `urn:li:organization:12345` must become `urn%3Ali%3Aorganization%3A12345`.
+
+The current `sync-linkedin/index.ts` passes all URNs raw (unencoded) in both path segments and query parameters.
+
+Additionally, the `timeIntervals` parameter uses RestLI 2.0 parenthetical syntax, which is fragile. The docs also show a simpler RestLI 1.0 dot-notation format that avoids encoding issues.
+
+## Fix (single file: `supabase/functions/sync-linkedin/index.ts`)
+
+Five functions need URN encoding:
+
+**1. `getFollowerCount` (line 31)** — URL-encode the URN in the path:
 ```
-LinkedIn organizations: {"status":400,"code":"ILLEGAL_ARGUMENT","message":"projection parameter is not allowed for this endpoint"}
+/rest/networkSizes/${encodeURIComponent(`urn:li:organization:${orgId}`)}?edgeType=CompanyFollowedByMember
 ```
+Also switch `edgeType` to camelCase `CompanyFollowedByMember` as shown in the docs' alternative format.
 
-Two issues in `supabase/functions/oauth-callback/index.ts` (lines 680-704):
-
-1. **`projection` parameter is not allowed** on the `organizationAcls` endpoint in newer API versions. The `organization~` decoration syntax is rejected.
-2. **API version is `202503`** (line 687) — should be `202603`.
-
-## Fix (single file: `supabase/functions/oauth-callback/index.ts`)
-
-Replace lines 680-704 with a two-step approach:
-
-**Step 1** — Call `organizationAcls?q=roleAssignee&role=ADMINISTRATOR` WITHOUT projection. This returns elements containing `organization` URNs like `urn:li:organization:12345`.
-
-**Step 2** — Extract the org ID from each URN, then fetch `/rest/organizations/{id}` individually to get the `localizedName`.
-
-**Also**: Update `LinkedIn-Version` from `202503` to `202603`.
-
-```typescript
-// Step 1: Get org URNs the user administers
-const orgRes = await fetch(
-  "https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR",
-  {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "LinkedIn-Version": "202603",
-      "X-Restli-Protocol-Version": "2.0.0",
-    },
-  }
-);
-const orgData = await orgRes.json();
-
-// Step 2: Fetch each org's name
-for (const el of orgData.elements || []) {
-  const orgUrn = el.organization; // "urn:li:organization:12345"
-  if (!orgUrn) continue;
-  const orgId = orgUrn.split(":").pop();
-  let name = orgId;
-  try {
-    const detailRes = await fetch(
-      `https://api.linkedin.com/rest/organizations/${orgId}`,
-      { headers: { Authorization: `Bearer ${accessToken}`, "LinkedIn-Version": "202603", "X-Restli-Protocol-Version": "2.0.0" } }
-    );
-    if (detailRes.ok) {
-      const detail = await detailRes.json();
-      name = detail.localizedName || orgId;
-    }
-  } catch {}
-  organizations.push({ id: orgId, name });
-}
+**2. `getFollowerGains` (lines 48-49)** — Switch to dot-notation and encode URN:
+```
+organizationalEntity=${encodeURIComponent(`urn:li:organization:${orgId}`)}
+&timeIntervals.timeGranularityType=MONTH
+&timeIntervals.timeRange.start=${startMs}
+&timeIntervals.timeRange.end=${endMs}
 ```
 
-No other files need changes. After deploy, users reconnect LinkedIn and their organisations will appear in the account picker.
+**3. `getShareStatistics` (lines 78-79)** — Same dot-notation + encoded URN pattern.
+
+**4. `getPageStatistics` (lines 107-108)** — Same dot-notation + encoded URN for the `organization` param.
+
+**5. `getTopContent` (line 145)** — Encode the `author` URN:
+```
+author=${encodeURIComponent(`urn:li:organization:${orgId}`)}&q=author&count=100&sortBy=LAST_MODIFIED
+```
+Also change `sortBy=CREATED` to `sortBy=LAST_MODIFIED` (the default per docs).
+
+**6. Per-post stats URL (line 168)** — Encode the `organizationalEntity` URN and any post URNs in the `ugcPosts` list.
+
+After changes, deploy the `sync-linkedin` edge function.
+
+## No other files change
+The fix is entirely within `supabase/functions/sync-linkedin/index.ts`. After deployment, trigger a re-sync on a LinkedIn-connected client to verify metrics flow in.
 
