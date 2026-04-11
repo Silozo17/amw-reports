@@ -235,30 +235,37 @@ const DashboardHeader = ({
               <span>All Platforms</span>
             </button>
 
-            <div className="my-1 h-px bg-border" />
-
-            {/* Individual platforms */}
-            {availablePlatforms.map(platform => {
-              const selected = isPlatformSelected(platform) && !isAll;
+            {PLATFORM_CATEGORIES.map((category, catIdx) => {
+              const catPlatforms = category.platforms.filter(p => availablePlatforms.includes(p));
+              if (catPlatforms.length === 0) return null;
               return (
-                <button
-                  key={platform}
-                  type="button"
-                  onClick={() => handleTogglePlatform(platform)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
-                    selected && "bg-accent/50"
-                  )}
-                >
-                  <div className={cn(
-                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
-                    selected ? "bg-primary text-primary-foreground" : "opacity-50"
-                  )}>
-                    {selected && <Check className="h-3 w-3" />}
-                  </div>
-                  <img src={PLATFORM_LOGOS[platform]} alt="" className="h-4 w-4 object-contain" />
-                  <span>{PLATFORM_LABELS[platform]}</span>
-                </button>
+                <div key={category.label}>
+                  <div className="my-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground px-2 pt-2 pb-1 block">{category.label}</span>
+                  {catPlatforms.map(platform => {
+                    const selected = isPlatformSelected(platform) && !isAll;
+                    return (
+                      <button
+                        key={platform}
+                        type="button"
+                        onClick={() => handleTogglePlatform(platform)}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
+                          selected && "bg-accent/50"
+                        )}
+                      >
+                        <div className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
+                          selected ? "bg-primary text-primary-foreground" : "opacity-50"
+                        )}>
+                          {selected && <Check className="h-3 w-3" />}
+                        </div>
+                        <img src={PLATFORM_LOGOS[platform]} alt="" className="h-4 w-4 object-contain" />
+                        <span>{PLATFORM_LABELS[platform]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               );
             })}
           </PopoverContent>
