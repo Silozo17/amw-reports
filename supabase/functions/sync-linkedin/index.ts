@@ -15,46 +15,47 @@ const liHeaders = (token: string) => ({
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
-async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<string, string>) {
+/**
+ * Fetch from LinkedIn API with a single 429 retry after 3s.
+ * Throws on any non-OK response (including 429 after retry).
+ */
+async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<string, string>): Promise<Record<string, unknown>> {
   const doFetch = async () => {
     const res = await fetch(url, { headers: { ...liHeaders(token), ...extraHeaders } });
     const body = await res.json();
     if (!res.ok) {
-      if (res.status === 429) {
-        return { _retry: true, body, status: res.status };
-      }
-      console.error(`LinkedIn API error [${res.status}] for ${url}:`, JSON.stringify(body));
-      throw new Error(`LinkedIn API ${res.status}: ${body.message || body.error || JSON.stringify(body)}`);
+      return { _ok: false, _status: res.status, _body: body };
     }
-    return body;
+    return { _ok: true, ...body };
   };
 
   const first = await doFetch();
-  if (first?._retry) {
-    console.warn(`LinkedIn 429 for ${url}, retrying after 3s...`);
-    await new Promise((r) => setTimeout(r, 3000));
-    const retry = await doFetch();
-    if (retry?._retry) {
-      console.error(`LinkedIn API error [429] for ${url} after retry:`, JSON.stringify(retry.body));
-      throw new Error(`LinkedIn API 429: ${retry.body.message || "Rate limit exceeded"}`);
+  if (!first._ok) {
+    if (first._status === 429) {
+      console.warn(`LinkedIn 429 for ${url}, retrying after 3s...`);
+      await new Promise((r) => setTimeout(r, 3000));
+      const retry = await doFetch();
+      if (!retry._ok) {
+        throw new Error(`LinkedIn API ${retry._status}: ${JSON.stringify(retry._body)}`);
+      }
+      return retry;
     }
-    return retry;
+    throw new Error(`LinkedIn API ${first._status}: ${JSON.stringify(first._body)}`);
   }
   return first;
 }
 
+/**
+ * Get total follower count via networkSizes endpoint.
+ * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/organization-network-size
+ */
 async function getFollowerCount(orgId: string, token: string): Promise<number> {
-  try {
-    const urn = encodeURIComponent(`urn:li:organization:${orgId}`);
-    const data = await fetchLinkedIn(
-      `https://api.linkedin.com/rest/networkSizes/${urn}?edgeType=CompanyFollowedByMember`,
-      token
-    );
-    return Number(data.firstDegreeSize || 0);
-  } catch (e) {
-    console.warn(`Failed to get follower count for org ${orgId}:`, e);
-    return 0;
-  }
+  const urn = encodeURIComponent(`urn:li:organization:${orgId}`);
+  const data = await fetchLinkedIn(
+    `https://api.linkedin.com/rest/networkSizes/${urn}?edgeType=COMPANY_FOLLOWED_BY_MEMBER`,
+    token
+  );
+  return Number(data.firstDegreeSize || 0);
 }
 
 interface FollowerGains {
@@ -62,6 +63,11 @@ interface FollowerGains {
   paid: number;
 }
 
+/**
+ * Get follower gains for a time period.
+ * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/follower-statistics
+ * Note: Only 12 months of data available. For older months this will return 0.
+ */
 async function getFollowerGains(orgId: string, token: string, startMs: number, endMs: number): Promise<FollowerGains> {
   try {
     const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
@@ -70,13 +76,16 @@ async function getFollowerGains(orgId: string, token: string, startMs: number, e
 
     let organic = 0;
     let paid = 0;
-    for (const el of data.elements || []) {
-      organic += Number(el.followerGains?.organicFollowerGain || 0);
-      paid += Number(el.followerGains?.paidFollowerGain || 0);
+    const elements = (data.elements || []) as Array<Record<string, unknown>>;
+    for (const el of elements) {
+      const gains = el.followerGains as Record<string, number> | undefined;
+      organic += Number(gains?.organicFollowerGain || 0);
+      paid += Number(gains?.paidFollowerGain || 0);
     }
     return { organic, paid };
   } catch (e) {
-    console.warn(`Failed to get follower gains for org ${orgId}:`, e);
+    // Follower gains are optional (12-month limit), log but don't fail the sync
+    console.warn(`Follower gains unavailable for org ${orgId} (expected for months >12mo ago):`, e);
     return { organic: 0, paid: 0 };
   }
 }
@@ -91,26 +100,29 @@ interface ShareStats {
   engagement: number;
 }
 
+/**
+ * Get share/post statistics for a time period.
+ * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/share-statistics
+ */
 async function getShareStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
   const result: ShareStats = { clicks: 0, comments: 0, likes: 0, shares: 0, impressions: 0, uniqueImpressions: 0, engagement: 0 };
-  try {
-    const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
-    const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
-    const data = await fetchLinkedIn(url, token);
 
-    for (const el of data.elements || []) {
-      const s = el.totalShareStatistics || {};
-      result.clicks += Number(s.clickCount || 0);
-      result.comments += Number(s.commentCount || 0);
-      result.likes += Number(s.likeCount || 0);
-      result.shares += Number(s.shareCount || 0);
-      result.impressions += Number(s.impressionCount || 0);
-      result.uniqueImpressions += Number(s.uniqueImpressionsCount || 0);
-      result.engagement += Number(s.engagement || 0);
-    }
-  } catch (e) {
-    console.warn(`Failed to get share stats for org ${orgId}:`, e);
+  const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+  const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+  const data = await fetchLinkedIn(url, token);
+
+  const elements = (data.elements || []) as Array<Record<string, unknown>>;
+  for (const el of elements) {
+    const s = (el.totalShareStatistics || {}) as Record<string, number>;
+    result.clicks += Number(s.clickCount || 0);
+    result.comments += Number(s.commentCount || 0);
+    result.likes += Number(s.likeCount || 0);
+    result.shares += Number(s.shareCount || 0);
+    result.impressions += Number(s.impressionCount || 0);
+    result.uniqueImpressions += Number(s.uniqueImpressionsCount || 0);
+    result.engagement += Number(s.engagement || 0);
   }
+
   return result;
 }
 
@@ -120,22 +132,31 @@ interface PageViews {
   mobile: number;
 }
 
+/**
+ * Get page view statistics for a time period.
+ * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/page-statistics
+ * 
+ * IMPORTANT: Page view values are nested objects: { pageViews: number }
+ * e.g. totalPageStatistics.views.allPageViews.pageViews
+ */
 async function getPageStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
   const result: PageViews = { total: 0, desktop: 0, mobile: 0 };
-  try {
-    const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
-    const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
-    const data = await fetchLinkedIn(url, token);
 
-    for (const el of data.elements || []) {
-      const views = el.totalPageStatistics?.views || {};
-      result.total += Number(views.allPageViews || 0);
-      result.desktop += Number(views.allDesktopPageViews || 0);
-      result.mobile += Number(views.allMobilePageViews || 0);
-    }
-  } catch (e) {
-    console.warn(`Failed to get page stats for org ${orgId}:`, e);
+  const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+  const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+  const data = await fetchLinkedIn(url, token);
+
+  const elements = (data.elements || []) as Array<Record<string, unknown>>;
+  for (const el of elements) {
+    const totalStats = el.totalPageStatistics as Record<string, unknown> | undefined;
+    const views = (totalStats?.views || {}) as Record<string, { pageViews?: number } | undefined>;
+
+    // Per LinkedIn docs, values are nested objects: { pageViews: number }
+    result.total += Number(views.allPageViews?.pageViews || 0);
+    result.desktop += Number(views.allDesktopPageViews?.pageViews || 0);
+    result.mobile += Number(views.allMobilePageViews?.pageViews || 0);
   }
+
   return result;
 }
 
@@ -152,6 +173,10 @@ interface LinkedInPost {
   total_engagement: number;
 }
 
+/**
+ * Get top content (posts) for a time period.
+ * This is best-effort — won't fail the sync if it errors.
+ */
 async function getTopContent(
   orgId: string,
   token: string,
@@ -167,32 +192,35 @@ async function getTopContent(
 
     const monthPosts: Array<{ id: string; text: string; createdAt: number }> = [];
 
-    for (const post of data.elements || []) {
+    const elements = (data.elements || []) as Array<Record<string, unknown>>;
+    for (const post of elements) {
       const createdAt = post.publishedAt || post.createdAt;
       if (!createdAt) continue;
-      const postTime = typeof createdAt === "number" ? createdAt : new Date(createdAt).getTime();
+      const postTime = typeof createdAt === "number" ? createdAt : new Date(createdAt as string).getTime();
       if (postTime < monthStartMs || postTime > monthEndMs) continue;
 
       monthPosts.push({
-        id: post.id,
-        text: post.commentary || "",
+        id: post.id as string,
+        text: (post.commentary || "") as string,
         createdAt: postTime,
       });
     }
 
     if (monthPosts.length === 0) return posts;
 
-    const encodedPostUrns = monthPosts.map((p) => encodeURIComponent(p.id)).join(",");
-    const encodedOrgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+    // Try to get per-post stats
     try {
+      const encodedPostUrns = monthPosts.map((p) => encodeURIComponent(p.id)).join(",");
+      const encodedOrgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
       const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedOrgUrn}&ugcPosts=List(${encodedPostUrns})`;
       const statsData = await fetchLinkedIn(statsUrl, token);
 
       const statsMap = new Map<string, { likes: number; comments: number; shares: number; impressions: number; clicks: number }>();
-      for (const el of statsData.elements || []) {
-        const postId = el.ugcPost || el.share;
+      const statsElements = (statsData.elements || []) as Array<Record<string, unknown>>;
+      for (const el of statsElements) {
+        const postId = (el.ugcPost || el.share) as string | undefined;
         if (!postId) continue;
-        const s = el.totalShareStatistics || {};
+        const s = (el.totalShareStatistics || {}) as Record<string, number>;
         statsMap.set(postId, {
           likes: Number(s.likeCount || 0),
           comments: Number(s.commentCount || 0),
@@ -218,7 +246,7 @@ async function getTopContent(
         });
       }
     } catch (e) {
-      console.warn(`Failed to get per-post stats for org ${orgId}, returning posts without stats:`, e);
+      console.warn(`Per-post stats failed for org ${orgId}, returning posts without stats:`, e);
       for (const mp of monthPosts) {
         posts.push({
           id: mp.id,
@@ -342,12 +370,16 @@ Deno.serve(async (req) => {
     }
 
     const metadata = conn.metadata as Record<string, unknown> | null;
-    // Sync only the selected organization (account_id) to minimize API calls
+    // Sync ONLY the selected organization (account_id) — single org scope
     const selectedOrgId = conn.account_id;
+    if (!selectedOrgId) {
+      throw new Error("No LinkedIn organization selected. Please select a company page in the connections settings.");
+    }
+
     const selectedOrgMeta = metadata?.selected_organization as { id?: string; name?: string } | undefined;
-    const organizations: Array<{ id?: string; name?: string }> = selectedOrgId
-      ? [{ id: selectedOrgId, name: selectedOrgMeta?.name || selectedOrgId }]
-      : ((metadata?.organizations) as Array<{ id?: string; name?: string }>) || [];
+    const orgName = selectedOrgMeta?.name || selectedOrgId;
+
+    console.log(`LinkedIn sync: org=${selectedOrgId} (${orgName}), month=${month}/${year}`);
 
     // Date range for the target month
     const monthStart = new Date(year, month - 1, 1);
@@ -355,59 +387,31 @@ Deno.serve(async (req) => {
     const monthStartMs = monthStart.getTime();
     const monthEndMs = monthEnd.getTime();
 
-    // ── Aggregate metrics across all organizations ──
-    let totalFollowers = 0;
-    let followerGainsOrganic = 0;
-    let followerGainsPaid = 0;
-    let totalClicks = 0;
-    let totalComments = 0;
-    let totalLikes = 0;
-    let totalShares = 0;
-    let totalImpressions = 0;
-    let totalUniqueImpressions = 0;
-    let totalEngagement = 0;
-    let totalPageViews = 0;
-    let totalPageViewsDesktop = 0;
-    let totalPageViewsMobile = 0;
-    const allPostsData: LinkedInPost[] = [];
+    // ── Fetch all data — critical endpoints fail-fast ──
+    // Followers count + share stats + page stats are critical (errors fail the sync)
+    // Follower gains is optional (12-month limit)
+    // Top content is best-effort
+    const [followers, shareStats, pageStats] = await Promise.all([
+      getFollowerCount(selectedOrgId, accessToken),
+      getShareStatistics(selectedOrgId, accessToken, monthStartMs, monthEndMs),
+      getPageStatistics(selectedOrgId, accessToken, monthStartMs, monthEndMs),
+    ]);
 
-    for (const org of organizations) {
-      if (!org.id) continue;
+    // These are non-critical — won't fail the sync
+    const [gains, topContentRaw] = await Promise.all([
+      getFollowerGains(selectedOrgId, accessToken, monthStartMs, monthEndMs),
+      getTopContent(selectedOrgId, accessToken, monthStartMs, monthEndMs),
+    ]);
 
-      // All four data fetches are independent per org — run in parallel
-      const [followers, gains, shareStats, pageStats] = await Promise.all([
-        getFollowerCount(org.id, accessToken),
-        getFollowerGains(org.id, accessToken, monthStartMs, monthEndMs),
-        getShareStatistics(org.id, accessToken, monthStartMs, monthEndMs),
-        getPageStatistics(org.id, accessToken, monthStartMs, monthEndMs),
-      ]);
+    console.log(`LinkedIn sync results: followers=${followers}, impressions=${shareStats.impressions}, pageViews=${pageStats.total}, posts=${topContentRaw.length}`);
 
-      totalFollowers += followers;
-      followerGainsOrganic += gains.organic;
-      followerGainsPaid += gains.paid;
-      totalClicks += shareStats.clicks;
-      totalComments += shareStats.comments;
-      totalLikes += shareStats.likes;
-      totalShares += shareStats.shares;
-      totalImpressions += shareStats.impressions;
-      totalUniqueImpressions += shareStats.uniqueImpressions;
-      totalEngagement += shareStats.engagement;
-      totalPageViews += pageStats.total;
-      totalPageViewsDesktop += pageStats.desktop;
-      totalPageViewsMobile += pageStats.mobile;
-
-      // Fetch top content (separate call — Posts API)
-      const orgPosts = await getTopContent(org.id, accessToken, monthStartMs, monthEndMs);
-      allPostsData.push(...orgPosts);
-    }
-
-    const engagementRate = totalImpressions > 0
-      ? (totalEngagement / totalImpressions) * 100
+    const engagementRate = shareStats.impressions > 0
+      ? (shareStats.engagement / shareStats.impressions) * 100
       : 0;
 
     // Sort top content by engagement descending, keep top 10
-    allPostsData.sort((a, b) => b.total_engagement - a.total_engagement);
-    const topContent = allPostsData.slice(0, 10).map((p) => ({
+    topContentRaw.sort((a, b) => b.total_engagement - a.total_engagement);
+    const topContent = topContentRaw.slice(0, 10).map((p) => ({
       message: p.text,
       permalink_url: p.permalink,
       created_time: p.created_time,
@@ -420,22 +424,22 @@ Deno.serve(async (req) => {
     }));
 
     const metricsData = {
-      total_followers: totalFollowers,
-      follower_gains_organic: followerGainsOrganic,
-      follower_gains_paid: followerGainsPaid,
-      impressions: totalImpressions,
-      unique_impressions: totalUniqueImpressions,
-      clicks: totalClicks,
-      likes: totalLikes,
-      comments: totalComments,
-      shares: totalShares,
-      engagement: totalEngagement,
+      total_followers: followers,
+      follower_gains_organic: gains.organic,
+      follower_gains_paid: gains.paid,
+      impressions: shareStats.impressions,
+      unique_impressions: shareStats.uniqueImpressions,
+      clicks: shareStats.clicks,
+      likes: shareStats.likes,
+      comments: shareStats.comments,
+      shares: shareStats.shares,
+      engagement: shareStats.engagement,
       engagement_rate: engagementRate,
-      page_views: totalPageViews,
-      page_views_desktop: totalPageViewsDesktop,
-      page_views_mobile: totalPageViewsMobile,
-      posts_published: allPostsData.length,
-      organizations_count: organizations.length,
+      page_views: pageStats.total,
+      page_views_desktop: pageStats.desktop,
+      page_views_mobile: pageStats.mobile,
+      posts_published: topContentRaw.length,
+      organizations_count: 1,
     };
 
     // Select-then-update/insert pattern
@@ -468,11 +472,12 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     console.error("LinkedIn sync error:", e);
+    const errorMsg = e instanceof Error ? e.message : "Unknown error";
     if (connectionId) {
-      await supabase.from("platform_connections").update({ last_sync_status: "failed", last_error: e instanceof Error ? e.message : "Unknown error" }).eq("id", connectionId);
+      await supabase.from("platform_connections").update({ last_sync_status: "failed", last_error: errorMsg }).eq("id", connectionId);
     }
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      JSON.stringify({ error: errorMsg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
