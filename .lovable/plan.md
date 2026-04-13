@@ -1,42 +1,29 @@
 
 
-## Plan: Fix Meta Ads Lead Double-Counting
+## Plan: Remove Reach from Facebook Entirely
 
-### Problem
-The `extractLeads` function (lines 349-360) sums four lead action types:
-- `lead` (rolled-up total)
-- `onsite_conversion.lead_grouped`
-- `offsite_conversion.fb_pixel_lead`
-- `onsite_web_lead`
+### What and Why
+Facebook's reach metrics (`page_total_media_view_unique`) are unreliable for distinguishing organic vs paid. Rather than continuing to fix the subtraction model, we'll remove reach from Facebook entirely — both the sync logic and the frontend display.
 
-Meta's API often returns `lead` as an aggregate that already includes the sub-types. Summing all of them double-counts leads (2 real leads showing as 4).
+### Changes
 
-### Fix — `supabase/functions/sync-meta-ads/index.ts`
+**1. `supabase/functions/sync-facebook-page/index.ts`**
+- Remove variable declarations `totalUniqueViewers` and `totalUniqueViewersOrganic` (lines 238-239)
+- Remove the entire reach try/catch block (lines 291-333)
+- Remove `reach` and `reach_total` from `metricsData` object (lines 479-480)
+- Remove `reach=${totalUniqueViewers}` from the final console.log (line 550)
 
-Change `extractLeads` to use a **priority-based approach**:
-1. If `lead` action type exists, use it exclusively (it's the rolled-up total)
-2. If `lead` is missing, fall back to summing the granular sub-types
+**2. `src/components/clients/dashboard/PlatformSection.tsx`**
+- Remove `'reach'` from `FACEBOOK_KEY_METRICS` array (line 95)
 
-```typescript
-const extractLeads = (actions: any[]): number => {
-  const leadAction = actions.find(a => a.action_type === "lead");
-  if (leadAction) return Number(leadAction.value || 0);
+**3. `src/components/clients/PlatformMetricsCard.tsx`**
+- Add a filter to hide `reach` and `reach_total` metrics when platform is `facebook`
 
-  let leads = 0;
-  for (const action of actions) {
-    if (action.action_type === "onsite_conversion.lead_grouped" ||
-        action.action_type === "offsite_conversion.fb_pixel_lead" ||
-        action.action_type === "onsite_web_lead") {
-      leads += Number(action.value || 0);
-    }
-  }
-  return leads;
-};
-```
+No database changes needed. Other platforms' reach metrics are untouched.
 
-### Files to Change
-1. `supabase/functions/sync-meta-ads/index.ts` — update `extractLeads` function (lines 349-360)
-
-### No Database or Frontend Changes
-After deploying, a re-sync of April data will produce the correct lead count.
+### Technical Detail
+- The `PlatformMetricsCard` will filter out metric keys `reach` and `reach_total` only when `platform === 'facebook'`
+- The sync function will no longer make any API calls for `page_total_media_view_unique`
+- Existing stored snapshot data with reach values will still exist but won't display
+- Edge function will be redeployed after changes
 
