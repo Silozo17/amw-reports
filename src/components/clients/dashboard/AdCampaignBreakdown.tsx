@@ -71,6 +71,7 @@ interface AdCampaignBreakdownProps {
     creatives?: Record<string, unknown>;
   };
   currSymbol: string;
+  adGroupLabel?: string;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────
