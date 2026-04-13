@@ -90,6 +90,7 @@ interface PlatformSectionProps {
 const AD_PLATFORM_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'conversions', 'cost_per_conversion', 'reach'];
 const META_ADS_KEY_METRICS = ['impressions', 'clicks', 'ctr', 'spend', 'cpc', 'leads', 'cost_per_lead', 'reach'];
 const SOCIAL_KEY_METRICS = ['reach', 'impressions', 'engagement', 'likes', 'comments', 'shares', 'total_followers', 'follower_growth', 'profile_visits', 'website_clicks', 'video_views', 'saves', 'reel_count'];
+const LINKEDIN_KEY_METRICS = ['total_followers', 'follower_growth', 'impressions', 'engagement', 'engagement_rate', 'likes', 'comments', 'shares', 'clicks', 'page_views', 'posts_published'];
 const FACEBOOK_KEY_METRICS = ['views', 'reach', 'engagement', 'reactions', 'comments', 'shares', 'total_followers', 'follower_growth', 'posts_published'];
 const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'total_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session', 'engaged_sessions', 'ga_engagement_rate'];
 const GSC_KEY_METRICS = ['search_clicks', 'search_impressions', 'search_ctr', 'search_position'];
@@ -102,7 +103,7 @@ const PLATFORM_KEY_METRICS: Record<string, string[]> = {
   facebook: FACEBOOK_KEY_METRICS,
   instagram: SOCIAL_KEY_METRICS,
   tiktok: SOCIAL_KEY_METRICS,
-  linkedin: SOCIAL_KEY_METRICS,
+  linkedin: LINKEDIN_KEY_METRICS,
   google_analytics: ANALYTICS_KEY_METRICS,
   google_search_console: GSC_KEY_METRICS,
   google_business_profile: GBP_KEY_METRICS,
