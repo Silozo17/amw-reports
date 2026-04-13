@@ -1,78 +1,71 @@
 
-Goal: fix LinkedIn Organic properly, based on the April 2026 docs and the actual failure in your screenshots, without touching LinkedIn Ads.
+Goal: fix LinkedIn Organic for real using the April 2026 docs and the actual live failure, not more guesswork.
 
-Do I know what the issue is? Yes.
+What I confirmed
+- LinkedIn Organic and LinkedIn Ads are already separate in this project:
+  - Organic connection row exists as `platform = linkedin`
+  - Ads connection row exists separately as `platform = linkedin_ads`
+- The live Organic connection is real and selected correctly:
+  - client: `c2b194b6-3b2c-4f5a-9f00-95e13ca28027`
+  - organic connection id: `47d8a260-a7f4-41f2-8ca0-f98e9b49cad0`
+  - selected page: `urn:li:organization:104033760`
+- The current blocking error is also real:
+  - `Invalid timeIntervals parameter ... End time must be greater than start time by at least one multiple of the granularity type [MONTH]`
 
-What’s actually wrong
-1. The current Organic sync is sending the wrong query format.
-   - `sync-linkedin` sends `X-Restli-Protocol-Version: 2.0.0`
-   - but still builds time-bound requests with dotted params like:
-     - `timeIntervals.timeGranularityType=MONTH`
-     - `timeIntervals.timeRange.start=...`
-     - `timeIntervals.timeRange.end=...`
-   - Your LinkedIn 400 screenshot matches this exactly: `QUERY_PARAM_NOT_ALLOWED`.
-   - With Rest.li 2.0, those requests must use a single `timeIntervals=(...)` param instead.
-
-2. Brand/showcase pages still hit the wrong page-stats endpoint.
-   - Current code always calls `organizationPageStatistics`
-   - April 2026 docs show brand pages must use:
-     - `brandPageStatistics?q=brand&brand=urn:li:organizationBrand:...`
-
-3. The backend snapshot I checked currently has:
-   - `0` `linkedin` rows
-   - `1` `linkedin_ads` row
-   So part of this needs a full audit of the connection flow itself: either Organic is not being persisted, or the UI is surfacing the wrong connection state.
-
-4. Organic and Ads are separate in routing already, but I need to harden the UI/backend so they cannot be confused in practice.
+Actual root cause
+- `supabase/functions/sync-linkedin/index.ts` is building monthly windows incorrectly.
+- It currently uses:
+  - start = first day of month at 00:00
+  - end = last day of month at 23:59:59.999
+- LinkedIn’s MONTH granularity expects full month boundary intervals, not “month-end minus 1ms”.
+- So the request is 1 ms short of a full month and LinkedIn rejects it.
+- This is why Organic fails before any dashboard rendering happens.
 
 Implementation plan
-1. Audit the LinkedIn Organic connection flow end-to-end
-   - trace creation of a new `linkedin` connection row
-   - verify OAuth callback updates the same organic row
-   - verify the picker saves `account_id` and `metadata.selected_organization`
-   - confirm the UI is not showing a `linkedin_ads` row as Organic
+1. Fix month interval construction in `supabase/functions/sync-linkedin/index.ts`
+- Replace the current local-time month range with a UTC month-boundary helper:
+  - `start = Date.UTC(year, month - 1, 1, 0, 0, 0, 0)`
+  - `end = Date.UTC(year, month, 1, 0, 0, 0, 0)`
+- Stop using `23:59:59.999` entirely for LinkedIn MONTH queries.
+- Use that helper for every LinkedIn Organic MONTH-based stats request.
 
-2. Fix request construction in `supabase/functions/sync-linkedin/index.ts`
-   - replace all time-bound LinkedIn stat requests with proper Rest.li 2.0 `timeIntervals=(...)` syntax
-   - build URLs with `URL` / `URLSearchParams` instead of manual string concatenation
-   - keep URNs encoded correctly
+2. Keep Rest.li 2.0 request formatting strict
+- Preserve `X-Restli-Protocol-Version: 2.0.0`
+- Preserve tuple syntax:
+  - `timeIntervals=(timeRange:(start:...,end:...),timeGranularityType:MONTH)`
+- Build URLs with `URL` / `searchParams` or a small dedicated helper so the request format is not hand-assembled inconsistently.
 
-3. Route Organic page-stat calls by entity type
-   - `urn:li:organization:*` → `organizationPageStatistics`
-   - `urn:li:organizationBrand:*` → `brandPageStatistics`
-   - keep share stats using the correct organic endpoint
-   - verify follower stats behavior for brand pages against docs and fail clearly if unsupported
+3. Align endpoint behavior to the docs, but only where needed
+- Keep Organic scoped to the selected Organic page only.
+- Keep the existing entity routing:
+  - company page → `organizationPageStatistics`
+  - brand/showcase page → `brandPageStatistics`
+- Keep LinkedIn Ads untouched.
 
-4. Re-check OAuth discovery and selection persistence
-   - ensure Organic discovery stores full URN + `entityType`
-   - ensure the selected Organic page is the one used for sync
-   - ensure Ads metadata remains completely separate
+4. Make failure reporting complete
+- In `sync-linkedin`, update the `sync_logs` row to `failed` with `error_message` in the catch path, not just `platform_connections.last_error`.
+- Keep fail-fast behavior so real API problems stay visible.
 
-5. Make Organic failures explicit
-   - preserve fail-fast behavior
-   - store the exact LinkedIn API error on the connection
-   - stop any “connected but silently wrong” state for Organic
+5. Validate against the live Organic connection
+- Re-test the actual failing Organic connection, not a hypothetical one.
+- Verify:
+  - no more MONTH interval error
+  - Organic sync returns success
+  - `last_sync_at` is populated for the Organic row
+  - a `monthly_snapshots` row is created for platform `linkedin`
+  - the dashboard then renders LinkedIn metrics from that snapshot
 
-6. Validate after implementation
-   - create/reconnect a real `linkedin` Organic connection
-   - confirm the backend contains a `linkedin` row, not just `linkedin_ads`
-   - trigger Organic sync
-   - verify no more `QUERY_PARAM_NOT_ALLOWED` errors
-   - verify snapshots contain real Organic metrics
-   - verify the Connections tab and dashboard show LinkedIn Organic data correctly
-
-Files to update
+Files to change
 - `supabase/functions/sync-linkedin/index.ts`
-- `supabase/functions/oauth-callback/index.ts`
-- `src/components/clients/AccountPickerDialog.tsx`
-- likely the connection UI file(s) that surface connection state:
-  - `src/components/clients/tabs/ClientConnectionsTab.tsx`
-  - possibly `src/pages/ClientPortalAuth.tsx` / `src/pages/Connections.tsx`
+
+Technical details
+- Live evidence shows the failure is not OAuth, not picker selection, and not an Organic/Ads mix-up.
+- The selected Organic page is already persisted.
+- The bad request is specifically the monthly interval shape.
+- The safe fix is to use exact month-start to next-month-start UTC boundaries for MONTH granularity.
 
 Expected outcome
-- LinkedIn Organic uses the correct April 2026 request format
-- Company pages and brand/showcase pages use the right Organic endpoints
-- Organic and Ads remain fully separate in both storage and UI
-- a real LinkedIn Organic page can be connected and synced without the current 400 errors
-
-No database schema changes expected.
+- LinkedIn Organic sync stops failing on `timeIntervals`
+- Organic snapshots start saving under `platform = linkedin`
+- Dashboard can display LinkedIn Organic data once the snapshot exists
+- LinkedIn Ads remains fully separate and unchanged
