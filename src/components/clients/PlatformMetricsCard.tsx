@@ -52,11 +52,14 @@ const PlatformMetricsCard = ({ platform, metrics, prevMetrics, currencyCode = 'G
   const [isOpen, setIsOpen] = useState(true);
   const isOrganic = ORGANIC_PLATFORMS.has(platform);
 
+  const FACEBOOK_HIDDEN_METRICS = new Set(['reach', 'reach_total']);
+
   const metricEntries = Object.entries(metrics).filter(
     ([key, val]) =>
       typeof val === 'number' &&
       !HIDDEN_METRICS.has(key) &&
       !(isOrganic && AD_METRICS.has(key)) &&
+      !(platform === 'facebook' && FACEBOOK_HIDDEN_METRICS.has(key)) &&
       (enabledMetrics ? enabledMetrics.includes(key) : true)
   );
   const currencySymbol = getCurrencySymbol(currencyCode);

@@ -235,8 +235,6 @@ Deno.serve(async (req) => {
     // ── Accumulators ──
     let totalViews = 0;       // organic only
     let totalViewsAll = 0;    // organic + paid
-    let totalUniqueViewers = 0;
-    let totalUniqueViewersOrganic = 0;
     let followerStart = 0;
     let followerEnd = 0;
     let coreInsightsFetched = false;
@@ -286,50 +284,6 @@ Deno.serve(async (req) => {
         }
       } catch (err) {
         console.error(`Organic views exception ${pageId}:`, err instanceof Error ? err.message : err);
-      }
-
-      // ── Reach: organic via page_total_media_view_unique breakdown ──
-      try {
-        // Step 1: Total reach (no breakdown)
-        const totalReachData = await fetchPageInsights(
-          pageId, pageToken,
-          ["page_total_media_view_unique"],
-          startDate, endDate
-        );
-        const pageTotalReach = sumDailyValues(totalReachData, "page_total_media_view_unique");
-        totalUniqueViewers += pageTotalReach;
-
-        // Step 2: Fetch is_from_ads breakdown to isolate paid reach
-        let pagePaidReach = 0;
-        try {
-          const reachUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_total_media_view_unique&breakdown=is_from_ads&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-          const reachRes = await fetchWithTimeout(reachUrl);
-          const reachBody = await reachRes.json();
-          if (reachRes.ok && reachBody.data) {
-            for (const metric of reachBody.data) {
-              if (metric.name === 'page_total_media_view_unique') {
-                for (const dayEntry of (metric.values || [])) {
-                  const val = dayEntry.value;
-                  if (typeof val === 'object' && val !== null) {
-                    // Breakdown returns { "true": paidCount, "false": organicCount }
-                    pagePaidReach += Number(val['true'] || val['True'] || val['1'] || 0);
-                  }
-                }
-              }
-            }
-          }
-        } catch (breakdownErr) {
-          console.warn(`Reach breakdown failed for ${pageId}, assuming no paid reach:`, breakdownErr instanceof Error ? breakdownErr.message : breakdownErr);
-        }
-
-        // Step 3: Organic = Total - Paid (never negative)
-        const pageOrganicReach = Math.max(0, pageTotalReach - pagePaidReach);
-        totalUniqueViewersOrganic += pageOrganicReach;
-
-        console.log(`Reach for ${pageId}: total=${pageTotalReach}, paid=${pagePaidReach}, organic=${pageOrganicReach}`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Reach fetch failed page ${pageId}:`, msg);
       }
 
       // ── Followers: first and last daily value for growth calculation ──
@@ -476,8 +430,6 @@ Deno.serve(async (req) => {
     const metricsData = {
       views:           totalViews,
       views_total:     totalViewsAll,
-      reach:           totalUniqueViewersOrganic,
-      reach_total:     totalUniqueViewers,
       engagement:      totalEngagement,
       engagement_rate: totalViews > 0 ? parseFloat(((totalEngagement / totalViews) * 100).toFixed(2)) : 0,
       total_followers: followerEnd,
@@ -547,7 +499,7 @@ Deno.serve(async (req) => {
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete (${finalStatus}). organic_views=${totalViews}, total_views=${totalViewsAll}, reach=${totalUniqueViewers}, engagement=${totalEngagement}, followers=${followerEnd}, growth=${followerGrowth}, posts=${allTopPosts.length}`);
+    console.log(`Facebook sync complete (${finalStatus}). organic_views=${totalViews}, total_views=${totalViewsAll}, engagement=${totalEngagement}, followers=${followerEnd}, growth=${followerGrowth}, posts=${allTopPosts.length}`);
 
     return new Response(JSON.stringify({ success: true, status: finalStatus, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
