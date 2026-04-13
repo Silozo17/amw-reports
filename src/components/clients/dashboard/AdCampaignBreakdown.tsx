@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '@/components/ui/table';
+import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight, ImageOff, Filter } from 'lucide-react';
+import { ChevronDown, ImageOff, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ interface AdSetItem {
   name: string;
   id: string;
   campaign_id: string;
+  campaign_name?: string;
   impressions: number;
   clicks: number;
   spend: number;
@@ -42,7 +44,9 @@ interface AdItem {
   name: string;
   id: string;
   adset_id: string;
+  adset_name?: string;
   campaign_id: string;
+  campaign_name?: string;
   impressions: number;
   clicks: number;
   spend: number;
@@ -78,90 +82,207 @@ const STATUS_COLORS: Record<string, string> = {
   DELETED: 'bg-destructive/20 text-destructive border-destructive/30',
 };
 
-const StatusBadge = ({ status }: { status: string }) => (
-  <span className={cn(
-    'inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
-    STATUS_COLORS[status] || 'bg-muted text-muted-foreground border-border',
-  )}>
-    {status?.charAt(0) + status?.slice(1).toLowerCase()}
-  </span>
-);
-
-const fmtCurrency = (val: number, sym: string) =>
-  `${sym}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const fmtNum = (val: number) => {
-  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
-  return Math.round(val).toLocaleString();
+const StatusBadge = ({ status }: { status: string | undefined | null }) => {
+  const s = status?.toUpperCase() || 'UNKNOWN';
+  const label = s.charAt(0) + s.slice(1).toLowerCase();
+  return (
+    <span className={cn(
+      'inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+      STATUS_COLORS[s] || 'bg-muted text-muted-foreground border-border',
+    )}>
+      {label}
+    </span>
+  );
 };
 
-const fmtPct = (val: number) => `${val.toFixed(2)}%`;
+const safe = (v: number | undefined | null): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
-// ─── Component ─────────────────────────────────────────────────
+const fmtCurrency = (val: number | undefined | null, sym: string) => {
+  const v = safe(val);
+  return `${sym}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const fmtNum = (val: number | undefined | null) => {
+  const v = safe(val);
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+  return Math.round(v).toLocaleString();
+};
+
+const fmtPct = (val: number | undefined | null) => `${safe(val).toFixed(2)}%`;
+
+// ─── Sub-components ────────────────────────────────────────────
+
+const CampaignsTable = ({ items, currSymbol }: { items: CampaignItem[]; currSymbol: string }) => (
+  <div className="rounded-lg border overflow-x-auto">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Campaign</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Objective</TableHead>
+          <TableHead className="text-right">Spend</TableHead>
+          <TableHead className="text-right">Impressions</TableHead>
+          <TableHead className="text-right">Clicks</TableHead>
+          <TableHead className="text-right">CTR</TableHead>
+          <TableHead className="text-right">CPC</TableHead>
+          <TableHead className="text-right">Leads</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">No campaigns found.</TableCell>
+          </TableRow>
+        ) : items.map(c => (
+          <TableRow key={c.id}>
+            <TableCell className="text-sm font-medium max-w-[250px] truncate">{c.name}</TableCell>
+            <TableCell><StatusBadge status={c.status} /></TableCell>
+            <TableCell className="text-sm text-muted-foreground capitalize">{c.objective?.toLowerCase().replace(/_/g, ' ') || '—'}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(c.spend, currSymbol)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtNum(c.impressions)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtNum(c.clicks)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtPct(c.ctr)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(c.cpc, currSymbol)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{safe(c.leads) > 0 ? fmtNum(c.leads) : '—'}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
+);
+
+const AdSetsTable = ({ items, currSymbol }: { items: AdSetItem[]; currSymbol: string }) => (
+  <div className="rounded-lg border overflow-x-auto">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Ad Set</TableHead>
+          <TableHead>Campaign</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Spend</TableHead>
+          <TableHead className="text-right">Impressions</TableHead>
+          <TableHead className="text-right">Clicks</TableHead>
+          <TableHead className="text-right">CTR</TableHead>
+          <TableHead className="text-right">CPC</TableHead>
+          <TableHead className="text-right">Leads</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">No ad sets found.</TableCell>
+          </TableRow>
+        ) : items.map(a => (
+          <TableRow key={a.id}>
+            <TableCell className="text-sm font-medium max-w-[220px] truncate">{a.name}</TableCell>
+            <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{a.campaign_name || '—'}</TableCell>
+            <TableCell><StatusBadge status={a.status} /></TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(a.spend, currSymbol)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtNum(a.impressions)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtNum(a.clicks)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtPct(a.ctr)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(a.cpc, currSymbol)}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{safe(a.leads) > 0 ? fmtNum(a.leads) : '—'}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
+);
+
+const AdCard = ({ ad, currSymbol }: { ad: AdItem; currSymbol: string }) => {
+  const thumbUrl = ad.creative?.thumbnail_url || ad.creative?.image_url;
+  return (
+    <Card className="overflow-hidden">
+      {/* Creative image */}
+      <div className="relative aspect-video bg-muted">
+        {thumbUrl ? (
+          <img
+            src={thumbUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <ImageOff className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
+        <div className="absolute top-2 right-2">
+          <StatusBadge status={ad.status} />
+        </div>
+      </div>
+
+      <CardContent className="p-3 space-y-2">
+        <p className="text-sm font-medium truncate">{ad.name}</p>
+        {ad.creative?.body && (
+          <p className="text-xs text-muted-foreground line-clamp-2">{ad.creative.body}</p>
+        )}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Spend</span>
+            <span className="tabular-nums font-medium">{fmtCurrency(ad.spend, currSymbol)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Clicks</span>
+            <span className="tabular-nums font-medium">{fmtNum(ad.clicks)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">CTR</span>
+            <span className="tabular-nums font-medium">{fmtPct(ad.ctr)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">CPC</span>
+            <span className="tabular-nums font-medium">{fmtCurrency(ad.cpc, currSymbol)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Impr.</span>
+            <span className="tabular-nums font-medium">{fmtNum(ad.impressions)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Reach</span>
+            <span className="tabular-nums font-medium">{fmtNum(ad.reach)}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ─── Main Component ────────────────────────────────────────────
 
 const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) => {
   const [open, setOpen] = useState(false);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
-  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
-  const [expandedAdSets, setExpandedAdSets] = useState<Set<string>>(new Set());
 
   const allCampaigns = rawData.campaigns || [];
   const allAdSets = rawData.adSets || [];
   const allAds = rawData.ads || [];
 
+  const isActive = (status: string | undefined | null) =>
+    (status?.toUpperCase() || '') === 'ACTIVE';
+
   const campaigns = useMemo(() => {
-    const filtered = showActiveOnly
-      ? allCampaigns.filter(c => c.status === 'ACTIVE')
-      : allCampaigns;
-    return [...filtered].sort((a, b) => b.spend - a.spend);
+    const filtered = showActiveOnly ? allCampaigns.filter(c => isActive(c.status)) : allCampaigns;
+    return [...filtered].sort((a, b) => safe(b.spend) - safe(a.spend));
   }, [allCampaigns, showActiveOnly]);
 
-  const adSetsByCampaign = useMemo(() => {
-    const map = new Map<string, AdSetItem[]>();
-    for (const as of allAdSets) {
-      if (showActiveOnly && as.status !== 'ACTIVE') continue;
-      const list = map.get(as.campaign_id) || [];
-      list.push(as);
-      map.set(as.campaign_id, list);
-    }
-    for (const [key, list] of map) {
-      map.set(key, list.sort((a, b) => b.spend - a.spend));
-    }
-    return map;
+  const adSets = useMemo(() => {
+    const filtered = showActiveOnly ? allAdSets.filter(a => isActive(a.status)) : allAdSets;
+    return [...filtered].sort((a, b) => safe(b.spend) - safe(a.spend));
   }, [allAdSets, showActiveOnly]);
 
-  const adsByAdSet = useMemo(() => {
-    const map = new Map<string, AdItem[]>();
-    for (const ad of allAds) {
-      if (showActiveOnly && ad.status !== 'ACTIVE') continue;
-      const list = map.get(ad.adset_id) || [];
-      list.push(ad);
-      map.set(ad.adset_id, list);
-    }
-    for (const [key, list] of map) {
-      map.set(key, list.sort((a, b) => b.spend - a.spend));
-    }
-    return map;
+  const ads = useMemo(() => {
+    const filtered = showActiveOnly ? allAds.filter(a => isActive(a.status)) : allAds;
+    return [...filtered].sort((a, b) => safe(b.spend) - safe(a.spend));
   }, [allAds, showActiveOnly]);
 
-  if (allCampaigns.length === 0) return null;
-
-  const toggleCampaign = (id: string) => {
-    setExpandedCampaigns(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAdSet = (id: string) => {
-    setExpandedAdSets(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  if (allCampaigns.length === 0 && allAdSets.length === 0 && allAds.length === 0) return null;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -182,146 +303,35 @@ const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) 
             <Filter className="h-3 w-3" />
             {showActiveOnly ? 'Active Only' : 'All Statuses'}
           </Button>
-          <span className="text-xs text-muted-foreground">
-            Showing {campaigns.length} of {allCampaigns.length} campaigns
-          </span>
         </div>
 
-        {/* Campaign Table */}
-        <div className="rounded-lg border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8 px-2" />
-                <TableHead>Campaign</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Spend</TableHead>
-                <TableHead className="text-right">Impressions</TableHead>
-                <TableHead className="text-right">Clicks</TableHead>
-                <TableHead className="text-right">CTR</TableHead>
-                <TableHead className="text-right">CPC</TableHead>
-                <TableHead className="text-right">Leads</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {campaigns.map(campaign => {
-                const isExpanded = expandedCampaigns.has(campaign.id);
-                const campaignAdSets = adSetsByCampaign.get(campaign.id) || [];
+        <Tabs defaultValue="campaigns" className="w-full">
+          <TabsList>
+            <TabsTrigger value="campaigns">Campaigns ({campaigns.length})</TabsTrigger>
+            <TabsTrigger value="adsets">Ad Sets ({adSets.length})</TabsTrigger>
+            <TabsTrigger value="ads">Ads ({ads.length})</TabsTrigger>
+          </TabsList>
 
-                return (
-                  <>
-                    <TableRow
-                      key={campaign.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => toggleCampaign(campaign.id)}
-                    >
-                      <TableCell className="w-8 px-2">
-                        {campaignAdSets.length > 0 ? (
-                          isExpanded
-                            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : <span className="h-3.5 w-3.5" />}
-                      </TableCell>
-                      <TableCell className="text-sm font-medium max-w-[250px] truncate">{campaign.name}</TableCell>
-                      <TableCell><StatusBadge status={campaign.status} /></TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(campaign.spend, currSymbol)}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{fmtNum(campaign.impressions)}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{fmtNum(campaign.clicks)}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{fmtPct(campaign.ctr)}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(campaign.cpc, currSymbol)}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{campaign.leads > 0 ? fmtNum(campaign.leads) : '—'}</TableCell>
-                    </TableRow>
+          <TabsContent value="campaigns">
+            <CampaignsTable items={campaigns} currSymbol={currSymbol} />
+          </TabsContent>
 
-                    {/* Ad Sets drill-down */}
-                    {isExpanded && campaignAdSets.map(adSet => {
-                      const isAdSetExpanded = expandedAdSets.has(adSet.id);
-                      const adSetAds = adsByAdSet.get(adSet.id) || [];
+          <TabsContent value="adsets">
+            <AdSetsTable items={adSets} currSymbol={currSymbol} />
+          </TabsContent>
 
-                      return (
-                        <>
-                          <TableRow
-                            key={`adset-${adSet.id}`}
-                            className="bg-muted/20 cursor-pointer hover:bg-muted/40"
-                            onClick={(e) => { e.stopPropagation(); toggleAdSet(adSet.id); }}
-                          >
-                            <TableCell className="w-8 px-2" />
-                            <TableCell className="text-sm max-w-[230px] truncate pl-6">
-                              <div className="flex items-center gap-1.5">
-                                {adSetAds.length > 0 ? (
-                                  isAdSetExpanded
-                                    ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-                                    : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                                ) : <span className="w-3" />}
-                                <span className="truncate">{adSet.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell><StatusBadge status={adSet.status} /></TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(adSet.spend, currSymbol)}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{fmtNum(adSet.impressions)}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{fmtNum(adSet.clicks)}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{fmtPct(adSet.ctr)}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(adSet.cpc, currSymbol)}</TableCell>
-                            <TableCell className="text-right text-sm tabular-nums">{adSet.leads > 0 ? fmtNum(adSet.leads) : '—'}</TableCell>
-                          </TableRow>
-
-                          {/* Ads drill-down */}
-                          {isAdSetExpanded && adSetAds.map(ad => (
-                            <TableRow
-                              key={`ad-${ad.id}`}
-                              className="bg-muted/10"
-                            >
-                              <TableCell className="w-8 px-2" />
-                              <TableCell className="text-sm max-w-[220px] pl-12">
-                                <div className="flex items-center gap-2">
-                                  {ad.creative?.thumbnail_url ? (
-                                    <img
-                                      src={ad.creative.thumbnail_url}
-                                      alt=""
-                                      className="h-8 w-8 rounded object-cover shrink-0"
-                                      loading="lazy"
-                                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                    />
-                                  ) : (
-                                    <div className="h-8 w-8 rounded bg-muted flex items-center justify-center shrink-0">
-                                      <ImageOff className="h-3 w-3 text-muted-foreground" />
-                                    </div>
-                                  )}
-                                  <div className="min-w-0">
-                                    <p className="text-sm truncate">{ad.name}</p>
-                                    {ad.creative?.body && (
-                                      <p className="text-[10px] text-muted-foreground truncate max-w-[180px]">
-                                        {ad.creative.body.slice(0, 60)}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell><StatusBadge status={ad.status} /></TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(ad.spend, currSymbol)}</TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">{fmtNum(ad.impressions)}</TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">{fmtNum(ad.clicks)}</TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">{fmtPct(ad.ctr)}</TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(ad.cpc, currSymbol)}</TableCell>
-                              <TableCell className="text-right text-sm tabular-nums">{ad.leads > 0 ? fmtNum(ad.leads) : '—'}</TableCell>
-                            </TableRow>
-                          ))}
-                        </>
-                      );
-                    })}
-                  </>
-                );
-              })}
-
-              {campaigns.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">
-                    No {showActiveOnly ? 'active ' : ''}campaigns found for this period.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+          <TabsContent value="ads">
+            {ads.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-6">No ads found.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {ads.map(ad => (
+                  <AdCard key={ad.id} ad={ad} currSymbol={currSymbol} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </CollapsibleContent>
     </Collapsible>
   );
