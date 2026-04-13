@@ -397,7 +397,126 @@ Deno.serve(async (req) => {
       ...deviceBreakdown.map((d) => ({ type: "device", ...d })),
     ];
 
-    const rawData = { campaigns, geoBreakdown, deviceBreakdown };
+    // ── Ad Group breakdown ────────────────────────────────────
+    const deadline = Date.now() + 50_000; // 50-second safety
+    let adGroups: any[] = [];
+    let ads: any[] = [];
+
+    try {
+      const adGroupQuery = `
+        SELECT
+          ad_group.name, ad_group.id, ad_group.status,
+          campaign.name, campaign.id,
+          metrics.impressions, metrics.clicks, metrics.cost_micros,
+          metrics.conversions, metrics.ctr, metrics.average_cpc
+        FROM ad_group
+        WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+          AND campaign.status != 'REMOVED'
+        ORDER BY metrics.cost_micros DESC
+      `;
+      const agRes = await fetch(searchUrl, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "developer-token": devToken, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: adGroupQuery }),
+      });
+      if (agRes.ok) {
+        const agData = await agRes.json();
+        const agResults = agData.flatMap((b: any) => b.results || []);
+        adGroups = agResults.map((row: any) => {
+          const m = row.metrics || {};
+          const costMicros = Number(m.costMicros || 0);
+          return {
+            name: row.adGroup?.name || "Unknown",
+            id: String(row.adGroup?.id || ""),
+            status: row.adGroup?.status || "UNKNOWN",
+            campaign_name: row.campaign?.name || "",
+            campaign_id: String(row.campaign?.id || ""),
+            impressions: Number(m.impressions || 0),
+            clicks: Number(m.clicks || 0),
+            spend: costMicros / 1_000_000,
+            reach: 0,
+            leads: 0,
+            ctr: Number(m.ctr || 0) * 100,
+            cpc: Number(m.averageCpc || 0) / 1_000_000,
+          };
+        });
+      } else {
+        console.warn("Ad group query failed, skipping:", await agRes.text().then(t => t.substring(0, 200)));
+      }
+    } catch (agErr) {
+      console.warn("Ad group fetch failed, skipping:", agErr);
+    }
+
+    // ── Individual Ad breakdown ────────────────────────────────
+    if (Date.now() < deadline) {
+      try {
+        const adQuery = `
+          SELECT
+            ad_group_ad.ad.id, ad_group_ad.ad.name,
+            ad_group_ad.ad.type, ad_group_ad.status,
+            ad_group_ad.ad.final_urls,
+            ad_group_ad.ad.responsive_search_ad.headlines,
+            ad_group_ad.ad.responsive_search_ad.descriptions,
+            ad_group_ad.ad.image_ad.image_url,
+            ad_group.name, ad_group.id,
+            campaign.name, campaign.id,
+            metrics.impressions, metrics.clicks, metrics.cost_micros,
+            metrics.conversions, metrics.ctr, metrics.average_cpc
+          FROM ad_group_ad
+          WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+            AND campaign.status != 'REMOVED'
+            AND ad_group_ad.status != 'REMOVED'
+          ORDER BY metrics.cost_micros DESC
+          LIMIT 200
+        `;
+        const adRes = await fetch(searchUrl, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}`, "developer-token": devToken, "Content-Type": "application/json" },
+          body: JSON.stringify({ query: adQuery }),
+        });
+        if (adRes.ok) {
+          const adData = await adRes.json();
+          const adResults = adData.flatMap((b: any) => b.results || []);
+          ads = adResults.map((row: any) => {
+            const m = row.metrics || {};
+            const costMicros = Number(m.costMicros || 0);
+            const ad = row.adGroupAd?.ad || {};
+            const headlines = ad.responsiveSearchAd?.headlines?.map((h: any) => h.text).filter(Boolean) || [];
+            const descriptions = ad.responsiveSearchAd?.descriptions?.map((d: any) => d.text).filter(Boolean) || [];
+            return {
+              name: ad.name || headlines[0] || "Ad " + (ad.id || ""),
+              id: String(ad.id || ""),
+              adset_id: String(row.adGroup?.id || ""),
+              adset_name: row.adGroup?.name || "",
+              campaign_id: String(row.campaign?.id || ""),
+              campaign_name: row.campaign?.name || "",
+              status: row.adGroupAd?.status || "UNKNOWN",
+              impressions: Number(m.impressions || 0),
+              clicks: Number(m.clicks || 0),
+              spend: costMicros / 1_000_000,
+              reach: 0,
+              leads: Number(m.conversions || 0),
+              ctr: Number(m.ctr || 0) * 100,
+              cpc: Number(m.averageCpc || 0) / 1_000_000,
+              creative: {
+                thumbnail_url: ad.imageAd?.imageUrl || null,
+                image_url: null,
+                title: headlines.join(" | ") || null,
+                body: descriptions.join(" | ") || null,
+              },
+            };
+          });
+        } else {
+          console.warn("Ad query failed, skipping:", await adRes.text().then(t => t.substring(0, 200)));
+        }
+      } catch (adErr) {
+        console.warn("Ad fetch failed, skipping:", adErr);
+      }
+    } else {
+      console.warn("Skipping ad-level query due to timeout safety");
+    }
+
+    const rawData = { campaigns, geoBreakdown, deviceBreakdown, adGroups, ads };
 
     // Upsert monthly snapshot
     const { data: existing } = await supabase

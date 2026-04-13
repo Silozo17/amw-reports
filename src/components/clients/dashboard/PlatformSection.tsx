@@ -641,6 +641,21 @@ const PlatformSection = ({
           />
         )}
 
+        {/* Google Ads Campaign Breakdown */}
+        {platform === 'google_ads' && rawData && (rawData.campaigns as any[])?.length > 0 && (
+          <AdCampaignBreakdown
+            rawData={{
+              campaigns: (rawData.campaigns as any[])?.map((c: any) => ({
+                ...c, spend: c.spend ?? c.cost, cpc: c.cpc ?? c.avg_cpc,
+              })),
+              adSets: (rawData.adGroups as any[]) || [],
+              ads: (rawData.ads as any[]) || [],
+            }}
+            currSymbol={currSymbol}
+            adGroupLabel="Ad Groups"
+          />
+        )}
+
         {/* GA4 Extended Widgets */}
         {platform === 'google_analytics' && rawData && (
           <>

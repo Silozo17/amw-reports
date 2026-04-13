@@ -71,15 +71,18 @@ interface AdCampaignBreakdownProps {
     creatives?: Record<string, unknown>;
   };
   currSymbol: string;
+  adGroupLabel?: string;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-accent/20 text-accent border-accent/30',
+  ENABLED: 'bg-accent/20 text-accent border-accent/30',
   PAUSED: 'bg-muted text-muted-foreground border-border',
   ARCHIVED: 'bg-muted text-muted-foreground/60 border-border',
   DELETED: 'bg-destructive/20 text-destructive border-destructive/30',
+  REMOVED: 'bg-destructive/20 text-destructive border-destructive/30',
 };
 
 const StatusBadge = ({ status }: { status: string | undefined | null }) => {
@@ -155,12 +158,12 @@ const CampaignsTable = ({ items, currSymbol }: { items: CampaignItem[]; currSymb
   </div>
 );
 
-const AdSetsTable = ({ items, currSymbol }: { items: AdSetItem[]; currSymbol: string }) => (
+const AdSetsTable = ({ items, currSymbol, label = 'Ad Set' }: { items: AdSetItem[]; currSymbol: string; label?: string }) => (
   <div className="rounded-lg border overflow-x-auto">
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Ad Set</TableHead>
+          <TableHead>{label}</TableHead>
           <TableHead>Campaign</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Spend</TableHead>
@@ -256,7 +259,7 @@ const AdCard = ({ ad, currSymbol }: { ad: AdItem; currSymbol: string }) => {
 
 // ─── Main Component ────────────────────────────────────────────
 
-const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) => {
+const AdCampaignBreakdown = ({ rawData, currSymbol, adGroupLabel = 'Ad Sets' }: AdCampaignBreakdownProps) => {
   const [open, setOpen] = useState(false);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
 
@@ -264,8 +267,10 @@ const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) 
   const allAdSets = rawData.adSets || [];
   const allAds = rawData.ads || [];
 
-  const isActive = (status: string | undefined | null) =>
-    (status?.toUpperCase() || '') === 'ACTIVE';
+  const isActive = (status: string | undefined | null) => {
+    const s = status?.toUpperCase() || '';
+    return s === 'ACTIVE' || s === 'ENABLED';
+  };
 
   const campaigns = useMemo(() => {
     const filtered = showActiveOnly ? allCampaigns.filter(c => isActive(c.status)) : allCampaigns;
@@ -288,7 +293,7 @@ const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) 
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
         <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
-        Campaign Breakdown ({allCampaigns.length} campaigns, {allAdSets.length} ad sets, {allAds.length} ads)
+        Campaign Breakdown ({allCampaigns.length} campaigns, {allAdSets.length} {adGroupLabel.toLowerCase()}, {allAds.length} ads)
       </CollapsibleTrigger>
 
       <CollapsibleContent className="mt-3 space-y-3">
@@ -308,7 +313,7 @@ const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) 
         <Tabs defaultValue="campaigns" className="w-full">
           <TabsList>
             <TabsTrigger value="campaigns">Campaigns ({campaigns.length})</TabsTrigger>
-            <TabsTrigger value="adsets">Ad Sets ({adSets.length})</TabsTrigger>
+            <TabsTrigger value="adsets">{adGroupLabel} ({adSets.length})</TabsTrigger>
             <TabsTrigger value="ads">Ads ({ads.length})</TabsTrigger>
           </TabsList>
 
@@ -317,7 +322,7 @@ const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) 
           </TabsContent>
 
           <TabsContent value="adsets">
-            <AdSetsTable items={adSets} currSymbol={currSymbol} />
+            <AdSetsTable items={adSets} currSymbol={currSymbol} label={adGroupLabel === 'Ad Groups' ? 'Ad Group' : 'Ad Set'} />
           </TabsContent>
 
           <TabsContent value="ads">
