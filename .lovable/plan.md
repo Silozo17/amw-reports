@@ -1,40 +1,53 @@
 
+Goal: make Facebook Reach behave like a true organic metric by deriving it from reliable inputs instead of trusting Meta’s missing/ambiguous “organic” flag.
 
-## Plan: Fix Facebook Reach to Show Organic Only
+What’s wrong now:
+- In `supabase/functions/sync-facebook-page/index.ts`, the Reach parser for `page_total_media_view_unique` still treats rows without a clean `is_from_ads` flag as organic.
+- That inflates `metrics_data.reach`, which is why you can see numbers like 26.9k even when true organic activity is much lower.
 
-### Problem
-The Facebook sync's reach parsing has a fallback (lines 317-322) that fires when the `is_from_ads` breakdown fails for `page_total_media_view_unique`. In this fallback, the total (paid + organic) value is assigned to **both** `totalUniqueViewers` and `totalUniqueViewersOrganic`, meaning `metrics_data.reach` ends up containing paid + organic reach instead of organic-only.
+Solution:
+1. Change Facebook Reach to a subtraction model
+   - Keep fetching the total reach metric: `page_total_media_view_unique`
+   - Also fetch the same metric with `breakdown=is_from_ads`
+   - From the breakdown response, count only rows explicitly marked paid (`is_from_ads = 1/true`) as paid reach
+   - Compute:
+     - `reach_total = totalReach`
+     - `reach = Math.max(0, totalReach - paidReach)`
+   - This “total - paid = organic” approach matches the safe logic you want.
 
-### Root Cause
-The `page_total_media_view_unique` metric with `breakdown=is_from_ads` may not be supported by the Facebook API for all pages, or may return data in a format that doesn't match the parser. When this happens, the fallback assigns all reach to organic — inflating the number.
+2. Remove the unsafe organic fallback
+   - Stop treating missing/unknown `is_from_ads` values as organic for Reach
+   - Stop using the breakdown response alone to build organic reach
+   - Only use the breakdown to identify paid rows, then subtract from total
 
-### Fix — `supabase/functions/sync-facebook-page/index.ts`
+3. Keep Views untouched unless needed
+   - Leave the current Views logic as-is since you’ve confirmed it is now showing the correct organic number
+   - Only update Reach logic so this stays a minimal fix
 
-**Option A (matching the views pattern):** When the breakdown fails, do NOT assign the fallback value to `totalUniqueViewersOrganic`. Only assign it to `totalUniqueViewers` (total). Set `totalUniqueViewersOrganic` to 0 for that page so the `reach` metric stays organic-only.
+4. Store the corrected snapshot values
+   - Continue writing:
+     - `metrics_data.reach` = organic inferred via subtraction
+     - `metrics_data.reach_total` = total
+   - No database or frontend changes needed because the dashboard already reads `metrics_data.reach`
 
-Change lines 317-323 from:
-```typescript
-console.warn(`Reach breakdown failed for ${pageId}, falling back to total`);
-const batch1b = await fetchPageInsights(...);
-const totalReach = sumDailyValues(batch1b, "page_total_media_view_unique");
-totalUniqueViewers += totalReach;
-totalUniqueViewersOrganic += totalReach;  // BUG: assigns total to organic
+5. Re-sync affected months
+   - Existing March data is already wrong in stored snapshots
+   - After the code fix, re-sync the affected Facebook months so the corrected organic reach replaces the inflated value
+
+Files to change:
+- `supabase/functions/sync-facebook-page/index.ts`
+
+Technical detail:
+```text
+totalReach = sum(page_total_media_view_unique)
+paidReach = sum(breakdown rows where is_from_ads is explicitly true/1)
+organicReach = max(0, totalReach - paidReach)
+
+metrics_data.reach = organicReach
+metrics_data.reach_total = totalReach
 ```
 
-To:
-```typescript
-console.warn(`Reach breakdown failed for ${pageId}, falling back to total`);
-const batch1b = await fetchPageInsights(...);
-const totalReach = sumDailyValues(batch1b, "page_total_media_view_unique");
-totalUniqueViewers += totalReach;
-// Do NOT add to organic — we can't distinguish paid vs organic without breakdown
-```
-
-This means when the breakdown fails, `reach` (organic) will be 0 rather than incorrectly inflated. `reach_total` will still have the total value.
-
-### Files to Change
-1. `supabase/functions/sync-facebook-page/index.ts` — remove the `totalUniqueViewersOrganic += totalReach` line in the fallback branch (line 322)
-
-### No Frontend or Database Changes
-The dashboard already reads `metrics_data.reach` which will now correctly contain organic-only values after re-sync.
-
+Expected result:
+- Facebook Reach will stop showing paid + organic mixed together
+- The platform card will show inferred organic reach only
+- If Meta returns bad breakdown data, Reach will still stay safe because paid is only counted when explicitly flagged
