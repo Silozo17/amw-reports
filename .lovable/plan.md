@@ -1,47 +1,74 @@
 
 
-## Plan: Redesign Meta Ads Breakdown with 3-Tab Layout and Creative Cards
+## Plan: Google Ads Campaign/Ad Group/Ad Breakdown
 
-### Problem
-The current `AdCampaignBreakdown` component uses a nested drill-down table. The user wants a layout matching Meta Ads Manager: three separate tabs (Campaigns, Ad Sets, Ads), with the Ads tab showing visual cards with creative images and metrics — not inline table rows.
+### Goal
+Add the same 3-tab hierarchical breakdown (Campaigns, Ad Groups, Ads) to Google Ads, matching what was built for Meta Ads. This requires backend changes to fetch ad group and ad-level data, and frontend changes to render the breakdown.
 
-Additionally, status shows "NaN" because some campaigns/ads have no status match in the status map, and the `StatusBadge` component does not handle missing values gracefully.
+### Backend — `supabase/functions/sync-google-ads/index.ts`
 
-### Changes
+Currently only fetches campaign-level data. Add two new GAQL queries after the existing campaign query:
 
-**1. Rewrite `src/components/clients/dashboard/AdCampaignBreakdown.tsx`**
+1. **Ad Group query** — Fetch ad group performance:
+   ```sql
+   SELECT ad_group.name, ad_group.id, ad_group.status,
+          campaign.name, campaign.id,
+          metrics.impressions, metrics.clicks, metrics.cost_micros,
+          metrics.conversions, metrics.ctr, metrics.average_cpc
+   FROM ad_group
+   WHERE segments.date BETWEEN ... AND ...
+     AND campaign.status != 'REMOVED'
+   ORDER BY metrics.cost_micros DESC
+   ```
 
-Replace the nested collapsible table with a tabbed layout using shadcn `Tabs`:
+2. **Ad query** — Fetch individual ad performance with creative info:
+   ```sql
+   SELECT ad_group_ad.ad.id, ad_group_ad.ad.name,
+          ad_group_ad.ad.type, ad_group_ad.status,
+          ad_group_ad.ad.final_urls,
+          ad_group_ad.ad.responsive_search_ad.headlines,
+          ad_group_ad.ad.responsive_display_ad.marketing_images,
+          ad_group.name, ad_group.id,
+          campaign.name, campaign.id,
+          metrics.impressions, metrics.clicks, metrics.cost_micros,
+          metrics.conversions, metrics.ctr, metrics.average_cpc
+   FROM ad_group_ad
+   WHERE segments.date BETWEEN ... AND ...
+     AND campaign.status != 'REMOVED'
+     AND ad_group_ad.status != 'REMOVED'
+   ORDER BY metrics.cost_micros DESC
+   ```
 
-- **Tab 1: Campaigns** — Table with columns: Campaign name, Status badge, Objective, Spend, Impressions, Clicks, CTR, CPC, Leads. Sorted by spend. Filter toggle for Active/All.
-- **Tab 2: Ad Sets** — Table with columns: Ad Set name, Campaign name, Status, Spend, Impressions, Clicks, CTR, CPC, Leads. Clicking a campaign name in the Campaigns tab could filter ad sets (stretch).
-- **Tab 3: Ads** — Card grid (not table). Each card shows:
-  - Creative thumbnail image (large, like the reference screenshot)
-  - Ad name
-  - Status badge
-  - Key metrics: Spend, CTR, CPC, Clicks
-  - Ad copy snippet (body text)
+3. **Store in `raw_data`**: Extend the existing `rawData` object to include `adGroups` and `ads` arrays alongside the existing `campaigns`, `geoBreakdown`, `deviceBreakdown`.
 
-The Ads tab card layout will match the reference image: large image at top, ad name below, then metric rows.
+4. **Map status**: Google Ads uses `ENABLED`, `PAUSED`, `REMOVED` — map to the same badge system.
 
-- Fix `StatusBadge` to handle undefined/null/empty status gracefully (show "Unknown" with neutral styling).
-- Fix NaN display by defaulting `ctr`/`cpc` to 0 when parsing and guarding `fmtPct`/`fmtCurrency` against NaN.
+5. **Timeout safety**: Add a 50-second deadline. If time runs short, skip the ad-level query.
 
-**2. Update `src/components/clients/dashboard/PlatformSection.tsx`**
+### Frontend — `PlatformSection.tsx`
 
-No structural changes needed — it already passes `rawData` and `currSymbol` to `AdCampaignBreakdown`. The component swap is internal.
+Add the `AdCampaignBreakdown` component for `google_ads` platform, same as `meta_ads`. The existing component already handles the 3-tab layout generically.
 
-**3. Backend — No changes needed**
+Around line 642, after the Meta Ads block, add:
+```tsx
+{platform === 'google_ads' && rawData && (rawData.campaigns as any[])?.length > 0 && (
+  <AdCampaignBreakdown rawData={rawData as any} currSymbol={currSymbol} />
+)}
+```
 
-The sync function already fetches campaigns, ad sets, ads, creatives, and statuses. The data structure in `raw_data` already has everything needed. If creative thumbnails are missing for some ads, the UI will show a placeholder.
+### Frontend — `AdCampaignBreakdown.tsx`
 
-### Files to change
-1. `src/components/clients/dashboard/AdCampaignBreakdown.tsx` — full rewrite with tabs + card grid for ads
+Minor adjustments to handle Google Ads field naming differences:
+- Google Ads uses `spend` (already converted from `cost_micros`) vs Meta's `spend` — same field name, no change needed.
+- Google uses `avg_cpc` instead of `cpc` — normalize in the mapping.
+- Google uses `ad_group` terminology instead of `ad_set` — the "Ad Sets" tab label should dynamically show "Ad Groups" for Google Ads. Add an optional `adGroupLabel` prop or detect from data shape.
+- Google Ads creatives differ: responsive search ads have headlines/descriptions text, responsive display ads have image assets. The AdCard component should handle text-only creatives gracefully (already shows placeholder when no image).
 
-### Technical details
-- Uses shadcn `Tabs` component (already in project)
-- Ads card grid: responsive `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`
-- Creative images displayed at ~200px height with `object-cover`
-- Filter bar (Active/All) persists across all three tabs
-- Tab headers show counts: "Campaigns (5)", "Ad Sets (12)", "Ads (24)"
+### Files to Change
+1. `supabase/functions/sync-google-ads/index.ts` — add ad group + ad-level GAQL queries, store in raw_data
+2. `src/components/clients/dashboard/AdCampaignBreakdown.tsx` — add `platformType` prop to switch "Ad Sets" label to "Ad Groups"
+3. `src/components/clients/dashboard/PlatformSection.tsx` — wire up AdCampaignBreakdown for `google_ads`
+
+### No Database Changes
+All data fits in existing `raw_data` JSONB column.
 
