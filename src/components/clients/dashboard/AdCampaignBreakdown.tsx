@@ -267,8 +267,10 @@ const AdCampaignBreakdown = ({ rawData, currSymbol, adGroupLabel = 'Ad Sets' }: 
   const allAdSets = rawData.adSets || [];
   const allAds = rawData.ads || [];
 
-  const isActive = (status: string | undefined | null) =>
-    (status?.toUpperCase() || '') === 'ACTIVE';
+  const isActive = (status: string | undefined | null) => {
+    const s = status?.toUpperCase() || '';
+    return s === 'ACTIVE' || s === 'ENABLED';
+  };
 
   const campaigns = useMemo(() => {
     const filtered = showActiveOnly ? allCampaigns.filter(c => isActive(c.status)) : allCampaigns;
