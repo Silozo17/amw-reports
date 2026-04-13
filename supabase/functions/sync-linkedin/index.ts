@@ -16,8 +16,18 @@ const liHeaders = (token: string) => ({
 });
 
 /**
+ * Build Rest.li 2.0 timeIntervals tuple parameter.
+ * Per April 2026 docs, when using X-Restli-Protocol-Version: 2.0.0,
+ * time-bound queries must use: timeIntervals=(timeRange:(start:X,end:Y),timeGranularityType:MONTH)
+ * URNs must be URL-encoded.
+ */
+function buildTimeIntervals(startMs: number, endMs: number, granularity: string = "MONTH"): string {
+  return `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:${granularity})`;
+}
+
+/**
  * Fetch from LinkedIn API with a single 429 retry after 3s.
- * Throws on any non-OK response.
+ * Throws on any non-OK response with the full error body for diagnostics.
  */
 async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<string, string>): Promise<Record<string, unknown>> {
   const doFetch = async () => {
@@ -51,11 +61,12 @@ async function getFollowerCount(orgUrn: string, token: string): Promise<number> 
   return Number(data.firstDegreeSize || 0);
 }
 
-/** Get follower gains (organic + paid) for a time period. Optional — won't fail sync. */
+/** Get follower gains (organic + paid) for a time period. Non-critical — won't fail sync. */
 async function getFollowerGains(orgUrn: string, token: string, startMs: number, endMs: number): Promise<{ organic: number; paid: number }> {
   try {
     const encodedUrn = encodeURIComponent(orgUrn);
-    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+    const timeParam = buildTimeIntervals(startMs, endMs, "MONTH");
+    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals=${timeParam}`;
     const data = await fetchLinkedIn(url, token);
 
     let organic = 0;
@@ -67,7 +78,7 @@ async function getFollowerGains(orgUrn: string, token: string, startMs: number, 
     }
     return { organic, paid };
   } catch (e) {
-    console.warn(`Follower gains unavailable (expected for months >12mo ago):`, e);
+    console.warn(`Follower gains unavailable:`, e);
     return { organic: 0, paid: 0 };
   }
 }
@@ -86,7 +97,8 @@ interface ShareStats {
 async function getShareStatistics(orgUrn: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
   const result: ShareStats = { clicks: 0, comments: 0, likes: 0, shares: 0, impressions: 0, uniqueImpressions: 0, engagement: 0 };
   const encodedUrn = encodeURIComponent(orgUrn);
-  const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+  const timeParam = buildTimeIntervals(startMs, endMs, "MONTH");
+  const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals=${timeParam}`;
   const data = await fetchLinkedIn(url, token);
 
   for (const el of (data.elements || []) as Array<Record<string, unknown>>) {
@@ -105,16 +117,30 @@ async function getShareStatistics(orgUrn: string, token: string, startMs: number
 
 interface PageViews { total: number; desktop: number; mobile: number }
 
-/** Get page view statistics — CRITICAL, will throw on failure. */
-async function getPageStatistics(orgUrn: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
+/**
+ * Get page view statistics — CRITICAL, will throw on failure.
+ * Routes to organizationPageStatistics or brandPageStatistics based on entity type.
+ */
+async function getPageStatistics(orgUrn: string, entityType: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
   const result: PageViews = { total: 0, desktop: 0, mobile: 0 };
   const encodedUrn = encodeURIComponent(orgUrn);
-  const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${encodedUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+  const timeParam = buildTimeIntervals(startMs, endMs, "MONTH");
+
+  let url: string;
+  if (entityType === "organizationBrand") {
+    // Brand/showcase pages use brandPageStatistics
+    url = `https://api.linkedin.com/rest/brandPageStatistics?q=brand&brand=${encodedUrn}&timeIntervals=${timeParam}`;
+  } else {
+    // Company pages use organizationPageStatistics
+    url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${encodedUrn}&timeIntervals=${timeParam}`;
+  }
+
   const data = await fetchLinkedIn(url, token);
 
   for (const el of (data.elements || []) as Array<Record<string, unknown>>) {
     const totalStats = el.totalPageStatistics as Record<string, unknown> | undefined;
-    const views = (totalStats?.views || {}) as Record<string, { pageViews?: number } | undefined>;
+    if (!totalStats) continue;
+    const views = (totalStats.views || {}) as Record<string, { pageViews?: number } | undefined>;
     result.total += Number(views.allPageViews?.pageViews || 0);
     result.desktop += Number(views.allDesktopPageViews?.pageViews || 0);
     result.mobile += Number(views.allMobilePageViews?.pageViews || 0);
@@ -317,9 +343,10 @@ Deno.serve(async (req) => {
 
     // Use the stored URN if available, otherwise reconstruct for backward compat
     const orgUrn = selectedOrg?.urn || `urn:li:organization:${selectedOrgId}`;
+    const entityType = selectedOrg?.entityType || "organization";
     const orgName = selectedOrg?.name || conn.account_name || selectedOrgId;
 
-    console.log(`LinkedIn sync: urn=${orgUrn}, name=${orgName}, month=${month}/${year}`);
+    console.log(`LinkedIn sync: urn=${orgUrn}, entityType=${entityType}, name=${orgName}, month=${month}/${year}`);
 
     // Date range for the target month
     const monthStart = new Date(year, month - 1, 1);
@@ -331,7 +358,7 @@ Deno.serve(async (req) => {
     const [followers, shareStats, pageStats] = await Promise.all([
       getFollowerCount(orgUrn, accessToken),
       getShareStatistics(orgUrn, accessToken, monthStartMs, monthEndMs),
-      getPageStatistics(orgUrn, accessToken, monthStartMs, monthEndMs),
+      getPageStatistics(orgUrn, entityType, accessToken, monthStartMs, monthEndMs),
     ]);
 
     // Non-critical — won't fail the sync
@@ -360,7 +387,7 @@ Deno.serve(async (req) => {
       total_engagement: p.total_engagement,
     }));
 
-    // Metric keys aligned with dashboard expectations (PLATFORM_AVAILABLE_METRICS in database.ts)
+    // Metric keys aligned with dashboard expectations
     const metricsData = {
       total_followers: followers,
       follower_growth: gains.organic + gains.paid,
@@ -374,7 +401,6 @@ Deno.serve(async (req) => {
       engagement_rate: engagementRate,
       page_views: pageStats.total,
       posts_published: topContentRaw.length,
-      // Detailed breakdowns (available via extraMetrics in PlatformSection)
       follower_gains_organic: gains.organic,
       follower_gains_paid: gains.paid,
       page_views_desktop: pageStats.desktop,
@@ -385,6 +411,8 @@ Deno.serve(async (req) => {
     const rawData = {
       _sync_ts: new Date().toISOString(),
       _org_urn: orgUrn,
+      _entity_type: entityType,
+      _restli_version: "2.0.0",
       follower_count_raw: followers,
       share_stats_raw: shareStats,
       page_stats_raw: pageStats,
