@@ -432,10 +432,9 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'conversions', 'conversions_value', 'reach', 'video_views', 'conversion_rate',
   ],
   linkedin: [
-    'total_followers', 'follower_growth', 'follower_removes',
+    'total_followers', 'follower_growth',
     'impressions', 'engagement', 'engagement_rate', 'likes', 'comments',
-    'shares', 'clicks', 'posts_published', 'video_views',
-    'organic_impressions',
+    'shares', 'clicks', 'page_views', 'posts_published',
   ],
   linkedin_ads: [
     'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm',
