@@ -1,71 +1,90 @@
 
-Goal: fix LinkedIn Organic for real using the April 2026 docs and the actual live failure, not more guesswork.
 
-What I confirmed
-- LinkedIn Organic and LinkedIn Ads are already separate in this project:
-  - Organic connection row exists as `platform = linkedin`
-  - Ads connection row exists separately as `platform = linkedin_ads`
-- The live Organic connection is real and selected correctly:
-  - client: `c2b194b6-3b2c-4f5a-9f00-95e13ca28027`
-  - organic connection id: `47d8a260-a7f4-41f2-8ca0-f98e9b49cad0`
-  - selected page: `urn:li:organization:104033760`
-- The current blocking error is also real:
-  - `Invalid timeIntervals parameter ... End time must be greater than start time by at least one multiple of the granularity type [MONTH]`
+## Plan: Meta Ads Campaign/Ad Set/Ad Breakdown with Creatives
 
-Actual root cause
-- `supabase/functions/sync-linkedin/index.ts` is building monthly windows incorrectly.
-- It currently uses:
-  - start = first day of month at 00:00
-  - end = last day of month at 23:59:59.999
-- LinkedIn’s MONTH granularity expects full month boundary intervals, not “month-end minus 1ms”.
-- So the request is 1 ms short of a full month and LinkedIn rejects it.
-- This is why Organic fails before any dashboard rendering happens.
+### Goal
+Expand the Meta Ads sync to pull campaign, ad set, and ad-level data including creatives (thumbnail images, ad copy, preview URLs), and display it in collapsible drill-down tables within the existing Meta Ads dashboard section. Users can filter by active vs inactive status.
 
-Implementation plan
-1. Fix month interval construction in `supabase/functions/sync-linkedin/index.ts`
-- Replace the current local-time month range with a UTC month-boundary helper:
-  - `start = Date.UTC(year, month - 1, 1, 0, 0, 0, 0)`
-  - `end = Date.UTC(year, month, 1, 0, 0, 0, 0)`
-- Stop using `23:59:59.999` entirely for LinkedIn MONTH queries.
-- Use that helper for every LinkedIn Organic MONTH-based stats request.
+### Current State
+- `sync-meta-ads` only fetches **campaign-level** insights using `level: "campaign"`.
+- Dashboard shows top 10 campaigns by spend in the "Top Content" collapsible, but only name/spend/clicks — no ad sets, no individual ads, no creatives.
+- Data is stored in `monthly_snapshots.raw_data` (JSON) and `top_content` (JSON array).
 
-2. Keep Rest.li 2.0 request formatting strict
-- Preserve `X-Restli-Protocol-Version: 2.0.0`
-- Preserve tuple syntax:
-  - `timeIntervals=(timeRange:(start:...,end:...),timeGranularityType:MONTH)`
-- Build URLs with `URL` / `searchParams` or a small dedicated helper so the request format is not hand-assembled inconsistently.
+### Backend Changes — `supabase/functions/sync-meta-ads/index.ts`
 
-3. Align endpoint behavior to the docs, but only where needed
-- Keep Organic scoped to the selected Organic page only.
-- Keep the existing entity routing:
-  - company page → `organizationPageStatistics`
-  - brand/showcase page → `brandPageStatistics`
-- Keep LinkedIn Ads untouched.
+**Add 3 new API calls** after the existing campaign insights fetch:
 
-4. Make failure reporting complete
-- In `sync-linkedin`, update the `sync_logs` row to `failed` with `error_message` in the catch path, not just `platform_connections.last_error`.
-- Keep fail-fast behavior so real API problems stay visible.
+1. **Ad Set Insights** — `GET /{ad_account_id}/insights?level=adset`
+   - Fields: `adset_name, adset_id, campaign_name, campaign_id, impressions, clicks, spend, actions, ctr, cpc, cpm, reach`
+   - Same `time_range` as campaigns
 
-5. Validate against the live Organic connection
-- Re-test the actual failing Organic connection, not a hypothetical one.
-- Verify:
-  - no more MONTH interval error
-  - Organic sync returns success
-  - `last_sync_at` is populated for the Organic row
-  - a `monthly_snapshots` row is created for platform `linkedin`
-  - the dashboard then renders LinkedIn metrics from that snapshot
+2. **Ad-Level Insights** — `GET /{ad_account_id}/insights?level=ad`
+   - Fields: `ad_name, ad_id, adset_name, adset_id, campaign_name, campaign_id, impressions, clicks, spend, actions, ctr, cpc, cpm, reach`
+   - Same `time_range`
 
-Files to change
-- `supabase/functions/sync-linkedin/index.ts`
+3. **Ad Creatives** — For each unique ad, fetch creative data:
+   - `GET /{ad_id}?fields=creative{thumbnail_url,effective_object_story_id,object_story_spec,asset_feed_spec,title,body,image_url,video_id}`
+   - Batch into groups of 50 using Facebook Batch API to avoid rate limits
+   - Store thumbnail URL, ad copy (title/body), and preview link per ad
 
-Technical details
-- Live evidence shows the failure is not OAuth, not picker selection, and not an Organic/Ads mix-up.
-- The selected Organic page is already persisted.
-- The bad request is specifically the monthly interval shape.
-- The safe fix is to use exact month-start to next-month-start UTC boundaries for MONTH granularity.
+4. **Campaign/Ad Set/Ad Status** — Fetch active vs paused/archived status:
+   - `GET /{ad_account_id}/campaigns?fields=id,name,status,objective&limit=500`
+   - `GET /{ad_account_id}/adsets?fields=id,name,status,campaign_id&limit=500`
+   - `GET /{ad_account_id}/ads?fields=id,name,status,adset_id,creative{id}&limit=500`
 
-Expected outcome
-- LinkedIn Organic sync stops failing on `timeIntervals`
-- Organic snapshots start saving under `platform = linkedin`
-- Dashboard can display LinkedIn Organic data once the snapshot exists
-- LinkedIn Ads remains fully separate and unchanged
+**Store in `raw_data`:**
+```json
+{
+  "campaigns": [...],
+  "adSets": [...],
+  "ads": [...],
+  "creatives": { "<ad_id>": { "thumbnail_url": "...", "title": "...", "body": "..." } }
+}
+```
+
+**Timeout safety:** Add a 50-second deadline check (matching the pattern from Facebook/Instagram sync). If time runs short, skip creative fetching and save what we have.
+
+### Frontend Changes
+
+**File: `src/components/clients/dashboard/PlatformSection.tsx`**
+
+Add a new collapsible section for Meta Ads (and later Google Ads) that renders:
+
+1. **Campaign Table** — collapsible, shows all campaigns with status badge (Active/Paused/Archived), spend, clicks, impressions, CTR, CPC, conversions. Filter toggle: Active / All.
+
+2. **Drill-down: Ad Sets per Campaign** — clicking a campaign row expands to show its ad sets with the same metrics.
+
+3. **Drill-down: Ads per Ad Set** — clicking an ad set row expands to show individual ads with:
+   - Thumbnail image (from creative)
+   - Ad name + copy snippet
+   - Status badge
+   - Spend, clicks, impressions, CTR
+   - Link to view on Facebook (if available)
+
+4. **Filter bar** — simple toggle between "Active" and "All" statuses, applied across the hierarchy.
+
+**New component file: `src/components/clients/dashboard/AdCampaignBreakdown.tsx`**
+- Keeps PlatformSection from growing too large
+- Receives `rawData` prop containing campaigns, adSets, ads, creatives
+- Handles the hierarchical expand/collapse and filtering logic
+- Reuses existing UI components (Table, Badge, Collapsible)
+
+### Technical Details
+
+- Meta Graph API `level` parameter handles deduplication automatically — no risk of double-counting
+- Creative thumbnails: request at `thumbnail_width=200` for display quality
+- Status values from Meta: `ACTIVE`, `PAUSED`, `ARCHIVED`, `DELETED` — map to badges
+- Edge function timeout: batch creative fetches and cap total processing at 50s
+- No database schema changes — all data fits in existing `raw_data` JSONB column
+
+### Files to Change
+1. `supabase/functions/sync-meta-ads/index.ts` — add ad set, ad, creative, and status fetches
+2. `src/components/clients/dashboard/AdCampaignBreakdown.tsx` — new component for hierarchical ad tables
+3. `src/components/clients/dashboard/PlatformSection.tsx` — wire up AdCampaignBreakdown for `meta_ads` platform
+4. `src/types/database.ts` — add TopContentItem fields for ad-level data if needed
+
+### What This Does NOT Include (deferred to next pass)
+- Google Ads equivalent (will follow same pattern after Meta Ads is confirmed working)
+- Video creative previews (thumbnails only for now)
+- Editing ads from the dashboard
+
