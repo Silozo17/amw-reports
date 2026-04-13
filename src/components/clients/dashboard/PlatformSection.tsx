@@ -26,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useChartColors } from '@/hooks/useChartColors';
 import GeoHeatmap from '@/components/clients/dashboard/GeoHeatmap';
 import DeviceBreakdown from '@/components/clients/dashboard/DeviceBreakdown';
+import AdCampaignBreakdown from '@/components/clients/dashboard/AdCampaignBreakdown';
 
 interface TopContentItem {
   type?: string;
@@ -630,6 +631,14 @@ const PlatformSection = ({
               )}
             </CollapsibleContent>
           </Collapsible>
+        )}
+
+        {/* Meta Ads Campaign Breakdown */}
+        {platform === 'meta_ads' && rawData && (rawData.campaigns as any[])?.length > 0 && (
+          <AdCampaignBreakdown
+            rawData={rawData as any}
+            currSymbol={currSymbol}
+          />
         )}
 
         {/* GA4 Extended Widgets */}

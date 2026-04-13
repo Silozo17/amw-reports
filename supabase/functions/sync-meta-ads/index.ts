@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const GRAPH_API_VERSION = "v25.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+const DEADLINE_MS = 50_000; // 50s safety deadline
 
 interface SyncRequest {
   connection_id: string;
@@ -16,11 +17,33 @@ interface SyncRequest {
   year: number;
 }
 
+function hasTimeLeft(start: number): boolean {
+  return Date.now() - start < DEADLINE_MS;
+}
+
+async function fetchAllPages(url: string, accessToken: string, start: number, limit = 500): Promise<any[]> {
+  const results: any[] = [];
+  let nextUrl: string | null = `${url}&limit=${limit}&access_token=${accessToken}`;
+  while (nextUrl && hasTimeLeft(start)) {
+    const res = await fetch(nextUrl);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Meta API error (${res.status}): ${errText.substring(0, 500)}`);
+    }
+    const json = await res.json();
+    if (json.data) results.push(...json.data);
+    nextUrl = json.paging?.next || null;
+    if (results.length >= 2000) break; // safety cap
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -83,7 +106,6 @@ Deno.serve(async (req) => {
       }
     }
 
-
     // Create sync log
     const { data: syncLog } = await supabase
       .from("sync_logs")
@@ -104,7 +126,7 @@ Deno.serve(async (req) => {
       const expiresAt = new Date(conn.token_expires_at);
       const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       if (expiresAt < sevenDaysFromNow) {
-        console.log("Meta Ads token expiring soon, re-exchanging for fresh long-lived token...");
+        console.log("Meta Ads token expiring soon, re-exchanging...");
         const appId = Deno.env.get("META_APP_ID")!;
         const appSecret = Deno.env.get("META_APP_SECRET")!;
         try {
@@ -126,9 +148,6 @@ Deno.serve(async (req) => {
               token_expires_at: newExpiresAt,
               last_error: null,
             }).eq("id", connectionId);
-            console.log("Meta Ads token re-exchanged successfully.");
-          } else {
-            console.warn("Meta Ads token re-exchange failed:", reExchangeData.error?.message || "Unknown");
           }
         } catch (e) {
           console.warn("Meta Ads token re-exchange exception:", e);
@@ -148,11 +167,9 @@ Deno.serve(async (req) => {
       if (!meData.data || meData.data.length === 0) {
         throw new Error("No ad accounts found for this Facebook user.");
       }
-      // Pick first active account
       const activeAccount = meData.data.find((a: any) => a.account_status === 1) || meData.data[0];
-      adAccountId = activeAccount.id; // format: act_123456
+      adAccountId = activeAccount.id;
       const accountName = activeAccount.name || `Meta Ads (${adAccountId})`;
-
       await supabase
         .from("platform_connections")
         .update({ account_id: adAccountId, account_name: accountName })
@@ -163,26 +180,164 @@ Deno.serve(async (req) => {
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const timeRange = JSON.stringify({ since: startDate, until: endDate });
 
-    // Fetch campaign-level insights
-    const insightsUrl = `${GRAPH_BASE}/${adAccountId}/insights`;
-    const insightsParams = new URLSearchParams({
-      access_token: accessToken,
-      level: "campaign",
-      fields: "campaign_name,campaign_id,impressions,clicks,spend,actions,action_values,ctr,cpc,cpm,reach,frequency,video_play_actions",
-      time_range: JSON.stringify({ since: startDate, until: endDate }),
-      limit: "500",
-    });
+    // ═══════════════════════════════════════════════════════════
+    // 1. Campaign-level insights (existing)
+    // ═══════════════════════════════════════════════════════════
+    const campaignInsightsUrl = `${GRAPH_BASE}/${adAccountId}/insights?` +
+      new URLSearchParams({
+        level: "campaign",
+        fields: "campaign_name,campaign_id,impressions,clicks,spend,actions,action_values,ctr,cpc,cpm,reach,frequency,video_play_actions",
+        time_range: timeRange,
+        limit: "500",
+        access_token: accessToken,
+      });
 
-    const insightsRes = await fetch(`${insightsUrl}?${insightsParams}`);
-    if (!insightsRes.ok) {
-      const errText = await insightsRes.text();
-      throw new Error(`Meta Ads API error (${insightsRes.status}): ${errText.substring(0, 500)}`);
+    const campaignInsightsRes = await fetch(campaignInsightsUrl);
+    if (!campaignInsightsRes.ok) {
+      const errText = await campaignInsightsRes.text();
+      throw new Error(`Meta Ads campaign insights error (${campaignInsightsRes.status}): ${errText.substring(0, 500)}`);
     }
-    const insightsData = await insightsRes.json();
-    const rows = insightsData.data || [];
+    const campaignInsightsData = await campaignInsightsRes.json();
+    const campaignRows = campaignInsightsData.data || [];
 
-    // Parse & aggregate
+    // ═══════════════════════════════════════════════════════════
+    // 2. Ad Set-level insights
+    // ═══════════════════════════════════════════════════════════
+    let adSetRows: any[] = [];
+    if (hasTimeLeft(startTime)) {
+      try {
+        const adSetUrl = `${GRAPH_BASE}/${adAccountId}/insights?` +
+          new URLSearchParams({
+            level: "adset",
+            fields: "adset_name,adset_id,campaign_name,campaign_id,impressions,clicks,spend,actions,ctr,cpc,cpm,reach",
+            time_range: timeRange,
+            limit: "500",
+            access_token: accessToken,
+          });
+        const adSetRes = await fetch(adSetUrl);
+        if (adSetRes.ok) {
+          const adSetData = await adSetRes.json();
+          adSetRows = adSetData.data || [];
+        } else {
+          console.warn("Ad set insights fetch failed:", await adSetRes.text());
+        }
+      } catch (e) {
+        console.warn("Ad set insights exception:", e);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. Ad-level insights
+    // ═══════════════════════════════════════════════════════════
+    let adRows: any[] = [];
+    if (hasTimeLeft(startTime)) {
+      try {
+        const adUrl = `${GRAPH_BASE}/${adAccountId}/insights?` +
+          new URLSearchParams({
+            level: "ad",
+            fields: "ad_name,ad_id,adset_name,adset_id,campaign_name,campaign_id,impressions,clicks,spend,actions,ctr,cpc,cpm,reach",
+            time_range: timeRange,
+            limit: "500",
+            access_token: accessToken,
+          });
+        const adRes = await fetch(adUrl);
+        if (adRes.ok) {
+          const adData = await adRes.json();
+          adRows = adData.data || [];
+        } else {
+          console.warn("Ad-level insights fetch failed:", await adRes.text());
+        }
+      } catch (e) {
+        console.warn("Ad-level insights exception:", e);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. Campaign/AdSet/Ad statuses
+    // ═══════════════════════════════════════════════════════════
+    const statusMaps = { campaigns: {} as Record<string, any>, adSets: {} as Record<string, any>, ads: {} as Record<string, any> };
+
+    if (hasTimeLeft(startTime)) {
+      try {
+        // Campaign statuses
+        const campStatusRows = await fetchAllPages(
+          `${GRAPH_BASE}/${adAccountId}/campaigns?fields=id,name,status,objective`,
+          accessToken, startTime
+        );
+        for (const c of campStatusRows) {
+          statusMaps.campaigns[c.id] = { status: c.status, objective: c.objective };
+        }
+
+        // Ad set statuses
+        if (hasTimeLeft(startTime)) {
+          const adSetStatusRows = await fetchAllPages(
+            `${GRAPH_BASE}/${adAccountId}/adsets?fields=id,name,status,campaign_id`,
+            accessToken, startTime
+          );
+          for (const a of adSetStatusRows) {
+            statusMaps.adSets[a.id] = { status: a.status, campaign_id: a.campaign_id };
+          }
+        }
+
+        // Ad statuses
+        if (hasTimeLeft(startTime)) {
+          const adStatusRows = await fetchAllPages(
+            `${GRAPH_BASE}/${adAccountId}/ads?fields=id,name,status,adset_id,creative{id}`,
+            accessToken, startTime
+          );
+          for (const a of adStatusRows) {
+            statusMaps.ads[a.id] = { status: a.status, adset_id: a.adset_id, creative_id: a.creative?.id };
+          }
+        }
+      } catch (e) {
+        console.warn("Status fetch exception:", e);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. Ad Creatives (batch via individual fetches, capped)
+    // ═══════════════════════════════════════════════════════════
+    const creatives: Record<string, any> = {};
+    if (hasTimeLeft(startTime) && adRows.length > 0) {
+      // Collect unique ad IDs that have creatives
+      const adIdsWithCreatives = adRows
+        .map((a: any) => a.ad_id)
+        .filter((id: string) => id && statusMaps.ads[id]?.creative_id);
+
+      const uniqueCreativeIds = [...new Set(adIdsWithCreatives.map((adId: string) => statusMaps.ads[adId].creative_id))];
+
+      // Fetch creatives in batches of 50
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < uniqueCreativeIds.length && hasTimeLeft(startTime); i += BATCH_SIZE) {
+        const batch = uniqueCreativeIds.slice(i, i + BATCH_SIZE);
+        const batchIds = batch.join(",");
+        try {
+          const creativeRes = await fetch(
+            `${GRAPH_BASE}/?ids=${batchIds}&fields=id,thumbnail_url,title,body,image_url,object_story_spec&access_token=${accessToken}`
+          );
+          if (creativeRes.ok) {
+            const creativeData = await creativeRes.json();
+            for (const [creativeId, data] of Object.entries(creativeData)) {
+              const d = data as any;
+              creatives[creativeId] = {
+                thumbnail_url: d.thumbnail_url || d.image_url || null,
+                title: d.title || d.object_story_spec?.link_data?.name || null,
+                body: d.body || d.object_story_spec?.link_data?.message || null,
+                image_url: d.image_url || null,
+              };
+            }
+          }
+        } catch (e) {
+          console.warn("Creative batch fetch exception:", e);
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Parse & aggregate campaign metrics (existing logic)
+    // ═══════════════════════════════════════════════════════════
     let totalImpressions = 0;
     let totalClicks = 0;
     let totalSpend = 0;
@@ -191,57 +346,105 @@ Deno.serve(async (req) => {
     let totalLinkClicks = 0;
     let totalVideoPlays = 0;
 
+    const extractLeads = (actions: any[]): number => {
+      let leads = 0;
+      for (const action of actions) {
+        if (action.action_type === "lead" ||
+            action.action_type === "onsite_conversion.lead_grouped" ||
+            action.action_type === "offsite_conversion.fb_pixel_lead" ||
+            action.action_type === "onsite_web_lead") {
+          leads += Number(action.value || 0);
+        }
+      }
+      return leads;
+    };
+
     const campaigns: any[] = [];
 
-    for (const row of rows) {
+    for (const row of campaignRows) {
       const impressions = Number(row.impressions || 0);
       const clicks = Number(row.clicks || 0);
       const spend = Number(row.spend || 0);
       const reach = Number(row.reach || 0);
-
-      // Extract leads from actions array
-      let leads = 0;
-      if (row.actions) {
-        for (const action of row.actions) {
-          if (action.action_type === "lead" ||
-              action.action_type === "onsite_conversion.lead_grouped" ||
-              action.action_type === "offsite_conversion.fb_pixel_lead" ||
-              action.action_type === "onsite_web_lead") {
-            leads += Number(action.value || 0);
-          }
-        }
-      }
+      const leads = row.actions ? extractLeads(row.actions) : 0;
 
       totalImpressions += impressions;
       totalClicks += clicks;
       totalSpend += spend;
       totalLeads += leads;
       totalReach += reach;
-      // Extract link_clicks from actions array
+
       const linkClickAction = row.actions?.find((a: any) => a.action_type === 'link_click');
       const outboundClickAction = row.actions?.find((a: any) => a.action_type === 'outbound_click');
       totalLinkClicks += linkClickAction ? Number(linkClickAction.value || 0)
-        : outboundClickAction ? Number(outboundClickAction.value || 0)
-        : 0;
+        : outboundClickAction ? Number(outboundClickAction.value || 0) : 0;
+
       if (row.video_play_actions) {
         for (const action of row.video_play_actions) {
           totalVideoPlays += Number(action.value || 0);
         }
       }
+
+      const campStatus = statusMaps.campaigns[row.campaign_id];
       campaigns.push({
         name: row.campaign_name || "Unknown",
         id: row.campaign_id,
-        impressions,
-        clicks,
-        spend,
-        reach,
-        leads,
+        impressions, clicks, spend, reach, leads,
         ctr: Number(row.ctr || 0),
         cpc: Number(row.cpc || 0),
         cpm: Number(row.cpm || 0),
         frequency: Number(row.frequency || 0),
+        status: campStatus?.status || "UNKNOWN",
+        objective: campStatus?.objective || null,
       });
     }
+
+    // Build ad sets array
+    const adSets: any[] = adSetRows.map((row: any) => {
+      const adSetStatus = statusMaps.adSets[row.adset_id];
+      const leads = row.actions ? extractLeads(row.actions) : 0;
+      return {
+        name: row.adset_name || "Unknown",
+        id: row.adset_id,
+        campaign_name: row.campaign_name,
+        campaign_id: row.campaign_id,
+        impressions: Number(row.impressions || 0),
+        clicks: Number(row.clicks || 0),
+        spend: Number(row.spend || 0),
+        reach: Number(row.reach || 0),
+        leads,
+        ctr: Number(row.ctr || 0),
+        cpc: Number(row.cpc || 0),
+        cpm: Number(row.cpm || 0),
+        status: adSetStatus?.status || "UNKNOWN",
+      };
+    });
+
+    // Build ads array
+    const ads: any[] = adRows.map((row: any) => {
+      const adStatus = statusMaps.ads[row.ad_id];
+      const creativeId = adStatus?.creative_id;
+      const creative = creativeId ? creatives[creativeId] : null;
+      const leads = row.actions ? extractLeads(row.actions) : 0;
+      return {
+        name: row.ad_name || "Unknown",
+        id: row.ad_id,
+        adset_name: row.adset_name,
+        adset_id: row.adset_id,
+        campaign_name: row.campaign_name,
+        campaign_id: row.campaign_id,
+        impressions: Number(row.impressions || 0),
+        clicks: Number(row.clicks || 0),
+        spend: Number(row.spend || 0),
+        reach: Number(row.reach || 0),
+        leads,
+        ctr: Number(row.ctr || 0),
+        cpc: Number(row.cpc || 0),
+        cpm: Number(row.cpm || 0),
+        status: adStatus?.status || "UNKNOWN",
+        creative: creative || null,
+      };
+    });
 
     const overallCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
     const overallCpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
@@ -264,7 +467,7 @@ Deno.serve(async (req) => {
       campaign_count: campaigns.length,
     };
 
-    // Top campaigns by spend
+    // Top campaigns by spend (kept for backwards compatibility)
     const topContent = campaigns
       .sort((a, b) => b.spend - a.spend)
       .slice(0, 10)
@@ -291,13 +494,15 @@ Deno.serve(async (req) => {
       throw new Error("Snapshot for this period is locked and cannot be overwritten.");
     }
 
+    const rawData = { campaigns, adSets, ads, creatives };
+
     if (existing) {
       await supabase
         .from("monthly_snapshots")
         .update({
           metrics_data: metricsData,
           top_content: topContent,
-          raw_data: { campaigns },
+          raw_data: rawData,
         })
         .eq("id", existing.id);
     } else {
@@ -308,7 +513,7 @@ Deno.serve(async (req) => {
         report_year: year,
         metrics_data: metricsData,
         top_content: topContent,
-        raw_data: { campaigns },
+        raw_data: rawData,
       });
     }
 
@@ -335,6 +540,9 @@ Deno.serve(async (req) => {
         success: true,
         metrics: metricsData,
         campaigns_synced: campaigns.length,
+        adsets_synced: adSets.length,
+        ads_synced: ads.length,
+        creatives_fetched: Object.keys(creatives).length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
