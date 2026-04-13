@@ -25,6 +25,30 @@ function buildTimeIntervals(startMs: number, endMs: number, granularity: string 
   return `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:${granularity})`;
 }
 
+function buildMonthlyRange(year: number, month: number): { startMs: number; endMs: number } {
+  const startMs = Date.UTC(year, month - 1, 1, 0, 0, 0, 0);
+  const endMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+  return { startMs, endMs };
+}
+
+function buildLinkedInUrl(
+  pathname: string,
+  params: Record<string, string>,
+  rawParams: Record<string, string> = {}
+): string {
+  const url = new URL(`https://api.linkedin.com${pathname}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+
+  const base = url.toString();
+  const rawQuery = Object.entries(rawParams)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  return rawQuery ? `${base}&${rawQuery}` : base;
+}
+
 /**
  * Fetch from LinkedIn API with a single 429 retry after 3s.
  * Throws on any non-OK response with the full error body for diagnostics.
@@ -64,9 +88,16 @@ async function getFollowerCount(orgUrn: string, token: string): Promise<number> 
 /** Get follower gains (organic + paid) for a time period. Non-critical — won't fail sync. */
 async function getFollowerGains(orgUrn: string, token: string, startMs: number, endMs: number): Promise<{ organic: number; paid: number }> {
   try {
-    const encodedUrn = encodeURIComponent(orgUrn);
-    const timeParam = buildTimeIntervals(startMs, endMs, "MONTH");
-    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals=${timeParam}`;
+    const url = buildLinkedInUrl(
+      "/rest/organizationalEntityFollowerStatistics",
+      {
+        q: "organizationalEntity",
+        organizationalEntity: orgUrn,
+      },
+      {
+        timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+      }
+    );
     const data = await fetchLinkedIn(url, token);
 
     let organic = 0;
@@ -96,9 +127,16 @@ interface ShareStats {
 /** Get share/post statistics for a time period — CRITICAL, will throw on failure. */
 async function getShareStatistics(orgUrn: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
   const result: ShareStats = { clicks: 0, comments: 0, likes: 0, shares: 0, impressions: 0, uniqueImpressions: 0, engagement: 0 };
-  const encodedUrn = encodeURIComponent(orgUrn);
-  const timeParam = buildTimeIntervals(startMs, endMs, "MONTH");
-  const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals=${timeParam}`;
+  const url = buildLinkedInUrl(
+    "/rest/organizationalEntityShareStatistics",
+    {
+      q: "organizationalEntity",
+      organizationalEntity: orgUrn,
+    },
+    {
+      timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+    }
+  );
   const data = await fetchLinkedIn(url, token);
 
   for (const el of (data.elements || []) as Array<Record<string, unknown>>) {
@@ -123,17 +161,28 @@ interface PageViews { total: number; desktop: number; mobile: number }
  */
 async function getPageStatistics(orgUrn: string, entityType: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
   const result: PageViews = { total: 0, desktop: 0, mobile: 0 };
-  const encodedUrn = encodeURIComponent(orgUrn);
-  const timeParam = buildTimeIntervals(startMs, endMs, "MONTH");
 
-  let url: string;
-  if (entityType === "organizationBrand") {
-    // Brand/showcase pages use brandPageStatistics
-    url = `https://api.linkedin.com/rest/brandPageStatistics?q=brand&brand=${encodedUrn}&timeIntervals=${timeParam}`;
-  } else {
-    // Company pages use organizationPageStatistics
-    url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${encodedUrn}&timeIntervals=${timeParam}`;
-  }
+  const url = entityType === "organizationBrand"
+    ? buildLinkedInUrl(
+        "/rest/brandPageStatistics",
+        {
+          q: "brand",
+          brand: orgUrn,
+        },
+        {
+          timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+        }
+      )
+    : buildLinkedInUrl(
+        "/rest/organizationPageStatistics",
+        {
+          q: "organization",
+          organization: orgUrn,
+        },
+        {
+          timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+        }
+      );
 
   const data = await fetchLinkedIn(url, token);
 
@@ -184,8 +233,11 @@ async function getTopContent(orgUrn: string, token: string, monthStartMs: number
     // Per-post stats (best-effort)
     try {
       const encodedPostUrns = monthPosts.map((p) => encodeURIComponent(p.id)).join(",");
-      const encodedOrgUrn = encodeURIComponent(orgUrn);
-      const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedOrgUrn}&ugcPosts=List(${encodedPostUrns})`;
+      const statsUrl = buildLinkedInUrl("/rest/organizationalEntityShareStatistics", {
+        q: "organizationalEntity",
+        organizationalEntity: orgUrn,
+        ugcPosts: `List(${encodedPostUrns})`,
+      });
       const statsData = await fetchLinkedIn(statsUrl, token);
 
       const statsMap = new Map<string, { likes: number; comments: number; shares: number; impressions: number; clicks: number }>();
@@ -348,11 +400,8 @@ Deno.serve(async (req) => {
 
     console.log(`LinkedIn sync: urn=${orgUrn}, entityType=${entityType}, name=${orgName}, month=${month}/${year}`);
 
-    // Date range for the target month
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
-    const monthStartMs = monthStart.getTime();
-    const monthEndMs = monthEnd.getTime();
+    // Date range for the target month using exact UTC month boundaries required by LinkedIn MONTH granularity
+    const { startMs: monthStartMs, endMs: monthEndMs } = buildMonthlyRange(year, month);
 
     // ── Fetch all data — critical endpoints fail-fast ──
     const [followers, shareStats, pageStats] = await Promise.all([
@@ -453,6 +502,14 @@ Deno.serve(async (req) => {
     const errorMsg = e instanceof Error ? e.message : "Unknown error";
     if (connectionId) {
       await supabase.from("platform_connections").update({ last_sync_status: "failed", last_error: errorMsg }).eq("id", connectionId);
+    }
+    if (clientId) {
+      await supabase
+        .from("sync_logs")
+        .update({ status: "failed", error_message: errorMsg, completed_at: new Date().toISOString() })
+        .eq("client_id", clientId)
+        .eq("platform", "linkedin")
+        .eq("status", "running");
     }
     return new Response(
       JSON.stringify({ error: errorMsg }),
