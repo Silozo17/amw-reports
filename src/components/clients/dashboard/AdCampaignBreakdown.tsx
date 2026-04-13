@@ -257,7 +257,7 @@ const AdCard = ({ ad, currSymbol }: { ad: AdItem; currSymbol: string }) => {
 
 // ─── Main Component ────────────────────────────────────────────
 
-const AdCampaignBreakdown = ({ rawData, currSymbol }: AdCampaignBreakdownProps) => {
+const AdCampaignBreakdown = ({ rawData, currSymbol, adGroupLabel = 'Ad Sets' }: AdCampaignBreakdownProps) => {
   const [open, setOpen] = useState(false);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
 
