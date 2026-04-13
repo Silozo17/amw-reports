@@ -633,6 +633,14 @@ const PlatformSection = ({
           </Collapsible>
         )}
 
+        {/* Meta Ads Campaign Breakdown */}
+        {platform === 'meta_ads' && rawData && (rawData.campaigns as any[])?.length > 0 && (
+          <AdCampaignBreakdown
+            rawData={rawData as any}
+            currSymbol={currSymbol}
+          />
+        )}
+
         {/* GA4 Extended Widgets */}
         {platform === 'google_analytics' && rawData && (
           <>
