@@ -90,9 +90,9 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
     return (metadata.pages as MetaPage[]) || [];
   };
 
-  const getOrganizations = (): DiscoveredAccount[] => {
+  const getOrganizations = (): (DiscoveredAccount & { urn?: string; entityType?: string })[] => {
     if (platform !== 'linkedin') return [];
-    return (metadata.organizations as DiscoveredAccount[]) || [];
+    return (metadata.organizations as (DiscoveredAccount & { urn?: string; entityType?: string })[]) || [];
   };
 
   const accounts = getAccountOptions();
@@ -102,6 +102,11 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
   const hasNoAssets = accounts.length === 0 && pages.length === 0 && organizations.length === 0;
 
   const togglePage = (pageId: string) => {
+    if (platform === 'linkedin') {
+      // LinkedIn organic: single-select only
+      setSelectedPages(prev => prev.includes(pageId) ? [] : [pageId]);
+      return;
+    }
     setSelectedPages(prev =>
       prev.includes(pageId) ? prev.filter(id => id !== pageId) : [...prev, pageId]
     );
@@ -114,11 +119,12 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
   };
 
   const handleSave = async () => {
-    if (!selectedAccountId && accounts.length > 0 && platform !== 'linkedin') {
-      toast.error('Please select an account');
-      return;
-    }
-    if (platform === 'linkedin' && !selectedAccountId && organizations.length === 0) {
+    if (platform === 'linkedin') {
+      if (selectedPages.length === 0 && organizations.length > 0) {
+        toast.error('Please select a Company Page');
+        return;
+      }
+    } else if (!selectedAccountId && accounts.length > 0) {
       toast.error('Please select an account');
       return;
     }
@@ -180,19 +186,27 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
         }
       }
 
-      // LinkedIn: save selected organization
+      // LinkedIn organic: save the single selected organization with full URN
       if (platform === 'linkedin' && selectedPages.length > 0) {
         const selectedOrg = organizations.find(o => selectedPages.includes(o.id));
         if (selectedOrg) {
-          const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-          await supabase
+          const { error: liError } = await supabase
             .from('platform_connections')
             .update({
-              account_id: selectedAccountId || selectedOrg.id,
-              account_name: selectedAccountId ? selectedAccount?.name : selectedOrg.name,
-              metadata: { ...metadata, selected_organization: { id: selectedOrg.id, name: selectedOrg.name } } as unknown as Record<string, never>,
+              account_id: selectedOrg.id,
+              account_name: selectedOrg.name,
+              metadata: {
+                ...metadata,
+                selected_organization: {
+                  id: selectedOrg.id,
+                  name: selectedOrg.name,
+                  urn: selectedOrg.urn || `urn:li:organization:${selectedOrg.id}`,
+                  entityType: selectedOrg.entityType || 'organization',
+                },
+              } as unknown as Record<string, never>,
             })
             .eq('id', connection.id);
+          if (liError) throw liError;
         }
       }
 

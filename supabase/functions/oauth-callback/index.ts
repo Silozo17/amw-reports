@@ -676,54 +676,74 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
   const accessToken = tokenData.access_token;
   const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
-  // Discover ALL organization pages (NO ad accounts — pages only)
-  const organizations: Array<{ id: string; name: string }> = [];
-  try {
-    // Step 1: Get org URNs the user administers (no projection — forbidden on newer API versions)
-    const orgRes = await fetch(
-      "https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "LinkedIn-Version": "202603",
-          "X-Restli-Protocol-Version": "2.0.0",
-        },
-      }
-    );
-    const orgData = await orgRes.json();
-    console.log("LinkedIn organizationAcls:", JSON.stringify(orgData));
+  const LI_HEADERS = {
+    Authorization: `Bearer ${accessToken}`,
+    "LinkedIn-Version": "202603",
+    "X-Restli-Protocol-Version": "2.0.0",
+  };
 
-    // Step 2: Fetch each org's name individually
-    for (const el of orgData.elements || []) {
-      const orgUrn = el.organization; // "urn:li:organization:12345"
-      if (!orgUrn) continue;
-      const orgId = orgUrn.split(":").pop();
-      let name = orgId;
-      try {
-        const detailRes = await fetch(
-          `https://api.linkedin.com/rest/organizations/${orgId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "LinkedIn-Version": "202603",
-              "X-Restli-Protocol-Version": "2.0.0",
-            },
-          }
-        );
-        if (detailRes.ok) {
-          const detail = await detailRes.json();
-          name = detail.localizedName || orgId;
-        }
-      } catch {
-        // Fall back to orgId as name
+  // Discover ALL organization pages the user administers
+  const organizations: Array<{ id: string; name: string; urn: string; entityType: string }> = [];
+  try {
+    // Paginate through organizationAcls
+    let start = 0;
+    const count = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const orgRes = await fetch(
+        `https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED&start=${start}&count=${count}`,
+        { headers: LI_HEADERS }
+      );
+      const orgData = await orgRes.json();
+      console.log(`LinkedIn organizationAcls (start=${start}):`, JSON.stringify(orgData));
+
+      const elements = orgData.elements || [];
+      if (elements.length === 0) {
+        hasMore = false;
+        break;
       }
-      organizations.push({ id: orgId!, name: name! });
+
+      for (const el of elements) {
+        // The field can be "organization" or "organizationBrand"
+        const orgUrn: string = el.organization || el.organizationBrand || "";
+        if (!orgUrn) continue;
+
+        // Parse URN: "urn:li:organization:12345" or "urn:li:organizationBrand:12345"
+        const urnParts = orgUrn.split(":");
+        const entityType = urnParts[2] || "organization"; // "organization" or "organizationBrand"
+        const orgId = urnParts[3] || urnParts.pop() || "";
+
+        let name = orgId;
+        try {
+          // Use the correct endpoint based on entity type
+          const endpoint = entityType === "organizationBrand"
+            ? `https://api.linkedin.com/rest/organizationBrands/${orgId}`
+            : `https://api.linkedin.com/rest/organizations/${orgId}`;
+          const detailRes = await fetch(endpoint, { headers: LI_HEADERS });
+          if (detailRes.ok) {
+            const detail = await detailRes.json();
+            name = detail.localizedName || detail.name || orgId;
+          }
+        } catch {
+          // Fall back to orgId as name
+        }
+        organizations.push({ id: orgId, name, urn: orgUrn, entityType });
+      }
+
+      start += elements.length;
+      // LinkedIn paging: if fewer elements than count, we're done
+      if (elements.length < count) hasMore = false;
     }
   } catch (e) {
     console.warn("Could not discover LinkedIn organizations:", e);
   }
 
-  // Store organizations only — no ad accounts
+  console.log(`LinkedIn discovered ${organizations.length} orgs:`, JSON.stringify(organizations));
+
+  // Auto-select if exactly one organization
+  const autoSelect = organizations.length === 1;
+
   const { error: updateError } = await supabase
     .from("platform_connections")
     .update({
@@ -732,9 +752,13 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
       token_expires_at: expiresAt,
       is_connected: true,
       last_error: null,
-      account_name: null,
-      account_id: null,
-      metadata: { organizations, token_type: "bearer" },
+      account_name: autoSelect ? organizations[0].name : null,
+      account_id: autoSelect ? organizations[0].id : null,
+      metadata: {
+        organizations,
+        token_type: "bearer",
+        ...(autoSelect ? { selected_organization: organizations[0] } : {}),
+      },
     })
     .eq("id", connectionId);
 

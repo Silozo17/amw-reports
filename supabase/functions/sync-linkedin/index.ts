@@ -17,15 +17,13 @@ const liHeaders = (token: string) => ({
 
 /**
  * Fetch from LinkedIn API with a single 429 retry after 3s.
- * Throws on any non-OK response (including 429 after retry).
+ * Throws on any non-OK response.
  */
 async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<string, string>): Promise<Record<string, unknown>> {
   const doFetch = async () => {
     const res = await fetch(url, { headers: { ...liHeaders(token), ...extraHeaders } });
     const body = await res.json();
-    if (!res.ok) {
-      return { _ok: false, _status: res.status, _body: body };
-    }
+    if (!res.ok) return { _ok: false, _status: res.status, _body: body };
     return { _ok: true, ...body };
   };
 
@@ -35,9 +33,7 @@ async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<s
       console.warn(`LinkedIn 429 for ${url}, retrying after 3s...`);
       await new Promise((r) => setTimeout(r, 3000));
       const retry = await doFetch();
-      if (!retry._ok) {
-        throw new Error(`LinkedIn API ${retry._status}: ${JSON.stringify(retry._body)}`);
-      }
+      if (!retry._ok) throw new Error(`LinkedIn API ${retry._status}: ${JSON.stringify(retry._body)}`);
       return retry;
     }
     throw new Error(`LinkedIn API ${first._status}: ${JSON.stringify(first._body)}`);
@@ -45,47 +41,33 @@ async function fetchLinkedIn(url: string, token: string, extraHeaders?: Record<s
   return first;
 }
 
-/**
- * Get total follower count via networkSizes endpoint.
- * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/organization-network-size
- */
-async function getFollowerCount(orgId: string, token: string): Promise<number> {
-  const urn = encodeURIComponent(`urn:li:organization:${orgId}`);
+/** Get total follower count via networkSizes endpoint. */
+async function getFollowerCount(orgUrn: string, token: string): Promise<number> {
+  const encodedUrn = encodeURIComponent(orgUrn);
   const data = await fetchLinkedIn(
-    `https://api.linkedin.com/rest/networkSizes/${urn}?edgeType=COMPANY_FOLLOWED_BY_MEMBER`,
+    `https://api.linkedin.com/rest/networkSizes/${encodedUrn}?edgeType=COMPANY_FOLLOWED_BY_MEMBER`,
     token
   );
   return Number(data.firstDegreeSize || 0);
 }
 
-interface FollowerGains {
-  organic: number;
-  paid: number;
-}
-
-/**
- * Get follower gains for a time period.
- * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/follower-statistics
- * Note: Only 12 months of data available. For older months this will return 0.
- */
-async function getFollowerGains(orgId: string, token: string, startMs: number, endMs: number): Promise<FollowerGains> {
+/** Get follower gains (organic + paid) for a time period. Optional — won't fail sync. */
+async function getFollowerGains(orgUrn: string, token: string, startMs: number, endMs: number): Promise<{ organic: number; paid: number }> {
   try {
-    const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
-    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+    const encodedUrn = encodeURIComponent(orgUrn);
+    const url = `https://api.linkedin.com/rest/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
     const data = await fetchLinkedIn(url, token);
 
     let organic = 0;
     let paid = 0;
-    const elements = (data.elements || []) as Array<Record<string, unknown>>;
-    for (const el of elements) {
+    for (const el of (data.elements || []) as Array<Record<string, unknown>>) {
       const gains = el.followerGains as Record<string, number> | undefined;
       organic += Number(gains?.organicFollowerGain || 0);
       paid += Number(gains?.paidFollowerGain || 0);
     }
     return { organic, paid };
   } catch (e) {
-    // Follower gains are optional (12-month limit), log but don't fail the sync
-    console.warn(`Follower gains unavailable for org ${orgId} (expected for months >12mo ago):`, e);
+    console.warn(`Follower gains unavailable (expected for months >12mo ago):`, e);
     return { organic: 0, paid: 0 };
   }
 }
@@ -100,19 +82,14 @@ interface ShareStats {
   engagement: number;
 }
 
-/**
- * Get share/post statistics for a time period.
- * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/share-statistics
- */
-async function getShareStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
+/** Get share/post statistics for a time period — CRITICAL, will throw on failure. */
+async function getShareStatistics(orgUrn: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
   const result: ShareStats = { clicks: 0, comments: 0, likes: 0, shares: 0, impressions: 0, uniqueImpressions: 0, engagement: 0 };
-
-  const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
-  const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+  const encodedUrn = encodeURIComponent(orgUrn);
+  const url = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
   const data = await fetchLinkedIn(url, token);
 
-  const elements = (data.elements || []) as Array<Record<string, unknown>>;
-  for (const el of elements) {
+  for (const el of (data.elements || []) as Array<Record<string, unknown>>) {
     const s = (el.totalShareStatistics || {}) as Record<string, number>;
     result.clicks += Number(s.clickCount || 0);
     result.comments += Number(s.commentCount || 0);
@@ -126,32 +103,18 @@ async function getShareStatistics(orgId: string, token: string, startMs: number,
   return result;
 }
 
-interface PageViews {
-  total: number;
-  desktop: number;
-  mobile: number;
-}
+interface PageViews { total: number; desktop: number; mobile: number }
 
-/**
- * Get page view statistics for a time period.
- * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/page-statistics
- * 
- * IMPORTANT: Page view values are nested objects: { pageViews: number }
- * e.g. totalPageStatistics.views.allPageViews.pageViews
- */
-async function getPageStatistics(orgId: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
+/** Get page view statistics — CRITICAL, will throw on failure. */
+async function getPageStatistics(orgUrn: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
   const result: PageViews = { total: 0, desktop: 0, mobile: 0 };
-
-  const orgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
-  const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${orgUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
+  const encodedUrn = encodeURIComponent(orgUrn);
+  const url = `https://api.linkedin.com/rest/organizationPageStatistics?q=organization&organization=${encodedUrn}&timeIntervals.timeGranularityType=MONTH&timeIntervals.timeRange.start=${startMs}&timeIntervals.timeRange.end=${endMs}`;
   const data = await fetchLinkedIn(url, token);
 
-  const elements = (data.elements || []) as Array<Record<string, unknown>>;
-  for (const el of elements) {
+  for (const el of (data.elements || []) as Array<Record<string, unknown>>) {
     const totalStats = el.totalPageStatistics as Record<string, unknown> | undefined;
     const views = (totalStats?.views || {}) as Record<string, { pageViews?: number } | undefined>;
-
-    // Per LinkedIn docs, values are nested objects: { pageViews: number }
     result.total += Number(views.allPageViews?.pageViews || 0);
     result.desktop += Number(views.allDesktopPageViews?.pageViews || 0);
     result.mobile += Number(views.allMobilePageViews?.pageViews || 0);
@@ -173,59 +136,40 @@ interface LinkedInPost {
   total_engagement: number;
 }
 
-/**
- * Get top content (posts) for a time period.
- * This is best-effort — won't fail the sync if it errors.
- */
-async function getTopContent(
-  orgId: string,
-  token: string,
-  monthStartMs: number,
-  monthEndMs: number
-): Promise<LinkedInPost[]> {
+/** Get top content (posts) — best-effort, won't fail the sync. */
+async function getTopContent(orgUrn: string, token: string, monthStartMs: number, monthEndMs: number): Promise<LinkedInPost[]> {
   const posts: LinkedInPost[] = [];
-
   try {
-    const authorUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+    const authorUrn = encodeURIComponent(orgUrn);
     const url = `https://api.linkedin.com/rest/posts?author=${authorUrn}&q=author&count=100&sortBy=LAST_MODIFIED`;
     const data = await fetchLinkedIn(url, token, { "X-RestLi-Method": "FINDER" });
 
     const monthPosts: Array<{ id: string; text: string; createdAt: number }> = [];
-
-    const elements = (data.elements || []) as Array<Record<string, unknown>>;
-    for (const post of elements) {
+    for (const post of (data.elements || []) as Array<Record<string, unknown>>) {
       const createdAt = post.publishedAt || post.createdAt;
       if (!createdAt) continue;
       const postTime = typeof createdAt === "number" ? createdAt : new Date(createdAt as string).getTime();
       if (postTime < monthStartMs || postTime > monthEndMs) continue;
-
-      monthPosts.push({
-        id: post.id as string,
-        text: (post.commentary || "") as string,
-        createdAt: postTime,
-      });
+      monthPosts.push({ id: post.id as string, text: (post.commentary || "") as string, createdAt: postTime });
     }
 
     if (monthPosts.length === 0) return posts;
 
-    // Try to get per-post stats
+    // Per-post stats (best-effort)
     try {
       const encodedPostUrns = monthPosts.map((p) => encodeURIComponent(p.id)).join(",");
-      const encodedOrgUrn = encodeURIComponent(`urn:li:organization:${orgId}`);
+      const encodedOrgUrn = encodeURIComponent(orgUrn);
       const statsUrl = `https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodedOrgUrn}&ugcPosts=List(${encodedPostUrns})`;
       const statsData = await fetchLinkedIn(statsUrl, token);
 
       const statsMap = new Map<string, { likes: number; comments: number; shares: number; impressions: number; clicks: number }>();
-      const statsElements = (statsData.elements || []) as Array<Record<string, unknown>>;
-      for (const el of statsElements) {
+      for (const el of (statsData.elements || []) as Array<Record<string, unknown>>) {
         const postId = (el.ugcPost || el.share) as string | undefined;
         if (!postId) continue;
         const s = (el.totalShareStatistics || {}) as Record<string, number>;
         statsMap.set(postId, {
-          likes: Number(s.likeCount || 0),
-          comments: Number(s.commentCount || 0),
-          shares: Number(s.shareCount || 0),
-          impressions: Number(s.impressionCount || 0),
+          likes: Number(s.likeCount || 0), comments: Number(s.commentCount || 0),
+          shares: Number(s.shareCount || 0), impressions: Number(s.impressionCount || 0),
           clicks: Number(s.clickCount || 0),
         });
       }
@@ -233,32 +177,25 @@ async function getTopContent(
       for (const mp of monthPosts) {
         const s = statsMap.get(mp.id) || { likes: 0, comments: 0, shares: 0, impressions: 0, clicks: 0 };
         posts.push({
-          id: mp.id,
-          text: mp.text,
-          permalink: `https://www.linkedin.com/feed/update/${mp.id}`,
+          id: mp.id, text: mp.text, permalink: `https://www.linkedin.com/feed/update/${mp.id}`,
           created_time: new Date(mp.createdAt).toISOString(),
-          likes: s.likes,
-          comments: s.comments,
-          shares: s.shares,
-          impressions: s.impressions,
-          clicks: s.clicks,
+          likes: s.likes, comments: s.comments, shares: s.shares,
+          impressions: s.impressions, clicks: s.clicks,
           total_engagement: s.likes + s.comments + s.shares,
         });
       }
     } catch (e) {
-      console.warn(`Per-post stats failed for org ${orgId}, returning posts without stats:`, e);
+      console.warn(`Per-post stats failed, returning posts without stats:`, e);
       for (const mp of monthPosts) {
         posts.push({
-          id: mp.id,
-          text: mp.text,
-          permalink: `https://www.linkedin.com/feed/update/${mp.id}`,
+          id: mp.id, text: mp.text, permalink: `https://www.linkedin.com/feed/update/${mp.id}`,
           created_time: new Date(mp.createdAt).toISOString(),
           likes: 0, comments: 0, shares: 0, impressions: 0, clicks: 0, total_engagement: 0,
         });
       }
     }
   } catch (e) {
-    console.warn(`Failed to fetch posts for org ${orgId}:`, e);
+    console.warn(`Failed to fetch posts:`, e);
   }
 
   return posts;
@@ -369,17 +306,20 @@ Deno.serve(async (req) => {
       console.log("LinkedIn token refreshed successfully.");
     }
 
+    // ── Resolve the selected organization URN ──
     const metadata = conn.metadata as Record<string, unknown> | null;
-    // Sync ONLY the selected organization (account_id) — single org scope
+    const selectedOrg = metadata?.selected_organization as { id?: string; name?: string; urn?: string; entityType?: string } | undefined;
     const selectedOrgId = conn.account_id;
+
     if (!selectedOrgId) {
       throw new Error("No LinkedIn organization selected. Please select a company page in the connections settings.");
     }
 
-    const selectedOrgMeta = metadata?.selected_organization as { id?: string; name?: string } | undefined;
-    const orgName = selectedOrgMeta?.name || selectedOrgId;
+    // Use the stored URN if available, otherwise reconstruct for backward compat
+    const orgUrn = selectedOrg?.urn || `urn:li:organization:${selectedOrgId}`;
+    const orgName = selectedOrg?.name || conn.account_name || selectedOrgId;
 
-    console.log(`LinkedIn sync: org=${selectedOrgId} (${orgName}), month=${month}/${year}`);
+    console.log(`LinkedIn sync: urn=${orgUrn}, name=${orgName}, month=${month}/${year}`);
 
     // Date range for the target month
     const monthStart = new Date(year, month - 1, 1);
@@ -388,19 +328,16 @@ Deno.serve(async (req) => {
     const monthEndMs = monthEnd.getTime();
 
     // ── Fetch all data — critical endpoints fail-fast ──
-    // Followers count + share stats + page stats are critical (errors fail the sync)
-    // Follower gains is optional (12-month limit)
-    // Top content is best-effort
     const [followers, shareStats, pageStats] = await Promise.all([
-      getFollowerCount(selectedOrgId, accessToken),
-      getShareStatistics(selectedOrgId, accessToken, monthStartMs, monthEndMs),
-      getPageStatistics(selectedOrgId, accessToken, monthStartMs, monthEndMs),
+      getFollowerCount(orgUrn, accessToken),
+      getShareStatistics(orgUrn, accessToken, monthStartMs, monthEndMs),
+      getPageStatistics(orgUrn, accessToken, monthStartMs, monthEndMs),
     ]);
 
-    // These are non-critical — won't fail the sync
+    // Non-critical — won't fail the sync
     const [gains, topContentRaw] = await Promise.all([
-      getFollowerGains(selectedOrgId, accessToken, monthStartMs, monthEndMs),
-      getTopContent(selectedOrgId, accessToken, monthStartMs, monthEndMs),
+      getFollowerGains(orgUrn, accessToken, monthStartMs, monthEndMs),
+      getTopContent(orgUrn, accessToken, monthStartMs, monthEndMs),
     ]);
 
     console.log(`LinkedIn sync results: followers=${followers}, impressions=${shareStats.impressions}, pageViews=${pageStats.total}, posts=${topContentRaw.length}`);
@@ -423,10 +360,10 @@ Deno.serve(async (req) => {
       total_engagement: p.total_engagement,
     }));
 
+    // Metric keys aligned with dashboard expectations (PLATFORM_AVAILABLE_METRICS in database.ts)
     const metricsData = {
       total_followers: followers,
-      follower_gains_organic: gains.organic,
-      follower_gains_paid: gains.paid,
+      follower_growth: gains.organic + gains.paid,
       impressions: shareStats.impressions,
       unique_impressions: shareStats.uniqueImpressions,
       clicks: shareStats.clicks,
@@ -436,10 +373,23 @@ Deno.serve(async (req) => {
       engagement: shareStats.engagement,
       engagement_rate: engagementRate,
       page_views: pageStats.total,
+      posts_published: topContentRaw.length,
+      // Detailed breakdowns (available via extraMetrics in PlatformSection)
+      follower_gains_organic: gains.organic,
+      follower_gains_paid: gains.paid,
       page_views_desktop: pageStats.desktop,
       page_views_mobile: pageStats.mobile,
-      posts_published: topContentRaw.length,
-      organizations_count: 1,
+    };
+
+    // Preserve raw response summary for diagnostics
+    const rawData = {
+      _sync_ts: new Date().toISOString(),
+      _org_urn: orgUrn,
+      follower_count_raw: followers,
+      share_stats_raw: shareStats,
+      page_stats_raw: pageStats,
+      gains_raw: gains,
+      posts_count: topContentRaw.length,
     };
 
     // Select-then-update/insert pattern
@@ -455,9 +405,9 @@ Deno.serve(async (req) => {
     if (existing?.snapshot_locked) throw new Error("Snapshot for this period is locked.");
 
     if (existing) {
-      await supabase.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: topContent, raw_data: {} }).eq("id", existing.id);
+      await supabase.from("monthly_snapshots").update({ metrics_data: metricsData, top_content: topContent, raw_data: rawData }).eq("id", existing.id);
     } else {
-      await supabase.from("monthly_snapshots").insert({ client_id: clientId, platform: "linkedin", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent, raw_data: {} });
+      await supabase.from("monthly_snapshots").insert({ client_id: clientId, platform: "linkedin", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent, raw_data: rawData });
     }
 
     await supabase.from("platform_connections").update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null }).eq("id", connectionId);
