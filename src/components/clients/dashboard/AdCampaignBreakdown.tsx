@@ -318,7 +318,7 @@ const AdCampaignBreakdown = ({ rawData, currSymbol, adGroupLabel = 'Ad Sets' }: 
           </TabsContent>
 
           <TabsContent value="adsets">
-            <AdSetsTable items={adSets} currSymbol={currSymbol} />
+            <AdSetsTable items={adSets} currSymbol={currSymbol} label={adGroupLabel === 'Ad Groups' ? 'Ad Group' : 'Ad Set'} />
           </TabsContent>
 
           <TabsContent value="ads">
