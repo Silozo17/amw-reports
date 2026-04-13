@@ -156,12 +156,12 @@ const CampaignsTable = ({ items, currSymbol }: { items: CampaignItem[]; currSymb
   </div>
 );
 
-const AdSetsTable = ({ items, currSymbol }: { items: AdSetItem[]; currSymbol: string }) => (
+const AdSetsTable = ({ items, currSymbol, label = 'Ad Set' }: { items: AdSetItem[]; currSymbol: string; label?: string }) => (
   <div className="rounded-lg border overflow-x-auto">
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Ad Set</TableHead>
+          <TableHead>{label}</TableHead>
           <TableHead>Campaign</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Spend</TableHead>
