@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
           const batch1b = await fetchPageInsights(pageId, pageToken, ["page_total_media_view_unique"], startDate, endDate);
           const totalReach = sumDailyValues(batch1b, "page_total_media_view_unique");
           totalUniqueViewers += totalReach;
-          totalUniqueViewersOrganic += totalReach;
+          // Do NOT add to organic — we can't distinguish paid vs organic without breakdown
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
