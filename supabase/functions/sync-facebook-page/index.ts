@@ -288,20 +288,45 @@ Deno.serve(async (req) => {
         console.error(`Organic views exception ${pageId}:`, err instanceof Error ? err.message : err);
       }
 
-      // ── Reach: organic and total using dedicated Facebook metrics ──
+      // ── Reach: organic via page_total_media_view_unique breakdown ──
       try {
-        const reachData = await fetchPageInsights(
-          pageId,
-          pageToken,
-          ["page_impressions_organic_unique", "page_impressions_unique"],
-          startDate,
-          endDate,
+        // Step 1: Total reach (no breakdown)
+        const totalReachData = await fetchPageInsights(
+          pageId, pageToken,
+          ["page_total_media_view_unique"],
+          startDate, endDate
         );
-        const pageOrganicReach = sumDailyValues(reachData, "page_impressions_organic_unique");
-        const pageTotalReach = sumDailyValues(reachData, "page_impressions_unique");
-        totalUniqueViewersOrganic += pageOrganicReach;
+        const pageTotalReach = sumDailyValues(totalReachData, "page_total_media_view_unique");
         totalUniqueViewers += pageTotalReach;
-        console.log(`Reach for ${pageId}: organic=${pageOrganicReach}, total=${pageTotalReach}`);
+
+        // Step 2: Fetch is_from_ads breakdown to isolate paid reach
+        let pagePaidReach = 0;
+        try {
+          const reachUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_total_media_view_unique&breakdown=is_from_ads&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+          const reachRes = await fetchWithTimeout(reachUrl);
+          const reachBody = await reachRes.json();
+          if (reachRes.ok && reachBody.data) {
+            for (const metric of reachBody.data) {
+              if (metric.name === 'page_total_media_view_unique') {
+                for (const dayEntry of (metric.values || [])) {
+                  const val = dayEntry.value;
+                  if (typeof val === 'object' && val !== null) {
+                    // Breakdown returns { "true": paidCount, "false": organicCount }
+                    pagePaidReach += Number(val['true'] || val['True'] || val['1'] || 0);
+                  }
+                }
+              }
+            }
+          }
+        } catch (breakdownErr) {
+          console.warn(`Reach breakdown failed for ${pageId}, assuming no paid reach:`, breakdownErr instanceof Error ? breakdownErr.message : breakdownErr);
+        }
+
+        // Step 3: Organic = Total - Paid (never negative)
+        const pageOrganicReach = Math.max(0, pageTotalReach - pagePaidReach);
+        totalUniqueViewersOrganic += pageOrganicReach;
+
+        console.log(`Reach for ${pageId}: total=${pageTotalReach}, paid=${pagePaidReach}, organic=${pageOrganicReach}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         console.error(`Reach fetch failed page ${pageId}:`, msg);
