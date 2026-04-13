@@ -347,10 +347,12 @@ Deno.serve(async (req) => {
     let totalVideoPlays = 0;
 
     const extractLeads = (actions: any[]): number => {
+      const leadAction = actions.find(a => a.action_type === "lead");
+      if (leadAction) return Number(leadAction.value || 0);
+
       let leads = 0;
       for (const action of actions) {
-        if (action.action_type === "lead" ||
-            action.action_type === "onsite_conversion.lead_grouped" ||
+        if (action.action_type === "onsite_conversion.lead_grouped" ||
             action.action_type === "offsite_conversion.fb_pixel_lead" ||
             action.action_type === "onsite_web_lead") {
           leads += Number(action.value || 0);
