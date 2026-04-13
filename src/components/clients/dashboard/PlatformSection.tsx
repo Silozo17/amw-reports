@@ -656,6 +656,26 @@ const PlatformSection = ({
           />
         )}
 
+        {/* LinkedIn Ads Campaign Breakdown */}
+        {platform === 'linkedin_ads' && rawData && ((rawData.campaignGroups as any[])?.length > 0 || (rawData.campaigns as any[])?.length > 0) && (
+          <AdCampaignBreakdown
+            rawData={{
+              campaigns: (rawData.campaignGroups as any[]) || [],
+              adSets: (rawData.campaigns as any[])?.map((c: any) => ({
+                ...c,
+                campaign_id: c.campaignGroupId || '',
+              })) || [],
+              ads: (rawData.ads as any[])?.map((a: any) => ({
+                ...a,
+                adset_id: a.campaignId || '',
+                adset_name: a.campaign_name || '',
+              })) || [],
+            }}
+            currSymbol={currSymbol}
+            adGroupLabel="Campaigns"
+          />
+        )}
+
         {/* GA4 Extended Widgets */}
         {platform === 'google_analytics' && rawData && (
           <>
