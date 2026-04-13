@@ -78,9 +78,11 @@ interface AdCampaignBreakdownProps {
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'bg-accent/20 text-accent border-accent/30',
+  ENABLED: 'bg-accent/20 text-accent border-accent/30',
   PAUSED: 'bg-muted text-muted-foreground border-border',
   ARCHIVED: 'bg-muted text-muted-foreground/60 border-border',
   DELETED: 'bg-destructive/20 text-destructive border-destructive/30',
+  REMOVED: 'bg-destructive/20 text-destructive border-destructive/30',
 };
 
 const StatusBadge = ({ status }: { status: string | undefined | null }) => {
