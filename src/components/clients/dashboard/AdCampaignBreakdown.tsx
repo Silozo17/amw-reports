@@ -289,7 +289,7 @@ const AdCampaignBreakdown = ({ rawData, currSymbol, adGroupLabel = 'Ad Sets' }: 
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full">
         <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
-        Campaign Breakdown ({allCampaigns.length} campaigns, {allAdSets.length} ad sets, {allAds.length} ads)
+        Campaign Breakdown ({allCampaigns.length} campaigns, {allAdSets.length} {adGroupLabel.toLowerCase()}, {allAds.length} ads)
       </CollapsibleTrigger>
 
       <CollapsibleContent className="mt-3 space-y-3">
@@ -309,7 +309,7 @@ const AdCampaignBreakdown = ({ rawData, currSymbol, adGroupLabel = 'Ad Sets' }: 
         <Tabs defaultValue="campaigns" className="w-full">
           <TabsList>
             <TabsTrigger value="campaigns">Campaigns ({campaigns.length})</TabsTrigger>
-            <TabsTrigger value="adsets">Ad Sets ({adSets.length})</TabsTrigger>
+            <TabsTrigger value="adsets">{adGroupLabel} ({adSets.length})</TabsTrigger>
             <TabsTrigger value="ads">Ads ({ads.length})</TabsTrigger>
           </TabsList>
 
