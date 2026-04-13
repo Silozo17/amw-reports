@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const LI_VERSION = "202601";
+const DEADLINE_MS = 50_000;
 
 const LI_HEADERS = (token: string) => ({
   Authorization: `Bearer ${token}`,
@@ -15,10 +16,9 @@ const LI_HEADERS = (token: string) => ({
   "X-Restli-Protocol-Version": "2.0.0",
 });
 
-// Only fields documented as valid in AdAnalyticsV8 finder (q=analytics)
-// See: https://learn.microsoft.com/en-gb/linkedin/marketing/integrations/ads/reporting/ads-reporting
 const ACCOUNT_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,dateRange,pivotValues,landingPageClicks,shares,likes";
 const CAMPAIGN_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues,shares,likes";
+const CREATIVE_FIELDS = "impressions,clicks,costInLocalCurrency,externalWebsiteConversions,pivotValues,shares,likes";
 
 function buildAnalyticsUrl(
   pivot: string,
@@ -33,11 +33,16 @@ function buildAnalyticsUrl(
   return `https://api.linkedin.com/rest/adAnalytics?q=analytics&pivot=${pivot}&dateRange=${dateRange}&timeGranularity=MONTHLY&accounts=List(${accountUrn})&fields=${fields}`;
 }
 
+function hasTimeLeft(startTime: number): boolean {
+  return Date.now() - startTime < DEADLINE_MS;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -193,6 +198,9 @@ Deno.serve(async (req) => {
       clicks: number;
       conversions: number;
       ctr: number;
+      cpc: number;
+      status: string;
+      campaignGroupId: string;
     }
 
     const campaigns: CampaignRow[] = [];
@@ -214,11 +222,16 @@ Deno.serve(async (req) => {
           clicks,
           conversions,
           ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+          cpc: clicks > 0 ? spend / clicks : 0,
+          status: "ACTIVE",
+          campaignGroupId: "",
         });
       }
     }
 
+    // ── Fetch campaign details (name, status, campaignGroup) ──
     for (const campaign of campaigns) {
+      if (!hasTimeLeft(startTime)) break;
       try {
         const nameRes = await fetch(
           `https://api.linkedin.com/rest/adCampaigns/${campaign.id}`,
@@ -226,8 +239,155 @@ Deno.serve(async (req) => {
         );
         if (nameRes.ok) {
           const nameData = await nameRes.json();
-          if (nameData.name) {
-            campaign.name = nameData.name;
+          if (nameData.name) campaign.name = nameData.name;
+          if (nameData.status) campaign.status = nameData.status;
+          if (nameData.campaignGroup) {
+            campaign.campaignGroupId = nameData.campaignGroup.replace("urn:li:sponsoredCampaignGroup:", "");
+          }
+        }
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // ── Fetch Campaign Group details ──
+    interface CampaignGroupRow {
+      id: string;
+      name: string;
+      status: string;
+      spend: number;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+      cpc: number;
+    }
+
+    const campaignGroupIds = [...new Set(campaigns.map(c => c.campaignGroupId).filter(Boolean))];
+    const campaignGroupMap = new Map<string, CampaignGroupRow>();
+
+    for (const groupId of campaignGroupIds) {
+      if (!hasTimeLeft(startTime)) break;
+      try {
+        const groupRes = await fetch(
+          `https://api.linkedin.com/rest/adCampaignGroups/${groupId}`,
+          { headers: LI_HEADERS(accessToken) }
+        );
+        if (groupRes.ok) {
+          const groupData = await groupRes.json();
+          campaignGroupMap.set(groupId, {
+            id: groupId,
+            name: groupData.name || `Campaign Group ${groupId}`,
+            status: groupData.status || "ACTIVE",
+            spend: 0, impressions: 0, clicks: 0, conversions: 0, ctr: 0, cpc: 0,
+          });
+        }
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // Aggregate campaign metrics into their groups
+    for (const campaign of campaigns) {
+      if (!campaign.campaignGroupId) continue;
+      let group = campaignGroupMap.get(campaign.campaignGroupId);
+      if (!group) {
+        group = {
+          id: campaign.campaignGroupId,
+          name: `Campaign Group ${campaign.campaignGroupId}`,
+          status: "ACTIVE",
+          spend: 0, impressions: 0, clicks: 0, conversions: 0, ctr: 0, cpc: 0,
+        };
+        campaignGroupMap.set(campaign.campaignGroupId, group);
+      }
+      group.spend += campaign.spend;
+      group.impressions += campaign.impressions;
+      group.clicks += campaign.clicks;
+      group.conversions += campaign.conversions;
+    }
+
+    // Calculate derived metrics for groups
+    for (const group of campaignGroupMap.values()) {
+      group.ctr = group.impressions > 0 ? (group.clicks / group.impressions) * 100 : 0;
+      group.cpc = group.clicks > 0 ? group.spend / group.clicks : 0;
+    }
+
+    const campaignGroups = [...campaignGroupMap.values()];
+
+    // ── Fetch Creative-level analytics ──
+    interface AdRow {
+      name: string;
+      id: string;
+      campaignId: string;
+      campaign_name: string;
+      spend: number;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+      cpc: number;
+      status: string;
+      creative?: { title?: string; body?: string; image_url?: string } | null;
+    }
+
+    const ads: AdRow[] = [];
+
+    if (hasTimeLeft(startTime)) {
+      const creativeUrlStr = buildAnalyticsUrl("CREATIVE", adAccountId, month, year, lastDay, CREATIVE_FIELDS);
+      const creativeRes = await fetch(creativeUrlStr, { headers: LI_HEADERS(accessToken) });
+      const creativeData = await creativeRes.json();
+
+      if (creativeRes.ok && creativeData.elements) {
+        for (const el of creativeData.elements) {
+          const pivotValue = (el.pivotValues && el.pivotValues[0]) || "";
+          const creativeId = pivotValue.replace("urn:li:sponsoredCreative:", "");
+          const impressions = Number(el.impressions || 0);
+          const clicks = Number(el.clicks || 0);
+          const spend = Number(el.costInLocalCurrency || 0) / 1_000_000;
+          const conversions = Number(el.externalWebsiteConversions || 0);
+
+          ads.push({
+            name: `Creative ${creativeId}`,
+            id: creativeId,
+            campaignId: "",
+            campaign_name: "",
+            spend,
+            impressions,
+            clicks,
+            conversions,
+            ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+            cpc: clicks > 0 ? spend / clicks : 0,
+            status: "ACTIVE",
+            creative: null,
+          });
+        }
+      }
+    }
+
+    // ── Fetch creative metadata (name, status, campaign link) ──
+    for (const ad of ads) {
+      if (!hasTimeLeft(startTime)) break;
+      try {
+        const metaRes = await fetch(
+          `https://api.linkedin.com/rest/adCreatives/${ad.id}`,
+          { headers: LI_HEADERS(accessToken) }
+        );
+        if (metaRes.ok) {
+          const metaData = await metaRes.json();
+          if (metaData.campaign) {
+            const campId = metaData.campaign.replace("urn:li:sponsoredCampaign:", "");
+            ad.campaignId = campId;
+            const matchedCampaign = campaigns.find(c => c.id === campId);
+            ad.campaign_name = matchedCampaign?.name || `Campaign ${campId}`;
+          }
+          if (metaData.status) ad.status = metaData.status;
+          // Extract creative content from intendedStatus or variables
+          const content = metaData.content || metaData.variables?.data;
+          if (content) {
+            ad.creative = {
+              title: content["com.linkedin.ads.SponsoredUpdateCreativeVariables"]?.title || undefined,
+              body: content["com.linkedin.ads.SponsoredUpdateCreativeVariables"]?.body || undefined,
+            };
           }
         }
       } catch {
@@ -262,6 +422,27 @@ Deno.serve(async (req) => {
         ctr: Math.round(c.ctr * 100) / 100,
       }));
 
+    const rawData = {
+      campaignGroups: campaignGroups.map(g => ({
+        ...g,
+        spend: Math.round(g.spend * 100) / 100,
+        ctr: Math.round(g.ctr * 100) / 100,
+        cpc: Math.round(g.cpc * 100) / 100,
+      })),
+      campaigns: campaigns.map(c => ({
+        ...c,
+        spend: Math.round(c.spend * 100) / 100,
+        ctr: Math.round(c.ctr * 100) / 100,
+        cpc: Math.round(c.cpc * 100) / 100,
+      })),
+      ads: ads.map(a => ({
+        ...a,
+        spend: Math.round(a.spend * 100) / 100,
+        ctr: Math.round(a.ctr * 100) / 100,
+        cpc: Math.round(a.cpc * 100) / 100,
+      })),
+    };
+
     const { data: existing } = await supabase
       .from("monthly_snapshots")
       .select("id, snapshot_locked")
@@ -279,7 +460,7 @@ Deno.serve(async (req) => {
       await supabase.from("monthly_snapshots").update({
         metrics_data: metricsData,
         top_content: topContent,
-        raw_data: { campaigns },
+        raw_data: rawData,
       }).eq("id", existing.id);
     } else {
       await supabase.from("monthly_snapshots").insert({
@@ -289,7 +470,7 @@ Deno.serve(async (req) => {
         report_year: year,
         metrics_data: metricsData,
         top_content: topContent,
-        raw_data: { campaigns },
+        raw_data: rawData,
       });
     }
 
@@ -304,7 +485,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, metrics: metricsData, campaigns_synced: campaigns.length }),
+      JSON.stringify({ success: true, metrics: metricsData, campaigns_synced: campaigns.length, ads_synced: ads.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -83,6 +83,7 @@ const STATUS_COLORS: Record<string, string> = {
   ARCHIVED: 'bg-muted text-muted-foreground/60 border-border',
   DELETED: 'bg-destructive/20 text-destructive border-destructive/30',
   REMOVED: 'bg-destructive/20 text-destructive border-destructive/30',
+  DRAFT: 'bg-muted text-muted-foreground/80 border-border',
 };
 
 const StatusBadge = ({ status }: { status: string | undefined | null }) => {
