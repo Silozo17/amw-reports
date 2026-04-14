@@ -26,7 +26,7 @@ const COMING_SOON = ['X (Twitter)', 'Shopify', 'Bing Ads', 'Snapchat Ads', 'Mail
 const IntegrationsPage = () => {
   usePageMeta({
     title: 'Integrations — 12 Marketing Platforms | AMW Reports',
-    description: 'Connect Google Ads, Meta Ads, Analytics, Search Console, YouTube, Facebook, Instagram, LinkedIn, TikTok, Pinterest & more.',
+    description: 'Connect Google Ads, Meta Ads, Analytics, Search Console, YouTube, Facebook, Instagram, LinkedIn, TikTok, Pinterest, Threads & more.',
   });
 
   return (
@@ -42,7 +42,7 @@ const IntegrationsPage = () => {
             Platform Integrations —<br />Connect Your <span className="text-gradient-purple">Marketing Stack</span>
           </h1>
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
-            One dashboard for all your marketing data. One dashboard for all your marketing data. Connect 12 platforms and pull 70+ metrics into branded, client-ready reports automatically. and pull 70+ metrics into branded, client-ready reports automatically.
+            One dashboard for all your marketing data. Connect 13 platforms and pull 70+ metrics into branded, client-ready reports automatically.
           </p>
           <Button size="lg" asChild>
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
