@@ -426,13 +426,13 @@ Deno.serve(async (req) => {
     // ── Fetch all data — critical endpoints fail-fast ──
     const [followers, shareStats, pageStats] = await Promise.all([
       getFollowerCount(orgUrn, accessToken),
-      getShareStatistics(orgUrn, accessToken, monthStartMs, monthEndMs),
-      getPageStatistics(orgUrn, entityType, accessToken, monthStartMs, monthEndMs),
+      getShareStatistics(orgUrn, accessToken, monthStartMs, monthEndMs, timeGranularity),
+      getPageStatistics(orgUrn, entityType, accessToken, monthStartMs, monthEndMs, timeGranularity),
     ]);
 
     // Non-critical — won't fail the sync
     const [gains, topContentRaw] = await Promise.all([
-      getFollowerGains(orgUrn, accessToken, monthStartMs, monthEndMs),
+      getFollowerGains(orgUrn, accessToken, monthStartMs, monthEndMs, timeGranularity),
       getTopContent(orgUrn, accessToken, monthStartMs, monthEndMs),
     ]);
 
