@@ -42,7 +42,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    const threadsAppId = Deno.env.get("THREADS_APP_ID");
+    const threadsAppId = Deno.env.get("THREADS_APP_ID")
+      || Deno.env.get("FACEBOOK_APP_ID")
+      || Deno.env.get("META_APP_ID")
+      || Deno.env.get("INSTAGRAM_APP_ID");
     if (!threadsAppId) {
       return new Response(
         JSON.stringify({ error: "THREADS_APP_ID is not configured" }),
