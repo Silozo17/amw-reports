@@ -101,7 +101,7 @@ export function computeKpis(
     ...(totalFollowers > 0 ? [{ label: "Followers", value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: "total_followers", platforms: followerPlatforms }] : []),
     ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions", platforms: sessionsPlatforms }] : []),
     ...(totalSearchImpressions > 0 ? [{ label: "Search Impressions", value: totalSearchImpressions, change: cc(totalSearchImpressions, prevSearchImpressions), icon: Search, metricKey: "search_impressions", platforms: searchImpressionsPlatforms }] : []),
-    ...(totalSearchClicks > 0 ? [{ label: "Search Clicks", value: totalSearchClicks, change: cc(totalSearchClicks, prevSearchClicks), icon: MousePointerClick, metricKey: "search_clicks", platforms: searchClicksPlatforms }] : []),
+    
     ...(totalSearchCtr > 0 ? [{ label: "Search CTR", value: totalSearchCtr, change: cc(totalSearchCtr, prevSearchCtr), icon: Crosshair, metricKey: "search_ctr", platforms: searchCtrPlatforms, isPercentage: true }] : []),
     ...(avgSearchPosition > 0 ? [{ label: "Avg. Position", value: avgSearchPosition, change: cc(avgSearchPosition, prevAvgSearchPosition), icon: Hash, metricKey: "search_position", platforms: searchPositionPlatforms, isDecimal: true }] : []),
     ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
