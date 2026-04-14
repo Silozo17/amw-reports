@@ -41,6 +41,7 @@ async function fetchAllPages(url: string, accessToken: string, start: number, li
 }
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-meta-ads", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

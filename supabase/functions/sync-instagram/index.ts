@@ -12,6 +12,7 @@ const corsHeaders = {
 const GRAPH_BASE = "https://graph.facebook.com/v25.0";
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-instagram", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

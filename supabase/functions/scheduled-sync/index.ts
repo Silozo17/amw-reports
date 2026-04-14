@@ -111,6 +111,7 @@ async function notifySyncFailure(
 }
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "scheduled-sync", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204 });
   }

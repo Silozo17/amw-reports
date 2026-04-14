@@ -12,6 +12,7 @@ const corsHeaders = {
 const ADS_REPORT_URL = "https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/";
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-tiktok-ads", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

@@ -68,6 +68,7 @@ async function fetchVideos(accessToken: string, cursor?: number): Promise<{ vide
 }
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-tiktok-business", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

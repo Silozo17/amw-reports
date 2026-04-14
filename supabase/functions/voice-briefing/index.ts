@@ -64,6 +64,7 @@ function canRegenerate(generatedAt: string, lastSyncAt: string | null): { allowe
 }
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "voice-briefing", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {

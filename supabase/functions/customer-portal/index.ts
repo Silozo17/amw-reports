@@ -16,6 +16,7 @@ const logStep = (step: string, details?: unknown) => {
 };
 
 serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "customer-portal", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

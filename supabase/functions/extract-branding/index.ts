@@ -14,6 +14,7 @@ const normaliseHex = (color: string | undefined | null): string | null => {
 };
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "extract-branding", method: req.method, connection_id: null }));
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

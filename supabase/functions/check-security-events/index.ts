@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Cron-only function — no CORS needed
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "check-security-events", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204 });
   }

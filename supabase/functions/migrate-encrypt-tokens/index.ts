@@ -4,6 +4,7 @@ import { encryptToken } from "../_shared/tokenCrypto.ts";
 const ENCRYPTION_PREFIX = "enc:";
 
 Deno.serve(async (req) => {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "migrate-encrypt-tokens", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204 });
   }
