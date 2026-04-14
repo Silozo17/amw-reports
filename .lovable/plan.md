@@ -1,112 +1,46 @@
 
 
-## Integrate Threads as a New Platform
+## Update All Platform References Across the Website
 
-### Overview
-Add Threads (Meta's text-based social platform) as the 14th platform integration. Threads has its own standalone OAuth flow via `graph.threads.net` (separate from Facebook/Instagram Graph API) with dedicated App ID and App Secret from the Meta Developer Console "Threads Use Case."
+### Problem
+Multiple pages reference outdated platform counts and lists. The actual platform count is **14** but pages variously say 12 or 13. Several pages are missing LinkedIn Ads, Threads, or both. The onboarding step only shows 10 of 14 platforms.
 
-### Threads API Summary (as of April 2026)
+### Audit Results
 
-- **OAuth**: Authorization via `https://threads.net/oauth/authorize`, token exchange via `https://graph.threads.net/oauth/access_token`
-- **Scopes**: `threads_basic`, `threads_manage_insights`
-- **Tokens**: Short-lived (1 hour) → exchanged for long-lived (60 days) → refreshable
-- **User Insights** (time-series with `since`/`until`): `views`, `likes`, `replies`, `reposts`, `quotes`, `clicks`, `followers_count`, `follower_demographics`
-- **Media Insights** (per-post lifetime): `views`, `likes`, `replies`, `reposts`, `quotes`, `shares`
-- **Profile endpoint**: `GET /me?fields=id,username,threads_profile_picture_url,threads_biography`
-- **Media listing**: `GET /{user-id}/threads?fields=id,text,timestamp,media_type,permalink,like_count,reply_count`
+| Page / Component | Issue |
+|---|---|
+| `HomePage.tsx` | PLATFORMS array missing **Threads** and **LinkedIn Ads** |
+| `PpcReportingPage.tsx` | PLATFORMS array missing **LinkedIn Ads** |
+| `IntegrationsPage.tsx` | Title says "12 Marketing Platforms", body says "13 platforms" — should be **14** |
+| `FeaturesPage.tsx` | Title and meta say "13 Platform Integrations" — should be **14** |
+| `PricingPage.tsx` | Label says "13 Platform Integrations", FAQ says "12 platforms in total" — should be **14** and include Threads |
+| `HowItWorksPage.tsx` | Body text says "12 platforms" — should be **14** |
+| `ForFreelancersPage.tsx` | Says "12 platforms" — should be **14** |
+| `ForAgenciesPage.tsx` | Says "12 platforms" — should be **14** |
+| `PlatformsStep.tsx` (Onboarding) | Missing **tiktok_ads**, **linkedin_ads**, **pinterest**, **threads** (shows 10 of 14) |
+| `ClientConnectionsTab.tsx` | CONNECTION_CATEGORIES missing **threads** from Organic Social |
 
----
+### Changes
 
-### Changes Required
+**1. `src/pages/HomePage.tsx`** — Add `'Threads'` and `'LinkedIn Ads'` to PLATFORMS array.
 
-#### 1. Database Migration — Add `threads` to `platform_type` enum
+**2. `src/pages/PpcReportingPage.tsx`** — Add LinkedIn Ads to PLATFORMS array with its metrics (Spend, Impressions, Clicks, CTR, CPC, CPM, Conversions, Conversion Rate, Cost/Conv., Engagement).
 
-```sql
-ALTER TYPE platform_type ADD VALUE IF NOT EXISTS 'threads';
-```
+**3. `src/pages/IntegrationsPage.tsx`** — Update meta title and body text from 12/13 to **14**.
 
-#### 2. Secrets — `THREADS_APP_ID` and `THREADS_APP_SECRET`
+**4. `src/pages/FeaturesPage.tsx`** — Update heading, meta description from "13" to **14**.
 
-These are separate from `META_APP_ID`. The Threads Use Case in the Meta Developer Console provides its own App ID and Secret. Will request these via `add_secret`.
+**5. `src/pages/PricingPage.tsx`** — Update "13 Platform Integrations" label to **14**, update FAQ answer to list all 14 platforms including Threads and LinkedIn Ads.
 
-#### 3. New Edge Function: `threads-connect`
+**6. `src/pages/HowItWorksPage.tsx`** — Change "12 platforms" to "14 platforms" in step 1 body text, add LinkedIn Ads mention.
 
-OAuth connect function that builds the Threads authorization URL:
-- URL: `https://threads.net/oauth/authorize`
-- Params: `client_id`, `redirect_uri` (→ `oauth-callback`), `scope=threads_basic,threads_manage_insights`, `response_type=code`, `state` (base64 JSON with `connection_id`, `platform: "threads"`, `redirect_url`)
+**7. `src/pages/ForFreelancersPage.tsx`** — Change "12 platforms" to "14 platforms".
 
-#### 4. Update `oauth-callback` — Add `handleThreads` handler
+**8. `src/pages/ForAgenciesPage.tsx`** — Change "12 platforms" to "14 platforms".
 
-- Exchange code for short-lived token via `POST https://graph.threads.net/oauth/access_token` with `client_id`, `client_secret`, `grant_type=authorization_code`, `redirect_uri`, `code`
-- Exchange short-lived for long-lived token via `GET https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=...&access_token=...`
-- Fetch profile via `GET https://graph.threads.net/v1.0/me?fields=id,username&access_token=...`
-- Store encrypted token, set `account_id`, `account_name` (username), `is_connected=true`, `token_expires_at` (60 days)
+**9. `src/components/onboarding/steps/PlatformsStep.tsx`** — Add `'tiktok_ads'`, `'linkedin_ads'`, `'pinterest'`, `'threads'` to PLATFORM_IDS. Adjust grid to `sm:grid-cols-7` for 14 items.
 
-#### 5. New Edge Function: `sync-threads`
+**10. `src/components/clients/tabs/ClientConnectionsTab.tsx`** — Add `'threads'` to the Organic Social platforms array in CONNECTION_CATEGORIES.
 
-Syncs monthly data using the Threads Insights API:
-- **User Insights**: `GET /{user-id}/threads_insights?metric=views,likes,replies,reposts,quotes,clicks,followers_count&since={start}&until={end}`
-- **Media listing + insights**: Fetch posts in the date range, then per-post insights for top content
-- **Metrics mapped**: `views`, `likes`, `replies` (as comments), `reposts` (as shares), `quotes`, `clicks`, `total_followers` (from `followers_count`), `follower_growth` (delta), `posts_published` (count), `engagement`, `engagement_rate`
-- Writes to `monthly_snapshots` with `platform: 'threads'`
-- Follows the same pattern as `sync-instagram` (decrypt token, 50s deadline, structured logging)
-
-#### 6. Token refresh in `check-expiring-tokens`
-
-Add Threads long-lived token refresh logic:
-- `GET https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=...`
-- Tokens are refreshable and valid for 60 days after refresh
-
-#### 7. Frontend Type Updates
-
-**`src/types/database.ts`:**
-- Add `'threads'` to `PlatformType` union
-- Add `threads: 'Threads'` to `PLATFORM_LABELS`
-- Import and add Threads logo to `PLATFORM_LOGOS`
-- Add `threads` metrics to `PLATFORM_AVAILABLE_METRICS`:
-  ```
-  threads: ['total_followers', 'follower_growth', 'views', 'likes', 'comments', 'shares', 'engagement', 'engagement_rate', 'clicks', 'posts_published', 'quotes']
-  ```
-- Add `'threads'` to `ORGANIC_PLATFORMS`
-- Add `'threads'` to the Organic Social category in `PLATFORM_CATEGORIES`
-- Add new metric labels: `quotes: 'Quotes'`, `reposts: 'Reposts'`
-
-#### 8. Platform Routing Updates
-
-**`src/lib/platformRouting.ts`:**
-- Add `threads: 'threads-connect'` to `CONNECT_FUNCTION_MAP`
-- Add `threads: 'sync-threads'` to `SYNC_FUNCTION_MAP`
-- Add `'threads'` to `OAUTH_SUPPORTED` and `ALL_PLATFORMS`
-
-#### 9. Logo Asset
-
-Copy the uploaded `threads_logo.webp` to `src/assets/logos/threads.webp` and import it in `database.ts`.
-
-#### 10. Website / Marketing Pages Updates
-
-Add Threads to platform lists on these pages:
-- **FeaturesPage.tsx** — Add Threads card with its metrics
-- **SocialMediaReportingPage.tsx** — Add Threads to the platforms list and update counts
-- **HowItWorksPage.tsx** — Add 'Threads' to `PLATFORMS` array
-- **ForCreatorsPage.tsx** — Add 'Threads' to `PLATFORMS` array
-- **PricingPage.tsx** — Update "12 Platform Integrations" → "13 Platform Integrations" and mention Threads
-- **ForAgenciesPage.tsx**, **ForSmbsPage.tsx**, **ForFreelancersPage.tsx** — Add Threads where other platforms are listed
-- **IntegrationsPage.tsx** — Add Threads integration card
-
-#### 11. Dashboard Extras Component
-
-Create `src/components/clients/dashboard/platforms/ThreadsExtras.tsx` — platform-specific dashboard section showing Threads-unique metrics (Quotes, Reposts) and top posts table. Wire it into `PlatformSection.tsx`.
-
-#### 12. Memory Update
-
-Save a `mem://integrations/threads-config` memory documenting the Threads API specifics, OAuth flow, and metric mapping.
-
----
-
-### Technical Details
-
-- Threads OAuth is completely separate from Facebook/Instagram OAuth (different base URL: `threads.net` and `graph.threads.net`)
-- Threads API only supports data from April 13, 2024 onwards (Unix timestamp `1712991600`)
-- Long-lived tokens last 60 days and must be refreshed — same pattern as existing `check-expiring-tokens`
-- No account picker needed — Threads is tied to the authenticated user's single account
+All changes are string/array updates only — no logic changes.
 
