@@ -10,7 +10,8 @@ import usePageMeta from '@/hooks/usePageMeta';
 
 const PLATFORMS = [
   'Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console',
-  'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile',
+  'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads',
+  'LinkedIn Ads', 'Pinterest', 'Google Business Profile', 'Threads',
 ];
 
 const STEPS = [
@@ -20,7 +21,7 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Pull data from 12 marketing platforms into a single dashboard. No more switching between tools.' },
+  { icon: BarChart3, title: 'Multi-Platform Analytics', desc: 'Pull data from 14 marketing platforms into a single dashboard. No more switching between tools.' },
   { icon: FileText, title: 'Branded PDF Reports', desc: 'Automatically generated, beautifully designed PDF reports with your logo, colours, and branding.' },
   { icon: Mail, title: 'Automated Delivery', desc: 'Reports are emailed directly to your clients on schedule — no manual work required.' },
   { icon: Palette, title: 'White-Label Branding', desc: 'Your logo, your colours, your fonts, your domain. Clients see your brand, not ours.' },
@@ -38,7 +39,7 @@ const AUDIENCES = [
 const WHY_US = [
   'White-label everything — your brand, your logo, your colours',
   'Automated monthly email delivery to your clients',
-  '12 platforms in one dashboard — no switching tools',
+  '14 platforms in one dashboard — no switching tools',
   'No per-seat pricing — your whole team for one price',
   'Built by marketers who run an agency themselves',
   'Client portal with shareable links for transparency',
@@ -54,7 +55,7 @@ const STAT_GROUPS = [
 const HomePage = () => {
   usePageMeta({
     title: 'AMW Reports — Client-Ready Marketing Reports',
-    description: 'Consolidate 12 platforms into branded PDF reports. Free plan available. Built for agencies, freelancers, and creators.',
+    description: 'Consolidate 14 platforms into branded PDF reports. Free plan available. Built for agencies, freelancers, and creators.',
   });
 
   return (
