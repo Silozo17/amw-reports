@@ -1,56 +1,38 @@
 
 
-## Plan: Fix LinkedIn Sync Bug + Redesign Admin Sync Dialog
+## Plan: Fix "Needs Attention" Showing Stale Failed Syncs Forever
 
-### Issue 1: LinkedIn sync crashes — `timeGranularity is not defined`
+### Problem
+The dashboard queries **all** failed sync logs ever recorded (`sync_logs WHERE status = 'failed'`). Once a sync fails, the log entry persists forever, so the "Needs Attention" card never clears — even after the platform is reconnected and syncs successfully.
 
-The previous edit added a `granularity` return value to `buildMonthlyRange` and destructured it as `timeGranularity` in the main handler (line 424). However, three helper functions reference `timeGranularity` directly without receiving it as a parameter:
+### Solution
+Two changes to `src/pages/Index.tsx`:
 
-- `getFollowerGains` (line 118)
-- `getShareStatistics` (line 157)
-- `getPageStatistics` (lines 193, 203)
+**1. Only count recent failed syncs (last 7 days)**
+Change the `syncsRes` query (line 97) to filter `started_at` to the last 7 days. Old failures that have since been resolved are no longer relevant.
 
-Since these are standalone functions, `timeGranularity` is not in their scope → `ReferenceError` → sync fails every time.
+```
+.gte('started_at', new Date(Date.now() - 7 * 86400000).toISOString())
+```
 
-**Fix**: Add a `granularity: string` parameter to all three functions and pass `timeGranularity` from the call sites in the main handler.
+**2. Exclude failures that have a newer successful sync for the same platform+client**
+After fetching, filter out any failed log where there's a more recent successful sync for the same `client_id + platform` combination. This way, if a user re-syncs and it succeeds, the failure disappears.
 
-| Function | Signature change | Call site (line ~) |
-|---|---|---|
-| `getFollowerGains` | Add 5th param `granularity: string` | 435 |
-| `getShareStatistics` | Add 5th param `granularity: string` | 429 |
-| `getPageStatistics` | Add 6th param `granularity: string` | 430 |
+This requires fetching the `platform` column in `syncsRes` (already fetched in `recentSyncsRes` but not in the failed count query), then cross-referencing against successful syncs.
 
-Each function's internal `buildTimeIntervals(startMs, endMs, timeGranularity)` becomes `buildTimeIntervals(startMs, endMs, granularity)`.
+### Implementation detail
 
-### Issue 2: Admin Sync Dialog UI — fields disappear, not intuitive
-
-The current dialog uses conditional rendering that makes sections appear/disappear as you change options. This is confusing.
-
-**Redesign approach — always show all relevant sections, disable rather than hide**:
-
-1. **Step 1 — Scope**: Keep radio group (Single Channel, Single Client, Whole Org, Whole Platform). Always visible.
-
-2. **Step 2 — Target selection**: Always render the client/channel/platform dropdowns but show a contextual placeholder. When scope is "Whole Organisation", show a simple "All X connections" summary instead of hiding the section entirely.
-
-3. **Step 3 — Channel filter** (only for client/org/platform scopes): Always show the "All channels" / "Select specific" toggle. When scope is "channel", skip this step with a clear visual indicator.
-
-4. **Step 4 — Time range**: Always visible. Show month/year pickers inline beneath the selected option (not conditionally mounted — just visually collapsed with CSS).
-
-5. **Summary bar**: Always visible at the bottom, updates reactively. Shows "Select a scope to continue" when nothing is ready yet.
-
-**Key UI improvements**:
-- Use a stepped card layout with numbered sections that stay mounted
-- Disabled/greyed sections instead of disappearing ones
-- Clear summary line always visible
-- Pinterest 3-month cap warning shown whenever Pinterest connections are in the target set (not just on "full" mode)
+- Modify `syncsRes` query to also select `platform, started_at` and add the 7-day filter
+- After fetching, for each failed log, check if a newer successful sync exists for the same `client_id + platform` pair (using data already available from `recentSyncsRes`, or adding a small additional query for recent successes)
+- Also apply the same 7-day window to the "Failed Syncs" stat card count so it stays consistent
 
 ### Files changed
 
 | File | Change |
 |---|---|
-| `supabase/functions/sync-linkedin/index.ts` | Add `granularity` param to 3 functions, pass from call sites |
-| `src/components/admin/AdminSyncDialog.tsx` | Rewrite UI to use stable layout with no disappearing sections |
+| `src/pages/Index.tsx` | Filter failed syncs to last 7 days + exclude superseded failures |
 
-### No other changes
-- `admin-sync` edge function is correct — the sequential queue logic works fine
-- No database changes needed
+### No other changes needed
+- No database changes — `sync_logs` table stays as-is
+- No edge function changes
+
