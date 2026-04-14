@@ -71,7 +71,7 @@ const batchFetchPostInsights = async (
   // Batch 1: post views (post_impressions_unique, post_total_media_view_unique)
   try {
     const ids = postIds.join(",");
-    const url = `${GRAPH_BASE}/?ids=${ids}&fields=insights.metric(post_impressions_unique,post_total_media_view_unique)&access_token=${pageToken}`;
+    const url = `${GRAPH_BASE}/?ids=${ids}&fields=insights.metric(post_total_media_view_unique)&access_token=${pageToken}`;
     const res = await fetchWithTimeout(url);
     if (res.ok) {
       const data = await res.json();
@@ -81,10 +81,7 @@ const batchFetchPostInsights = async (
         const entry = result.get(postId)!;
         for (const insight of postData.insights.data) {
           const val = Number(insight.values?.[0]?.value || 0);
-          if (insight.name === "post_impressions_unique" && val > 0) {
-            entry.views = val;
-          }
-          if (insight.name === "post_total_media_view_unique" && val > 0 && entry.views === 0) {
+          if (insight.name === "post_total_media_view_unique" && val > 0) {
             entry.views = val;
           }
         }
