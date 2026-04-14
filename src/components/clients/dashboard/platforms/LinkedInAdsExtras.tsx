@@ -6,23 +6,27 @@ interface LinkedInAdsExtrasProps {
   currSymbol: string;
 }
 
+type RawDataProp = Parameters<typeof AdCampaignBreakdown>[0]['rawData'];
+
 const LinkedInAdsExtras = ({ rawData, currSymbol }: LinkedInAdsExtrasProps) => {
   if (!((rawData.campaignGroups as RawDataItem[])?.length || (rawData.campaigns as RawDataItem[])?.length)) return null;
 
+  const mapped: RawDataProp = {
+    campaigns: ((rawData.campaignGroups as RawDataItem[]) || []) as RawDataProp['campaigns'],
+    adSets: ((rawData.campaigns as RawDataItem[])?.map((c) => ({
+      ...c,
+      campaign_id: c.campaignGroupId || '',
+    })) || []) as RawDataProp['adSets'],
+    ads: ((rawData.ads as RawDataItem[])?.map((a) => ({
+      ...a,
+      adset_id: a.campaignId || '',
+      adset_name: a.campaign_name || '',
+    })) || []) as RawDataProp['ads'],
+  };
+
   return (
     <AdCampaignBreakdown
-      rawData={{
-        campaigns: (rawData.campaignGroups as RawDataItem[]) || [],
-        adSets: (rawData.campaigns as RawDataItem[])?.map((c: RawDataItem) => ({
-          ...c,
-          campaign_id: c.campaignGroupId || '',
-        })) || [],
-        ads: (rawData.ads as RawDataItem[])?.map((a: RawDataItem) => ({
-          ...a,
-          adset_id: a.campaignId || '',
-          adset_name: a.campaign_name || '',
-        })) || [],
-      }}
+      rawData={mapped}
       currSymbol={currSymbol}
       adGroupLabel="Campaigns"
     />

@@ -6,6 +6,9 @@ import GeoHeatmap from '@/components/clients/dashboard/GeoHeatmap';
 import DeviceBreakdown from '@/components/clients/dashboard/DeviceBreakdown';
 import type { RawDataItem } from './shared/types';
 
+type GeoProps = Parameters<typeof GeoHeatmap>[0];
+type DeviceProps = Parameters<typeof DeviceBreakdown>[0];
+
 interface GoogleAnalyticsExtrasProps {
   rawData: Record<string, unknown>;
 }
@@ -15,14 +18,14 @@ const GoogleAnalyticsExtras = ({ rawData }: GoogleAnalyticsExtrasProps) => {
     <>
       {((rawData.geoCountries as RawDataItem[])?.length > 0 || (rawData.geoCities as RawDataItem[])?.length > 0) && (
         <GeoHeatmap
-          countries={(rawData.geoCountries as RawDataItem[]) || []}
-          cities={(rawData.geoCities as RawDataItem[]) || []}
+          countries={((rawData.geoCountries as RawDataItem[]) || []) as GeoProps['countries']}
+          cities={((rawData.geoCities as RawDataItem[]) || []) as GeoProps['cities']}
         />
       )}
       {((rawData.devices as RawDataItem[])?.length > 0 || (rawData.newVsReturning as RawDataItem[])?.length > 0) && (
         <DeviceBreakdown
-          devices={(rawData.devices as RawDataItem[]) || []}
-          newVsReturning={(rawData.newVsReturning as RawDataItem[]) || []}
+          devices={((rawData.devices as RawDataItem[]) || []) as DeviceProps['devices']}
+          newVsReturning={((rawData.newVsReturning as RawDataItem[]) || []) as DeviceProps['newVsReturning']}
         />
       )}
       {(rawData.landingPages as RawDataItem[])?.length > 0 && (

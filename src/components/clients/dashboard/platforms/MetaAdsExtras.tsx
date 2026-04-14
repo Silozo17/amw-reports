@@ -11,7 +11,7 @@ const MetaAdsExtras = ({ rawData, currSymbol }: MetaAdsExtrasProps) => {
 
   return (
     <AdCampaignBreakdown
-      rawData={rawData as Record<string, unknown>}
+      rawData={rawData as Parameters<typeof AdCampaignBreakdown>[0]['rawData']}
       currSymbol={currSymbol}
     />
   );

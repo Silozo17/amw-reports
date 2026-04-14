@@ -6,18 +6,22 @@ interface GoogleAdsExtrasProps {
   currSymbol: string;
 }
 
+type RawDataProp = Parameters<typeof AdCampaignBreakdown>[0]['rawData'];
+
 const GoogleAdsExtras = ({ rawData, currSymbol }: GoogleAdsExtrasProps) => {
   if (!(rawData.campaigns as RawDataItem[])?.length) return null;
 
+  const mapped: RawDataProp = {
+    campaigns: ((rawData.campaigns as RawDataItem[]) ?? []).map((c) => ({
+      ...c, spend: c.spend ?? c.cost, cpc: c.cpc ?? c.avg_cpc,
+    })) as RawDataProp['campaigns'],
+    adSets: ((rawData.adGroups as RawDataItem[]) || []) as RawDataProp['adSets'],
+    ads: ((rawData.ads as RawDataItem[]) || []) as RawDataProp['ads'],
+  };
+
   return (
     <AdCampaignBreakdown
-      rawData={{
-        campaigns: (rawData.campaigns as RawDataItem[])?.map((c: RawDataItem) => ({
-          ...c, spend: c.spend ?? c.cost, cpc: c.cpc ?? c.avg_cpc,
-        })),
-        adSets: (rawData.adGroups as RawDataItem[]) || [],
-        ads: (rawData.ads as RawDataItem[]) || [],
-      }}
+      rawData={mapped}
       currSymbol={currSymbol}
       adGroupLabel="Ad Groups"
     />
