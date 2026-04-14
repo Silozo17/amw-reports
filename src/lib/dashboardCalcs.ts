@@ -34,6 +34,13 @@ export function computeKpis(
   const totalPageViews = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
   const totalWebsiteClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
   const totalPostsPublished = filtered.reduce((sum, s) => sum + (s.metrics_data.posts_published || 0), 0);
+  const totalGbpCalls = filtered.reduce((sum, s) => sum + (s.metrics_data.gbp_calls || 0), 0);
+  const totalGbpDirections = filtered.reduce((sum, s) => sum + (s.metrics_data.gbp_direction_requests || 0), 0);
+  const totalLeads = filtered.reduce((sum, s) => sum + (s.metrics_data.leads || 0), 0);
+  const gbpRatingSnapshots = filtered.filter(s => s.platform === 'google_business_profile' && s.metrics_data.gbp_average_rating != null);
+  const latestGbpRating = gbpRatingSnapshots.length > 0
+    ? [...gbpRatingSnapshots].sort((a, b) => (b.report_year - a.report_year) || (b.report_month - a.report_month))[0].metrics_data.gbp_average_rating
+    : 0;
 
   const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
   const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
