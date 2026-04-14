@@ -171,27 +171,6 @@ async function fetchSearchKeywords(
   }
 }
 
-/** Resolve a GBP location resource name to a Place ID */
-async function resolveLocationToPlaceId(
-  locationId: string,
-  accessToken: string
-): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://mybusinessbusinessinformation.googleapis.com/v1/${locationId}?readMask=metadata`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (!res.ok) {
-      console.warn(`Location lookup failed (${res.status}):`, await res.text());
-      return null;
-    }
-    const data = await res.json();
-    return data.metadata?.placeId ?? null;
-  } catch (e) {
-    console.warn("Could not resolve location to placeId:", e);
-    return null;
-  }
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
