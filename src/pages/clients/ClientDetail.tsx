@@ -16,8 +16,8 @@ import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
-import { triggerInitialSync, type SyncProgress } from '@/lib/triggerSync';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { SyncQueue, type QueueState } from '@/lib/syncQueue';
 import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
 import UpsellTab from '@/components/clients/UpsellTab';
@@ -45,8 +45,13 @@ const ClientDetail = () => {
   const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
-  const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncProgress>>(new Map());
+  const [queueState, setQueueState] = useState<QueueState>({ currentJob: null, queuedJobs: [], currentProgress: null });
   const [syncStartTime, setSyncStartTime] = useState(0);
+  const [syncQueue] = useState(() => new SyncQueue(
+    (state) => setQueueState({ ...state }),
+    () => fetchDataRef.current?.(),
+  ));
+  const fetchDataRef = { current: null as (() => void) | null };
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
