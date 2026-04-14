@@ -25,7 +25,7 @@ export function computeKpis(
 ): KpiItem[] {
   const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
   const totalReach = filtered.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
-  const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0); }, 0);
+  const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0) + (m.website_clicks || 0) + (m.link_clicks || 0); }, 0);
   const totalEngagement = filtered.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
   const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
   const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
