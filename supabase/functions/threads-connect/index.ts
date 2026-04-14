@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+    const redirectUri = `https://reports.amwmedia.co.uk/auth/threads/callback`;
 
     const state = btoa(
       JSON.stringify({
