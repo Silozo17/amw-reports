@@ -313,8 +313,27 @@ Deno.serve(async (req) => {
     // ── Fetch search keywords ────────────────────────────────────
     const searchKeywords = await fetchSearchKeywords(locationId, year, month, accessToken);
 
+    // ── Compute new reviews (diff from previous snapshot) ──────
+    let gbpNewReviews: number | null = null;
+    if (reviewsCount !== null) {
+      const { data: prevSnap } = await supabase
+        .from("monthly_snapshots")
+        .select("metrics_data")
+        .eq("client_id", clientId)
+        .eq("platform", "google_business_profile")
+        .lt("report_year", year)
+        .order("report_year", { ascending: false })
+        .order("report_month", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const prevCount = (prevSnap?.metrics_data as any)?.gbp_reviews_count;
+      if (typeof prevCount === "number") {
+        gbpNewReviews = Math.max(0, reviewsCount - prevCount);
+      }
+    }
+
     // ── Build metrics data ───────────────────────────────────────
-    const metricsData = {
+    const metricsData: Record<string, number | null> = {
       gbp_views: gbpViews,
       gbp_searches: totalSearches,
       gbp_calls: metricTotals["CALL_CLICKS"],
@@ -322,6 +341,7 @@ Deno.serve(async (req) => {
       gbp_website_clicks: metricTotals["WEBSITE_CLICKS"],
       gbp_reviews_count: reviewsCount,
       gbp_average_rating: avgRating,
+      gbp_new_reviews: gbpNewReviews,
       gbp_conversations: metricTotals["BUSINESS_CONVERSATIONS"],
       gbp_bookings: metricTotals["BUSINESS_BOOKINGS"],
       gbp_maps_desktop: gbpMapsDesktop,
@@ -330,7 +350,15 @@ Deno.serve(async (req) => {
       gbp_search_mobile: gbpSearchMobile,
     };
 
-    const topContent = searchKeywords.length > 0 ? searchKeywords : null;
+    // ── Build top_content with typed entries ──────────────────────
+    const topContentItems: any[] = [];
+    for (const r of latestReviews) {
+      topContentItems.push(r);
+    }
+    for (const k of searchKeywords) {
+      topContentItems.push({ type: "keyword", keyword: k.keyword, impressions: k.impressions });
+    }
+    const topContent = topContentItems.length > 0 ? topContentItems : null;
 
     // ── Upsert snapshot ──────────────────────────────────────────
     const { data: existing } = await supabase
