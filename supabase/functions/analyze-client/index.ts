@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-portal-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY"
 };
 
 // In-memory rate limit: 60s cooldown per actor
@@ -12,7 +14,7 @@ const RATE_LIMIT_MS = 60_000;
 const PLATFORM_CATEGORIES: Record<string, string[]> = {
   "Paid Advertising": ["google_ads", "meta_ads", "tiktok_ads"],
   "Organic Social": ["facebook", "instagram", "tiktok", "linkedin", "youtube", "pinterest"],
-  "SEO & Web Analytics": ["google_search_console", "google_analytics", "google_business_profile"],
+  "SEO & Web Analytics": ["google_search_console", "google_analytics", "google_business_profile"]
 };
 
 Deno.serve(async (req) => {

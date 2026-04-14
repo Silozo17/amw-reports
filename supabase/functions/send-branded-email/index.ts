@@ -9,6 +9,8 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY"
 };
 
 // ─── Colour helpers ──────────────────────────────────────
@@ -601,7 +603,7 @@ const TEMPLATES: Record<string, TemplateBuilder> = {
   new_device_login,
   failed_login_attempts,
   // Client Portal
-  client_invite,
+  client_invite
 };
 
 // ═══════════════════════════════════════════════════════════

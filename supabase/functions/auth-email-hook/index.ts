@@ -13,6 +13,8 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY"
 };
 
 const ACTION_TO_TEMPLATE: Record<string, string> = {
@@ -21,7 +23,7 @@ const ACTION_TO_TEMPLATE: Record<string, string> = {
   recovery: "auth_recovery",
   email_change: "auth_email_change",
   reauthentication: "auth_magic_link",
-  invite: "team_invitation",
+  invite: "team_invitation"
 };
 
 /** Build a verification / action URL from token_hash when confirmation_url is absent */
