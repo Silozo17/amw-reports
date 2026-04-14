@@ -77,6 +77,7 @@ export class SyncQueue {
     };
     this.emit();
 
+    let lastError: unknown = null;
     try {
       const results = await triggerInitialSync(
         nextJob.connectionId,
@@ -90,10 +91,10 @@ export class SyncQueue {
 
       const failures = results.filter(r => !r.success);
       if (failures.length > 0) {
-        console.error(`Sync errors for ${nextJob.platform}:`, failures);
+        lastError = failures;
       }
     } catch (err) {
-      console.error(`Sync failed for ${nextJob.platform}:`, err);
+      lastError = err;
     }
 
     await this.processNext();
