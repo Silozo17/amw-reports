@@ -43,6 +43,10 @@ const ACCENT_COLORS: Record<string, string> = {
   search_ctr: 'hsl(var(--amw-green))',
   search_position: 'hsl(var(--amw-blue))',
   posts_published: 'hsl(var(--amw-green))',
+  gbp_calls: 'hsl(var(--amw-blue))',
+  gbp_direction_requests: 'hsl(var(--amw-orange))',
+  gbp_average_rating: 'hsl(var(--amw-green))',
+  leads: 'hsl(var(--amw-purple))',
 };
 
 const formatValue = (val: number, isCost: boolean, currSymbol: string, isPercentage?: boolean, isDecimal?: boolean): string => {
