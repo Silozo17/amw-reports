@@ -33,6 +33,117 @@ async function refreshAccessToken(
   return data;
 }
 
+/** Fetch a single daily metric time series and return the total */
+async function fetchDailyMetricTotal(
+  locationId: string,
+  metric: string,
+  year: number,
+  month: number,
+  lastDay: number,
+  accessToken: string
+): Promise<number> {
+  try {
+    const res = await fetch(
+      `https://businessprofileperformance.googleapis.com/v1/${locationId}:getDailyMetricsTimeSeries?dailyMetric=${metric}&dailyRange.startDate.year=${year}&dailyRange.startDate.month=${month}&dailyRange.startDate.day=1&dailyRange.endDate.year=${year}&dailyRange.endDate.month=${month}&dailyRange.endDate.day=${lastDay}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.warn(`GBP metric ${metric} failed (${res.status}):`, errBody);
+      return 0;
+    }
+    const data = await res.json();
+    const dataPoints = data.timeSeries?.datedValues || [];
+    return dataPoints.reduce((sum: number, dp: any) => sum + Number(dp.value || 0), 0);
+  } catch (e) {
+    console.warn(`Could not fetch GBP metric ${metric}:`, e);
+    return 0;
+  }
+}
+
+/** Fetch reviews count and rating via Places API (New) */
+async function fetchReviewsData(
+  placeId: string,
+  apiKey: string
+): Promise<{ reviewsCount: number | null; averageRating: number | null }> {
+  try {
+    const res = await fetch(
+      `https://places.googleapis.com/v1/places/${placeId}?fields=rating,userRatingCount`,
+      {
+        headers: {
+          "X-Goog-Api-Key": apiKey,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (!res.ok) {
+      console.warn(`Places API failed (${res.status}):`, await res.text());
+      return { reviewsCount: null, averageRating: null };
+    }
+    const data = await res.json();
+    return {
+      reviewsCount: data.userRatingCount ?? null,
+      averageRating: data.rating ?? null,
+    };
+  } catch (e) {
+    console.warn("Could not fetch Places API reviews:", e);
+    return { reviewsCount: null, averageRating: null };
+  }
+}
+
+/** Fetch top search keywords for the location */
+async function fetchSearchKeywords(
+  locationId: string,
+  year: number,
+  month: number,
+  accessToken: string
+): Promise<Array<{ keyword: string; impressions: number }>> {
+  try {
+    const res = await fetch(
+      `https://businessprofileperformance.googleapis.com/v1/${locationId}/searchkeywords/impressions/monthly?monthlyRange.startMonth.year=${year}&monthlyRange.startMonth.month=${month}&monthlyRange.endMonth.year=${year}&monthlyRange.endMonth.month=${month}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!res.ok) {
+      console.warn(`Search keywords failed (${res.status}):`, await res.text());
+      return [];
+    }
+    const data = await res.json();
+    const keywords = data.searchKeywordsCounts || [];
+    return keywords
+      .map((k: any) => ({
+        keyword: k.searchKeyword || "",
+        impressions: Number(k.insightsValue?.value || 0),
+      }))
+      .sort((a: any, b: any) => b.impressions - a.impressions)
+      .slice(0, 10);
+  } catch (e) {
+    console.warn("Could not fetch search keywords:", e);
+    return [];
+  }
+}
+
+/** Resolve a GBP location resource name to a Place ID */
+async function resolveLocationToPlaceId(
+  locationId: string,
+  accessToken: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://mybusinessbusinessinformation.googleapis.com/v1/${locationId}?readMask=metadata`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!res.ok) {
+      console.warn(`Location lookup failed (${res.status}):`, await res.text());
+      return null;
+    }
+    const data = await res.json();
+    return data.metadata?.placeId ?? null;
+  } catch (e) {
+    console.warn("Could not resolve location to placeId:", e);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -99,7 +210,6 @@ Deno.serve(async (req) => {
       }
     }
 
-
     const { data: syncLog } = await supabase
       .from("sync_logs")
       .insert({
@@ -115,6 +225,7 @@ Deno.serve(async (req) => {
 
     const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
     const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+    const googleApiKey = Deno.env.get("GOOGLE_API_KEY") || "";
 
     let accessToken = conn.access_token;
     const tokenExpiry = conn.token_expires_at ? new Date(conn.token_expires_at) : new Date(0);
@@ -130,11 +241,9 @@ Deno.serve(async (req) => {
       throw new Error("No location selected. Please select a business location in the Account Picker.");
     }
 
-    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
     const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-    // Fetch daily metrics time series
+    // ── Fetch all daily metrics ──────────────────────────────────
     const dailyMetrics = [
       "BUSINESS_IMPRESSIONS_DESKTOP_MAPS",
       "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH",
@@ -143,62 +252,73 @@ Deno.serve(async (req) => {
       "CALL_CLICKS",
       "WEBSITE_CLICKS",
       "BUSINESS_DIRECTION_REQUESTS",
+      "BUSINESS_CONVERSATIONS",
+      "BUSINESS_BOOKINGS",
     ];
 
-    let totalViews = 0;
-    let totalSearches = 0;
-    let totalCalls = 0;
-    let totalWebsiteClicks = 0;
-    let totalDirections = 0;
-
+    const metricTotals: Record<string, number> = {};
     for (const metric of dailyMetrics) {
-      try {
-        const metricRes = await fetch(
-          `https://businessprofileperformance.googleapis.com/v1/${locationId}:getDailyMetricsTimeSeries?dailyMetric=${metric}&dailyRange.startDate.year=${year}&dailyRange.startDate.month=${month}&dailyRange.startDate.day=1&dailyRange.endDate.year=${year}&dailyRange.endDate.month=${month}&dailyRange.endDate.day=${lastDay}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+      metricTotals[metric] = await fetchDailyMetricTotal(locationId, metric, year, month, lastDay, accessToken);
+    }
 
-        if (!metricRes.ok) {
-          const errBody = await metricRes.text();
-          console.warn(`GBP metric ${metric} failed (${metricRes.status}):`, errBody);
-          continue;
+    // Granular breakdown
+    const gbpMapsDesktop = metricTotals["BUSINESS_IMPRESSIONS_DESKTOP_MAPS"];
+    const gbpMapsLobile = metricTotals["BUSINESS_IMPRESSIONS_MOBILE_MAPS"];
+    const gbpSearchDesktop = metricTotals["BUSINESS_IMPRESSIONS_DESKTOP_SEARCH"];
+    const gbpSearchMobile = metricTotals["BUSINESS_IMPRESSIONS_MOBILE_SEARCH"];
+    const totalSearches = gbpSearchDesktop + gbpSearchMobile;
+    const totalMaps = gbpMapsDesktop + gbpMapsLobile;
+    const gbpViews = totalMaps + totalSearches;
+
+    // ── Fetch reviews via Places API ─────────────────────────────
+    let reviewsCount: number | null = null;
+    let avgRating: number | null = null;
+
+    if (googleApiKey) {
+      // Try to get placeId from connection metadata first
+      let placeId = (conn.metadata as any)?.place_id || null;
+
+      if (!placeId) {
+        placeId = await resolveLocationToPlaceId(locationId, accessToken);
+        // Cache placeId in connection metadata for future syncs
+        if (placeId) {
+          const existingMeta = conn.metadata || {};
+          await supabase.from("platform_connections").update({
+            metadata: { ...existingMeta, place_id: placeId },
+          }).eq("id", connectionId);
         }
+      }
 
-        const metricData = await metricRes.json();
-        const dataPoints = metricData.timeSeries?.datedValues || [];
-        const total = dataPoints.reduce((sum: number, dp: any) => sum + Number(dp.value || 0), 0);
-
-        if (metric.includes("IMPRESSIONS")) {
-          if (metric.includes("SEARCH")) totalSearches += total;
-          else totalViews += total;
-        } else if (metric === "CALL_CLICKS") totalCalls += total;
-        else if (metric === "WEBSITE_CLICKS") totalWebsiteClicks += total;
-        else if (metric === "BUSINESS_DIRECTION_REQUESTS") totalDirections += total;
-      } catch (e) {
-        console.warn(`Could not fetch GBP metric ${metric}:`, e);
+      if (placeId) {
+        const reviews = await fetchReviewsData(placeId, googleApiKey);
+        reviewsCount = reviews.reviewsCount;
+        avgRating = reviews.averageRating;
       }
     }
 
-    // Total views = maps + search views
-    const gbpViews = totalViews + totalSearches;
+    // ── Fetch search keywords ────────────────────────────────────
+    const searchKeywords = await fetchSearchKeywords(locationId, year, month, accessToken);
 
-    // TODO: Reviews API — the v4 mybusiness.googleapis.com endpoint was deprecated (sunset March 2023).
-    // Google has not yet released a public v1 replacement for reviews.
-    // Setting to null so the dashboard can distinguish "no data" from "zero reviews."
-    const reviewsCount: number | null = null;
-    const avgRating: number | null = null;
-
+    // ── Build metrics data ───────────────────────────────────────
     const metricsData = {
       gbp_views: gbpViews,
       gbp_searches: totalSearches,
-      gbp_calls: totalCalls,
-      gbp_direction_requests: totalDirections,
-      gbp_website_clicks: totalWebsiteClicks,
+      gbp_calls: metricTotals["CALL_CLICKS"],
+      gbp_direction_requests: metricTotals["BUSINESS_DIRECTION_REQUESTS"],
+      gbp_website_clicks: metricTotals["WEBSITE_CLICKS"],
       gbp_reviews_count: reviewsCount,
       gbp_average_rating: avgRating,
+      gbp_conversations: metricTotals["BUSINESS_CONVERSATIONS"],
+      gbp_bookings: metricTotals["BUSINESS_BOOKINGS"],
+      gbp_maps_desktop: gbpMapsDesktop,
+      gbp_maps_mobile: gbpMapsLobile,
+      gbp_search_desktop: gbpSearchDesktop,
+      gbp_search_mobile: gbpSearchMobile,
     };
 
-    // Upsert snapshot
+    const topContent = searchKeywords.length > 0 ? searchKeywords : null;
+
+    // ── Upsert snapshot ──────────────────────────────────────────
     const { data: existing } = await supabase
       .from("monthly_snapshots")
       .select("id, snapshot_locked")
@@ -212,7 +332,7 @@ Deno.serve(async (req) => {
 
     if (existing) {
       await supabase.from("monthly_snapshots")
-        .update({ metrics_data: metricsData, raw_data: { dailyMetrics: metricsData } })
+        .update({ metrics_data: metricsData, raw_data: { dailyMetrics: metricTotals }, top_content: topContent })
         .eq("id", existing.id);
     } else {
       await supabase.from("monthly_snapshots").insert({
@@ -221,7 +341,8 @@ Deno.serve(async (req) => {
         report_month: month,
         report_year: year,
         metrics_data: metricsData,
-        raw_data: { dailyMetrics: metricsData },
+        raw_data: { dailyMetrics: metricTotals },
+        top_content: topContent,
       });
     }
 

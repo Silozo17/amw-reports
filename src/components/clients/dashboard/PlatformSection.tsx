@@ -95,7 +95,7 @@ const LINKEDIN_KEY_METRICS = ['total_followers', 'follower_growth', 'impressions
 const FACEBOOK_KEY_METRICS = ['views', 'engagement', 'reactions', 'comments', 'shares', 'total_followers', 'follower_growth', 'posts_published'];
 const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'total_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session', 'engaged_sessions', 'ga_engagement_rate'];
 const GSC_KEY_METRICS = ['search_clicks', 'search_impressions', 'search_ctr', 'search_position'];
-const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating'];
+const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating', 'gbp_conversations', 'gbp_bookings', 'gbp_maps_desktop', 'gbp_maps_mobile', 'gbp_search_desktop', 'gbp_search_mobile'];
 const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers', 'likes', 'comments', 'avg_view_duration'];
 
 const PLATFORM_KEY_METRICS: Record<string, string[]> = {

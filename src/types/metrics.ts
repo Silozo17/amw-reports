@@ -67,6 +67,12 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   gbp_website_clicks: 'Number of clicks to your website from your Google Business Profile',
   gbp_reviews_count: 'Total number of reviews on your Google Business Profile',
   gbp_average_rating: 'Average star rating of your Google Business Profile reviews',
+  gbp_conversations: 'Messages and conversations initiated through your Google Business Profile',
+  gbp_bookings: 'Bookings made through your Google Business Profile',
+  gbp_maps_desktop: 'Times your business appeared on Google Maps on desktop',
+  gbp_maps_mobile: 'Times your business appeared on Google Maps on mobile',
+  gbp_search_desktop: 'Times your business appeared in Google Search on desktop',
+  gbp_search_mobile: 'Times your business appeared in Google Search on mobile',
   // YouTube
   subscribers: 'Net new subscribers gained during this period',
   views: 'Organic views — times your content was seen excluding paid/boosted delivery',

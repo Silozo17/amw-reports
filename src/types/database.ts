@@ -368,6 +368,12 @@ export const METRIC_LABELS: Record<string, string> = {
   gbp_website_clicks: 'Website Clicks (GBP)',
   gbp_reviews_count: 'Reviews Count',
   gbp_average_rating: 'Avg. Rating',
+  gbp_conversations: 'Messages',
+  gbp_bookings: 'Bookings',
+  gbp_maps_desktop: 'Maps (Desktop)',
+  gbp_maps_mobile: 'Maps (Mobile)',
+  gbp_search_desktop: 'Search (Desktop)',
+  gbp_search_mobile: 'Search (Mobile)',
   subscribers: 'Net Subscribers',
   views:          'Views',
   watch_time: 'Watch Time (min)',
@@ -453,6 +459,8 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
   google_business_profile: [
     'gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests',
     'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating',
+    'gbp_conversations', 'gbp_bookings',
+    'gbp_maps_desktop', 'gbp_maps_mobile', 'gbp_search_desktop', 'gbp_search_mobile',
   ],
   youtube: [
     'subscribers', 'views', 'watch_time', 'videos_published',
