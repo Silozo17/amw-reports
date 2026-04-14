@@ -141,41 +141,30 @@ const AccountPickerDialog = ({ connection, open, onOpenChange, onComplete, clien
 
       // Meta: create facebook/instagram connections for selected pages
       if (isMeta && selectedPages.length > 0) {
-        const { data: fullConn } = await supabase
-          .from('platform_connections')
-          .select('access_token, token_expires_at')
-          .eq('id', connection.id)
-          .single();
-
-        const connAccessToken = fullConn?.access_token;
-        const connTokenExpires = fullConn?.token_expires_at;
-
         for (const pageId of selectedPages) {
           const page = pages.find(p => p.id === pageId);
           if (!page) continue;
 
-          await supabase.from('platform_connections').insert({
-            client_id: clientId,
-            platform: 'facebook' as PlatformType,
-            is_connected: true,
-            account_id: page.id,
-            account_name: page.name,
-            access_token: page.access_token || connAccessToken,
-            token_expires_at: connTokenExpires,
-            metadata: { page_id: page.id, page_name: page.name, source_connection_id: connection.id },
+          await supabase.rpc('create_child_platform_connection', {
+            _source_connection_id: connection.id,
+            _client_id: clientId,
+            _platform: 'facebook',
+            _account_id: page.id,
+            _account_name: page.name,
+            _direct_access_token: page.access_token || null,
+            _metadata: { page_id: page.id, page_name: page.name, source_connection_id: connection.id },
           });
 
           if (page.instagram) {
             const igName = page.instagram.username ? `@${page.instagram.username}` : `IG (${page.instagram.id})`;
-            await supabase.from('platform_connections').insert({
-              client_id: clientId,
-              platform: 'instagram' as PlatformType,
-              is_connected: true,
-              account_id: page.instagram.id,
-              account_name: igName,
-              access_token: page.access_token || connAccessToken,
-              token_expires_at: connTokenExpires,
-              metadata: {
+            await supabase.rpc('create_child_platform_connection', {
+              _source_connection_id: connection.id,
+              _client_id: clientId,
+              _platform: 'instagram',
+              _account_id: page.instagram.id,
+              _account_name: igName,
+              _direct_access_token: page.access_token || null,
+              _metadata: {
                 ig_user_id: page.instagram.id,
                 ig_username: page.instagram.username,
                 page_id: page.id,

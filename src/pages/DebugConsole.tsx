@@ -200,8 +200,8 @@ const DebugConsole = () => {
                         <div><span className="text-muted-foreground">Last Sync:</span> {conn.last_sync_at ? new Date(conn.last_sync_at).toLocaleString() : '—'}</div>
                         <div><span className="text-muted-foreground">Sync Status:</span> {conn.last_sync_status ?? '—'}</div>
                         <div><span className="text-muted-foreground">Token Expires:</span> {conn.token_expires_at ? new Date(conn.token_expires_at).toLocaleString() : '—'}</div>
-                        <div><span className="text-muted-foreground">Access Token:</span> <code className="font-mono">{maskToken(conn.access_token)}</code></div>
-                        <div><span className="text-muted-foreground">Refresh Token:</span> <code className="font-mono">{maskToken(conn.refresh_token)}</code></div>
+                        <div><span className="text-muted-foreground">Access Token:</span> <code className="font-mono text-muted-foreground">[hidden]</code></div>
+                        <div><span className="text-muted-foreground">Refresh Token:</span> <code className="font-mono text-muted-foreground">[hidden]</code></div>
                       </div>
                       {conn.last_error && (
                         <div className="text-xs text-destructive bg-destructive/10 rounded p-2">
