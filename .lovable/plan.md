@@ -1,33 +1,75 @@
 
 
-## Reorder Hero KPIs with Fixed Priority List
+## Redesign Hero KPI Cards: 3D, Glassmorphism, Metric-Specific Visuals + Featured Layout
+
+### Overview
+
+Transform the 12 Hero KPI cards from identical flat rectangles into dynamic, interactive cards with:
+- **3D mouse-tilt** with holographic light reflection
+- **Glassmorphism** with per-metric colored glow halos
+- **Metric-specific visuals** (stars for rating, gauge for spend, growth ring for followers, etc.)
+- **Featured + Standard layout** — top 4 cards are larger, remaining 8 are compact
+
+### Layout
+
+```text
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│   TOTAL SPEND    │ │   VIDEO VIEWS    │ │      REACH       │ │     CLICKS       │
+│   (Featured)     │ │   (Featured)     │ │   (Featured)     │ │   (Featured)     │
+│   Larger card    │ │   Larger card    │ │   Larger card    │ │   Larger card    │
+│   with gauge     │ │   with bars      │ │   with rings     │ │   with arrow     │
+└──────────────────┘ └──────────────────┘ └──────────────────┘ └──────────────────┘
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│Engagement│ │Followers │ │Posts Pub. │ │Avg Rating│ │  Leads   │ │Page Views│ │Phone Call│ │Web Clicks│
+│(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│
+└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+```
 
 ### Changes
 
-**File: `src/lib/dashboardCalcs.ts`**
+**File: `src/components/clients/dashboard/HeroKPIs.tsx`** (major rewrite)
 
-1. **Fix Clicks calculation** — Remove `website_clicks`, `gbp_website_clicks`, and `link_clicks` from the `totalClicks` / `prevClicks` / `clicksPlatforms` aggregation. Clicks should only include `clicks`, `search_clicks`, and `post_clicks`.
+1. **3D Tilt Hook** — new inline `useTilt` hook that tracks mouse position relative to card, applies `perspective(800px) rotateX(Ydeg) rotateY(Xdeg)` via `onMouseMove` / `onMouseLeave`. Tilt intensity: ~8deg for featured, ~5deg for standard. Includes a moving light reflection overlay (`radial-gradient` at cursor position).
 
-2. **Bring back Website Clicks** — Already computed as `totalWebsiteClicks`. Just needs to be in the return array.
+2. **Glassmorphism Base** — replace `Card` with a custom div using `backdrop-blur-xl bg-white/5 dark:bg-white/5 border border-white/10`. Each card gets a colored glow halo behind it using `box-shadow` with the metric's accent color at low opacity, pulsing gently via CSS animation.
 
-3. **Reorder the return array** to match the requested priority:
+3. **Metric-Specific Visuals** — a `MetricVisual` sub-component renders a unique decorative element per metric type:
+   - **Spend** — animated semi-circular gauge arc (SVG) filling to proportional value
+   - **Video Views** — small animated bar chart (3 bars at staggered heights)
+   - **Reach** — concentric expanding rings (CSS animation)
+   - **Clicks** — animated upward arrow with trail
+   - **Engagement** — pulsing heart/chat icon
+   - **Followers** — growth ring (SVG circle with stroke-dashoffset animation)
+   - **Posts Published** — small calendar grid dots
+   - **Avg. Rating** — animated gold stars (5 stars, filled proportionally)
+   - **Leads** — target/bullseye icon with pulse
+   - **Page Views** — mini sparkline rendered inline
+   - **Phone Calls** — ringing phone icon with vibration animation
+   - **Website Clicks** — cursor click animation
 
-| # | KPI | Notes |
-|---|---|---|
-| 1 | Total Spend | No change |
-| 2 | Video Views | No change |
-| 3 | Reach | No change |
-| 4 | Clicks | Exclude website clicks and link clicks |
-| 5 | Engagement | No change |
-| 6 | Followers | No change |
-| 7 | Posts Published | Move up |
-| 8 | Avg. Rating | Move up |
-| 9 | Leads | Move up |
-| 10 | Page Views | Move up |
-| 11 | Phone Calls | Move up |
-| 12 | Website Clicks | Bring back |
+4. **Featured vs Standard sizing** — first 4 KPIs render in `lg:col-span-1` within a 4-col grid (taller cards, larger text `text-3xl sm:text-4xl`). Remaining 8 render in a separate 4-col grid below (compact cards, `text-xl sm:text-2xl`). Featured cards include the sparkline background; standard cards omit it for density.
 
-4. **Demote to overflow** (position 13+, only shown if any above are empty): Sessions, Search Impressions, Conversions, Direction Requests. Remove Search CTR and Avg Position entirely (covered by Search Performance trend section).
+5. **CSS additions in `index.css`**:
+   - `@keyframes glow-pulse` — subtle box-shadow pulse
+   - `@keyframes ring-expand` — for reach rings
+   - `@keyframes phone-vibrate` — shake animation for phone icon
+   - `.kpi-card-glass` utility class for the glassmorphism base
 
-5. **Add sparklines** for `website_clicks` and `page_views` (currently missing from sparkline computation). Remove `search_clicks` sparkline key (no longer a separate KPI).
+**File: `src/hooks/useTilt.ts`** (new file)
+- Custom hook returning `ref`, `style`, and `overlayStyle`
+- Uses `onMouseMove` to calculate rotation angles from cursor position relative to card center
+- Returns to neutral on `onMouseLeave` with a smooth CSS transition
+- Accepts `maxTilt` parameter (8 for featured, 5 for standard)
+
+**File: `tailwind.config.ts`**
+- Add `glow-pulse`, `ring-expand`, `phone-vibrate` keyframes and animation entries
+
+### Technical Notes
+
+- No external 3D library needed — pure CSS `transform: perspective() rotateX() rotateY()` with a React ref
+- Glassmorphism uses `backdrop-filter: blur()` which is well-supported in modern browsers
+- Metric visuals are lightweight SVG/CSS — no canvas or heavy rendering
+- All animations use `will-change: transform` for GPU acceleration
+- Mobile: tilt disabled (no hover), cards stack single-column, animations reduced via `prefers-reduced-motion`
+- The sparkline background chart remains on featured cards only
 
