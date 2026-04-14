@@ -204,7 +204,7 @@ const AdminOrgDetail = () => {
           </TabsContent>
 
           <TabsContent value="clients">
-            <AdminOrgClients orgId={id!} clients={clients} connections={connections} />
+            <AdminOrgClients orgId={id!} clients={clients} connections={connections as Tables<'platform_connections'>[]} />
           </TabsContent>
 
           <TabsContent value="members">
