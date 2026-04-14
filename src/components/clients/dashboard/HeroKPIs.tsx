@@ -53,7 +53,7 @@ const ACCENT_COLORS: Record<string, string> = {
   website_clicks: 'hsl(var(--amw-orange))',
 };
 
-const FEATURED_COUNT = 4;
+
 
 /* ─── Helpers ─── */
 
@@ -286,12 +286,10 @@ const HeroKPICard = ({
   kpi,
   currSymbol,
   sparkline,
-  featured,
 }: {
   kpi: HeroKPI;
   currSymbol: string;
   sparkline: Array<{ v: number; name: string }>;
-  featured: boolean;
 }) => {
   const animatedValue = useAnimatedCounter(kpi.value);
   const isCost = kpi.isCost ?? false;
@@ -299,7 +297,7 @@ const HeroKPICard = ({
   const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
   const accentColor = ACCENT_COLORS[kpi.metricKey] ?? 'hsl(var(--primary))';
   const Icon = kpi.icon;
-  const { ref, style, overlayStyle, handleMouseMove, handleMouseLeave } = useTilt(featured ? 8 : 5);
+  const { ref, style, overlayStyle, handleMouseMove, handleMouseLeave } = useTilt(5);
 
   return (
     <div
@@ -310,56 +308,26 @@ const HeroKPICard = ({
       className="relative group"
     >
       <div
-        className={cn(
-          'relative overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow duration-300',
-          'hover:shadow-md',
-          featured ? 'min-h-[160px]' : 'min-h-[120px]',
-        )}
+        className="relative overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow duration-300 hover:shadow-md min-h-[130px]"
       >
-        {/* Holographic reflection overlay */}
         <div style={overlayStyle} />
 
-        {/* Color accent bar — left side */}
         <div className="absolute top-0 left-0 w-1.5 h-full rounded-l-xl" style={{ backgroundColor: accentColor }} />
 
-        {/* Subtle top gradient band for color identity */}
         <div
           className="absolute top-0 left-0 right-0 h-16 pointer-events-none"
-          style={{
-            background: `linear-gradient(180deg, ${accentColor}08 0%, transparent 100%)`,
-          }}
+          style={{ background: `linear-gradient(180deg, ${accentColor}08 0%, transparent 100%)` }}
         />
 
-        {/* Background sparkline (featured only) */}
-        {featured && sparkline.length > 1 && (
-          <div className="absolute inset-0 opacity-[0.07] pointer-events-none">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={sparkline} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={`hero-bg-${kpi.metricKey}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={accentColor} stopOpacity={1} />
-                    <stop offset="100%" stopColor={accentColor} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="v" stroke="none" fill={`url(#hero-bg-${kpi.metricKey})`} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        <div className={cn('relative z-10', featured ? 'p-5 pl-6' : 'p-4 pl-5')}>
-          {/* Header row */}
+        <div className="relative z-10 p-4 pl-5">
           <div className="flex items-center gap-2 mb-2">
             <div
-              className={cn('shrink-0 rounded-lg flex items-center justify-center', featured ? 'h-9 w-9' : 'h-7 w-7')}
+              className="shrink-0 rounded-lg flex items-center justify-center h-7 w-7"
               style={{ backgroundColor: `${accentColor}18` }}
             >
-              <Icon className={cn(featured ? 'h-4.5 w-4.5' : 'h-3.5 w-3.5')} style={{ color: accentColor }} />
+              <Icon className="h-3.5 w-3.5" style={{ color: accentColor }} />
             </div>
-            <span className={cn(
-              'font-medium text-muted-foreground uppercase tracking-wider font-body',
-              featured ? 'text-xs' : 'text-[10px]',
-            )}>
+            <span className="font-medium text-muted-foreground uppercase tracking-wider font-body text-[10px]">
               {kpi.label}
             </span>
             <MetricTooltip metricKey={kpi.metricKey} />
@@ -372,7 +340,7 @@ const HeroKPICard = ({
                         <img
                           src={PLATFORM_LOGOS[p]}
                           alt={PLATFORM_LABELS[p]}
-                          className={cn(featured ? 'h-4 w-4' : 'h-3.5 w-3.5', 'object-contain')}
+                          className="h-3.5 w-3.5 object-contain"
                         />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
@@ -385,21 +353,16 @@ const HeroKPICard = ({
             )}
           </div>
 
-          {/* Value + metric visual row */}
           <div className="flex items-end justify-between gap-2">
             <div>
-              <p className={cn(
-                'font-bold font-body tabular-nums leading-none mb-2 text-foreground',
-                featured ? 'text-3xl sm:text-4xl' : 'text-xl sm:text-2xl',
-              )}>
+              <p className="font-bold font-body tabular-nums leading-none mb-2 text-foreground text-xl sm:text-2xl">
                 {formatValue(animatedValue, isCost, currSymbol, kpi.isPercentage, kpi.isDecimal)}
               </p>
 
               {change !== undefined && (
                 <div
                   className={cn(
-                    'inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-full',
-                    featured ? 'text-xs' : 'text-[10px]',
+                    'inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-full text-[10px]',
                     isPositive === true ? 'bg-accent text-accent-foreground' :
                     isPositive === false ? 'bg-destructive text-destructive-foreground' :
                     'bg-muted text-muted-foreground',
@@ -410,9 +373,8 @@ const HeroKPICard = ({
               )}
             </div>
 
-            {/* Metric-specific decorative visual */}
             <div className="shrink-0">
-              <MetricVisual metricKey={kpi.metricKey} value={kpi.value} accentColor={accentColor} featured={featured} />
+              <MetricVisual metricKey={kpi.metricKey} value={kpi.value} accentColor={accentColor} featured={false} />
             </div>
           </div>
         </div>
@@ -426,38 +388,16 @@ const HeroKPICard = ({
 const HeroKPIs = ({ kpis, currSymbol, sparklineMap }: HeroKPIsProps) => {
   if (kpis.length === 0) return null;
 
-  const featured = kpis.slice(0, FEATURED_COUNT);
-  const standard = kpis.slice(FEATURED_COUNT, 12);
-
   return (
-    <div className="space-y-4">
-      {/* Featured row — top 4 KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {featured.map((kpi) => (
-          <HeroKPICard
-            key={kpi.metricKey}
-            kpi={kpi}
-            currSymbol={currSymbol}
-            sparkline={sparklineMap[kpi.metricKey] ?? []}
-            featured
-          />
-        ))}
-      </div>
-
-      {/* Standard row — remaining KPIs */}
-      {standard.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {standard.map((kpi) => (
-            <HeroKPICard
-              key={kpi.metricKey}
-              kpi={kpi}
-              currSymbol={currSymbol}
-              sparkline={sparklineMap[kpi.metricKey] ?? []}
-              featured={false}
-            />
-          ))}
-        </div>
-      )}
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      {kpis.slice(0, 12).map((kpi) => (
+        <HeroKPICard
+          key={kpi.metricKey}
+          kpi={kpi}
+          currSymbol={currSymbol}
+          sparkline={sparklineMap[kpi.metricKey] ?? []}
+        />
+      ))}
     </div>
   );
 };
