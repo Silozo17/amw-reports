@@ -664,6 +664,62 @@ const PlatformSection = ({
                   </Table>
                 </div>
               )}
+
+              {gbpReviews.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-body">Latest Reviews</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Rating</TableHead>
+                          <TableHead>Author</TableHead>
+                          <TableHead>Review</TableHead>
+                          <TableHead className="text-right">When</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {gbpReviews.slice(0, 5).map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="w-[120px]">
+                              <StarRating rating={r.rating ?? 0} />
+                            </TableCell>
+                            <TableCell className="text-sm font-medium whitespace-nowrap">{r.author ?? 'Anonymous'}</TableCell>
+                            <TableCell className="text-sm max-w-[300px]">
+                              <span className="line-clamp-2">{r.text || '—'}</span>
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">{r.relative_time ?? '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {gbpKeywords.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-body">Top Search Keywords</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Keyword</TableHead>
+                          <TableHead className="text-right">Impressions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {gbpKeywords.slice(0, 10).map((k, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-sm">{k.keyword}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(k.impressions ?? 0).toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
             </CollapsibleContent>
           </Collapsible>
         )}
