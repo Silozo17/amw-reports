@@ -1297,6 +1297,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_child_platform_connection: {
+        Args: {
+          _account_id: string
+          _account_name: string
+          _client_id: string
+          _direct_access_token?: string
+          _metadata?: Json
+          _platform: Database["public"]["Enums"]["platform_type"]
+          _source_connection_id: string
+        }
+        Returns: string
+      }
       get_client_user_info: {
         Args: { _user_id: string }
         Returns: {
