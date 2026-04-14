@@ -368,6 +368,7 @@ export const METRIC_LABELS: Record<string, string> = {
   gbp_website_clicks: 'Website Clicks (GBP)',
   gbp_reviews_count: 'Reviews Count',
   gbp_average_rating: 'Avg. Rating',
+  gbp_new_reviews: 'New Reviews',
   gbp_conversations: 'Messages',
   gbp_bookings: 'Bookings',
   gbp_maps_desktop: 'Maps (Desktop)',
@@ -459,7 +460,7 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
   google_business_profile: [
     'gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests',
     'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating',
-    'gbp_conversations', 'gbp_bookings',
+    'gbp_conversations', 'gbp_bookings', 'gbp_new_reviews',
     'gbp_maps_desktop', 'gbp_maps_mobile', 'gbp_search_desktop', 'gbp_search_mobile',
   ],
   youtube: [

@@ -8,7 +8,7 @@ import { PLATFORM_LOGOS, PLATFORM_LABELS, HIDDEN_METRICS, AD_METRICS, ORGANIC_PL
 import { METRIC_EXPLANATIONS } from '@/types/metrics';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import type { PlatformType, JobStatus } from '@/types/database';
-import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Clock, Wifi, WifiOff, Star, StarHalf } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -65,6 +65,13 @@ interface TopContentItem {
   country?: string;
   countryId?: string;
   device?: string;
+  // GBP reviews
+  author?: string;
+  rating?: number;
+  text?: string;
+  relative_time?: string;
+  // GBP keywords
+  keyword?: string;
 }
 
 interface ConnectionInfo {
@@ -95,7 +102,7 @@ const LINKEDIN_KEY_METRICS = ['total_followers', 'follower_growth', 'impressions
 const FACEBOOK_KEY_METRICS = ['views', 'engagement', 'reactions', 'comments', 'shares', 'total_followers', 'follower_growth', 'posts_published'];
 const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', 'total_users', 'ga_page_views', 'bounce_rate', 'avg_session_duration', 'pages_per_session', 'engaged_sessions', 'ga_engagement_rate'];
 const GSC_KEY_METRICS = ['search_clicks', 'search_impressions', 'search_ctr', 'search_position'];
-const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating', 'gbp_conversations', 'gbp_bookings', 'gbp_maps_desktop', 'gbp_maps_mobile', 'gbp_search_desktop', 'gbp_search_mobile'];
+const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating', 'gbp_new_reviews', 'gbp_conversations', 'gbp_bookings', 'gbp_maps_desktop', 'gbp_maps_mobile', 'gbp_search_desktop', 'gbp_search_mobile'];
 const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers', 'likes', 'comments', 'avg_view_duration'];
 
 const PLATFORM_KEY_METRICS: Record<string, string[]> = {
@@ -127,6 +134,21 @@ const formatMetricValue = (key: string, value: number, currSymbol: string): stri
   return Math.round(value).toLocaleString();
 };
 
+// ─── Star Rating Display ───────────────────────────────────────
+const StarRating = ({ rating }: { rating: number }) => {
+  const stars = [];
+  for (let i = 1; i <= 5; i++) {
+    if (rating >= i) {
+      stars.push(<Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />);
+    } else if (rating >= i - 0.5) {
+      stars.push(<StarHalf key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />);
+    } else {
+      stars.push(<Star key={i} className="h-4 w-4 text-muted-foreground/30" />);
+    }
+  }
+  return <div className="flex items-center gap-0.5">{stars}</div>;
+};
+
 // ─── Single Metric Card ────────────────────────────────────────
 const MetricCard = ({
   metricKey,
@@ -143,6 +165,8 @@ const MetricCard = ({
   const isPositive = change !== undefined ? (isCost ? change < 0 : change > 0) : undefined;
   const label = METRIC_LABELS[metricKey] ?? metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+  const isRating = metricKey === 'gbp_average_rating';
+
   return (
     <div className="rounded-lg border bg-card p-3 space-y-1">
       <div className="flex items-center gap-1">
@@ -151,9 +175,16 @@ const MetricCard = ({
         </p>
         <MetricTooltip metricKey={metricKey} />
       </div>
-      <p className="text-xl font-bold font-body tabular-nums leading-none">
-        {formatMetricValue(metricKey, value, currSymbol)}
-      </p>
+      {isRating ? (
+        <div className="flex items-center gap-2">
+          <StarRating rating={value} />
+          <span className="text-xl font-bold font-body tabular-nums leading-none">{value.toFixed(1)}</span>
+        </div>
+      ) : (
+        <p className="text-xl font-bold font-body tabular-nums leading-none">
+          {formatMetricValue(metricKey, value, currSymbol)}
+        </p>
+      )}
       {change !== undefined && (
         <span
           className={cn(
@@ -232,8 +263,10 @@ const PlatformSection = ({
   const gaPages = (topContent ?? []).filter(p => p.page && !p.query && platform === 'google_analytics');
   const gaSources = (topContent ?? []).filter(p => p.source);
   const ytVideos = (topContent ?? []).filter(p => p.title);
+  const gbpReviews = (topContent ?? []).filter(p => p.type === 'review');
+  const gbpKeywords = (topContent ?? []).filter(p => p.type === 'keyword');
 
-  const hasTopContent = socialPosts.length > 0 || gscQueries.length > 0 || gscPages.length > 0 || gaPages.length > 0 || gaSources.length > 0 || ytVideos.length > 0;
+  const hasTopContent = socialPosts.length > 0 || gscQueries.length > 0 || gscPages.length > 0 || gaPages.length > 0 || gaSources.length > 0 || ytVideos.length > 0 || gbpReviews.length > 0 || gbpKeywords.length > 0;
 
   // Determine a chart to show: spend trend for ad platforms, engagement for social
   const isAdPlatform = platform === 'google_ads' || platform === 'meta_ads';
@@ -444,7 +477,9 @@ const PlatformSection = ({
                gscQueries.length > 0 ? 'Top Search Queries & Pages' :
                ytVideos.length > 0 ? 'Top Videos' :
                gaPages.length > 0 ? 'Top Pages' :
-               gaSources.length > 0 ? 'Traffic Sources' : 'Details'}
+               gaSources.length > 0 ? 'Traffic Sources' :
+               gbpReviews.length > 0 ? 'Latest Reviews & Keywords' :
+               gbpKeywords.length > 0 ? 'Top Search Keywords' : 'Details'}
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
               {socialPosts.length > 0 && (
@@ -627,6 +662,62 @@ const PlatformSection = ({
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+
+              {gbpReviews.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-body">Latest Reviews</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Rating</TableHead>
+                          <TableHead>Author</TableHead>
+                          <TableHead>Review</TableHead>
+                          <TableHead className="text-right">When</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {gbpReviews.slice(0, 5).map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="w-[120px]">
+                              <StarRating rating={r.rating ?? 0} />
+                            </TableCell>
+                            <TableCell className="text-sm font-medium whitespace-nowrap">{r.author ?? 'Anonymous'}</TableCell>
+                            <TableCell className="text-sm max-w-[300px]">
+                              <span className="line-clamp-2">{r.text || '—'}</span>
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">{r.relative_time ?? '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {gbpKeywords.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-body">Top Search Keywords</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Keyword</TableHead>
+                          <TableHead className="text-right">Impressions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {gbpKeywords.slice(0, 10).map((k, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-sm">{k.keyword}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{(k.impressions ?? 0).toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
             </CollapsibleContent>

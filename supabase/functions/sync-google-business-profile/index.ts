@@ -61,14 +61,18 @@ async function fetchDailyMetricTotal(
   }
 }
 
-/** Fetch reviews count and rating via Places API (New) */
+/** Fetch reviews count, rating, and latest reviews via Places API (New) */
 async function fetchReviewsData(
   placeId: string,
   apiKey: string
-): Promise<{ reviewsCount: number | null; averageRating: number | null }> {
+): Promise<{
+  reviewsCount: number | null;
+  averageRating: number | null;
+  latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }>;
+}> {
   try {
     const res = await fetch(
-      `https://places.googleapis.com/v1/places/${placeId}?fields=rating,userRatingCount`,
+      `https://places.googleapis.com/v1/places/${placeId}?fields=rating,userRatingCount,reviews`,
       {
         headers: {
           "X-Goog-Api-Key": apiKey,
@@ -78,16 +82,24 @@ async function fetchReviewsData(
     );
     if (!res.ok) {
       console.warn(`Places API failed (${res.status}):`, await res.text());
-      return { reviewsCount: null, averageRating: null };
+      return { reviewsCount: null, averageRating: null, latestReviews: [] };
     }
     const data = await res.json();
+    const reviews = (data.reviews || []).slice(0, 5).map((r: any) => ({
+      type: "review",
+      author: r.authorAttribution?.displayName || "Anonymous",
+      rating: r.rating ?? 0,
+      text: (r.text?.text || r.originalText?.text || "").slice(0, 300),
+      relative_time: r.relativePublishTimeDescription || "",
+    }));
     return {
       reviewsCount: data.userRatingCount ?? null,
       averageRating: data.rating ?? null,
+      latestReviews: reviews,
     };
   } catch (e) {
     console.warn("Could not fetch Places API reviews:", e);
-    return { reviewsCount: null, averageRating: null };
+    return { reviewsCount: null, averageRating: null, latestReviews: [] };
   }
 }
 
@@ -273,6 +285,7 @@ Deno.serve(async (req) => {
     // ── Fetch reviews via Places API ─────────────────────────────
     let reviewsCount: number | null = null;
     let avgRating: number | null = null;
+    let latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }> = [];
 
     if (googleApiKey) {
       // Try to get placeId from connection metadata first
@@ -293,14 +306,34 @@ Deno.serve(async (req) => {
         const reviews = await fetchReviewsData(placeId, googleApiKey);
         reviewsCount = reviews.reviewsCount;
         avgRating = reviews.averageRating;
+        latestReviews = reviews.latestReviews;
       }
     }
 
     // ── Fetch search keywords ────────────────────────────────────
     const searchKeywords = await fetchSearchKeywords(locationId, year, month, accessToken);
 
+    // ── Compute new reviews (diff from previous snapshot) ──────
+    let gbpNewReviews: number | null = null;
+    if (reviewsCount !== null) {
+      const { data: prevSnap } = await supabase
+        .from("monthly_snapshots")
+        .select("metrics_data")
+        .eq("client_id", clientId)
+        .eq("platform", "google_business_profile")
+        .lt("report_year", year)
+        .order("report_year", { ascending: false })
+        .order("report_month", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const prevCount = (prevSnap?.metrics_data as any)?.gbp_reviews_count;
+      if (typeof prevCount === "number") {
+        gbpNewReviews = Math.max(0, reviewsCount - prevCount);
+      }
+    }
+
     // ── Build metrics data ───────────────────────────────────────
-    const metricsData = {
+    const metricsData: Record<string, number | null> = {
       gbp_views: gbpViews,
       gbp_searches: totalSearches,
       gbp_calls: metricTotals["CALL_CLICKS"],
@@ -308,6 +341,7 @@ Deno.serve(async (req) => {
       gbp_website_clicks: metricTotals["WEBSITE_CLICKS"],
       gbp_reviews_count: reviewsCount,
       gbp_average_rating: avgRating,
+      gbp_new_reviews: gbpNewReviews,
       gbp_conversations: metricTotals["BUSINESS_CONVERSATIONS"],
       gbp_bookings: metricTotals["BUSINESS_BOOKINGS"],
       gbp_maps_desktop: gbpMapsDesktop,
@@ -316,7 +350,15 @@ Deno.serve(async (req) => {
       gbp_search_mobile: gbpSearchMobile,
     };
 
-    const topContent = searchKeywords.length > 0 ? searchKeywords : null;
+    // ── Build top_content with typed entries ──────────────────────
+    const topContentItems: any[] = [];
+    for (const r of latestReviews) {
+      topContentItems.push(r);
+    }
+    for (const k of searchKeywords) {
+      topContentItems.push({ type: "keyword", keyword: k.keyword, impressions: k.impressions });
+    }
+    const topContent = topContentItems.length > 0 ? topContentItems : null;
 
     // ── Upsert snapshot ──────────────────────────────────────────
     const { data: existing } = await supabase

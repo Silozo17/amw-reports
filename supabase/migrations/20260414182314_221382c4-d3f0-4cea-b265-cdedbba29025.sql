@@ -1,0 +1,1 @@
+UPDATE metric_defaults SET available_metrics = ARRAY['gbp_views','gbp_searches','gbp_calls','gbp_direction_requests','gbp_website_clicks','gbp_reviews_count','gbp_average_rating','gbp_new_reviews','gbp_conversations','gbp_bookings','gbp_maps_desktop','gbp_maps_mobile','gbp_search_desktop','gbp_search_mobile'] WHERE platform = 'google_business_profile';
