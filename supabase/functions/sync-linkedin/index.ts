@@ -25,12 +25,30 @@ function buildTimeIntervals(startMs: number, endMs: number, granularity: string 
   return `(timeRange:(start:${startMs},end:${endMs}),timeGranularityType:${granularity})`;
 }
 
-function buildMonthlyRange(year: number, month: number): { startMs: number; endMs: number } {
+function buildMonthlyRange(year: number, month: number): { startMs: number; endMs: number; granularity: string } {
+
   const startMs = Date.UTC(year, month - 1, 1, 0, 0, 0, 0);
-  const rawEndMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
-  // Cap end date to now so LinkedIn does not reject future date ranges
-  const endMs = Math.min(rawEndMs, Date.now());
-  return { startMs, endMs };
+
+  const nextMonthMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+
+  const now = Date.now();
+
+  const twoDaysAgo = now - (2 * 24 * 60 * 60 * 1000);
+
+  // If next month start is in the future, this is the current month
+
+  // Use DAY granularity so LinkedIn accepts a partial month range
+
+  if (nextMonthMs > now) {
+
+    return { startMs, endMs: twoDaysAgo, granularity: "DAY" };
+
+  }
+
+  // Completed month — use MONTH granularity
+
+  return { startMs, endMs: nextMonthMs, granularity: "MONTH" };
+
 }
 
 function buildLinkedInUrl(
@@ -97,7 +115,7 @@ async function getFollowerGains(orgUrn: string, token: string, startMs: number, 
         organizationalEntity: orgUrn,
       },
       {
-        timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+        timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
       }
     );
     const data = await fetchLinkedIn(url, token);
@@ -136,7 +154,7 @@ async function getShareStatistics(orgUrn: string, token: string, startMs: number
       organizationalEntity: orgUrn,
     },
     {
-      timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+      timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
     }
   );
   const data = await fetchLinkedIn(url, token);
@@ -172,7 +190,7 @@ async function getPageStatistics(orgUrn: string, entityType: string, token: stri
           brand: orgUrn,
         },
         {
-          timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+          timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
         }
       )
     : buildLinkedInUrl(
@@ -182,7 +200,7 @@ async function getPageStatistics(orgUrn: string, entityType: string, token: stri
           organization: orgUrn,
         },
         {
-          timeIntervals: buildTimeIntervals(startMs, endMs, "MONTH"),
+          timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
         }
       );
 
@@ -403,7 +421,7 @@ Deno.serve(async (req) => {
     console.log(`LinkedIn sync: urn=${orgUrn}, entityType=${entityType}, name=${orgName}, month=${month}/${year}`);
 
     // Date range for the target month using exact UTC month boundaries required by LinkedIn MONTH granularity
-    const { startMs: monthStartMs, endMs: monthEndMs } = buildMonthlyRange(year, month);
+    const { startMs: monthStartMs, endMs: monthEndMs, granularity: timeGranularity } = buildMonthlyRange(year, month);
 
     // ── Fetch all data — critical endpoints fail-fast ──
     const [followers, shareStats, pageStats] = await Promise.all([
