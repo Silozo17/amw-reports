@@ -69,6 +69,7 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   gbp_average_rating: 'Average star rating of your Google Business Profile reviews',
   gbp_conversations: 'Messages and conversations initiated through your Google Business Profile',
   gbp_bookings: 'Bookings made through your Google Business Profile',
+  gbp_new_reviews: 'New reviews received on your Google Business Profile during this period',
   gbp_maps_desktop: 'Times your business appeared on Google Maps on desktop',
   gbp_maps_mobile: 'Times your business appeared on Google Maps on mobile',
   gbp_search_desktop: 'Times your business appeared in Google Search on desktop',

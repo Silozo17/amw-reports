@@ -96,7 +96,7 @@ const HeroKPICard = ({
       <CardContent className="p-5 pl-6 relative z-10">
         <div className="flex items-center gap-2 mb-3">
           <div
-            className="h-8 w-8 rounded-lg flex items-center justify-center"
+            className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: `${accentColor}15` }}
           >
             <Icon className="h-4 w-4" style={{ color: accentColor }} />
@@ -106,7 +106,7 @@ const HeroKPICard = ({
           </span>
           <MetricTooltip metricKey={kpi.metricKey} />
           {kpi.platforms && kpi.platforms.length > 0 && (
-            <div className="flex items-center gap-0.5 ml-auto">
+            <div className="flex items-center gap-0.5 ml-auto shrink-0">
               <TooltipProvider delayDuration={200}>
                 {kpi.platforms.slice(0, 5).map((p) => (
                   <Tooltip key={p}>
