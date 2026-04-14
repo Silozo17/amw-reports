@@ -10,6 +10,7 @@ const PLATFORMS = [
   { name: 'Google Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'] },
   { name: 'Meta Ads', metrics: ['Spend', 'Impressions', 'Reach', 'Clicks', 'Link Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'ROAS', 'Frequency', 'Leads'] },
   { name: 'TikTok Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'] },
+  { name: 'LinkedIn Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conversion Rate', 'Cost/Conv.', 'Engagement'] },
 ];
 
 const METRICS_GRID = ['Total Ad Spend', 'Return on Ad Spend', 'Cost Per Click', 'Cost Per Mille', 'Click-Through Rate', 'Conversions', 'Conversion Value', 'Cost Per Conversion', 'Impression Share', 'Frequency'];
@@ -21,7 +22,7 @@ const AUDIENCES = [
 ];
 
 const FAQS = [
-  { q: 'What ad platforms does AMW Reports support?', a: 'We integrate with Google Ads, Meta Ads (Facebook & Instagram advertising), and TikTok Ads. All three can be included in a single client report.' },
+  { q: 'What ad platforms does AMW Reports support?', a: 'We integrate with Google Ads, Meta Ads (Facebook & Instagram advertising), TikTok Ads, and LinkedIn Ads. All four can be included in a single client report.' },
   { q: 'Can I track ROAS and conversion data?', a: 'Yes. We pull spend, conversions, conversion value, and ROAS directly from each ad platform so you can demonstrate clear ROI to your clients.' },
   { q: 'Can I combine organic and paid data in the same report?', a: 'Absolutely. Each client report can include ad data alongside social media, SEO, and web analytics — giving clients a complete picture of their marketing performance.' },
   { q: 'How often is ad data synced?', a: 'Agency plans sync ad data daily. Freelance plans sync weekly (every Monday). The free Creator plan syncs monthly.' },

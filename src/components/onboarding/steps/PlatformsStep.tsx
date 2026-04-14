@@ -8,8 +8,9 @@ const CARD_SELECTED =
 
 const PLATFORM_IDS: PlatformType[] = [
   'facebook', 'instagram', 'tiktok', 'linkedin', 'youtube',
-  'meta_ads', 'google_ads', 'google_search_console', 'google_analytics',
-  'google_business_profile',
+  'threads', 'pinterest',
+  'meta_ads', 'google_ads', 'tiktok_ads', 'linkedin_ads',
+  'google_search_console', 'google_analytics', 'google_business_profile',
 ];
 
 interface PlatformsStepProps {
@@ -18,7 +19,7 @@ interface PlatformsStepProps {
 }
 
 const PlatformsStep = ({ platformsUsed, onToggle }: PlatformsStepProps) => (
-  <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-7">
     {PLATFORM_IDS.map((platformId) => {
       const selected = platformsUsed.includes(platformId);
       return (

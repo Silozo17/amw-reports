@@ -7,7 +7,7 @@ import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
 import googleAdsPlatform from '@/assets/screenshots/Google_ads.webp';
 
 const PAIN_POINTS = [
-  { title: 'Hours wasted on manual reports', desc: 'Logging into 12 platforms, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },
+  { title: 'Hours wasted on manual reports', desc: 'Logging into 14 platforms, copy-pasting data into spreadsheets, formatting slides — every single month, for every client.' },
   { title: 'Inconsistent formatting', desc: 'Different team members create reports differently. No unified brand presence across client deliverables.' },
   { title: 'Manual data pulling is error-prone', desc: 'Wrong date ranges, missed metrics, outdated screenshots — manual reporting introduces mistakes that erode client trust.' },
 ];
@@ -26,7 +26,7 @@ const KEY_FEATURES = [
   { icon: Globe, title: 'Custom Domain', desc: 'Serve the client portal from your own domain for a premium, fully branded experience.' },
 ];
 
-const PLATFORMS = ['Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile', 'Threads'];
+const PLATFORMS = ['Google Ads', 'Meta Ads', 'LinkedIn Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile', 'Threads'];
 
 const ForAgenciesPage = () => {
   usePageMeta({
