@@ -217,13 +217,13 @@ const PricingPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {COMPARISON_ROWS.map(({ feature, tooltip, starter, freelance, agency }) => (
+                {COMPARISON_ROWS.map(({ feature, tooltip, creator, freelance, agency }) => (
                   <tr key={feature} className="border-b border-sidebar-border/20">
                     <td className="py-3 pr-4 text-sm font-body text-amw-offwhite/70 whitespace-nowrap">
                       {feature}
                       <FeatureTooltip text={tooltip} />
                     </td>
-                    <td className="py-3 px-4 text-center"><CellValue value={starter} /></td>
+                    <td className="py-3 px-4 text-center"><CellValue value={creator} /></td>
                     <td className="py-3 px-4 text-center"><CellValue value={freelance} /></td>
                     <td className="py-3 pl-4 text-center"><CellValue value={agency} /></td>
                   </tr>
