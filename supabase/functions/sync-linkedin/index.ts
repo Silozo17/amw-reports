@@ -302,10 +302,11 @@ async function getTopContent(orgUrn: string, token: string, monthStartMs: number
 }
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-linkedin", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-linkedin", method: req.method, connection_id: null }));
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

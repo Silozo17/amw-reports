@@ -1052,10 +1052,11 @@ function getPostCaption(item: Record<string, unknown>): string {
 }
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "generate-report", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "generate-report", method: req.method, connection_id: null }));
 
   let earlyReportId: string | undefined;
   try {

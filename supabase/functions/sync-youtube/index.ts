@@ -10,10 +10,11 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-youtube", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-youtube", method: req.method, connection_id: null }));
 
   try {
     const { connection_id, month, year } = await req.json();

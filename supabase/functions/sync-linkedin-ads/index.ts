@@ -40,10 +40,11 @@ function hasTimeLeft(startTime: number): boolean {
 }
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-linkedin-ads", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-linkedin-ads", method: req.method, connection_id: null }));
 
   const startTime = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

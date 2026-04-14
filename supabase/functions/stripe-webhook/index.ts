@@ -6,10 +6,11 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 const GRACE_PERIOD_DAYS = 7;
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "stripe-webhook", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204 });
   }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "stripe-webhook", method: req.method, connection_id: null }));
 
   try {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");

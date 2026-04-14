@@ -64,7 +64,6 @@ function canRegenerate(generatedAt: string, lastSyncAt: string | null): { allowe
 }
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "voice-briefing", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -83,6 +82,8 @@ Deno.serve(async (req) => {
     if (!client_id || !month || !year) {
       return jsonResponse({ error: "Missing client_id, month, or year" }, 400);
     }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "voice-briefing", method: req.method, connection_id: null }));
 
     const orgId = await verifyAccess(supabase, callerId, client_id);
     if (!orgId) return jsonResponse({ error: "Forbidden" }, 403);

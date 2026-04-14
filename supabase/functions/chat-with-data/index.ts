@@ -30,7 +30,6 @@ function checkRateLimit(actorId: string): { allowed: boolean; waitSec?: number }
 }
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "chat-with-data", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -52,6 +51,8 @@ Deno.serve(async (req) => {
       if (!userError && userData?.user?.id) {
         callerId = userData.user.id;
       }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "chat-with-data", method: req.method, connection_id: null }));
     }
 
     if (!callerId && portalToken) {

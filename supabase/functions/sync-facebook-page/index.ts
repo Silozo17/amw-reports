@@ -130,10 +130,11 @@ const batchFetchPostInsights = async (
 };
 
 Deno.serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-facebook-page", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-facebook-page", method: req.method, connection_id: null }));
 
   const startTime = Date.now();
   const isNearTimeout = () => Date.now() - startTime > DEADLINE_MS;

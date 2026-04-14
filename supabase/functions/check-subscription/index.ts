@@ -114,10 +114,11 @@ async function syncOrgSubscription(
 }
 
 serve(async (req) => {
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "check-subscription", method: req.method, connection_id: null }));
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "check-subscription", method: req.method, connection_id: null }));
 
   try {
     logStep("Function started");
