@@ -27,7 +27,9 @@ function buildTimeIntervals(startMs: number, endMs: number, granularity: string 
 
 function buildMonthlyRange(year: number, month: number): { startMs: number; endMs: number } {
   const startMs = Date.UTC(year, month - 1, 1, 0, 0, 0, 0);
-  const endMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+  const rawEndMs = Date.UTC(year, month, 1, 0, 0, 0, 0);
+  // Cap end date to now so LinkedIn does not reject future date ranges
+  const endMs = Math.min(rawEndMs, Date.now());
   return { startMs, endMs };
 }
 
