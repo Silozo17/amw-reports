@@ -1,75 +1,61 @@
 
 
-## Plan: Maximise Google Business Profile Data Pull
+## Plan: GBP Star Ratings, Latest Reviews, and Hero KPI Icon Fix
 
-### What we gain
-- **Reviews and rating** via Google Places API (New) — using the `GOOGLE_API_KEY` already configured
-- **2 new engagement metrics**: Message conversations (`BUSINESS_CONVERSATIONS`) and Bookings (`BUSINESS_BOOKINGS`)
-- **Top search keywords** — the terms people search to find the business (valuable for reports)
-- **Granular impressions breakdown** — store maps vs search and desktop vs mobile separately instead of collapsing
+### 1. Display average rating as stars in GBP metric card
 
-### Changes
+**File: `src/components/clients/dashboard/PlatformSection.tsx`**
 
-**1. Edge function: `supabase/functions/sync-google-business-profile/index.ts`**
+- In the `MetricCard` component (or as a special-case render for `gbp_average_rating`), render filled/half/empty star icons instead of a plain number. Example: 4.3 becomes ★★★★☆ with the numeric value shown alongside.
+- Add a check: if `metricKey === 'gbp_average_rating'`, render a `StarRating` inline component instead of the standard `formatMetricValue` output.
 
-- Add `BUSINESS_CONVERSATIONS` and `BUSINESS_BOOKINGS` to the `dailyMetrics` array
-- After fetching performance metrics, call the **Places API (New)** to get reviews count and average rating:
+### 2. Add new reviews count and latest 5 reviews
+
+**Backend: `supabase/functions/sync-google-business-profile/index.ts`**
+
+- Expand the `fetchReviewsData` function to also call the Places API reviews endpoint:
   ```
-  GET https://places.googleapis.com/v1/places/{placeId}?fields=rating,userRatingCount
-  Header: X-Goog-Api-Key: GOOGLE_API_KEY
+  GET https://places.googleapis.com/v1/places/{placeId}?fields=rating,userRatingCount,reviews
   ```
-  The `placeId` can be derived from the location's `account_id` (which stores the GBP location resource name). We'll need to fetch the location details once via the Account Management API to get the `placeId`, or store it during the account picker step.
-- Call the **search keywords endpoint**:
+  This returns the 5 most relevant reviews with `author`, `rating`, `text`, `relativePublishTimeDescription`, and `publishTime`.
+- Add `gbp_new_reviews` to `metricsData` (calculated as difference from previous snapshot's `gbp_reviews_count`, or just stored as the raw count for now).
+- Store the reviews array in `top_content` alongside existing search keywords. Format:
+  ```json
+  { "type": "review", "author": "...", "rating": 5, "text": "...", "relative_time": "a week ago" }
   ```
-  GET https://businessprofileperformance.googleapis.com/v1/{location}:searchkeywords/impressions/monthly?monthlyRange.startMonth.year=Y&monthlyRange.startMonth.month=M&monthlyRange.endMonth.year=Y&monthlyRange.endMonth.month=M
-  ```
-  Store top 10 keywords in `top_content` field (same pattern as other platforms)
-- Expand `metricsData` to include:
-  - `gbp_conversations` (new)
-  - `gbp_bookings` (new)
-  - `gbp_reviews_count` (now real data)
-  - `gbp_average_rating` (now real data)
-  - `gbp_maps_desktop`, `gbp_maps_mobile`, `gbp_search_desktop`, `gbp_search_mobile` (granular breakdown)
-- Store search keywords in `top_content` as `[{ keyword, impressions }]`
+  Merge with existing keyword entries (keywords get `type: "keyword"`).
 
-**2. Frontend metric definitions: `src/types/database.ts`**
+**Frontend: `src/components/clients/dashboard/PlatformSection.tsx`**
 
-Add labels for new metrics:
-- `gbp_conversations: 'Messages'`
-- `gbp_bookings: 'Bookings'`
-- `gbp_maps_desktop / gbp_maps_mobile / gbp_search_desktop / gbp_search_mobile` labels
+- Add a `TopContentItem` field for `rating` and `author` and `relative_time`.
+- Filter GBP top content by `type === 'review'` and render a collapsible "Latest Reviews" table showing: star rating (as stars), author name, review snippet, and time ago.
+- Filter by `type === 'keyword'` for the existing search keywords display (add a separate collapsible "Top Search Keywords" for GBP).
 
-Add to `PLATFORM_METRICS.google_business_profile` array.
+**Frontend: `src/types/metrics.ts`**
 
-**3. Frontend metric tooltips: `src/types/metrics.ts`**
+- Add tooltip for `gbp_new_reviews`.
 
-Add tooltip descriptions for each new metric.
+**Frontend: `src/types/database.ts`**
 
-**4. Dashboard display: `src/components/clients/dashboard/PlatformSection.tsx`**
+- Add `gbp_new_reviews` label to `METRIC_LABELS` and `PLATFORM_METRICS`.
 
-Add new metrics to `GBP_KEY_METRICS` array.
+### 3. Fix hero KPI icons clipped on smaller screens
 
-**5. Metric defaults seed (optional, via DB)**
+**File: `src/components/clients/dashboard/HeroKPIs.tsx`**
 
-Update `metric_defaults` table for `google_business_profile` to include the new metric keys in both `available_metrics` and `default_metrics`.
-
-### Risk note
-- The Places API (New) call uses `GOOGLE_API_KEY` which is already set. This API has a per-request cost (~$0.005 per call) but we only call it once per sync per location — negligible.
-- Search keywords endpoint may return empty for locations with low traffic. We handle this gracefully.
-- `BUSINESS_CONVERSATIONS` and `BUSINESS_BOOKINGS` may return 0 for businesses that don't use those features — we'll include them as optional metrics (not in defaults).
+- The icon container (line 98-103) uses fixed `h-8 w-8` which gets clipped when the card is narrow. Add `shrink-0` to the icon wrapper div to prevent it from being crushed by flex layout.
+- The platform logo images (line 109-127) also need `shrink-0` on the container to prevent clipping.
 
 ### Files changed
 
 | File | Change |
 |---|---|
-| `supabase/functions/sync-google-business-profile/index.ts` | Add conversations, bookings, reviews via Places API, search keywords, granular breakdown |
-| `src/types/database.ts` | Add metric labels + platform metrics list |
-| `src/types/metrics.ts` | Add tooltip descriptions |
-| `src/components/clients/dashboard/PlatformSection.tsx` | Update `GBP_KEY_METRICS` |
-| Database: `metric_defaults` | Update available/default metrics for GBP |
+| `supabase/functions/sync-google-business-profile/index.ts` | Fetch reviews from Places API, add to top_content, add gbp_new_reviews metric |
+| `src/components/clients/dashboard/PlatformSection.tsx` | Star rating display for gbp_average_rating, reviews table for GBP, keywords table for GBP |
+| `src/components/clients/dashboard/HeroKPIs.tsx` | Add `shrink-0` to icon wrapper and platform logos container |
+| `src/types/database.ts` | Add `gbp_new_reviews` label |
+| `src/types/metrics.ts` | Add `gbp_new_reviews` tooltip |
 
-### No other changes needed
-- OAuth scope (`business.manage`) already covers everything
-- Connect function unchanged
-- No new secrets required
+### Database
+- Update `metric_defaults` for `google_business_profile` to include `gbp_new_reviews` in `available_metrics`.
 
