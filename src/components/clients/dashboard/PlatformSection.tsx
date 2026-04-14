@@ -477,7 +477,9 @@ const PlatformSection = ({
                gscQueries.length > 0 ? 'Top Search Queries & Pages' :
                ytVideos.length > 0 ? 'Top Videos' :
                gaPages.length > 0 ? 'Top Pages' :
-               gaSources.length > 0 ? 'Traffic Sources' : 'Details'}
+               gaSources.length > 0 ? 'Traffic Sources' :
+               gbpReviews.length > 0 ? 'Latest Reviews & Keywords' :
+               gbpKeywords.length > 0 ? 'Top Search Keywords' : 'Details'}
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
               {socialPosts.length > 0 && (
