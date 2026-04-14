@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,7 @@ const AdminOrgDetail = () => {
     queryFn: async () => {
       const clientIds = clients.map((c) => c.id);
       if (clientIds.length === 0) return [];
-      const { data } = await supabase.from('platform_connections').select('*').in('client_id', clientIds);
+      const { data } = await supabase.from('platform_connections').select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at').in('client_id', clientIds);
       return data ?? [];
     },
     enabled: clients.length > 0,
@@ -204,7 +205,7 @@ const AdminOrgDetail = () => {
           </TabsContent>
 
           <TabsContent value="clients">
-            <AdminOrgClients orgId={id!} clients={clients} connections={connections} />
+            <AdminOrgClients orgId={id!} clients={clients} connections={connections as unknown as Tables<'platform_connections'>[]} />
           </TabsContent>
 
           <TabsContent value="members">
