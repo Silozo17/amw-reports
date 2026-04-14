@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -204,7 +205,7 @@ const AdminOrgDetail = () => {
           </TabsContent>
 
           <TabsContent value="clients">
-            <AdminOrgClients orgId={id!} clients={clients} connections={connections as Tables<'platform_connections'>[]} />
+            <AdminOrgClients orgId={id!} clients={clients} connections={connections as unknown as Tables<'platform_connections'>[]} />
           </TabsContent>
 
           <TabsContent value="members">
