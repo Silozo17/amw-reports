@@ -1315,8 +1315,8 @@ Deno.serve(async (req) => {
     const configs = configRes.data ?? [];
 
     // ── Aggregate multi-month snapshots per platform ──
-    const RATE_METRICS = new Set(["ctr", "engagement_rate", "conversion_rate", "audience_growth_rate", "search_ctr", "bounce_rate", "search_impression_share", "completion_rate", "cpc", "cpm", "cost_per_conversion", "cost_per_lead", "avg_session_duration", "pages_per_session", "avg_view_duration", "average_time_watched", "frequency", "gbp_average_rating", "search_position", "roas"]);
-    const CUMULATIVE_METRICS = new Set(["total_followers", "followers", "subscribers", "following", "total_pins", "total_boards", "total_video_count", "media_count"]);
+    const RATE_METRICS = new Set(["ctr", "engagement_rate", "conversion_rate", "audience_growth_rate", "search_ctr", "bounce_rate", "search_impression_share", "completion_rate", "cpc", "cpm", "cost_per_conversion", "cost_per_lead", "avg_session_duration", "pages_per_session", "avg_view_duration", "average_time_watched", "frequency", "search_position", "roas"]);
+    const CUMULATIVE_METRICS = new Set(["total_followers", "followers", "subscribers", "following", "total_pins", "total_boards", "total_video_count", "media_count", "gbp_average_rating", "gbp_reviews_count"]);
 
     const aggregateSnapshots = (snaps: typeof rawSnapshots): { platform: string; metrics_data: Record<string, number>; top_content: unknown[] }[] => {
       const byPlatform = new Map<string, typeof rawSnapshots>();
