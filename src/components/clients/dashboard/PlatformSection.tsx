@@ -14,6 +14,7 @@ import MetaAdsExtras from './platforms/MetaAdsExtras';
 import GoogleAdsExtras from './platforms/GoogleAdsExtras';
 import LinkedInAdsExtras from './platforms/LinkedInAdsExtras';
 import GoogleAnalyticsExtras from './platforms/GoogleAnalyticsExtras';
+import ThreadsExtras from './platforms/ThreadsExtras';
 
 // ─── Platform Section ──────────────────────────────────────────
 const PlatformSection = ({
@@ -156,6 +157,9 @@ const PlatformSection = ({
         )}
         {platform === 'google_search_console' && rawData && (
           <GscRawDataExtras rawData={rawData} />
+        )}
+        {platform === 'threads' && topContent && topContent.length > 0 && (
+          <ThreadsExtras topContent={topContent} />
         )}
       </CardContent>
     </Card>

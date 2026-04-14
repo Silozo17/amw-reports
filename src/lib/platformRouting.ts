@@ -42,6 +42,7 @@ export const CONNECT_FUNCTION_MAP: Record<string, string> = {
   google_business_profile: 'google-business-connect',
   youtube: 'youtube-connect',
   pinterest: 'pinterest-connect',
+  threads: 'threads-connect',
 };
 
 /** Maps each platform key to its data-sync edge-function name. */
@@ -59,6 +60,7 @@ export const SYNC_FUNCTION_MAP: Record<string, string> = {
   google_business_profile: 'sync-google-business-profile',
   youtube: 'sync-youtube',
   pinterest: 'sync-pinterest',
+  threads: 'sync-threads',
 };
 
 /** All platforms that support OAuth connection. */
@@ -66,7 +68,7 @@ export const OAUTH_SUPPORTED: PlatformType[] = [
   'google_ads', 'meta_ads', 'facebook', 'instagram',
   'tiktok', 'tiktok_ads', 'linkedin', 'linkedin_ads',
   'google_search_console', 'google_analytics', 'google_business_profile',
-  'youtube', 'pinterest',
+  'youtube', 'pinterest', 'threads',
 ];
 
 /** All platform keys in display order. */
@@ -74,5 +76,5 @@ export const ALL_PLATFORMS: PlatformType[] = [
   'google_ads', 'meta_ads', 'facebook', 'instagram',
   'tiktok', 'tiktok_ads', 'linkedin', 'linkedin_ads',
   'google_search_console', 'google_analytics', 'google_business_profile',
-  'youtube', 'pinterest',
+  'youtube', 'pinterest', 'threads',
 ];

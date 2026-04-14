@@ -19,6 +19,7 @@ const PLATFORM_DETAILS = [
   { name: 'TikTok Ads', desc: 'Track TikTok ad campaign performance with detailed spend, conversion, and reach metrics.', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'] },
   { name: 'Google Business Profile', desc: 'See how customers find and interact with your Google Business listing.', metrics: ['Views', 'Searches', 'Calls', 'Direction Requests', 'Website Clicks', 'Reviews Count', 'Avg. Rating'] },
   { name: 'Pinterest', desc: 'Track your Pinterest presence with pin performance, impressions, and audience growth.', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'] },
+  { name: 'Threads', desc: 'Monitor your Threads presence with views, engagement, and follower growth.', metrics: ['Followers', 'Views', 'Likes', 'Replies', 'Reposts', 'Quotes', 'Clicks', 'Engagement Rate'] },
 ];
 
 const REPORTING_FEATURES = [
@@ -43,7 +44,7 @@ const PIPELINE_STEPS = [
 const FeaturesPage = () => {
   usePageMeta({
     title: 'Features — Marketing Report Automation | AMW Reports',
-    description: '12 platform integrations, 70+ metrics, branded PDFs, automated delivery, white-label client portal. Free plan.',
+    description: '13 platform integrations, 70+ metrics, branded PDFs, automated delivery, white-label client portal. Free plan.',
   });
 
   return (
@@ -60,7 +61,7 @@ const FeaturesPage = () => {
             All-in-One Marketing<br />Reporting <span className="text-gradient-purple">Platform</span>
           </h1>
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
-            A client-ready reporting and analytics platform that consolidates data from 12 marketing platforms into one clean, branded, easy-to-digest format — ready to present to clients.
+            A client-ready reporting and analytics platform that consolidates data from 13 marketing platforms into one clean, branded, easy-to-digest format — ready to present to clients.
           </p>
           <div className="flex flex-wrap justify-center gap-3 mb-12">
             <Button size="lg" asChild>
@@ -85,7 +86,7 @@ const FeaturesPage = () => {
       <section className="py-16 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="font-accent text-lg text-primary text-center mb-2">All platforms</p>
-          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">12 Platform Integrations, One Dashboard</h2>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">13 Platform Integrations, One Dashboard</h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-12">
             Connect once, sync automatically. Here's every metric we track for each platform.
           </p>

@@ -18,6 +18,7 @@ const PLATFORMS = [
   { name: 'YouTube', category: 'Social', metrics: ['Subscribers', 'Views', 'Watch Time', 'Avg. View Duration', 'Videos Published', 'Top Videos'], link: '/social-media-reporting' },
   { name: 'TikTok', category: 'Social', metrics: ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Video Views'], link: '/social-media-reporting' },
   { name: 'Pinterest', category: 'Social', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'], link: '/social-media-reporting' },
+  { name: 'Threads', category: 'Social', metrics: ['Followers', 'Views', 'Likes', 'Replies', 'Reposts', 'Quotes', 'Clicks', 'Engagement Rate'], link: '/social-media-reporting' },
 ];
 
 const COMING_SOON = ['X (Twitter)', 'Shopify', 'Bing Ads', 'Snapchat Ads', 'Mailchimp'];

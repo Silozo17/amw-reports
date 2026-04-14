@@ -9,7 +9,7 @@ import StarDecoration from '@/components/landing/StarDecoration';
 const UNIVERSAL_FEATURES = [
   { icon: FileText, label: 'Branded PDF Reports', desc: 'Professional reports with your logo and colours, auto-generated every month.' },
   { icon: Share2, label: 'Client Portal', desc: 'A shareable link for each client — no login needed for them to view their dashboard.' },
-  { icon: BarChart3, label: '12 Platform Integrations', desc: 'Connect Google Ads, Meta, Instagram, LinkedIn, TikTok, YouTube, Pinterest and more.' },
+  { icon: BarChart3, label: '13 Platform Integrations', desc: 'Connect Google Ads, Meta, Instagram, LinkedIn, TikTok, YouTube, Pinterest, Threads and more.' },
   { icon: Mail, label: 'Monthly Reports', desc: 'Automated report generation delivered to your inbox or your clients\' inbox.' },
 ];
 

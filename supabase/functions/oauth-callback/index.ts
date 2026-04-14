@@ -85,6 +85,8 @@ Deno.serve(async (req) => {
       await handleYouTube(supabase, authCode, connectionId, supabaseUrl);
     } else if (platform === "pinterest") {
       await handlePinterest(supabase, authCode, connectionId, supabaseUrl);
+    } else if (platform === "threads") {
+      await handleThreads(supabase, authCode, connectionId, supabaseUrl);
     } else {
       throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -1231,6 +1233,84 @@ async function handlePinterest(supabase: any, code: string, connectionId: string
       account_id: accountId,
       account_name: username,
       metadata: { token_type: "bearer", accounts: [{ id: accountId, name: username }] },
+    })
+    .eq("id", connectionId);
+
+  if (updateError) throw new Error(`DB update failed: ${updateError.message}`);
+}
+
+// ── Threads ──
+async function handleThreads(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
+  const appId = Deno.env.get("THREADS_APP_ID")!;
+  const appSecret = Deno.env.get("THREADS_APP_SECRET")!;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+
+  // Exchange code for short-lived token
+  const tokenRes = await fetch("https://graph.threads.net/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+      code,
+    }),
+  });
+
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) {
+    throw new Error(tokenData.error_message || tokenData.error_type || "Threads token exchange failed");
+  }
+
+  let accessToken = tokenData.access_token;
+  let expiresIn = 5184000; // 60 days default for long-lived
+
+  // Exchange for long-lived token
+  try {
+    const longRes = await fetch(
+      `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${encodeURIComponent(appSecret)}&access_token=${encodeURIComponent(accessToken)}`
+    );
+    const longData = await longRes.json();
+    if (longData.access_token) {
+      accessToken = longData.access_token;
+      expiresIn = longData.expires_in || 5184000;
+    }
+  } catch (e) {
+    console.warn("Could not exchange for Threads long-lived token:", e);
+  }
+
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  // Fetch profile
+  let userId = tokenData.user_id?.toString() || "";
+  let username = "";
+
+  try {
+    const profileRes = await fetch(
+      `https://graph.threads.net/v1.0/me?fields=id,username&access_token=${accessToken}`
+    );
+    if (profileRes.ok) {
+      const profileData = await profileRes.json();
+      userId = profileData.id || userId;
+      username = profileData.username || "";
+    }
+  } catch (e) {
+    console.warn("Could not fetch Threads profile:", e);
+  }
+
+  // Threads = single account, auto-select
+  const { error: updateError } = await supabase
+    .from("platform_connections")
+    .update({
+      access_token: await encryptToken(accessToken),
+      refresh_token: null,
+      token_expires_at: expiresAt,
+      is_connected: true,
+      last_error: null,
+      account_id: userId,
+      account_name: username || `Threads (${userId})`,
+      metadata: { token_type: "bearer", long_lived: true },
     })
     .eq("id", connectionId);
 
