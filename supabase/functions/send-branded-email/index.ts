@@ -625,6 +625,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "send-branded-email", method: req.method, connection_id: null }));
+
   try {
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     if (!resendApiKey) throw new Error("RESEND_API_KEY is not configured");

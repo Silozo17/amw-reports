@@ -20,6 +20,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "create-checkout", method: req.method, connection_id: null }));
+
   try {
     logStep("Function started");
 

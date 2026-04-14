@@ -10,6 +10,8 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204 });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "stripe-webhook", method: req.method, connection_id: null }));
+
   try {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");

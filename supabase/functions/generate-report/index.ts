@@ -1056,6 +1056,8 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "generate-report", method: req.method, connection_id: null }));
+
   let earlyReportId: string | undefined;
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

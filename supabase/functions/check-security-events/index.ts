@@ -7,6 +7,8 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204 });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "check-security-events", method: req.method, connection_id: null }));
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

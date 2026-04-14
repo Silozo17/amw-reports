@@ -13,6 +13,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "verify-domain", method: req.method, connection_id: null }));
+
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {

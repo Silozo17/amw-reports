@@ -83,6 +83,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing client_id, month, or year" }, 400);
     }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "voice-briefing", method: req.method, connection_id: null }));
+
     const orgId = await verifyAccess(supabase, callerId, client_id);
     if (!orgId) return jsonResponse({ error: "Forbidden" }, 403);
 

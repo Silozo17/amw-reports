@@ -21,6 +21,8 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "invite-org-member", method: req.method, connection_id: null }));
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

@@ -45,6 +45,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-meta-ads", method: req.method, connection_id: null }));
+
   const startTime = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

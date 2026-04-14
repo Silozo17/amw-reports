@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "auth-email-hook", method: req.method, connection_id: null }));
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

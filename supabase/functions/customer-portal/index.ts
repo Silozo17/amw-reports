@@ -20,6 +20,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "customer-portal", method: req.method, connection_id: null }));
+
   try {
     logStep("Function started");
 

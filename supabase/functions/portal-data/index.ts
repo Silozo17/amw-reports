@@ -33,6 +33,8 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "portal-data", method: req.method, connection_id: null }));
+
   try {
     // Rate limiting by IP
     const clientIp =

@@ -134,6 +134,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "sync-facebook-page", method: req.method, connection_id: null }));
+
   const startTime = Date.now();
   const isNearTimeout = () => Date.now() - startTime > DEADLINE_MS;
 

@@ -18,6 +18,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "extract-branding", method: req.method, connection_id: null }));
+
   try {
     // ── Auth verification ──
     const authHeader = req.headers.get('Authorization');

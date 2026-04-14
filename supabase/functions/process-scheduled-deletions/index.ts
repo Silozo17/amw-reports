@@ -7,6 +7,8 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204 });
   }
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "process-scheduled-deletions", method: req.method, connection_id: null }));
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,

@@ -38,6 +38,8 @@ Deno.serve(async (req) => {
       if (!userError && userData?.user?.id) {
         callerId = userData.user.id;
       }
+
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "analyze-client", method: req.method, connection_id: null }));
     }
 
     if (!callerId && portalToken) {
