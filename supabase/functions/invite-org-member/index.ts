@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify caller belongs to the org
+    // Verify caller belongs to the org and check their role
     const { data: membership } = await supabase
       .from("org_members")
       .select("role")
@@ -71,6 +71,15 @@ Deno.serve(async (req) => {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Only owners can invite as owner
+    const requestedRole = (role || "manager").toLowerCase();
+    if (requestedRole === "owner" && membership.role !== "owner") {
+      return new Response(
+        JSON.stringify({ error: "Only organisation owners can invite new owners" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Check if user already exists in profiles
