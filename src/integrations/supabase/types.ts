@@ -1169,6 +1169,63 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_jobs: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          connection_id: string
+          created_at: string
+          current_month: number | null
+          current_year: number | null
+          error_message: string | null
+          id: string
+          months: number
+          org_id: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          priority: number
+          progress_completed: number
+          progress_total: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["sync_job_status"]
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          connection_id: string
+          created_at?: string
+          current_month?: number | null
+          current_year?: number | null
+          error_message?: string | null
+          id?: string
+          months?: number
+          org_id: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          priority?: number
+          progress_completed?: number
+          progress_total?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["sync_job_status"]
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          connection_id?: string
+          created_at?: string
+          current_month?: number | null
+          current_year?: number | null
+          error_message?: string | null
+          id?: string
+          months?: number
+          org_id?: string
+          platform?: Database["public"]["Enums"]["platform_type"]
+          priority?: number
+          progress_completed?: number
+          progress_total?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["sync_job_status"]
+        }
+        Relationships: []
+      }
       sync_logs: {
         Row: {
           client_id: string
@@ -1382,6 +1439,7 @@ export type Database = {
         | "pinterest"
         | "tiktok_ads"
         | "linkedin_ads"
+      sync_job_status: "pending" | "processing" | "completed" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1526,6 +1584,7 @@ export const Constants = {
         "tiktok_ads",
         "linkedin_ads",
       ],
+      sync_job_status: ["pending", "processing", "completed", "failed"],
     },
   },
 } as const
