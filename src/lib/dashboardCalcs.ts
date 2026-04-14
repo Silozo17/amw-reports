@@ -28,7 +28,7 @@ export function computeKpis(
   const totalEngagement = filtered.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
   const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
   const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
-  const totalVideoViews = filtered.reduce((sum, s) => s.platform === 'meta_ads' ? sum : sum + (s.metrics_data.video_views || 0), 0);
+  const totalVideoViews = filtered.reduce((sum, s) => { if (s.platform === 'meta_ads') return sum; if (s.platform === 'facebook') return sum + (s.metrics_data.views || 0); return sum + (s.metrics_data.video_views || 0); }, 0);
   const totalConversions = filtered.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
   const totalPageViews = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
   const totalWebsiteClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
@@ -39,7 +39,7 @@ export function computeKpis(
   const prevClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0); }, 0);
   const prevEngagement = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
   const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
-  const prevVideoViews = filteredPrev.reduce((sum, s) => s.platform === 'meta_ads' ? sum : sum + (s.metrics_data.video_views || 0), 0);
+  const prevVideoViews = filteredPrev.reduce((sum, s) => { if (s.platform === 'meta_ads') return sum; if (s.platform === 'facebook') return sum + (s.metrics_data.views || 0); return sum + (s.metrics_data.video_views || 0); }, 0);
   const prevConversions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
   const prevPageViews = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0); }, 0);
   const prevWebsiteClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0); }, 0);
@@ -54,7 +54,7 @@ export function computeKpis(
   const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0));
   const followerPlatforms = platformsFor(m => m.total_followers || 0);
   const sessionsPlatforms = platformsFor(m => m.sessions || 0);
-  const videoViewsPlatforms = [...new Set(filtered.filter(s => s.platform !== 'meta_ads' && (s.metrics_data.video_views || 0) > 0).map(s => s.platform))];
+  const videoViewsPlatforms = [...new Set(filtered.filter(s => { if (s.platform === 'meta_ads') return false; if (s.platform === 'facebook') return (s.metrics_data.views || 0) > 0; return (s.metrics_data.video_views || 0) > 0; }).map(s => s.platform))];
   const conversionsPlatforms = platformsFor(m => m.conversions || 0);
   const pageViewsPlatforms = platformsFor(m => (m.ga_page_views || 0) + (m.page_views || 0) + (m.gbp_views || 0));
   const websiteClicksPlatforms = platformsFor(m => (m.website_clicks || 0) + (m.gbp_website_clicks || 0) + (m.link_clicks || 0));
@@ -112,7 +112,7 @@ export function computeSparklines(
     existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0) + (s.metrics_data.search_clicks || 0) + (s.metrics_data.gbp_website_clicks || 0);
     existing.engagement = (existing.engagement || 0) + (s.metrics_data.engagement ? s.metrics_data.engagement : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0));
     existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
-    existing.video_views = (existing.video_views || 0) + (s.platform === 'meta_ads' ? 0 : (s.metrics_data.video_views || 0));
+    existing.video_views = (existing.video_views || 0) + (s.platform === 'meta_ads' ? 0 : s.platform === 'facebook' ? (s.metrics_data.views || 0) : (s.metrics_data.video_views || 0));
     existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
     existing.search_impressions = (existing.search_impressions || 0) + (s.metrics_data.search_impressions || 0);
     existing.search_clicks = (existing.search_clicks || 0) + (s.metrics_data.search_clicks || 0);
