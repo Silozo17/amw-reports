@@ -10,9 +10,10 @@ import gaLogo from '@/assets/logos/google-analytics.webp';
 import gbpLogo from '@/assets/logos/google-business.webp';
 import youtubeLogo from '@/assets/logos/youtube.webp';
 import pinterestLogo from '@/assets/logos/pinterest.webp';
+import threadsLogo from '@/assets/logos/threads.webp';
 
 export type AppRole = 'owner' | 'manager';
-export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'tiktok_ads' | 'linkedin' | 'linkedin_ads' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube' | 'pinterest';
+export type PlatformType = 'google_ads' | 'meta_ads' | 'facebook' | 'instagram' | 'tiktok' | 'tiktok_ads' | 'linkedin' | 'linkedin_ads' | 'google_search_console' | 'google_analytics' | 'google_business_profile' | 'youtube' | 'pinterest' | 'threads';
 export type JobStatus = 'pending' | 'running' | 'success' | 'failed' | 'partial';
 
 export interface Organisation {
@@ -210,6 +211,7 @@ export const PLATFORM_LABELS: Record<PlatformType, string> = {
   google_business_profile: 'Google Business Profile',
   youtube: 'YouTube',
   pinterest: 'Pinterest',
+  threads: 'Threads',
 };
 
 export const PLATFORM_LOGOS: Record<string, string> = {
@@ -227,6 +229,7 @@ export const PLATFORM_LOGOS: Record<string, string> = {
   google_business_profile: gbpLogo,
   youtube: youtubeLogo,
   pinterest: pinterestLogo,
+  threads: threadsLogo,
 };
 
 export const CURRENCY_OPTIONS = [
@@ -296,7 +299,7 @@ export const AD_METRICS = new Set([
 ]);
 
 /** Platforms that are organic-only (no ad spend metrics) */
-export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest']);
+export const ORGANIC_PLATFORMS = new Set<PlatformType>(['facebook', 'instagram', 'tiktok', 'linkedin', 'google_search_console', 'google_analytics', 'google_business_profile', 'youtube', 'pinterest', 'threads']);
 
 export const METRIC_LABELS: Record<string, string> = {
   spend: 'Spend',
@@ -402,6 +405,8 @@ export const METRIC_LABELS: Record<string, string> = {
   total_pins:     'Total Pins',
   total_boards:   'Total Boards',
   top_boards:     'Top Boards',
+  quotes:         'Quotes',
+  reposts:        'Reposts',
 };
 
 /** Platform-specific metrics — only these metrics are relevant per platform */
@@ -472,11 +477,16 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'engagement', 'engagement_rate', 'total_followers',
     'total_pins', 'total_boards', 'top_boards',
   ],
+  threads: [
+    'total_followers', 'follower_growth', 'views', 'likes', 'comments',
+    'shares', 'quotes', 'engagement', 'engagement_rate', 'clicks',
+    'posts_published',
+  ],
 };
 
 /** Platform categories for grouped dashboard display */
 export const PLATFORM_CATEGORIES: { label: string; platforms: PlatformType[] }[] = [
   { label: 'Paid Advertising', platforms: ['google_ads', 'meta_ads', 'tiktok_ads', 'linkedin_ads'] },
-  { label: 'Organic Social', platforms: ['facebook', 'instagram', 'tiktok', 'linkedin', 'youtube', 'pinterest'] },
+  { label: 'Organic Social', platforms: ['facebook', 'instagram', 'tiktok', 'linkedin', 'youtube', 'pinterest', 'threads'] },
   { label: 'SEO & Web Analytics', platforms: ['google_search_console', 'google_analytics', 'google_business_profile'] },
 ];
