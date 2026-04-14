@@ -17,6 +17,7 @@ const PLATFORM_DETAILS = [
   { name: 'LinkedIn', desc: 'Monitor your LinkedIn company page with follower analytics and post performance.', metrics: ['Followers', 'Follower Growth', 'Impressions', 'Engagement', 'Clicks', 'Reactions', 'Comments', 'Shares', 'Posts Published'] },
   { name: 'TikTok', desc: 'Track organic TikTok content performance including followers, views, likes, and engagement.', metrics: ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Video Views'] },
   { name: 'TikTok Ads', desc: 'Track TikTok ad campaign performance with detailed spend, conversion, and reach metrics.', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'] },
+  { name: 'LinkedIn Ads', desc: 'Monitor your LinkedIn advertising campaigns with spend tracking, conversion metrics, and professional audience engagement.', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conversion Rate', 'Cost/Conv.', 'Engagement'] },
   { name: 'Google Business Profile', desc: 'See how customers find and interact with your Google Business listing.', metrics: ['Views', 'Searches', 'Calls', 'Direction Requests', 'Website Clicks', 'Reviews Count', 'Avg. Rating'] },
   { name: 'Pinterest', desc: 'Track your Pinterest presence with pin performance, impressions, and audience growth.', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'] },
   { name: 'Threads', desc: 'Monitor your Threads presence with views, engagement, and follower growth.', metrics: ['Followers', 'Views', 'Likes', 'Replies', 'Reposts', 'Quotes', 'Clicks', 'Engagement Rate'] },
@@ -86,7 +87,7 @@ const FeaturesPage = () => {
       <section className="py-16 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="font-accent text-lg text-primary text-center mb-2">All platforms</p>
-          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">13 Platform Integrations, One Dashboard</h2>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-4">14 Platform Integrations, One Dashboard</h2>
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-12">
             Connect once, sync automatically. Here's every metric we track for each platform.
           </p>
