@@ -263,8 +263,10 @@ const PlatformSection = ({
   const gaPages = (topContent ?? []).filter(p => p.page && !p.query && platform === 'google_analytics');
   const gaSources = (topContent ?? []).filter(p => p.source);
   const ytVideos = (topContent ?? []).filter(p => p.title);
+  const gbpReviews = (topContent ?? []).filter(p => p.type === 'review');
+  const gbpKeywords = (topContent ?? []).filter(p => p.type === 'keyword');
 
-  const hasTopContent = socialPosts.length > 0 || gscQueries.length > 0 || gscPages.length > 0 || gaPages.length > 0 || gaSources.length > 0 || ytVideos.length > 0;
+  const hasTopContent = socialPosts.length > 0 || gscQueries.length > 0 || gscPages.length > 0 || gaPages.length > 0 || gaSources.length > 0 || ytVideos.length > 0 || gbpReviews.length > 0 || gbpKeywords.length > 0;
 
   // Determine a chart to show: spend trend for ad platforms, engagement for social
   const isAdPlatform = platform === 'google_ads' || platform === 'meta_ads';
