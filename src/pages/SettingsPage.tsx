@@ -1,4 +1,5 @@
 import AppLayout from '@/components/layout/AppLayout';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { useAuth } from '@/hooks/useAuth';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useOrg } from '@/contexts/OrgContext';
@@ -70,36 +71,36 @@ const SettingsPage = () => {
           </div>
 
           {canManageOrg && (
-            <TabsContent value="organisation" className="space-y-6 mt-6">
-              <OrganisationSection />
+             <TabsContent value="organisation" className="space-y-6 mt-6">
+              <SectionErrorBoundary><OrganisationSection /></SectionErrorBoundary>
             </TabsContent>
           )}
 
           <TabsContent value="account" className="space-y-6 mt-6">
-            <AccountSection />
+            <SectionErrorBoundary><AccountSection /></SectionErrorBoundary>
           </TabsContent>
 
           {showWhitelabel && (
             <TabsContent value="whitelabel" className="space-y-6 mt-6">
-              <BrandingSection />
-              <ReportSettingsSection />
-              <CustomDomainSection />
+              <SectionErrorBoundary><BrandingSection /></SectionErrorBoundary>
+              <SectionErrorBoundary><ReportSettingsSection /></SectionErrorBoundary>
+              <SectionErrorBoundary><CustomDomainSection /></SectionErrorBoundary>
             </TabsContent>
           )}
 
           {canManageMetrics && (
             <TabsContent value="metrics" className="space-y-6 mt-6">
-              <MetricsDefaultsSection />
+              <SectionErrorBoundary><MetricsDefaultsSection /></SectionErrorBoundary>
             </TabsContent>
           )}
 
           <TabsContent value="upsells" className="space-y-6 mt-6">
-            <UpsellsOverviewSection />
+            <SectionErrorBoundary><UpsellsOverviewSection /></SectionErrorBoundary>
           </TabsContent>
 
           {canManageBilling && (
             <TabsContent value="billing" className="space-y-6 mt-6">
-              <BillingSection />
+              <SectionErrorBoundary><BillingSection /></SectionErrorBoundary>
             </TabsContent>
           )}
         </Tabs>

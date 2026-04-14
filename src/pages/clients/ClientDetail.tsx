@@ -14,6 +14,7 @@ import { PLATFORM_LABELS } from '@/types/database';
 import type { SelectedPeriod } from '@/components/clients/DashboardHeader';
 import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -411,7 +412,9 @@ const ClientDetail = () => {
           </div>
 
           <TabsContent value="dashboard" className="mt-4">
-            <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} showHealthScore={client.show_health_score !== false} onPeriodChange={handlePeriodChange} />
+            <SectionErrorBoundary>
+              <ClientDashboard clientId={client.id} clientName={client.company_name} currencyCode={client.preferred_currency} showHealthScore={client.show_health_score !== false} onPeriodChange={handlePeriodChange} />
+            </SectionErrorBoundary>
           </TabsContent>
 
           <TabsContent value="connections" className="mt-4">

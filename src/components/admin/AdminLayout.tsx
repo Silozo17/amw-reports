@@ -1,4 +1,5 @@
 import { ReactNode, useState } from 'react';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Building2, ScrollText, ArrowLeft, Menu, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -78,7 +79,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           <h1 className="text-lg font-display text-primary">AMW Admin</h1>
         </header>
         <main className="p-4 overflow-auto">
-          {children}
+          <SectionErrorBoundary>{children}</SectionErrorBoundary>
         </main>
       </div>
     );
@@ -90,7 +91,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         <SidebarContent />
       </aside>
       <main className="flex-1 p-6 md:p-8 overflow-auto">
-        {children}
+        <SectionErrorBoundary>{children}</SectionErrorBoundary>
       </main>
     </div>
   );
