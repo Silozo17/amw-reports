@@ -106,7 +106,7 @@ export function computeKpis(
     ...(avgSearchPosition > 0 ? [{ label: "Avg. Position", value: avgSearchPosition, change: cc(avgSearchPosition, prevAvgSearchPosition), icon: Hash, metricKey: "search_position", platforms: searchPositionPlatforms, isDecimal: true }] : []),
     ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
     ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views", platforms: pageViewsPlatforms }] : []),
-    ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks", platforms: websiteClicksPlatforms }] : []),
+    
     ...(totalPostsPublished > 0 ? [{ label: "Posts Published", value: totalPostsPublished, change: cc(totalPostsPublished, prevPostsPublished), icon: PenSquare, metricKey: "posts_published", platforms: postsPublishedPlatforms }] : []),
     ...(totalGbpCalls > 0 ? [{ label: "Phone Calls", value: totalGbpCalls, change: cc(totalGbpCalls, prevGbpCalls), icon: Phone, metricKey: "gbp_calls", platforms: gbpCallsPlatforms }] : []),
     ...(totalGbpDirections > 0 ? [{ label: "Direction Requests", value: totalGbpDirections, change: cc(totalGbpDirections, prevGbpDirections), icon: MapPin, metricKey: "gbp_direction_requests", platforms: gbpDirectionsPlatforms }] : []),
