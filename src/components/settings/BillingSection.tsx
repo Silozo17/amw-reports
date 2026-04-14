@@ -10,8 +10,8 @@ import { toast } from 'sonner';
 import { useSearchParams } from 'react-router-dom';
 
 const STRIPE_PLANS = {
-  starter: {
-    name: 'Starter',
+  creator: {
+    name: 'Creator',
     price: 'Free',
     priceId: null,
     features: ['1 client', '5 connections', 'Basic reports'],
@@ -111,7 +111,7 @@ const BillingSection = () => {
     return <div className="text-sm text-muted-foreground">Loading billing info...</div>;
   }
 
-  const currentPlanSlug = plan?.slug || 'starter';
+  const currentPlanSlug = plan?.slug || 'creator';
 
   return (
     <div className="space-y-6">
