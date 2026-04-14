@@ -51,7 +51,7 @@ const ConnectionDialog = ({ clientId, connections, onUpdate }: ConnectionDialogP
         platform: platform as PlatformType,
         is_connected: false,
       })
-      .select('*')
+      .select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at')
       .single();
 
     if (error || !newConn) {
