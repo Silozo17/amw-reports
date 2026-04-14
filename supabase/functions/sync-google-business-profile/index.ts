@@ -61,46 +61,83 @@ async function fetchDailyMetricTotal(
   }
 }
 
-/** Fetch reviews count, rating, and latest reviews via Places API (New) */
+/** Fetch reviews count, rating, and latest reviews */
 async function fetchReviewsData(
-  placeId: string,
+  locationId: string,
+  accessToken: string,
   apiKey: string
 ): Promise<{
   reviewsCount: number | null;
   averageRating: number | null;
   latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }>;
 }> {
-  try {
-    const res = await fetch(
-      `https://places.googleapis.com/v1/places/${placeId}?fields=rating,userRatingCount,reviews`,
-      {
-        headers: {
-          "X-Goog-Api-Key": apiKey,
-          "Content-Type": "application/json",
-        },
+  // Fetch rating and count from Places API (New) — still best source for these
+  let reviewsCount: number | null = null;
+  let averageRating: number | null = null;
+
+  if (apiKey) {
+    try {
+      // Get placeId for rating/count only
+      const placeRes = await fetch(
+        `https://mybusinessbusinessinformation.googleapis.com/v1/${locationId}?readMask=metadata`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (placeRes.ok) {
+        const placeData = await placeRes.json();
+        const placeId = placeData.metadata?.placeId;
+        if (placeId) {
+          const ratingRes = await fetch(
+            `https://places.googleapis.com/v1/places/${placeId}?fields=rating,userRatingCount`,
+            {
+              headers: {
+                "X-Goog-Api-Key": apiKey,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          if (ratingRes.ok) {
+            const ratingData = await ratingRes.json();
+            reviewsCount = ratingData.userRatingCount ?? null;
+            averageRating = ratingData.rating ?? null;
+          }
+        }
       }
-    );
-    if (!res.ok) {
-      console.warn(`Places API failed (${res.status}):`, await res.text());
-      return { reviewsCount: null, averageRating: null, latestReviews: [] };
+    } catch (e) {
+      console.warn("Could not fetch rating/count from Places API:", e);
     }
-    const data = await res.json();
-    const reviews = (data.reviews || []).slice(0, 5).map((r: any) => ({
-      type: "review",
-      author: r.authorAttribution?.displayName || "Anonymous",
-      rating: r.rating ?? 0,
-      text: (r.text?.text || r.originalText?.text || "").slice(0, 300),
-      relative_time: r.relativePublishTimeDescription || "",
-    }));
-    return {
-      reviewsCount: data.userRatingCount ?? null,
-      averageRating: data.rating ?? null,
-      latestReviews: reviews,
-    };
-  } catch (e) {
-    console.warn("Could not fetch Places API reviews:", e);
-    return { reviewsCount: null, averageRating: null, latestReviews: [] };
   }
+
+  // Fetch reviews sorted by newest using GMB API
+  const latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }> = [];
+  try {
+    const reviewsRes = await fetch(
+      `https://mybusiness.googleapis.com/v4/${locationId}/reviews?pageSize=5&orderBy=updateTime+desc`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!reviewsRes.ok) {
+      console.warn(`GMB reviews failed (${reviewsRes.status}):`, await reviewsRes.text());
+    } else {
+      const reviewsData = await reviewsRes.json();
+      for (const r of (reviewsData.reviews || []).slice(0, 5)) {
+        const starMap: Record<string, number> = {
+          ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5,
+        };
+        latestReviews.push({
+          type: "review",
+          author: r.reviewer?.displayName || "Anonymous",
+          rating: starMap[r.starRating] ?? 0,
+          text: (r.comment || "").slice(0, 300),
+          relative_time: r.updateTime
+            ? new Date(r.updateTime).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+            : "",
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Could not fetch GMB reviews:", e);
+  }
+
+  return { reviewsCount, averageRating, latestReviews };
 }
 
 /** Fetch top search keywords for the location */
@@ -282,33 +319,11 @@ Deno.serve(async (req) => {
     const totalMaps = gbpMapsDesktop + gbpMapsLobile;
     const gbpViews = totalMaps + totalSearches;
 
-    // ── Fetch reviews via Places API ─────────────────────────────
-    let reviewsCount: number | null = null;
-    let avgRating: number | null = null;
-    let latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }> = [];
-
-    if (googleApiKey) {
-      // Try to get placeId from connection metadata first
-      let placeId = (conn.metadata as any)?.place_id || null;
-
-      if (!placeId) {
-        placeId = await resolveLocationToPlaceId(locationId, accessToken);
-        // Cache placeId in connection metadata for future syncs
-        if (placeId) {
-          const existingMeta = conn.metadata || {};
-          await supabase.from("platform_connections").update({
-            metadata: { ...existingMeta, place_id: placeId },
-          }).eq("id", connectionId);
-        }
-      }
-
-      if (placeId) {
-        const reviews = await fetchReviewsData(placeId, googleApiKey);
-        reviewsCount = reviews.reviewsCount;
-        avgRating = reviews.averageRating;
-        latestReviews = reviews.latestReviews;
-      }
-    }
+    // ── Fetch reviews via GMB API + Places API ─────────────────
+    const reviews = await fetchReviewsData(locationId, accessToken, googleApiKey);
+    const reviewsCount = reviews.reviewsCount;
+    const avgRating = reviews.averageRating;
+    const latestReviews = reviews.latestReviews;
 
     // ── Fetch search keywords ────────────────────────────────────
     const searchKeywords = await fetchSearchKeywords(locationId, year, month, accessToken);
