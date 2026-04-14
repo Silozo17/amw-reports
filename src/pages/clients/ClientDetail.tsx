@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
@@ -51,7 +51,7 @@ const ClientDetail = () => {
     (state) => setQueueState({ ...state }),
     () => fetchDataRef.current?.(),
   ));
-  const fetchDataRef = { current: null as (() => void) | null };
+  const fetchDataRef = useRef<(() => void) | null>(null);
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -178,6 +178,7 @@ const ClientDetail = () => {
     setIsLoading(false);
   }, [id]);
 
+  fetchDataRef.current = fetchData;
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleInviteClient = async () => {
