@@ -112,12 +112,12 @@ async function fetchReviewsData(
   // Fetch reviews sorted by newest using GMB API
   const latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }> = [];
   try {
-    const reviewsRes = await fetch(
-      `https://mybusiness.googleapis.com/v4/${locationId}/reviews?pageSize=5&orderBy=updateTime+desc`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
+    const reviewsUrl = `https://mybusiness.googleapis.com/v4/${locationId}/reviews?pageSize=5&orderBy=updateTime+desc`;
+    console.log(`GMB reviews URL: ${reviewsUrl}`);
+    const reviewsRes = await fetch(reviewsUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (!reviewsRes.ok) {
-      console.warn(`GMB reviews failed (${reviewsRes.status}):`, await reviewsRes.text());
+      const errText = await reviewsRes.text();
+      console.warn(`GMB reviews failed (${reviewsRes.status}):`, errText);
     } else {
       const reviewsData = await reviewsRes.json();
       for (const r of (reviewsData.reviews || []).slice(0, 5)) {
