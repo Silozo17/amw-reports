@@ -68,9 +68,15 @@ Deno.serve(async (req) => {
     const { data: clientData } = await supabaseClient.from("clients").select("org_id").eq("id", clientId).single();
     const orgId = clientData?.org_id;
 
-    // Verify requesting user belongs to the client's org
+    // Require authorization
     const authHeader = req.headers.get("Authorization");
-    if (authHeader && orgId) {
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (orgId) {
       const token = authHeader.replace("Bearer ", "");
       const { data: { user: caller } } = await supabaseClient.auth.getUser(token);
       if (caller) {
