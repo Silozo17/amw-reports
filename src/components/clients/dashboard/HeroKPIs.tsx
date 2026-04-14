@@ -1,7 +1,5 @@
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
-import { METRIC_EXPLANATIONS } from '@/types/metrics';
 import {
   ResponsiveContainer, AreaChart, Area,
 } from 'recharts';
@@ -72,7 +70,7 @@ const formatValue = (val: number, isCost: boolean, currSymbol: string, isPercent
 /* ─── Metric-Specific Visuals ─── */
 
 const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: string; value: number; accentColor: string; featured: boolean }) => {
-  const size = featured ? 56 : 40;
+  const size = featured ? 72 : 52;
 
   switch (metricKey) {
     case 'spend': {
@@ -80,19 +78,19 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
       const r = size / 2 - 4;
       const circumHalf = Math.PI * r;
       return (
-        <svg width={size} height={size / 2 + 4} className="opacity-60">
+        <svg width={size} height={size / 2 + 4} className="opacity-80">
           <path
             d={`M 4 ${size / 2} A ${r} ${r} 0 0 1 ${size - 4} ${size / 2}`}
             fill="none"
             stroke={accentColor}
-            strokeWidth={3}
-            strokeOpacity={0.2}
+            strokeWidth={3.5}
+            strokeOpacity={0.15}
           />
           <path
             d={`M 4 ${size / 2} A ${r} ${r} 0 0 1 ${size - 4} ${size / 2}`}
             fill="none"
             stroke={accentColor}
-            strokeWidth={3}
+            strokeWidth={3.5}
             strokeDasharray={`${circumHalf}`}
             strokeDashoffset={circumHalf * (1 - pct)}
             strokeLinecap="round"
@@ -104,10 +102,10 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'video_views': {
       const bars = [0.5, 0.8, 0.6];
-      const barW = featured ? 8 : 6;
-      const maxH = featured ? 32 : 22;
+      const barW = featured ? 10 : 7;
+      const maxH = featured ? 40 : 28;
       return (
-        <div className="flex items-end gap-1 opacity-60">
+        <div className="flex items-end gap-1 opacity-80">
           {bars.map((h, i) => (
             <div
               key={i}
@@ -126,7 +124,7 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'reach':
       return (
-        <div className="relative opacity-50" style={{ width: size, height: size }}>
+        <div className="relative opacity-70" style={{ width: size, height: size }}>
           {[0, 1, 2].map((i) => (
             <div
               key={i}
@@ -142,7 +140,7 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'clicks':
       return (
-        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-60">
+        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-80">
           <path d="M20 32 L20 8" stroke={accentColor} strokeWidth={2.5} strokeLinecap="round" />
           <path d="M12 16 L20 8 L28 16" stroke={accentColor} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M20 32 L20 18" stroke={accentColor} strokeWidth={1.5} strokeOpacity={0.3} strokeLinecap="round" />
@@ -151,7 +149,7 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'engagement':
       return (
-        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-60 animate-[pulse_2s_ease-in-out_infinite]">
+        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-80 animate-[pulse_2s_ease-in-out_infinite]">
           <path
             d="M20 35 C12 28 4 22 4 15 C4 9 8 5 13 5 C16 5 18 7 20 10 C22 7 24 5 27 5 C32 5 36 9 36 15 C36 22 28 28 20 35Z"
             fill={accentColor}
@@ -165,11 +163,11 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
       const r = (size / 2) - 5;
       const circ = 2 * Math.PI * r;
       return (
-        <svg width={size} height={size} className="opacity-60 -rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={accentColor} strokeWidth={3} strokeOpacity={0.15} />
+        <svg width={size} height={size} className="opacity-80 -rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={accentColor} strokeWidth={3.5} strokeOpacity={0.15} />
           <circle
             cx={size / 2} cy={size / 2} r={r}
-            fill="none" stroke={accentColor} strokeWidth={3}
+            fill="none" stroke={accentColor} strokeWidth={3.5}
             strokeDasharray={circ}
             strokeDashoffset={circ * (1 - pct)}
             strokeLinecap="round"
@@ -181,9 +179,9 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'posts_published': {
       const dots = Array.from({ length: 9 });
-      const dotSize = featured ? 5 : 4;
+      const dotSize = featured ? 6 : 5;
       return (
-        <div className="grid grid-cols-3 gap-1 opacity-50">
+        <div className="grid grid-cols-3 gap-1 opacity-70">
           {dots.map((_, i) => (
             <div
               key={i}
@@ -203,9 +201,9 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
     case 'gbp_average_rating': {
       const rating = Math.min(value, 5);
       return (
-        <div className="flex gap-0.5 opacity-70">
+        <div className="flex gap-0.5 opacity-85">
           {Array.from({ length: 5 }).map((_, i) => (
-            <svg key={i} width={featured ? 14 : 10} height={featured ? 14 : 10} viewBox="0 0 20 20">
+            <svg key={i} width={featured ? 16 : 12} height={featured ? 16 : 12} viewBox="0 0 20 20">
               <polygon
                 points="10,1 12.5,7.5 19.5,7.5 13.5,12 15.5,19 10,14.5 4.5,19 6.5,12 0.5,7.5 7.5,7.5"
                 fill={i < Math.floor(rating) ? '#F59E0B' : 'none'}
@@ -221,7 +219,7 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'leads':
       return (
-        <div className="relative opacity-50" style={{ width: size, height: size }}>
+        <div className="relative opacity-70" style={{ width: size, height: size }}>
           <div
             className="absolute inset-0 rounded-full border-2 animate-[pulse_2s_ease-in-out_infinite]"
             style={{ borderColor: accentColor }}
@@ -243,7 +241,7 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'page_views':
       return (
-        <svg width={size} height={size * 0.6} viewBox="0 0 50 30" className="opacity-50">
+        <svg width={size} height={size * 0.6} viewBox="0 0 50 30" className="opacity-70">
           <polyline
             points="0,25 10,18 20,22 30,10 40,15 50,5"
             fill="none"
@@ -257,7 +255,7 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'gbp_calls':
       return (
-        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-60 animate-phone-vibrate">
+        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-80 animate-phone-vibrate">
           <path
             d="M11 5 C11 5 15 5 16 9 L17 14 C17 15 16 16 15 16 L13 17 C13 17 15 23 23 27 L24 25 C24 24 25 23 26 23 L31 24 C35 25 35 29 35 29 L35 31 C35 35 31 37 27 35 C21 32 13 25 8 17 C5 12 5 7 5 7 L5 6 C5 5 7 5 11 5Z"
             fill={accentColor}
@@ -267,7 +265,7 @@ const MetricVisual = ({ metricKey, value, accentColor, featured }: { metricKey: 
 
     case 'website_clicks':
       return (
-        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-60">
+        <svg width={size} height={size} viewBox="0 0 40 40" className="opacity-80">
           <path
             d="M10 8 L10 28 L22 20 Z"
             fill={accentColor}
@@ -309,33 +307,32 @@ const HeroKPICard = ({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={style}
-      className="relative"
+      className="relative group"
     >
-      {/* Glow halo */}
-      <div
-        className="absolute -inset-1 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl pointer-events-none animate-glow-pulse"
-        style={{ backgroundColor: accentColor, opacity: 0.08 }}
-      />
-
       <div
         className={cn(
-          'kpi-card-glass relative overflow-hidden rounded-xl border transition-shadow duration-300',
-          'border-white/10 dark:border-white/10',
+          'relative overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow duration-300',
+          'hover:shadow-md',
           featured ? 'min-h-[160px]' : 'min-h-[120px]',
         )}
-        style={{
-          boxShadow: `0 0 20px -5px ${accentColor}20, 0 4px 20px -8px ${accentColor}15`,
-        }}
       >
         {/* Holographic reflection overlay */}
         <div style={overlayStyle} />
 
-        {/* Color accent bar */}
-        <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl" style={{ backgroundColor: accentColor }} />
+        {/* Color accent bar — left side */}
+        <div className="absolute top-0 left-0 w-1.5 h-full rounded-l-xl" style={{ backgroundColor: accentColor }} />
+
+        {/* Subtle top gradient band for color identity */}
+        <div
+          className="absolute top-0 left-0 right-0 h-16 pointer-events-none"
+          style={{
+            background: `linear-gradient(180deg, ${accentColor}08 0%, transparent 100%)`,
+          }}
+        />
 
         {/* Background sparkline (featured only) */}
         {featured && sparkline.length > 1 && (
-          <div className="absolute inset-0 opacity-[0.06] pointer-events-none">
+          <div className="absolute inset-0 opacity-[0.07] pointer-events-none">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={sparkline} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                 <defs>
@@ -355,7 +352,7 @@ const HeroKPICard = ({
           <div className="flex items-center gap-2 mb-2">
             <div
               className={cn('shrink-0 rounded-lg flex items-center justify-center', featured ? 'h-9 w-9' : 'h-7 w-7')}
-              style={{ backgroundColor: `${accentColor}15` }}
+              style={{ backgroundColor: `${accentColor}18` }}
             >
               <Icon className={cn(featured ? 'h-4.5 w-4.5' : 'h-3.5 w-3.5')} style={{ color: accentColor }} />
             </div>
@@ -392,7 +389,7 @@ const HeroKPICard = ({
           <div className="flex items-end justify-between gap-2">
             <div>
               <p className={cn(
-                'font-bold font-body tabular-nums leading-none mb-2',
+                'font-bold font-body tabular-nums leading-none mb-2 text-foreground',
                 featured ? 'text-3xl sm:text-4xl' : 'text-xl sm:text-2xl',
               )}>
                 {formatValue(animatedValue, isCost, currSymbol, kpi.isPercentage, kpi.isDecimal)}
@@ -401,10 +398,10 @@ const HeroKPICard = ({
               {change !== undefined && (
                 <div
                   className={cn(
-                    'inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-full',
+                    'inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-full',
                     featured ? 'text-xs' : 'text-[10px]',
-                    isPositive === true ? 'bg-accent/10 text-accent' :
-                    isPositive === false ? 'bg-destructive/10 text-destructive' :
+                    isPositive === true ? 'bg-accent text-accent-foreground' :
+                    isPositive === false ? 'bg-destructive text-destructive-foreground' :
                     'bg-muted text-muted-foreground',
                   )}
                 >
