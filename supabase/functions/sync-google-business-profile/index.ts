@@ -61,14 +61,18 @@ async function fetchDailyMetricTotal(
   }
 }
 
-/** Fetch reviews count and rating via Places API (New) */
+/** Fetch reviews count, rating, and latest reviews via Places API (New) */
 async function fetchReviewsData(
   placeId: string,
   apiKey: string
-): Promise<{ reviewsCount: number | null; averageRating: number | null }> {
+): Promise<{
+  reviewsCount: number | null;
+  averageRating: number | null;
+  latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }>;
+}> {
   try {
     const res = await fetch(
-      `https://places.googleapis.com/v1/places/${placeId}?fields=rating,userRatingCount`,
+      `https://places.googleapis.com/v1/places/${placeId}?fields=rating,userRatingCount,reviews`,
       {
         headers: {
           "X-Goog-Api-Key": apiKey,
@@ -78,16 +82,24 @@ async function fetchReviewsData(
     );
     if (!res.ok) {
       console.warn(`Places API failed (${res.status}):`, await res.text());
-      return { reviewsCount: null, averageRating: null };
+      return { reviewsCount: null, averageRating: null, latestReviews: [] };
     }
     const data = await res.json();
+    const reviews = (data.reviews || []).slice(0, 5).map((r: any) => ({
+      type: "review",
+      author: r.authorAttribution?.displayName || "Anonymous",
+      rating: r.rating ?? 0,
+      text: (r.text?.text || r.originalText?.text || "").slice(0, 300),
+      relative_time: r.relativePublishTimeDescription || "",
+    }));
     return {
       reviewsCount: data.userRatingCount ?? null,
       averageRating: data.rating ?? null,
+      latestReviews: reviews,
     };
   } catch (e) {
     console.warn("Could not fetch Places API reviews:", e);
-    return { reviewsCount: null, averageRating: null };
+    return { reviewsCount: null, averageRating: null, latestReviews: [] };
   }
 }
 
