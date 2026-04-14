@@ -283,7 +283,6 @@ Deno.serve(async (req) => {
     // --- Weekly gap detection (runs on Sundays) ---
     let backfillTriggered = 0;
     const MAX_BACKFILLS_PER_RUN = 50;
-    const BACKFILL_BATCH_SIZE = 2;
 
     if (now.getDay() === 0) {
       // Build list of months to check (last 12)
@@ -294,10 +293,17 @@ Deno.serve(async (req) => {
       }
 
       // For each active connection, check for missing snapshots
-      const connectionsToBackfill: string[] = [];
+      const jobsToInsert: Array<{
+        connection_id: string;
+        client_id: string;
+        org_id: string;
+        platform: string;
+        months: number;
+        priority: number;
+      }> = [];
 
       for (const conn of connections) {
-        if (connectionsToBackfill.length >= MAX_BACKFILLS_PER_RUN) break;
+        if (jobsToInsert.length >= MAX_BACKFILLS_PER_RUN) break;
 
         const fnName = SYNC_FUNCTION_MAP[conn.platform];
         if (!fnName) continue;
@@ -319,23 +325,47 @@ Deno.serve(async (req) => {
         );
 
         if (hasMissing) {
-          connectionsToBackfill.push(conn.id);
+          // Check no pending/processing job already exists
+          const { data: existingJob } = await supabase
+            .from("sync_jobs")
+            .select("id")
+            .eq("connection_id", conn.id)
+            .eq("platform", conn.platform)
+            .in("status", ["pending", "processing"])
+            .limit(1);
+
+          if (!existingJob || existingJob.length === 0) {
+            const connClientData = (conn as Record<string, unknown>).clients as { org_id: string };
+            jobsToInsert.push({
+              connection_id: conn.id,
+              client_id: conn.client_id,
+              org_id: connClientData.org_id,
+              platform: conn.platform,
+              months: 12,
+              priority: 0,
+            });
+          }
         }
       }
 
-      // Invoke backfill-sync in small batches
-      for (let i = 0; i < connectionsToBackfill.length; i += BACKFILL_BATCH_SIZE) {
-        const batch = connectionsToBackfill.slice(i, i + BACKFILL_BATCH_SIZE);
-        await Promise.allSettled(
-          batch.map((connId) =>
-            supabase.functions.invoke("backfill-sync", {
-              body: { connection_id: connId, months: 12 },
-            })
-          )
-        );
-        backfillTriggered += batch.length;
+      if (jobsToInsert.length > 0) {
+        await supabase.from("sync_jobs").insert(jobsToInsert);
+        backfillTriggered = jobsToInsert.length;
+
+        // Trigger the queue processor
+        supabase.functions.invoke("process-sync-queue").catch((err: unknown) => {
+          console.warn("Failed to trigger process-sync-queue:", err);
+        });
       }
     }
+
+    // Reset stale processing jobs (stuck > 10 minutes)
+    const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await supabase
+      .from("sync_jobs")
+      .update({ status: "pending", started_at: null, error_message: "Reset: previous attempt timed out" })
+      .eq("status", "processing")
+      .lt("started_at", staleThreshold);
 
     return new Response(
       JSON.stringify({

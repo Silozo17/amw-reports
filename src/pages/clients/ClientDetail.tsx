@@ -18,7 +18,7 @@ import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { SyncQueue, type QueueState } from '@/lib/syncQueue';
+import { useSyncJobs } from '@/hooks/useSyncJobs';
 import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
 import UpsellTab from '@/components/clients/UpsellTab';
@@ -46,17 +46,13 @@ const ClientDetail = () => {
   const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
-  const [queueState, setQueueState] = useState<QueueState>({ currentJob: null, queuedJobs: [], currentProgress: null });
-  const [syncStartTime, setSyncStartTime] = useState(0);
-  const [syncQueue] = useState(() => new SyncQueue(
-    (state) => setQueueState({ ...state }),
-    () => fetchDataRef.current?.(),
-  ));
-  const fetchDataRef = useRef<(() => void) | null>(null);
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const entitlements = useEntitlements();
+
+  // Server-side sync queue
+  const { activeJobs, isAnySyncing, enqueueSync } = useSyncJobs(id);
 
   const getSyncMonths = useCallback(async (): Promise<number> => {
     if (entitlements.plan?.slug === 'agency') return 24;
@@ -104,10 +100,21 @@ const ClientDetail = () => {
             toast.success(`${label} connected successfully${conn.account_name ? ` — ${conn.account_name}` : ''}`);
             await fetchData();
 
-            if (conn.account_id && conn.is_connected) {
+            // Enqueue server-side sync (sync will happen even if user navigates away)
+            if (conn.account_id && conn.is_connected && client) {
               const months = await getSyncMonths();
-              if (!syncStartTime) setSyncStartTime(Date.now());
-              syncQueue.enqueue({ connectionId: conn.id, platform: conn.platform, months });
+              try {
+                await enqueueSync({
+                  connectionId: conn.id,
+                  clientId: conn.client_id,
+                  orgId: client.org_id,
+                  platform: conn.platform,
+                  months,
+                });
+                toast.success('Historical data sync started — progress shown below');
+              } catch {
+                toast.error('Failed to start sync — it will be retried automatically');
+              }
             }
           } else {
             toast.success('Platform connected successfully');
@@ -179,7 +186,6 @@ const ClientDetail = () => {
     setIsLoading(false);
   }, [id]);
 
-  fetchDataRef.current = fetchData;
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleInviteClient = async () => {
@@ -278,7 +284,7 @@ const ClientDetail = () => {
 
   const handlePickerComplete = async () => {
     await fetchData();
-    if (!pickerConnection) return;
+    if (!pickerConnection || !client) return;
 
     // Re-fetch only the specific connection that was just configured
     const { data: conn } = await supabase
@@ -287,10 +293,20 @@ const ClientDetail = () => {
     if (!conn || !conn.account_id || !conn.is_connected) return;
 
     const typedConn = conn as PlatformConnection;
-    if (!syncStartTime) setSyncStartTime(Date.now());
     const months = await getSyncMonths();
-    syncQueue.enqueue({ connectionId: typedConn.id, platform: typedConn.platform, months });
-    toast.success('Historical data sync started — progress shown below');
+
+    try {
+      await enqueueSync({
+        connectionId: typedConn.id,
+        clientId: typedConn.client_id,
+        orgId: client.org_id,
+        platform: typedConn.platform,
+        months,
+      });
+      toast.success('Historical data sync started — progress shown below');
+    } catch {
+      toast.error('Failed to start sync — it will be retried automatically');
+    }
   };
 
   const handleRemoveConnection = async (conn: PlatformConnection) => {
@@ -397,7 +413,7 @@ const ClientDetail = () => {
           </div>
         </div>
 
-        {queueState.currentJob && <SyncProgressBar queueState={queueState} startTime={syncStartTime} />}
+        {isAnySyncing && <SyncProgressBar jobs={activeJobs} />}
 
         <Tabs defaultValue="dashboard">
           <div className="relative">

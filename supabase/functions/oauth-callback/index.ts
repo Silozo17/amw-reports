@@ -100,8 +100,46 @@ Deno.serve(async (req) => {
       ? `/clients/${connData.client_id}`
       : "/clients";
 
-    // If auto-selected (account_id set), redirect with success flag
-    if (connData?.account_id) {
+    // If auto-selected (account_id set), enqueue server-side sync and redirect
+    if (connData?.account_id && connData?.client_id) {
+      // Determine sync months based on org subscription
+      let syncMonths = 12;
+      try {
+        const { data: clientRow } = await supabase
+          .from("clients")
+          .select("org_id")
+          .eq("id", connData.client_id)
+          .single();
+        if (clientRow?.org_id) {
+          const { data: sub } = await supabase
+            .from("org_subscriptions")
+            .select("plan_id, subscription_plans!inner(slug)")
+            .eq("org_id", clientRow.org_id)
+            .eq("status", "active")
+            .limit(1)
+            .maybeSingle();
+          const planSlug = (sub?.subscription_plans as unknown as { slug: string })?.slug;
+          if (planSlug === "agency") syncMonths = 24;
+
+          // Insert sync job into the server-side queue
+          await supabase.from("sync_jobs").insert({
+            connection_id: connectionId,
+            client_id: connData.client_id,
+            org_id: clientRow.org_id,
+            platform: platform,
+            months: syncMonths,
+            priority: 1,
+          });
+
+          // Fire-and-forget: trigger the queue processor
+          supabase.functions.invoke("process-sync-queue").catch((err: unknown) => {
+            console.warn("Failed to trigger process-sync-queue:", err);
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to auto-enqueue sync job:", e);
+      }
+
       return Response.redirect(
         `${frontendUrl}${clientPath}?oauth_connected=${connectionId}`,
         302
