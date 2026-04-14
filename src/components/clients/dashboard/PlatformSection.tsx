@@ -729,7 +729,7 @@ const PlatformSection = ({
         )}
 
         {/* Meta Ads Campaign Breakdown */}
-        {platform === 'meta_ads' && rawData && (rawData.campaigns as any[])?.length > 0 && (
+        {platform === 'meta_ads' && rawData && (rawData.campaigns as RawDataItem[])?.length > 0 && (
           <AdCampaignBreakdown
             rawData={rawData as any}
             currSymbol={currSymbol}
@@ -737,14 +737,14 @@ const PlatformSection = ({
         )}
 
         {/* Google Ads Campaign Breakdown */}
-        {platform === 'google_ads' && rawData && (rawData.campaigns as any[])?.length > 0 && (
+        {platform === 'google_ads' && rawData && (rawData.campaigns as RawDataItem[])?.length > 0 && (
           <AdCampaignBreakdown
             rawData={{
-              campaigns: (rawData.campaigns as any[])?.map((c: any) => ({
+              campaigns: (rawData.campaigns as RawDataItem[])?.map((c: any) => ({
                 ...c, spend: c.spend ?? c.cost, cpc: c.cpc ?? c.avg_cpc,
               })),
-              adSets: (rawData.adGroups as any[]) || [],
-              ads: (rawData.ads as any[]) || [],
+              adSets: (rawData.adGroups as RawDataItem[]) || [],
+              ads: (rawData.ads as RawDataItem[]) || [],
             }}
             currSymbol={currSymbol}
             adGroupLabel="Ad Groups"
@@ -752,15 +752,15 @@ const PlatformSection = ({
         )}
 
         {/* LinkedIn Ads Campaign Breakdown */}
-        {platform === 'linkedin_ads' && rawData && ((rawData.campaignGroups as any[])?.length > 0 || (rawData.campaigns as any[])?.length > 0) && (
+        {platform === 'linkedin_ads' && rawData && ((rawData.campaignGroups as RawDataItem[])?.length > 0 || (rawData.campaigns as RawDataItem[])?.length > 0) && (
           <AdCampaignBreakdown
             rawData={{
-              campaigns: (rawData.campaignGroups as any[]) || [],
-              adSets: (rawData.campaigns as any[])?.map((c: any) => ({
+              campaigns: (rawData.campaignGroups as RawDataItem[]) || [],
+              adSets: (rawData.campaigns as RawDataItem[])?.map((c: any) => ({
                 ...c,
                 campaign_id: c.campaignGroupId || '',
               })) || [],
-              ads: (rawData.ads as any[])?.map((a: any) => ({
+              ads: (rawData.ads as RawDataItem[])?.map((a: any) => ({
                 ...a,
                 adset_id: a.campaignId || '',
                 adset_name: a.campaign_name || '',
@@ -774,19 +774,19 @@ const PlatformSection = ({
         {/* GA4 Extended Widgets */}
         {platform === 'google_analytics' && rawData && (
           <>
-            {((rawData.geoCountries as any[])?.length > 0 || (rawData.geoCities as any[])?.length > 0) && (
+            {((rawData.geoCountries as RawDataItem[])?.length > 0 || (rawData.geoCities as RawDataItem[])?.length > 0) && (
               <GeoHeatmap
-                countries={(rawData.geoCountries as any[]) || []}
-                cities={(rawData.geoCities as any[]) || []}
+                countries={(rawData.geoCountries as RawDataItem[]) || []}
+                cities={(rawData.geoCities as RawDataItem[]) || []}
               />
             )}
-            {((rawData.devices as any[])?.length > 0 || (rawData.newVsReturning as any[])?.length > 0) && (
+            {((rawData.devices as RawDataItem[])?.length > 0 || (rawData.newVsReturning as RawDataItem[])?.length > 0) && (
               <DeviceBreakdown
-                devices={(rawData.devices as any[]) || []}
-                newVsReturning={(rawData.newVsReturning as any[]) || []}
+                devices={(rawData.devices as RawDataItem[]) || []}
+                newVsReturning={(rawData.newVsReturning as RawDataItem[]) || []}
               />
             )}
-            {(rawData.landingPages as any[])?.length > 0 && (
+            {(rawData.landingPages as RawDataItem[])?.length > 0 && (
               <Card>
                 <CardContent className="p-5 space-y-3">
                   <h4 className="text-sm font-semibold font-body">Top Landing Pages</h4>
@@ -800,7 +800,7 @@ const PlatformSection = ({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {(rawData.landingPages as any[]).slice(0, 15).map((lp: any, i: number) => (
+                        {(rawData.landingPages as RawDataItem[]).slice(0, 15).map((lp: any, i: number) => (
                           <TableRow key={i}>
                             <TableCell className="text-sm font-body max-w-[300px] truncate">{lp.page}</TableCell>
                             <TableCell className="text-right text-sm tabular-nums">{(lp.sessions ?? 0).toLocaleString()}</TableCell>
@@ -819,9 +819,9 @@ const PlatformSection = ({
         {/* GSC Extended Widgets — Countries & Devices */}
         {platform === 'google_search_console' && rawData && (
           <>
-            {(rawData.topCountries as any[])?.length > 0 && (
+            {(rawData.topCountries as RawDataItem[])?.length > 0 && (
               <GeoHeatmap
-                countries={((rawData.topCountries as any[]) || []).map((c: any) => ({
+                countries={((rawData.topCountries as RawDataItem[]) || []).map((c: any) => ({
                   country: c.country || c.keys?.[0] || 'Unknown',
                   countryId: c.countryId || c.keys?.[0] || '',
                   users: c.clicks ?? 0,
@@ -830,9 +830,9 @@ const PlatformSection = ({
                 cities={[]}
               />
             )}
-            {(rawData.topDevices as any[])?.length > 0 && (
+            {(rawData.topDevices as RawDataItem[])?.length > 0 && (
               <DeviceBreakdown
-                devices={((rawData.topDevices as any[]) || []).map((d: any) => ({
+                devices={((rawData.topDevices as RawDataItem[]) || []).map((d: any) => ({
                   device: d.device || d.keys?.[0] || 'Unknown',
                   users: d.clicks ?? 0,
                   sessions: d.impressions ?? 0,
