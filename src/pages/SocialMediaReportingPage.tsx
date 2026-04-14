@@ -16,6 +16,7 @@ const PLATFORMS = [
   { name: 'TikTok Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Reach', 'Video Views'] },
   { name: 'YouTube', metrics: ['Subscribers', 'Views', 'Watch Time', 'Avg. View Duration', 'Videos Published', 'Top Videos'] },
   { name: 'Pinterest', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'] },
+  { name: 'Threads', metrics: ['Followers', 'Views', 'Likes', 'Replies', 'Reposts', 'Quotes', 'Clicks', 'Engagement Rate'] },
 ];
 
 const METRICS_GRID = ['Followers & Growth', 'Engagement Rate', 'Reach & Impressions', 'Video Views & Watch Time', 'Top-Performing Posts', 'Audience Demographics', 'Comments & Shares', 'Profile Visits', 'Content Type Breakdown', 'Month-over-Month Trends'];
@@ -53,7 +54,7 @@ const SocialMediaReportingPage = () => {
             Social Media Reporting Tool for <span className="text-gradient-purple">Agencies & Freelancers</span>
           </h1>
           <p className="text-lg text-amw-offwhite/60 font-body max-w-2xl mx-auto mb-6">
-            Consolidate Facebook, Instagram, LinkedIn, TikTok, YouTube, and Pinterest data into one clean, client-ready report — automatically. Free plan available.
+            Consolidate Facebook, Instagram, LinkedIn, TikTok, YouTube, Pinterest, and Threads data into one clean, client-ready report — automatically. Free plan available.
           </p>
           <Button size="lg" asChild className="mb-12">
             <Link to="/login?view=signup">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>

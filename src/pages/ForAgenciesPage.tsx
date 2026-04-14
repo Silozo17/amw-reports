@@ -26,7 +26,7 @@ const KEY_FEATURES = [
   { icon: Globe, title: 'Custom Domain', desc: 'Serve the client portal from your own domain for a premium, fully branded experience.' },
 ];
 
-const PLATFORMS = ['Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile'];
+const PLATFORMS = ['Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile', 'Threads'];
 
 const ForAgenciesPage = () => {
   usePageMeta({

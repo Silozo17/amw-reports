@@ -12,7 +12,7 @@ const FEATURES = [
   { icon: Mail, title: 'Automatic Email Delivery', desc: 'Receive your monthly marketing report by email automatically. No need to log in or remember to check.' },
 ];
 
-const PLATFORMS = ['Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile'];
+const PLATFORMS = ['Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile', 'Threads'];
 
 const ForSmbsPage = () => {
   usePageMeta({

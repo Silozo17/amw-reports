@@ -13,7 +13,7 @@ const METRICS = [
   { icon: FileText, title: 'Sponsor-Ready Reports', desc: 'Generate branded PDF reports with your stats that you can share directly with sponsors and brand partners.' },
 ];
 
-const PLATFORMS = ['YouTube', 'Instagram', 'TikTok', 'TikTok Ads', 'LinkedIn', 'Facebook', 'Pinterest'];
+const PLATFORMS = ['YouTube', 'Instagram', 'TikTok', 'TikTok Ads', 'LinkedIn', 'Facebook', 'Pinterest', 'Threads'];
 
 const ForCreatorsPage = () => {
   usePageMeta({
