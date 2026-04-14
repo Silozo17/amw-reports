@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
@@ -16,8 +16,8 @@ import AccountPickerDialog from '@/components/clients/AccountPickerDialog';
 import ClientDashboard from '@/components/clients/ClientDashboard';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
-import { triggerInitialSync, type SyncProgress } from '@/lib/triggerSync';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { SyncQueue, type QueueState } from '@/lib/syncQueue';
 import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
 import UpsellTab from '@/components/clients/UpsellTab';
@@ -45,8 +45,13 @@ const ClientDetail = () => {
   const [clientUsers, setClientUsers] = useState<{ id: string; invited_email: string; user_id: string; created_at: string }[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
-  const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncProgress>>(new Map());
+  const [queueState, setQueueState] = useState<QueueState>({ currentJob: null, queuedJobs: [], currentProgress: null });
   const [syncStartTime, setSyncStartTime] = useState(0);
+  const [syncQueue] = useState(() => new SyncQueue(
+    (state) => setQueueState({ ...state }),
+    () => fetchDataRef.current?.(),
+  ));
+  const fetchDataRef = useRef<(() => void) | null>(null);
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -98,16 +103,10 @@ const ClientDetail = () => {
             toast.success(`${label} connected successfully${conn.account_name ? ` — ${conn.account_name}` : ''}`);
             await fetchData();
 
-            // Auto-trigger 12-month sync for platforms that auto-select (e.g. TikTok organic)
             if (conn.account_id && conn.is_connected) {
               const months = await getSyncMonths();
-              setSyncStartTime(Date.now());
-              setActiveSyncs(new Map([[conn.platform, { platform: conn.platform, completed: 0, total: months, currentMonth: 0, currentYear: 0 }]]));
-              triggerInitialSync(conn.id, conn.platform, months, (progress) => {
-                setActiveSyncs(prev => new Map(prev).set(conn.platform, progress));
-              }).then(() => {
-                fetchData();
-              });
+              if (!syncStartTime) setSyncStartTime(Date.now());
+              syncQueue.enqueue({ connectionId: conn.id, platform: conn.platform, months });
             }
           } else {
             toast.success('Platform connected successfully');
@@ -179,6 +178,7 @@ const ClientDetail = () => {
     setIsLoading(false);
   }, [id]);
 
+  fetchDataRef.current = fetchData;
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleInviteClient = async () => {
@@ -286,16 +286,9 @@ const ClientDetail = () => {
     if (!conn || !conn.account_id || !conn.is_connected) return;
 
     const typedConn = conn as PlatformConnection;
-    setSyncStartTime(Date.now());
+    if (!syncStartTime) setSyncStartTime(Date.now());
     const months = await getSyncMonths();
-    triggerInitialSync(typedConn.id, typedConn.platform, months, (progress) => {
-      setActiveSyncs(prev => { const next = new Map(prev); next.set(typedConn.platform, progress); return next; });
-    }).then(results => {
-      const failures = results.filter(r => !r.success);
-      if (failures.length > 0) console.error(`Sync errors for ${typedConn.platform}:`, failures);
-      setActiveSyncs(prev => { const next = new Map(prev); next.delete(typedConn.platform); return next; });
-      fetchData();
-    });
+    syncQueue.enqueue({ connectionId: typedConn.id, platform: typedConn.platform, months });
     toast.success('Historical data sync started — progress shown below');
   };
 
@@ -403,7 +396,7 @@ const ClientDetail = () => {
           </div>
         </div>
 
-        {activeSyncs.size > 0 && <SyncProgressBar activeSyncs={activeSyncs} startTime={syncStartTime} />}
+        {queueState.currentJob && <SyncProgressBar queueState={queueState} startTime={syncStartTime} />}
 
         <Tabs defaultValue="dashboard">
           <div className="relative">

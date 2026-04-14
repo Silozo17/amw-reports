@@ -1,46 +1,31 @@
 import { Progress } from '@/components/ui/progress';
 import { PLATFORM_LABELS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
-import type { SyncProgress } from '@/lib/triggerSync';
-import { Loader2 } from 'lucide-react';
+import type { QueueState } from '@/lib/syncQueue';
+import { Loader2, Clock } from 'lucide-react';
 
 const MONTH_NAMES = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 interface SyncProgressBarProps {
-  activeSyncs: Map<string, SyncProgress>;
+  queueState: QueueState;
   startTime: number;
 }
 
-const SyncProgressBar = ({ activeSyncs, startTime }: SyncProgressBarProps) => {
-  if (activeSyncs.size === 0) return null;
+const SyncProgressBar = ({ queueState, startTime }: SyncProgressBarProps) => {
+  const { currentJob, currentProgress, queuedJobs } = queueState;
 
-  // Aggregate progress across all platforms
-  let totalCompleted = 0;
-  let totalItems = 0;
-  let currentPlatform = '';
-  let currentMonth = 0;
-  let currentYear = 0;
+  if (!currentJob) return null;
 
-  activeSyncs.forEach((progress) => {
-    totalCompleted += progress.completed;
-    totalItems += progress.total;
-    // Show the platform currently being synced (not yet fully complete)
-    if (progress.completed < progress.total) {
-      currentPlatform = progress.platform;
-      currentMonth = progress.currentMonth;
-      currentYear = progress.currentYear;
-    }
-  });
+  const completed = currentProgress?.completed ?? 0;
+  const total = currentProgress?.total ?? 1;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const percentage = totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0;
-
-  // Estimate time remaining
   const elapsed = (Date.now() - startTime) / 1000;
-  const perItem = totalCompleted > 0 ? elapsed / totalCompleted : 0;
-  const remaining = perItem * (totalItems - totalCompleted);
+  const perItem = completed > 0 ? elapsed / completed : 0;
+  const remaining = perItem * (total - completed);
   const mins = Math.floor(remaining / 60);
   const secs = Math.floor(remaining % 60);
-  const timeLeft = totalCompleted > 0
+  const timeLeft = completed > 0
     ? remaining < 60
       ? `~${secs} sec`
       : mins < 60
@@ -48,8 +33,12 @@ const SyncProgressBar = ({ activeSyncs, startTime }: SyncProgressBarProps) => {
         : `~${Math.floor(mins / 60)} hr ${mins % 60} min`
     : 'Estimating...';
 
-  const platformLabel = currentPlatform ? (PLATFORM_LABELS[currentPlatform as PlatformType] || currentPlatform) : '';
-  const monthLabel = currentMonth ? `${MONTH_NAMES[currentMonth]} ${currentYear}` : '';
+  const platformLabel = currentProgress?.platform
+    ? (PLATFORM_LABELS[currentProgress.platform as PlatformType] || currentProgress.platform)
+    : '';
+  const monthLabel = currentProgress?.currentMonth
+    ? `${MONTH_NAMES[currentProgress.currentMonth]} ${currentProgress.currentYear}`
+    : '';
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3">
@@ -66,8 +55,20 @@ const SyncProgressBar = ({ activeSyncs, startTime }: SyncProgressBarProps) => {
         </div>
       </div>
       <p className="text-xs text-muted-foreground text-center">
-        {totalCompleted} of {totalItems} months synced across {activeSyncs.size} platform{activeSyncs.size > 1 ? 's' : ''}
+        {completed} of {total} months synced
       </p>
+
+      {queuedJobs.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {queuedJobs.map((job) => (
+            <div key={job.platform} className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-2.5 py-1">
+              <Clock className="h-3 w-3" />
+              <span>{PLATFORM_LABELS[job.platform] || job.platform}</span>
+              <span className="text-muted-foreground/60">— Queued</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

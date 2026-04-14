@@ -10,6 +10,7 @@ import AdminSyncDialog from '@/components/admin/AdminSyncDialog';
 import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import type { Tables } from '@/integrations/supabase/types';
 import type { SyncProgress } from '@/lib/triggerSync';
+import type { QueueState } from '@/lib/syncQueue';
 
 interface AdminOrgClientsProps {
   orgId: string;
@@ -43,9 +44,16 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
 
   return (
     <>
-      {activeSyncs.size > 0 && (
-        <SyncProgressBar activeSyncs={activeSyncs} startTime={syncStartTime} />
-      )}
+      {activeSyncs.size > 0 && (() => {
+        const entries = [...activeSyncs.entries()];
+        const active = entries.find(([, p]) => p.completed < p.total) ?? entries[0];
+        const qs: QueueState = {
+          currentJob: active ? { connectionId: '', platform: active[0] as any, months: active[1].total } : null,
+          queuedJobs: [],
+          currentProgress: active ? active[1] : null,
+        };
+        return <SyncProgressBar queueState={qs} startTime={syncStartTime} />;
+      })()}
 
       <Card>
         <CardHeader><CardTitle className="font-display text-lg">Clients</CardTitle></CardHeader>
