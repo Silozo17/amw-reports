@@ -91,22 +91,44 @@ const Dashboard = () => {
       // Guard: if no clients, use impossible ID to avoid empty .in() error
       const safeClientIds = orgClientIds.length > 0 ? orgClientIds : ['00000000-0000-0000-0000-000000000000'];
 
-      const [clientsRes, reportsRes, syncsRes, emailsRes, connectionsRes, recentSyncsRes, recentReportsRes, recentEmailsRes, pendingDeletionRes] = await Promise.all([
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+
+      const [clientsRes, reportsRes, syncsRes, emailsRes, connectionsRes, recentSyncsRes, recentReportsRes, recentEmailsRes, pendingDeletionRes, successSyncsRes] = await Promise.all([
         supabase.from('clients').select('id, company_name, logo_url, is_active').eq('is_active', true).eq('org_id', orgId).order('company_name'),
         supabase.from('reports').select('id, status', { count: 'exact' }).eq('org_id', orgId),
-        supabase.from('sync_logs').select('id, client_id, status', { count: 'exact' }).eq('status', 'failed').eq('org_id', orgId),
+        supabase.from('sync_logs').select('id, client_id, platform, started_at, status').eq('status', 'failed').eq('org_id', orgId).gte('started_at', sevenDaysAgo),
         supabase.from('email_logs').select('id', { count: 'exact' }).eq('status', 'failed').eq('org_id', orgId),
         supabase.from('platform_connections').select('id, client_id, is_connected, last_sync_at, platform').in('client_id', safeClientIds),
         supabase.from('sync_logs').select('id, client_id, platform, status, started_at').eq('org_id', orgId).order('started_at', { ascending: false }).limit(5),
         supabase.from('reports').select('id, client_id, status, created_at').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
         supabase.from('email_logs').select('id, client_id, status, created_at, recipient_email').eq('org_id', orgId).order('created_at', { ascending: false }).limit(5),
         supabase.from('clients').select('id, company_name, scheduled_deletion_at').not('scheduled_deletion_at', 'is', null).eq('org_id', orgId),
+        supabase.from('sync_logs').select('client_id, platform, started_at').eq('status', 'success').eq('org_id', orgId).gte('started_at', sevenDaysAgo),
       ]);
+
+      // Build a set of client+platform combos that have a newer success, to exclude superseded failures
+      const successLogs = (successSyncsRes.data ?? []) as Array<{ client_id: string; platform: string; started_at: string }>;
+      const rawFailedLogs = (syncsRes.data ?? []) as Array<{ id: string; client_id: string; platform: string; started_at: string; status: string }>;
+
+      // For each success, track the latest success time per client+platform
+      const latestSuccess = new Map<string, string>();
+      for (const s of successLogs) {
+        const key = `${s.client_id}:${s.platform}`;
+        const prev = latestSuccess.get(key);
+        if (!prev || s.started_at > prev) latestSuccess.set(key, s.started_at);
+      }
+
+      // Filter out failures that have been superseded by a newer success
+      const failedLogs = rawFailedLogs.filter(f => {
+        const key = `${f.client_id}:${f.platform}`;
+        const successTime = latestSuccess.get(key);
+        return !successTime || f.started_at > successTime;
+      });
 
       setStats({
         activeClients: clientsRes.data?.length ?? 0,
         totalReports: reportsRes.count ?? 0,
-        failedSyncs: syncsRes.count ?? 0,
+        failedSyncs: failedLogs.length,
         failedEmails: emailsRes.count ?? 0,
         disconnected: (connectionsRes.data ?? []).filter(c => !c.is_connected).length,
       });
@@ -114,7 +136,6 @@ const Dashboard = () => {
       // Build client health data — reuse clientsRes and connectionsRes
       const clients = (clientsRes.data ?? []) as Array<{ id: string; company_name: string; logo_url: string | null; is_active: boolean }>;
       const allConns = (connectionsRes.data ?? []) as Array<{ client_id: string; is_connected: boolean; last_sync_at: string | null; platform: string }>;
-      const failedLogs = (syncsRes.data ?? []) as Array<{ client_id: string; status: string }>;
 
       const clientMap = new Map(clients.map(c => [c.id, c.company_name]));
 
