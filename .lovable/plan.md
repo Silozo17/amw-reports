@@ -1,63 +1,33 @@
 
 
-## Three Fixes: Hero KPIs, Missing Platform on Website, AI Platform Coverage
+## Reorder Hero KPIs with Fixed Priority List
 
-### Issue 1: Hero KPIs Missing Platform-Specific Metrics
+### Changes
 
-**Problem**: GBP metrics (phone calls, avg rating, direction requests), ad platform leads, and other unique metrics never appear as Hero KPI cards. The `computeKpis` function in `dashboardCalcs.ts` has a fixed list of ~15 aggregate KPIs but omits platform-specific ones.
+**File: `src/lib/dashboardCalcs.ts`**
 
-**Fix** — Add new Hero KPI entries in `src/lib/dashboardCalcs.ts`:
-- **Phone Calls** (`gbp_calls`) — sum across GBP snapshots
-- **Direction Requests** (`gbp_direction_requests`) — sum across GBP snapshots
-- **Avg. Rating** (`gbp_average_rating`) — latest value (not sum), flagged as `isDecimal`
-- **Leads** (`leads`) — sum across ad platforms (Meta Ads, Google Ads)
+1. **Fix Clicks calculation** — Remove `website_clicks`, `gbp_website_clicks`, and `link_clicks` from the `totalClicks` / `prevClicks` / `clicksPlatforms` aggregation. Clicks should only include `clicks`, `search_clicks`, and `post_clicks`.
 
-Also add corresponding sparkline entries in `computeSparklines` for the new metrics. Import additional icons (e.g. `Phone`, `MapPin`, `Star`) from lucide-react.
+2. **Bring back Website Clicks** — Already computed as `totalWebsiteClicks`. Just needs to be in the return array.
 
-Add accent colors for the new metrics in `HeroKPIs.tsx` ACCENT_COLORS map.
+3. **Reorder the return array** to match the requested priority:
 
-**Files**: `src/lib/dashboardCalcs.ts`, `src/components/clients/dashboard/HeroKPIs.tsx`
+| # | KPI | Notes |
+|---|---|---|
+| 1 | Total Spend | No change |
+| 2 | Video Views | No change |
+| 3 | Reach | No change |
+| 4 | Clicks | Exclude website clicks and link clicks |
+| 5 | Engagement | No change |
+| 6 | Followers | No change |
+| 7 | Posts Published | Move up |
+| 8 | Avg. Rating | Move up |
+| 9 | Leads | Move up |
+| 10 | Page Views | Move up |
+| 11 | Phone Calls | Move up |
+| 12 | Website Clicks | Bring back |
 
----
+4. **Demote to overflow** (position 13+, only shown if any above are empty): Sessions, Search Impressions, Conversions, Direction Requests. Remove Search CTR and Avg Position entirely (covered by Search Performance trend section).
 
-### Issue 2: IntegrationsPage Shows 12 Platforms, Missing LinkedIn Ads
-
-**Problem**: The `PLATFORMS` array in `IntegrationsPage.tsx` has 12 entries. LinkedIn Ads is missing.
-
-**Fix** — Add LinkedIn Ads entry:
-```
-{ name: 'LinkedIn Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conversion Rate', 'Cost/Conv.', 'Engagement'], link: '/ppc-reporting' }
-```
-
-**File**: `src/pages/IntegrationsPage.tsx`
-
----
-
-### Issue 3: AI Functions Missing LinkedIn Ads from Platform Categories
-
-**Problem**: The `analyze-client` edge function defines its own `PLATFORM_CATEGORIES` that excludes `linkedin_ads` from the "Paid Advertising" category. This means LinkedIn Ads data is never included in the AI analysis prompt.
-
-The `chat-with-data` and `voice-briefing` functions pass all snapshots without filtering by platform category — so they already include all 13 platforms. No change needed there.
-
-**Fix** — In `supabase/functions/analyze-client/index.ts`, add `"linkedin_ads"` to the `"Paid Advertising"` array:
-```typescript
-"Paid Advertising": ["google_ads", "meta_ads", "tiktok_ads", "linkedin_ads"],
-```
-
-**File**: `supabase/functions/analyze-client/index.ts`
-
----
-
-### Summary of Changes
-
-| File | Change |
-|---|---|
-| `src/lib/dashboardCalcs.ts` | Add GBP calls, direction requests, avg rating, leads to Hero KPIs + sparklines |
-| `src/components/clients/dashboard/HeroKPIs.tsx` | Add accent colors for new metric keys |
-| `src/pages/IntegrationsPage.tsx` | Add LinkedIn Ads platform entry |
-| `supabase/functions/analyze-client/index.ts` | Add `linkedin_ads` to PLATFORM_CATEGORIES |
-
-### Risk
-- Hero KPIs are capped at 8 cards (`kpis.slice(0, 8)`). With more KPIs added, some may not display. The existing ordering prioritizes spend/reach/clicks first, so new GBP/leads cards will appear when those primary metrics have no data, or when a specific platform filter is active.
-- No database migration needed.
+5. **Add sparklines** for `website_clicks` and `page_views` (currently missing from sparkline computation). Remove `search_clicks` sparkline key (no longer a separate KPI).
 
