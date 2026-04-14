@@ -1,43 +1,105 @@
 
 
-## Plan: Harden check-subscription with rate limiting and org-ownership scoping
+## Fix: Reports Bucket Storage Policy
 
 ### Problem
+The current SELECT policy on `storage.objects` for the `reports` bucket only checks `bucket_id = 'reports'`, meaning any authenticated user can read any organisation's report files and voice briefings.
 
-The `check-subscription` function is callable by any authenticated user. While it reads from Stripe (source of truth) and writes to `org_subscriptions` using a service-role client, there are two risks:
+The same issue exists for UPDATE and INSERT policies.
 
-1. **No rate limiting** — a user could spam the endpoint, hammering the Stripe API and causing unnecessary DB writes.
-2. **Org ownership not verified** — the function writes to whatever `org_id` is on the caller's profile. While this is their own org, the function should explicitly verify the caller is a member of that org before writing.
+### Solution
+Replace all three overly-permissive policies with scoped versions that verify the user has access to the client whose files they're accessing.
 
-### Changes
+**Storage path structure**: `{client_id}/...` and `voice-briefings/{client_id}/...`
 
-**File: `supabase/functions/check-subscription/index.ts`**
+The fix extracts the `client_id` from the file path and checks that the user either:
+- Belongs to the org that owns the client (`user_belongs_to_org`)
+- Is a client-portal user for that client (`is_client_user`)
+- Is a platform admin (`is_platform_admin`)
 
-1. **Add in-memory rate limiter** — Track calls per user ID with a sliding window (max 5 calls per 60 seconds). Return 429 if exceeded. Same pattern used in other edge functions.
+### Migration SQL
 
-2. **Add org membership check** — After resolving `profile.org_id`, verify the caller belongs to that org via an `org_members` lookup before allowing any writes to `org_subscriptions`.
+```sql
+-- Drop overly-permissive policies
+DROP POLICY IF EXISTS "Authenticated users can read reports" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload reports" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can update reports" ON storage.objects;
 
-3. **Make DB writes idempotent** — Before writing, compare current DB state with what Stripe returned. Skip the update if status and period_end already match, reducing unnecessary writes from repeated calls.
+-- SELECT: org members, client users, or platform admins
+CREATE POLICY "Scoped read access to reports"
+ON storage.objects FOR SELECT TO authenticated
+USING (
+  bucket_id = 'reports'
+  AND (
+    is_platform_admin(auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM clients c
+      WHERE c.id = (
+        CASE
+          WHEN storage.objects.name LIKE 'voice-briefings/%'
+            THEN split_part(storage.objects.name, '/', 2)::uuid
+          ELSE split_part(storage.objects.name, '/', 1)::uuid
+        END
+      )
+      AND (
+        user_belongs_to_org(auth.uid(), c.org_id)
+        OR is_client_user(auth.uid(), c.id)
+      )
+    )
+  )
+);
 
-### Technical detail
+-- INSERT: org members or platform admins only (not client users)
+CREATE POLICY "Scoped upload access to reports"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'reports'
+  AND (
+    is_platform_admin(auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM clients c
+      WHERE c.id = (
+        CASE
+          WHEN name LIKE 'voice-briefings/%'
+            THEN split_part(name, '/', 2)::uuid
+          ELSE split_part(name, '/', 1)::uuid
+        END
+      )
+      AND user_belongs_to_org(auth.uid(), c.org_id)
+    )
+  )
+);
 
-```text
-Request flow (after change):
-
-  Auth check (existing)
-    ↓
-  Rate limit check (NEW — 5 req/60s per user_id)
-    ↓ pass          ↓ fail
-  Stripe lookup     429 Too Many Requests
-    ↓
-  Org membership verify (NEW)
-    ↓ pass          ↓ fail
-  Compare DB state  403 Forbidden
-    ↓ changed       ↓ same
-  Write to DB       Skip write, return cached
-    ↓
-  Return response
+-- UPDATE: org members or platform admins only
+CREATE POLICY "Scoped update access to reports"
+ON storage.objects FOR UPDATE TO authenticated
+USING (
+  bucket_id = 'reports'
+  AND (
+    is_platform_admin(auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM clients c
+      WHERE c.id = (
+        CASE
+          WHEN storage.objects.name LIKE 'voice-briefings/%'
+            THEN split_part(storage.objects.name, '/', 2)::uuid
+          ELSE split_part(storage.objects.name, '/', 1)::uuid
+        END
+      )
+      AND user_belongs_to_org(auth.uid(), c.org_id)
+    )
+  )
+);
 ```
 
-### No other files change.
+### What This Changes
+- **SELECT**: Only org members, client-portal users, and platform admins can read files belonging to their clients
+- **INSERT**: Only org members and platform admins can upload
+- **UPDATE**: Only org members and platform admins can update
+- No code changes needed — the storage paths and Supabase client calls remain identical
+
+### Risk Assessment
+- Edge functions use the service role key to upload, so they bypass RLS entirely — no breakage
+- Client-portal users who download reports via signed URLs (generated server-side) are unaffected
+- Client-portal users who access reports via the Supabase client directly now need `is_client_user` — which is included in the SELECT policy
 
