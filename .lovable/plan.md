@@ -1,38 +1,19 @@
 
 
-## Fix Hero KPIs Visual Clarity + Upgrade Health Score Card
+## Make All KPI Cards Uniform Size
 
 ### Problem
-The Hero KPI cards blend into the page background — the glassmorphism effect makes them look washed out and indistinguishable. The metric-specific visuals are too small and faint. The Health Score card is a plain white card with a basic SVG gauge.
+The Hero KPIs use two tiers — "featured" (top 4, taller with larger text) and "standard" (remaining 8, shorter with smaller text). You want them all the same size.
 
 ### Changes
 
 **File: `src/components/clients/dashboard/HeroKPIs.tsx`**
 
-1. **Increase card contrast** — Replace the transparent glassmorphism with a solid white card background (`bg-card`) with a stronger left accent bar (w-1.5 instead of w-1). Add a subtle top gradient band in the accent color at ~5% opacity to give each card its own color identity without the washed-out glass look.
+1. **Remove the featured/standard split** — render all KPIs in a single uniform grid (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4`).
 
-2. **Make metric visuals larger and bolder** — Increase size from 40/56px to 52/72px. Increase opacity from 0.5-0.6 to 0.7-0.85. Position them more prominently in the bottom-right corner.
+2. **Pass `featured={false}` to all cards** (or remove the prop entirely) so every card uses the same sizing: same `min-h`, same text size (`text-xl sm:text-2xl`), same icon size, same tilt intensity, same metric visual size.
 
-3. **Stronger change badges** — Use solid background colors for the MoM change pills instead of transparent tints. Green pill for positive, red for negative, with white text.
+3. **Remove `FEATURED_COUNT` constant** and the `slice` logic that splits KPIs into two arrays.
 
-4. **Remove the glassmorphism class** — Drop `kpi-card-glass` in favor of `bg-card` with a proper `shadow-sm` and `border border-border`. Cards should look like distinct, elevated objects — not transparent overlays.
-
-5. **Keep 3D tilt + holographic overlay** — These are interactive effects that work well. Just ensure the card itself has enough contrast for the overlay to be visible.
-
-**File: `src/components/clients/dashboard/HealthScore.tsx`**
-
-1. **Premium card treatment** — Add a gradient background header strip with the score color. Use a larger gauge (w-40 h-40) with a thicker stroke and animated glow ring behind it.
-
-2. **3D tilt effect** — Apply the same `useTilt` hook to make the Health Score card interactive on hover.
-
-3. **Sub-score cards upgrade** — Replace the flat `bg-muted/30` boxes with mini progress bars showing the score as a horizontal fill. Add the accent color as a left border.
-
-4. **Score label badge** — Display the label ("Excellent", "Good", etc.) as a colored pill badge below the gauge instead of tiny text inside it.
-
-**File: `src/index.css`**
-
-1. Remove `.kpi-card-glass` class (no longer needed).
-
-### Layout stays the same
-Featured 4 + Standard 8 grid is unchanged. Only the visual treatment of each card changes.
+4. **Keep sparklines on all cards** — currently only featured cards show the background sparkline. Either enable it for all or disable for all (recommend disable for cleaner uniform look).
 
