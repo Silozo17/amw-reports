@@ -25,7 +25,7 @@ export function computeKpis(
 ): KpiItem[] {
   const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
   const totalReach = filtered.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
-  const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0) + (m.website_clicks || 0) + (m.link_clicks || 0); }, 0);
+  const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.post_clicks || 0); }, 0);
   const totalEngagement = filtered.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
   const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
   const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
@@ -44,7 +44,7 @@ export function computeKpis(
 
   const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
   const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
-  const prevClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0) + (m.website_clicks || 0) + (m.link_clicks || 0); }, 0);
+  const prevClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.post_clicks || 0); }, 0);
   const prevEngagement = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
   const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
   const prevVideoViews = filteredPrev.reduce((sum, s) => { if (s.platform === 'meta_ads') return sum; if (s.platform === 'facebook') return sum + (s.metrics_data.views || 0); return sum + (s.metrics_data.video_views || 0); }, 0);
@@ -61,7 +61,7 @@ export function computeKpis(
 
   const spendPlatforms = platformsFor(m => m.spend || 0);
   const reachPlatforms = [...new Set(filtered.filter(s => { const m = s.metrics_data; if (s.platform === 'facebook') return (m.views || 0) > 0; return (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0) > 0; }).map(s => s.platform))];
-  const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0) + (m.website_clicks || 0) + (m.link_clicks || 0));
+  const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.post_clicks || 0));
   const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0));
   const followerPlatforms = platformsFor(m => m.total_followers || 0);
   const sessionsPlatforms = platformsFor(m => m.sessions || 0);
@@ -92,27 +92,31 @@ export function computeKpis(
   const searchCtrPlatforms = platformsFor(m => m.search_ctr !== undefined ? 1 : 0);
   const searchPositionPlatforms = platformsFor(m => m.search_position > 0 ? 1 : 0);
 
-  return [
+  // Priority 1-12: fixed order, shown first
+  const priority: KpiItem[] = [
     ...((selectedPlatform === 'all' || filterIncludesPlatform(selectedPlatform, 'meta_ads') || filterIncludesPlatform(selectedPlatform, 'google_ads')) && totalSpend > 0 ? [{ label: "Total Spend", value: totalSpend, change: cc(totalSpend, prevSpend), icon: Banknote, isCost: true, metricKey: "spend", platforms: spendPlatforms }] : []),
     ...(totalVideoViews > 0 ? [{ label: "Video Views", value: totalVideoViews, change: cc(totalVideoViews, prevVideoViews), icon: Eye, metricKey: "video_views", platforms: videoViewsPlatforms }] : []),
     ...(totalReach > 0 ? [{ label: "Reach", value: totalReach, change: cc(totalReach, prevReach), icon: Eye, metricKey: "reach", platforms: reachPlatforms }] : []),
     ...(totalClicks > 0 ? [{ label: "Clicks", value: totalClicks, change: cc(totalClicks, prevClicks), icon: MousePointerClick, metricKey: "clicks", platforms: clicksPlatforms }] : []),
     ...(totalEngagement > 0 ? [{ label: "Engagement", value: totalEngagement, change: cc(totalEngagement, prevEngagement), icon: MessageCircle, metricKey: "engagement", platforms: engagementPlatforms }] : []),
     ...(totalFollowers > 0 ? [{ label: "Followers", value: totalFollowers, change: undefined as number | undefined, icon: Users, metricKey: "total_followers", platforms: followerPlatforms }] : []),
-    ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions", platforms: sessionsPlatforms }] : []),
-    ...(totalSearchImpressions > 0 ? [{ label: "Search Impressions", value: totalSearchImpressions, change: cc(totalSearchImpressions, prevSearchImpressions), icon: Search, metricKey: "search_impressions", platforms: searchImpressionsPlatforms }] : []),
-    
-    ...(totalSearchCtr > 0 ? [{ label: "Search CTR", value: totalSearchCtr, change: cc(totalSearchCtr, prevSearchCtr), icon: Crosshair, metricKey: "search_ctr", platforms: searchCtrPlatforms, isPercentage: true }] : []),
-    ...(avgSearchPosition > 0 ? [{ label: "Avg. Position", value: avgSearchPosition, change: cc(avgSearchPosition, prevAvgSearchPosition), icon: Hash, metricKey: "search_position", platforms: searchPositionPlatforms, isDecimal: true }] : []),
-    ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
-    ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views", platforms: pageViewsPlatforms }] : []),
-    
     ...(totalPostsPublished > 0 ? [{ label: "Posts Published", value: totalPostsPublished, change: cc(totalPostsPublished, prevPostsPublished), icon: PenSquare, metricKey: "posts_published", platforms: postsPublishedPlatforms }] : []),
-    ...(totalGbpCalls > 0 ? [{ label: "Phone Calls", value: totalGbpCalls, change: cc(totalGbpCalls, prevGbpCalls), icon: Phone, metricKey: "gbp_calls", platforms: gbpCallsPlatforms }] : []),
-    ...(totalGbpDirections > 0 ? [{ label: "Direction Requests", value: totalGbpDirections, change: cc(totalGbpDirections, prevGbpDirections), icon: MapPin, metricKey: "gbp_direction_requests", platforms: gbpDirectionsPlatforms }] : []),
     ...(latestGbpRating > 0 ? [{ label: "Avg. Rating", value: latestGbpRating, change: undefined as number | undefined, icon: Star, metricKey: "gbp_average_rating", platforms: gbpRatingPlatforms, isDecimal: true }] : []),
     ...(totalLeads > 0 ? [{ label: "Leads", value: totalLeads, change: cc(totalLeads, prevLeads), icon: UserPlus, metricKey: "leads", platforms: leadsPlatforms }] : []),
-  ] as KpiItem[];
+    ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views", platforms: pageViewsPlatforms }] : []),
+    ...(totalGbpCalls > 0 ? [{ label: "Phone Calls", value: totalGbpCalls, change: cc(totalGbpCalls, prevGbpCalls), icon: Phone, metricKey: "gbp_calls", platforms: gbpCallsPlatforms }] : []),
+    ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks", platforms: websiteClicksPlatforms }] : []),
+  ];
+
+  // Overflow: only shown if priority slots are empty (total still capped at 12)
+  const overflow: KpiItem[] = [
+    ...(totalSessions > 0 ? [{ label: "Sessions", value: totalSessions, change: cc(totalSessions, prevSessions), icon: Activity, metricKey: "sessions", platforms: sessionsPlatforms }] : []),
+    ...(totalSearchImpressions > 0 ? [{ label: "Search Impressions", value: totalSearchImpressions, change: cc(totalSearchImpressions, prevSearchImpressions), icon: Search, metricKey: "search_impressions", platforms: searchImpressionsPlatforms }] : []),
+    ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
+    ...(totalGbpDirections > 0 ? [{ label: "Direction Requests", value: totalGbpDirections, change: cc(totalGbpDirections, prevGbpDirections), icon: MapPin, metricKey: "gbp_direction_requests", platforms: gbpDirectionsPlatforms }] : []),
+  ];
+
+  return [...priority, ...overflow] as KpiItem[];
 }
 
 export function computeSparklines(
@@ -128,21 +132,22 @@ export function computeSparklines(
     const existing = monthMap.get(key) || {};
     existing.spend = (existing.spend || 0) + (s.metrics_data.spend || 0);
     existing.reach = (existing.reach || 0) + (s.platform === 'facebook' ? (s.metrics_data.views || 0) : (s.metrics_data.reach || s.metrics_data.impressions || s.metrics_data.search_impressions || s.metrics_data.views || s.metrics_data.gbp_views || 0));
-    existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0) + (s.metrics_data.search_clicks || 0) + (s.metrics_data.gbp_website_clicks || 0);
+    existing.clicks = (existing.clicks || 0) + (s.metrics_data.clicks || 0) + (s.metrics_data.search_clicks || 0) + (s.metrics_data.post_clicks || 0);
     existing.engagement = (existing.engagement || 0) + (s.metrics_data.engagement ? s.metrics_data.engagement : (s.metrics_data.likes || 0) + (s.metrics_data.comments || 0) + (s.metrics_data.shares || 0));
     existing.total_followers = Math.max(existing.total_followers || 0, s.metrics_data.total_followers || 0);
     existing.video_views = (existing.video_views || 0) + (s.platform === 'meta_ads' ? 0 : s.platform === 'facebook' ? (s.metrics_data.views || 0) : (s.metrics_data.video_views || 0));
     existing.sessions = (existing.sessions || 0) + (s.metrics_data.sessions || 0);
     existing.search_impressions = (existing.search_impressions || 0) + (s.metrics_data.search_impressions || 0);
-    existing.search_clicks = (existing.search_clicks || 0) + (s.metrics_data.search_clicks || 0);
     existing.posts_published = (existing.posts_published || 0) + (s.metrics_data.posts_published || 0);
     existing.gbp_calls = (existing.gbp_calls || 0) + (s.metrics_data.gbp_calls || 0);
     existing.gbp_direction_requests = (existing.gbp_direction_requests || 0) + (s.metrics_data.gbp_direction_requests || 0);
     existing.leads = (existing.leads || 0) + (s.metrics_data.leads || 0);
+    existing.website_clicks = (existing.website_clicks || 0) + (s.metrics_data.website_clicks || 0) + (s.metrics_data.gbp_website_clicks || 0) + (s.metrics_data.link_clicks || 0);
+    existing.page_views = (existing.page_views || 0) + (s.metrics_data.ga_page_views || 0) + (s.metrics_data.page_views || 0) + (s.metrics_data.gbp_views || 0);
     monthMap.set(key, existing);
   }
   const sortedFinal = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
-  for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions", "search_impressions", "search_clicks", "posts_published", "gbp_calls", "gbp_direction_requests", "leads"]) {
+  for (const metricKey of ["spend", "reach", "clicks", "engagement", "total_followers", "video_views", "sessions", "search_impressions", "posts_published", "gbp_calls", "gbp_direction_requests", "leads", "website_clicks", "page_views"]) {
     map[metricKey] = sortedFinal.map(([key, data]) => { const [y, m] = key.split("-"); return { v: data[metricKey] || 0, name: `${MONTH_NAMES[parseInt(m)]} ${y.slice(2)}` }; });
   }
   return map;
