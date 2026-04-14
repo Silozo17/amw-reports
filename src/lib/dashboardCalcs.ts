@@ -25,7 +25,7 @@ export function computeKpis(
 ): KpiItem[] {
   const totalSpend = filtered.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
   const totalReach = filtered.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
-  const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0); }, 0);
+  const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0) + (m.website_clicks || 0) + (m.link_clicks || 0); }, 0);
   const totalEngagement = filtered.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
   const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
   const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
@@ -44,7 +44,7 @@ export function computeKpis(
 
   const prevSpend = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.spend || 0), 0);
   const prevReach = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
-  const prevClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0); }, 0);
+  const prevClicks = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0) + (m.website_clicks || 0) + (m.link_clicks || 0); }, 0);
   const prevEngagement = filteredPrev.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
   const prevSessions = filteredPrev.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
   const prevVideoViews = filteredPrev.reduce((sum, s) => { if (s.platform === 'meta_ads') return sum; if (s.platform === 'facebook') return sum + (s.metrics_data.views || 0); return sum + (s.metrics_data.video_views || 0); }, 0);
@@ -61,7 +61,7 @@ export function computeKpis(
 
   const spendPlatforms = platformsFor(m => m.spend || 0);
   const reachPlatforms = [...new Set(filtered.filter(s => { const m = s.metrics_data; if (s.platform === 'facebook') return (m.views || 0) > 0; return (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0) > 0; }).map(s => s.platform))];
-  const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0));
+  const clicksPlatforms = platformsFor(m => (m.clicks || 0) + (m.search_clicks || 0) + (m.gbp_website_clicks || 0) + (m.post_clicks || 0) + (m.website_clicks || 0) + (m.link_clicks || 0));
   const engagementPlatforms = platformsFor(m => m.engagement ? m.engagement : (m.likes || 0) + (m.reactions || 0) + (m.comments || 0) + (m.shares || 0));
   const followerPlatforms = platformsFor(m => m.total_followers || 0);
   const sessionsPlatforms = platformsFor(m => m.sessions || 0);
@@ -106,7 +106,7 @@ export function computeKpis(
     ...(avgSearchPosition > 0 ? [{ label: "Avg. Position", value: avgSearchPosition, change: cc(avgSearchPosition, prevAvgSearchPosition), icon: Hash, metricKey: "search_position", platforms: searchPositionPlatforms, isDecimal: true }] : []),
     ...(totalConversions > 0 ? [{ label: "Conversions", value: totalConversions, change: cc(totalConversions, prevConversions), icon: Target, metricKey: "conversions", platforms: conversionsPlatforms }] : []),
     ...(totalPageViews > 0 ? [{ label: "Page Views", value: totalPageViews, change: cc(totalPageViews, prevPageViews), icon: FileText, metricKey: "page_views", platforms: pageViewsPlatforms }] : []),
-    ...(totalWebsiteClicks > 0 ? [{ label: "Website Clicks", value: totalWebsiteClicks, change: cc(totalWebsiteClicks, prevWebsiteClicks), icon: Link, metricKey: "website_clicks", platforms: websiteClicksPlatforms }] : []),
+    
     ...(totalPostsPublished > 0 ? [{ label: "Posts Published", value: totalPostsPublished, change: cc(totalPostsPublished, prevPostsPublished), icon: PenSquare, metricKey: "posts_published", platforms: postsPublishedPlatforms }] : []),
     ...(totalGbpCalls > 0 ? [{ label: "Phone Calls", value: totalGbpCalls, change: cc(totalGbpCalls, prevGbpCalls), icon: Phone, metricKey: "gbp_calls", platforms: gbpCallsPlatforms }] : []),
     ...(totalGbpDirections > 0 ? [{ label: "Direction Requests", value: totalGbpDirections, change: cc(totalGbpDirections, prevGbpDirections), icon: MapPin, metricKey: "gbp_direction_requests", platforms: gbpDirectionsPlatforms }] : []),
