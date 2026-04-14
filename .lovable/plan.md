@@ -1,80 +1,63 @@
 
 
-## Fix: GBP Rating Summing + Reviews Not Fetching
+## Three Fixes: Hero KPIs, Missing Platform on Website, AI Platform Coverage
 
-### Two Issues
+### Issue 1: Hero KPIs Missing Platform-Specific Metrics
 
-**Issue 1: Rating shows 20 instead of 5 in multi-month views**
-The `aggregateMultiMonth` function in `useClientDashboard.ts` (line 139) sums all metrics blindly. When viewing YTD with 4 months of `gbp_average_rating: 5.0`, it shows 20.0. Same problem for `gbp_reviews_count` — it sums instead of taking the latest value.
+**Problem**: GBP metrics (phone calls, avg rating, direction requests), ad platform leads, and other unique metrics never appear as Hero KPI cards. The `computeKpis` function in `dashboardCalcs.ts` has a fixed list of ~15 aggregate KPIs but omits platform-specific ones.
 
-**Issue 2: Reviews not being fetched**
-Edge function logs confirm the GMB reviews API returns 404. The URL is:
-```
-https://mybusiness.googleapis.com/v4/locations/11903806665193965801/reviews
-```
-But the v4 API requires the full account path:
-```
-https://mybusiness.googleapis.com/v4/accounts/{accountId}/locations/{locationId}/reviews
-```
-The oauth-callback stores `loc.name` (e.g. `locations/12345`) as `account_id`, but discards the parent `acct.name` (e.g. `accounts/67890`).
+**Fix** — Add new Hero KPI entries in `src/lib/dashboardCalcs.ts`:
+- **Phone Calls** (`gbp_calls`) — sum across GBP snapshots
+- **Direction Requests** (`gbp_direction_requests`) — sum across GBP snapshots
+- **Avg. Rating** (`gbp_average_rating`) — latest value (not sum), flagged as `isDecimal`
+- **Leads** (`leads`) — sum across ad platforms (Meta Ads, Google Ads)
+
+Also add corresponding sparkline entries in `computeSparklines` for the new metrics. Import additional icons (e.g. `Phone`, `MapPin`, `Star`) from lucide-react.
+
+Add accent colors for the new metrics in `HeroKPIs.tsx` ACCENT_COLORS map.
+
+**Files**: `src/lib/dashboardCalcs.ts`, `src/components/clients/dashboard/HeroKPIs.tsx`
 
 ---
 
-### Fix 1: Dashboard aggregation (frontend)
+### Issue 2: IntegrationsPage Shows 12 Platforms, Missing LinkedIn Ads
 
-**File: `src/hooks/useClientDashboard.ts`** — `aggregateMultiMonth` function (lines 139-160)
+**Problem**: The `PLATFORMS` array in `IntegrationsPage.tsx` has 12 entries. LinkedIn Ads is missing.
 
-Add a set of cumulative/latest-value metrics that should NOT be summed. Instead, take the latest snapshot's value (by report_year/month). Also preserve `top_content` in the aggregated output.
+**Fix** — Add LinkedIn Ads entry:
+```
+{ name: 'LinkedIn Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conversion Rate', 'Cost/Conv.', 'Engagement'], link: '/ppc-reporting' }
+```
 
+**File**: `src/pages/IntegrationsPage.tsx`
+
+---
+
+### Issue 3: AI Functions Missing LinkedIn Ads from Platform Categories
+
+**Problem**: The `analyze-client` edge function defines its own `PLATFORM_CATEGORIES` that excludes `linkedin_ads` from the "Paid Advertising" category. This means LinkedIn Ads data is never included in the AI analysis prompt.
+
+The `chat-with-data` and `voice-briefing` functions pass all snapshots without filtering by platform category — so they already include all 13 platforms. No change needed there.
+
+**Fix** — In `supabase/functions/analyze-client/index.ts`, add `"linkedin_ads"` to the `"Paid Advertising"` array:
 ```typescript
-const LATEST_VALUE_METRICS = new Set([
-  'gbp_average_rating', 'gbp_reviews_count', 'total_followers',
-  'followers', 'subscribers', 'following', 'total_pins',
-  'total_boards', 'total_video_count', 'media_count'
-]);
+"Paid Advertising": ["google_ads", "meta_ads", "tiktok_ads", "linkedin_ads"],
 ```
 
-For these metrics, sort snapshots by year/month descending and take the first non-null value. For `total_followers`, keep existing `Math.max` logic. Also merge `top_content` arrays across snapshots.
+**File**: `supabase/functions/analyze-client/index.ts`
 
-**File: `src/hooks/useClientDashboard.ts`** — `aggregateMultiMonth` function
+---
 
-Update to:
-- Track latest snapshot per platform (by year/month)
-- Use latest value for cumulative metrics instead of summing
-- Merge `top_content` from all snapshots into the aggregated result
+### Summary of Changes
 
-### Fix 2: Reviews API URL (edge function)
-
-**File: `supabase/functions/oauth-callback/index.ts`**
-
-When discovering locations, store the parent account name alongside the location in metadata:
-```typescript
-locations.push({ id: locId, name: loc.title || locId, accountName: acct.name });
-```
-
-Also store the `accountName` in `metadata` when auto-selecting.
-
-**File: `supabase/functions/sync-google-business-profile/index.ts`** — `fetchReviewsData`
-
-Update the reviews URL to use the full account+location path. Extract the account name from `conn.metadata.locations` or fall back to constructing it. Change:
-```
-https://mybusiness.googleapis.com/v4/${locationId}/reviews
-```
-To:
-```
-https://mybusiness.googleapis.com/v4/${accountName}/${locationId}/reviews
-```
-
-Where `accountName` is retrieved from `conn.metadata`.
-
-**Fallback**: If `accountName` isn't in metadata (existing connections), try to discover it via the Account Management API (`https://mybusinessaccountmanagement.googleapis.com/v1/accounts`) during sync, then cache it in metadata for future use.
-
-### Files Changed
-1. `src/hooks/useClientDashboard.ts` — fix aggregation for cumulative metrics + preserve top_content
-2. `supabase/functions/oauth-callback/index.ts` — store account name in location metadata
-3. `supabase/functions/sync-google-business-profile/index.ts` — fix reviews URL using account name
+| File | Change |
+|---|---|
+| `src/lib/dashboardCalcs.ts` | Add GBP calls, direction requests, avg rating, leads to Hero KPIs + sparklines |
+| `src/components/clients/dashboard/HeroKPIs.tsx` | Add accent colors for new metric keys |
+| `src/pages/IntegrationsPage.tsx` | Add LinkedIn Ads platform entry |
+| `supabase/functions/analyze-client/index.ts` | Add `linkedin_ads` to PLATFORM_CATEGORIES |
 
 ### Risk
-- Existing GBP connections won't have `accountName` in metadata until re-connected. The fallback account discovery during sync handles this.
+- Hero KPIs are capped at 8 cards (`kpis.slice(0, 8)`). With more KPIs added, some may not display. The existing ordering prioritizes spend/reach/clicks first, so new GBP/leads cards will appear when those primary metrics have no data, or when a specific platform filter is active.
 - No database migration needed.
 
