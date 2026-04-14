@@ -1439,6 +1439,7 @@ export type Database = {
         | "pinterest"
         | "tiktok_ads"
         | "linkedin_ads"
+        | "threads"
       sync_job_status: "pending" | "processing" | "completed" | "failed"
     }
     CompositeTypes: {
@@ -1583,6 +1584,7 @@ export const Constants = {
         "pinterest",
         "tiktok_ads",
         "linkedin_ads",
+        "threads",
       ],
       sync_job_status: ["pending", "processing", "completed", "failed"],
     },
