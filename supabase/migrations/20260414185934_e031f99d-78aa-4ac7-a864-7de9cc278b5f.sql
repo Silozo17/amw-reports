@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Client users can manage own connections" ON public.platform_connections;
