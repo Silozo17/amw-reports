@@ -1,75 +1,38 @@
 
 
-## Redesign Hero KPI Cards: 3D, Glassmorphism, Metric-Specific Visuals + Featured Layout
+## Fix Hero KPIs Visual Clarity + Upgrade Health Score Card
 
-### Overview
-
-Transform the 12 Hero KPI cards from identical flat rectangles into dynamic, interactive cards with:
-- **3D mouse-tilt** with holographic light reflection
-- **Glassmorphism** with per-metric colored glow halos
-- **Metric-specific visuals** (stars for rating, gauge for spend, growth ring for followers, etc.)
-- **Featured + Standard layout** — top 4 cards are larger, remaining 8 are compact
-
-### Layout
-
-```text
-┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-│   TOTAL SPEND    │ │   VIDEO VIEWS    │ │      REACH       │ │     CLICKS       │
-│   (Featured)     │ │   (Featured)     │ │   (Featured)     │ │   (Featured)     │
-│   Larger card    │ │   Larger card    │ │   Larger card    │ │   Larger card    │
-│   with gauge     │ │   with bars      │ │   with rings     │ │   with arrow     │
-└──────────────────┘ └──────────────────┘ └──────────────────┘ └──────────────────┘
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│Engagement│ │Followers │ │Posts Pub. │ │Avg Rating│ │  Leads   │ │Page Views│ │Phone Call│ │Web Clicks│
-│(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│ │(Standard)│
-└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
-```
+### Problem
+The Hero KPI cards blend into the page background — the glassmorphism effect makes them look washed out and indistinguishable. The metric-specific visuals are too small and faint. The Health Score card is a plain white card with a basic SVG gauge.
 
 ### Changes
 
-**File: `src/components/clients/dashboard/HeroKPIs.tsx`** (major rewrite)
+**File: `src/components/clients/dashboard/HeroKPIs.tsx`**
 
-1. **3D Tilt Hook** — new inline `useTilt` hook that tracks mouse position relative to card, applies `perspective(800px) rotateX(Ydeg) rotateY(Xdeg)` via `onMouseMove` / `onMouseLeave`. Tilt intensity: ~8deg for featured, ~5deg for standard. Includes a moving light reflection overlay (`radial-gradient` at cursor position).
+1. **Increase card contrast** — Replace the transparent glassmorphism with a solid white card background (`bg-card`) with a stronger left accent bar (w-1.5 instead of w-1). Add a subtle top gradient band in the accent color at ~5% opacity to give each card its own color identity without the washed-out glass look.
 
-2. **Glassmorphism Base** — replace `Card` with a custom div using `backdrop-blur-xl bg-white/5 dark:bg-white/5 border border-white/10`. Each card gets a colored glow halo behind it using `box-shadow` with the metric's accent color at low opacity, pulsing gently via CSS animation.
+2. **Make metric visuals larger and bolder** — Increase size from 40/56px to 52/72px. Increase opacity from 0.5-0.6 to 0.7-0.85. Position them more prominently in the bottom-right corner.
 
-3. **Metric-Specific Visuals** — a `MetricVisual` sub-component renders a unique decorative element per metric type:
-   - **Spend** — animated semi-circular gauge arc (SVG) filling to proportional value
-   - **Video Views** — small animated bar chart (3 bars at staggered heights)
-   - **Reach** — concentric expanding rings (CSS animation)
-   - **Clicks** — animated upward arrow with trail
-   - **Engagement** — pulsing heart/chat icon
-   - **Followers** — growth ring (SVG circle with stroke-dashoffset animation)
-   - **Posts Published** — small calendar grid dots
-   - **Avg. Rating** — animated gold stars (5 stars, filled proportionally)
-   - **Leads** — target/bullseye icon with pulse
-   - **Page Views** — mini sparkline rendered inline
-   - **Phone Calls** — ringing phone icon with vibration animation
-   - **Website Clicks** — cursor click animation
+3. **Stronger change badges** — Use solid background colors for the MoM change pills instead of transparent tints. Green pill for positive, red for negative, with white text.
 
-4. **Featured vs Standard sizing** — first 4 KPIs render in `lg:col-span-1` within a 4-col grid (taller cards, larger text `text-3xl sm:text-4xl`). Remaining 8 render in a separate 4-col grid below (compact cards, `text-xl sm:text-2xl`). Featured cards include the sparkline background; standard cards omit it for density.
+4. **Remove the glassmorphism class** — Drop `kpi-card-glass` in favor of `bg-card` with a proper `shadow-sm` and `border border-border`. Cards should look like distinct, elevated objects — not transparent overlays.
 
-5. **CSS additions in `index.css`**:
-   - `@keyframes glow-pulse` — subtle box-shadow pulse
-   - `@keyframes ring-expand` — for reach rings
-   - `@keyframes phone-vibrate` — shake animation for phone icon
-   - `.kpi-card-glass` utility class for the glassmorphism base
+5. **Keep 3D tilt + holographic overlay** — These are interactive effects that work well. Just ensure the card itself has enough contrast for the overlay to be visible.
 
-**File: `src/hooks/useTilt.ts`** (new file)
-- Custom hook returning `ref`, `style`, and `overlayStyle`
-- Uses `onMouseMove` to calculate rotation angles from cursor position relative to card center
-- Returns to neutral on `onMouseLeave` with a smooth CSS transition
-- Accepts `maxTilt` parameter (8 for featured, 5 for standard)
+**File: `src/components/clients/dashboard/HealthScore.tsx`**
 
-**File: `tailwind.config.ts`**
-- Add `glow-pulse`, `ring-expand`, `phone-vibrate` keyframes and animation entries
+1. **Premium card treatment** — Add a gradient background header strip with the score color. Use a larger gauge (w-40 h-40) with a thicker stroke and animated glow ring behind it.
 
-### Technical Notes
+2. **3D tilt effect** — Apply the same `useTilt` hook to make the Health Score card interactive on hover.
 
-- No external 3D library needed — pure CSS `transform: perspective() rotateX() rotateY()` with a React ref
-- Glassmorphism uses `backdrop-filter: blur()` which is well-supported in modern browsers
-- Metric visuals are lightweight SVG/CSS — no canvas or heavy rendering
-- All animations use `will-change: transform` for GPU acceleration
-- Mobile: tilt disabled (no hover), cards stack single-column, animations reduced via `prefers-reduced-motion`
-- The sparkline background chart remains on featured cards only
+3. **Sub-score cards upgrade** — Replace the flat `bg-muted/30` boxes with mini progress bars showing the score as a horizontal fill. Add the accent color as a left border.
+
+4. **Score label badge** — Display the label ("Excellent", "Good", etc.) as a colored pill badge below the gauge instead of tiny text inside it.
+
+**File: `src/index.css`**
+
+1. Remove `.kpi-card-glass` class (no longer needed).
+
+### Layout stays the same
+Featured 4 + Standard 8 grid is unchanged. Only the visual treatment of each card changes.
 
