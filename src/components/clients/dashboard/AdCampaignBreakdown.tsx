@@ -252,6 +252,10 @@ const AdCard = ({ ad, currSymbol }: { ad: AdItem; currSymbol: string }) => {
             <span className="text-muted-foreground">Reach</span>
             <span className="tabular-nums font-medium">{fmtNum(ad.reach)}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Leads</span>
+            <span className="tabular-nums font-medium">{safe(ad.leads) > 0 ? fmtNum(ad.leads) : '—'}</span>
+          </div>
         </div>
       </CardContent>
     </Card>
