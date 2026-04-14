@@ -1,34 +1,113 @@
 
 
-## Sync Missing Data for AMW Media + Root Cause Analysis
+## Server-Side Sync Queue — Never Miss a Sync Again
 
-### Root Cause: Why Meta Ads Only Has 2 Months
+### Problem
+All sync orchestration (initial backfill after OAuth connection, manual re-sync, multi-platform queuing) runs client-side in the browser. If a user navigates away, closes the tab, or loses internet, the sync stops mid-way and months of data are lost until the weekly Sunday gap-detection catches it.
 
-Meta Ads was connected on **April 14 at 09:18**. The initial sync is triggered **client-side** via the `SyncQueue` in `ClientDetail.tsx` — it runs sequentially month-by-month from the browser. If the user navigated away, closed the tab, or the page refreshed during the sync, the remaining months were lost. The sync queue has no server-side persistence or resume capability, so interrupted syncs simply stop.
+### Solution
+Create a persistent server-side sync queue backed by a database table. The client simply inserts a job row; a new edge function processes jobs sequentially. The client polls the table for progress display — but the sync runs independently of the browser.
 
-The weekly gap-detection backfill (runs on Sundays via `scheduled-sync`) would eventually catch this, but it hasn't run yet since the connection was made today.
+### Architecture
 
-### Current Data Gaps
+```text
+┌─────────────┐     INSERT job row     ┌──────────────┐
+│  Browser /   │ ───────────────────►  │  sync_jobs   │  (DB table)
+│  OAuth CB    │                       │  table       │
+└─────────────┘                        └──────┬───────┘
+                                              │
+       ┌──────────────────────────────────────┘
+       ▼
+┌──────────────────┐    invoke per-month     ┌─────────────────┐
+│  process-sync-   │ ──────────────────────► │  sync-google-ads │
+│  queue (edge fn) │                         │  sync-meta-ads   │
+│  (sequential)    │                         │  etc.            │
+└──────────────────┘                         └─────────────────┘
+```
 
-| Platform | Months Synced | Expected | Missing |
-|----------|--------------|----------|---------|
-| Meta Ads | 2 | 24 | 22 months (May 2024 — Feb 2026) |
-| Instagram | 23 | 24 | Aug 2025 |
-| All others | 24 | 24 | None |
+### Changes
 
-### Action Plan
+#### 1. New DB table: `sync_jobs`
 
-1. **Trigger backfill-sync for Meta Ads** — call the `backfill-sync` edge function with `connection_id = e3654506-a5b9-4420-a74d-392f10067589`, `months = 24`, `start_offset = 0`. This will skip the 2 existing months and sync the remaining 22.
+```sql
+CREATE TYPE sync_job_status AS ENUM ('pending', 'processing', 'completed', 'failed');
 
-2. **Trigger backfill-sync for Instagram** — call with `connection_id = 0f9a7c15-4835-427f-a42f-285397f299f5`, `months = 24`, `start_offset = 0`. This will skip the 23 existing months and sync Aug 2025 only.
+CREATE TABLE sync_jobs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  connection_id uuid NOT NULL,
+  client_id uuid NOT NULL,
+  org_id uuid NOT NULL,
+  platform platform_type NOT NULL,
+  months integer NOT NULL DEFAULT 12,
+  status sync_job_status NOT NULL DEFAULT 'pending',
+  progress_completed integer NOT NULL DEFAULT 0,
+  progress_total integer NOT NULL DEFAULT 0,
+  current_month integer,
+  current_year integer,
+  error_message text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  started_at timestamptz,
+  completed_at timestamptz,
+  priority integer NOT NULL DEFAULT 0
+);
 
-3. **No code changes needed** — the backfill-sync function already handles gap detection (skips existing snapshots). This is an operational data fix.
+ALTER TABLE sync_jobs ENABLE ROW LEVEL SECURITY;
+-- RLS: org members can view/insert; service role processes
+```
 
-### Why This Won't Self-Fix Soon
+#### 2. New edge function: `process-sync-queue`
 
-The weekly gap-detection in `scheduled-sync` only runs on Sundays. Meta Ads was connected today (Monday), so without manual intervention it would take almost a week.
+- Queries `sync_jobs` for the oldest `pending` job (ordered by `priority DESC, created_at ASC`)
+- Sets it to `processing`, updates `progress_completed` / `current_month` / `current_year` as each month completes
+- Calls the per-platform sync function sequentially with 1.5s delays (same as backfill-sync)
+- On completion, sets status to `completed` or `failed`
+- Then checks for next pending job and processes it (loop until queue empty)
+- Uses row-level locking (`FOR UPDATE SKIP LOCKED`) to prevent double-processing
+- Deduplicates: skips if an identical pending/processing job already exists for the same connection+platform
 
-### Suggested Future Improvement (Not in Scope)
+#### 3. Trigger processing automatically
 
-To prevent this recurring, a server-side initial sync (calling `backfill-sync` from `oauth-callback` directly) would ensure 24-month history is fetched regardless of client-side navigation. This is a separate task.
+- After inserting a job, the client calls `process-sync-queue` (fire-and-forget) to kick off processing
+- The `oauth-callback` edge function also inserts a job + triggers processing directly (so even if the user never returns to the page, sync starts)
+- The `scheduled-sync` function inserts jobs instead of invoking sync functions directly
+
+#### 4. Client-side changes
+
+**`src/pages/clients/ClientDetail.tsx`:**
+- Replace `SyncQueue` class usage with a simple insert into `sync_jobs` table
+- Poll `sync_jobs` table for progress (every 3s while jobs exist for this client)
+- Remove `syncQueue` state and `SyncQueue` import
+
+**`src/components/clients/SyncProgressBar.tsx`:**
+- Read from polled `sync_jobs` data instead of in-memory `QueueState`
+- Show all pending/processing jobs for the current client
+
+**`src/lib/syncQueue.ts`:**
+- Delete this file (no longer needed)
+
+**`src/lib/triggerSync.ts`:**
+- Keep `triggerSync` for single-month manual use
+- Remove `triggerInitialSync` (replaced by server queue)
+
+#### 5. OAuth callback auto-enqueue
+
+**`supabase/functions/oauth-callback/index.ts`:**
+- After successfully connecting a platform, insert a `sync_jobs` row with the correct months (query org subscription for plan)
+- Fire-and-forget invoke `process-sync-queue`
+- This ensures sync starts even if the user closes the browser during the OAuth redirect
+
+#### 6. Admin sync integration
+
+**`supabase/functions/admin-sync/index.ts`:**
+- Insert jobs into `sync_jobs` instead of directly invoking sync functions
+- Trigger `process-sync-queue`
+
+### What this guarantees
+
+- **Browser-independent**: Sync runs entirely server-side once a job row is inserted
+- **Sequential processing**: Jobs are processed one at a time in FIFO order with priority support
+- **No duplicates**: Dedup check prevents the same platform from being queued twice
+- **Crash-resilient**: If the edge function times out, the job stays in `processing` status; a periodic check (via `scheduled-sync`) can reset stale processing jobs back to `pending`
+- **Observable**: Progress is stored in the DB — any page load can show current sync status
+- **10-platform support**: User connects 10 platforms one by one; each inserts a job; they process in order regardless of browser state
 
