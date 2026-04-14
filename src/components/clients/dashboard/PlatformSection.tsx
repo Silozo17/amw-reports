@@ -28,6 +28,10 @@ import GeoHeatmap from '@/components/clients/dashboard/GeoHeatmap';
 import DeviceBreakdown from '@/components/clients/dashboard/DeviceBreakdown';
 import AdCampaignBreakdown from '@/components/clients/dashboard/AdCampaignBreakdown';
 
+interface RawDataItem {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
 interface TopContentItem {
   type?: string;
   page_name?: string;
