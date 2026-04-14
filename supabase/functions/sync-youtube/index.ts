@@ -111,11 +111,15 @@ Deno.serve(async (req) => {
       // Date range for the month
       const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
       const lastDay = new Date(year, month, 0).getDate();
-      const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      const rawEndDate = new Date(year, month - 1, lastDay);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const effectiveEnd = rawEndDate < yesterday ? rawEndDate : yesterday;
+      const endDate = effectiveEnd.toISOString().split("T")[0];
 
       // Query YouTube Analytics API
       const metricsParam = "views,estimatedMinutesWatched,likes,comments,shares,subscribersGained,subscribersLost,averageViewDuration";
-      const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${channelId}&startDate=${startDate}&endDate=${endDate}&metrics=${metricsParam}&dimensions=&sort=`;
+      const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${channelId}&startDate=${startDate}&endDate=${endDate}&metrics=${metricsParam}`;
 
       const analyticsRes = await fetch(analyticsUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
