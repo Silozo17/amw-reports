@@ -18,6 +18,7 @@ const VoiceBriefing = ({ clientId, month, year }: VoiceBriefingProps) => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [hasExisting, setHasExisting] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
 
   const cleanup = useCallback(() => {
     if (audioRef.current) {
@@ -25,12 +26,15 @@ const VoiceBriefing = ({ clientId, month, year }: VoiceBriefingProps) => {
       audioRef.current.removeAttribute("src");
       audioRef.current = null;
     }
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
     setAudioUrl(null);
     setIsPlaying(false);
     setProgress(0);
     setHasExisting(false);
-  }, [audioUrl]);
+  }, []);
 
   const setupAudio = useCallback((url: string) => {
     const audio = new Audio(url);
@@ -42,6 +46,7 @@ const VoiceBriefing = ({ clientId, month, year }: VoiceBriefingProps) => {
       setIsPlaying(false);
       setProgress(0);
     });
+    audioUrlRef.current = url;
     setAudioUrl(url);
   }, []);
 
@@ -76,7 +81,6 @@ const VoiceBriefing = ({ clientId, month, year }: VoiceBriefingProps) => {
 
         if (data.exists && data.signed_url) {
           setHasExisting(true);
-          // Fetch the audio from signed URL
           const audioResponse = await fetch(data.signed_url);
           if (cancelled || !audioResponse.ok) return;
           const blob = await audioResponse.blob();
@@ -93,7 +97,8 @@ const VoiceBriefing = ({ clientId, month, year }: VoiceBriefingProps) => {
 
     checkExisting();
     return () => { cancelled = true; };
-  }, [clientId, month, year, cleanup, setupAudio]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, month, year]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -101,6 +106,9 @@ const VoiceBriefing = ({ clientId, month, year }: VoiceBriefingProps) => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
+      }
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
       }
     };
   }, []);
@@ -147,7 +155,9 @@ const VoiceBriefing = ({ clientId, month, year }: VoiceBriefingProps) => {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+      }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
