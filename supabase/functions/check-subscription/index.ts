@@ -56,7 +56,7 @@ serve(async (req) => {
     if (customers.data.length === 0) {
       logStep("No Stripe customer found");
       return new Response(
-        JSON.stringify({ subscribed: false, plan: "starter" }),
+        JSON.stringify({ subscribed: false, plan: "creator" }),
         { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     }
@@ -108,7 +108,7 @@ serve(async (req) => {
             .single();
 
           const planSlug = (planData as unknown as { subscription_plans: { slug: string } })?.subscription_plans?.slug;
-          if (planSlug && planSlug !== "starter") {
+          if (planSlug && planSlug !== "creator") {
             const graceEnd = new Date();
             graceEnd.setDate(graceEnd.getDate() + GRACE_PERIOD_DAYS);
             await supabase
@@ -124,7 +124,7 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ subscribed: false, plan: "starter" }),
+        JSON.stringify({ subscribed: false, plan: "creator" }),
         { headers: { "Content-Type": "application/json" }, status: 200 }
       );
     }

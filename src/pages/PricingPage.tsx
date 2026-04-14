@@ -23,7 +23,7 @@ const PLANS = [
     cta: 'Get Started Free',
     href: '/login?view=signup',
     highlight: false,
-    features: ['1 client', '5 platform connections', 'Branded PDF reports', 'Client portal', 'Monthly sync (4th of each month)'],
+    features: ['1 client', '5 platform connections', 'Branded PDF reports', 'Client portal', 'Weekly sync (Monday)'],
   },
   {
     name: 'Freelance',
@@ -52,28 +52,28 @@ const PLANS = [
 interface ComparisonRow {
   feature: string;
   tooltip: string;
-  starter: boolean | string;
+  creator: boolean | string;
   freelance: boolean | string;
   agency: boolean | string;
 }
 
 const COMPARISON_ROWS: ComparisonRow[] = [
-  { feature: 'Clients Included', tooltip: 'A client is one of your customers. Each client has their own dashboard, connections, and reports.', starter: '1', freelance: '5', agency: '5' },
-  { feature: 'Connections Included', tooltip: 'A connection links one client to one platform. E.g. connecting Google Ads + Instagram for one client = 2 connections.', starter: '5', freelance: '25', agency: '25' },
-  { feature: 'Data Sync Frequency', tooltip: 'How often we pull fresh data from your connected platforms. More frequent = more up-to-date dashboards.', starter: 'Monthly', freelance: 'Weekly', agency: 'Daily' },
-  { feature: 'Historical Data Sync', tooltip: 'How many months of historical data we import when you first connect a platform.', starter: '12 months', freelance: '12 months', agency: '24 months' },
-  { feature: 'Branded PDF Reports', tooltip: 'Professionally designed PDF reports with your branding, generated automatically from your data.', starter: true, freelance: true, agency: true },
-  { feature: 'Client Portal', tooltip: 'A unique shareable link for each client to view their live dashboard — no login required for them.', starter: true, freelance: true, agency: true },
-  { feature: 'AI-Powered Analysis', tooltip: 'An AI assistant that analyses your marketing data and provides plain-English insights, trends, and recommendations.', starter: false, freelance: true, agency: true },
-  { feature: 'Automated Email Delivery', tooltip: 'Automatically send reports to your clients via email on a schedule you choose.', starter: false, freelance: true, agency: true },
-  { feature: 'Team Members', tooltip: 'Invite team members to your organisation to collaborate on client management and reporting.', starter: '1', freelance: 'Unlimited', agency: 'Unlimited' },
-  { feature: 'Report Customisation', tooltip: 'Choose which metrics appear per platform, reorder sections, and toggle features like month-over-month comparisons.', starter: 'Basic', freelance: 'Full', agency: 'Full' },
-  { feature: 'White-Label Branding', tooltip: 'Remove all AMW Reports branding. Your logo, colours, and fonts appear everywhere — reports, portal, and emails.', starter: false, freelance: false, agency: true },
-  { feature: 'Custom Domain', tooltip: 'Use your own domain (e.g. reports.youragency.com) for the client portal instead of our default URL.', starter: false, freelance: false, agency: true },
-  { feature: 'Data Retention', tooltip: 'How long we store your historical data. Longer retention means more trend analysis and year-over-year comparisons.', starter: '6 months', freelance: '24 months', agency: 'Unlimited' },
-  { feature: 'Email Support', tooltip: 'Priority and response time for email support queries.', starter: 'Community', freelance: 'Standard', agency: 'Priority' },
-  { feature: 'Additional Clients', tooltip: 'Add more clients beyond your plan\'s included amount. Each add-on client comes with 5 connections (3 reserved + 2 flexible).', starter: false, freelance: '£9.99/mo each', agency: '£9.99/mo each' },
-  { feature: 'Additional Connections', tooltip: 'Buy extra connections in packs of 5, usable across any client. Great for clients with many platforms.', starter: false, freelance: '£9.99/mo (5 pack)', agency: '£9.99/mo (5 pack)' },
+  { feature: 'Clients Included', tooltip: 'A client is one of your customers. Each client has their own dashboard, connections, and reports.', creator: '1', freelance: '5', agency: '5' },
+  { feature: 'Connections Included', tooltip: 'A connection links one client to one platform. E.g. connecting Google Ads + Instagram for one client = 2 connections.', creator: '5', freelance: '25', agency: '25' },
+  { feature: 'Data Sync Frequency', tooltip: 'How often we pull fresh data from your connected platforms. More frequent = more up-to-date dashboards.', creator: 'Weekly', freelance: 'Weekly', agency: 'Daily' },
+  { feature: 'Historical Data Sync', tooltip: 'How many months of historical data we import when you first connect a platform.', creator: '12 months', freelance: '12 months', agency: '24 months' },
+  { feature: 'Branded PDF Reports', tooltip: 'Professionally designed PDF reports with your branding, generated automatically from your data.', creator: true, freelance: true, agency: true },
+  { feature: 'Client Portal', tooltip: 'A unique shareable link for each client to view their live dashboard — no login required for them.', creator: true, freelance: true, agency: true },
+  { feature: 'AI-Powered Analysis', tooltip: 'An AI assistant that analyses your marketing data and provides plain-English insights, trends, and recommendations.', creator: false, freelance: true, agency: true },
+  { feature: 'Automated Email Delivery', tooltip: 'Automatically send reports to your clients via email on a schedule you choose.', creator: false, freelance: true, agency: true },
+  { feature: 'Team Members', tooltip: 'Invite team members to your organisation to collaborate on client management and reporting.', creator: '1', freelance: 'Unlimited', agency: 'Unlimited' },
+  { feature: 'Report Customisation', tooltip: 'Choose which metrics appear per platform, reorder sections, and toggle features like month-over-month comparisons.', creator: 'Basic', freelance: 'Full', agency: 'Full' },
+  { feature: 'White-Label Branding', tooltip: 'Remove all AMW Reports branding. Your logo, colours, and fonts appear everywhere — reports, portal, and emails.', creator: false, freelance: false, agency: true },
+  { feature: 'Custom Domain', tooltip: 'Use your own domain (e.g. reports.youragency.com) for the client portal instead of our default URL.', creator: false, freelance: false, agency: true },
+  { feature: 'Data Retention', tooltip: 'How long we store your historical data. Longer retention means more trend analysis and year-over-year comparisons.', creator: '6 months', freelance: '24 months', agency: 'Unlimited' },
+  { feature: 'Email Support', tooltip: 'Priority and response time for email support queries.', creator: 'Community', freelance: 'Standard', agency: 'Priority' },
+  { feature: 'Additional Clients', tooltip: 'Add more clients beyond your plan\'s included amount. Each add-on client comes with 5 connections (3 reserved + 2 flexible).', creator: false, freelance: '£9.99/mo each', agency: '£9.99/mo each' },
+  { feature: 'Additional Connections', tooltip: 'Buy extra connections in packs of 5, usable across any client. Great for clients with many platforms.', creator: false, freelance: '£9.99/mo (5 pack)', agency: '£9.99/mo (5 pack)' },
 ];
 
 const FAQS = [
@@ -217,13 +217,13 @@ const PricingPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {COMPARISON_ROWS.map(({ feature, tooltip, starter, freelance, agency }) => (
+                {COMPARISON_ROWS.map(({ feature, tooltip, creator, freelance, agency }) => (
                   <tr key={feature} className="border-b border-sidebar-border/20">
                     <td className="py-3 pr-4 text-sm font-body text-amw-offwhite/70 whitespace-nowrap">
                       {feature}
                       <FeatureTooltip text={tooltip} />
                     </td>
-                    <td className="py-3 px-4 text-center"><CellValue value={starter} /></td>
+                    <td className="py-3 px-4 text-center"><CellValue value={creator} /></td>
                     <td className="py-3 px-4 text-center"><CellValue value={freelance} /></td>
                     <td className="py-3 pl-4 text-center"><CellValue value={agency} /></td>
                   </tr>

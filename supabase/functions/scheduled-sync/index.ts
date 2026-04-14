@@ -183,9 +183,9 @@ Deno.serve(async (req) => {
     for (const conn of connections) {
       const connClientData = (conn as Record<string, unknown>).clients as { org_id: string };
       const orgId = connClientData.org_id;
-      const planSlug = orgPlanMap[orgId] || "starter";
+      const planSlug = orgPlanMap[orgId] || "creator";
 
-      if (planSlug === "starter" && dayOfMonth !== 4) {
+      if (planSlug === "creator" && now.getDay() !== 1) {
         skippedCount++;
         continue;
       }

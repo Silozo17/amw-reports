@@ -87,17 +87,17 @@ const AdminOrgList = () => {
       return;
     }
 
-    // Auto-assign starter plan
-    const { data: starterPlan } = await supabase
+    // Auto-assign creator plan
+    const { data: creatorPlan } = await supabase
       .from('subscription_plans')
       .select('id')
-      .eq('slug', 'starter')
+      .eq('slug', 'creator')
       .maybeSingle();
 
-    if (starterPlan) {
+    if (creatorPlan) {
       await supabase.from('org_subscriptions').insert({
         org_id: org.id,
-        plan_id: starterPlan.id,
+        plan_id: creatorPlan.id,
         status: 'active',
       });
     }

@@ -74,7 +74,7 @@ export async function ensureOrgMembership(user: User): Promise<string | null> {
   const { data: starterPlan } = await supabase
     .from('subscription_plans')
     .select('id')
-    .eq('slug', 'starter')
+    .eq('slug', 'creator')
     .single();
 
   if (starterPlan) {
