@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 type SyncScope = 'channel' | 'client' | 'organisation' | 'platform';
@@ -56,6 +56,8 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const PINTEREST_MAX_MONTHS = 3;
+
 function getYearOptions(): number[] {
   const current = new Date().getFullYear();
   return Array.from({ length: 4 }, (_, i) => current - i);
@@ -69,7 +71,7 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [channelMode, setChannelMode] = useState<'all' | 'selected'>('all');
   const [selectedChannelIds, setSelectedChannelIds] = useState<Set<string>>(new Set());
-  const [timeMode, setTimeMode] = useState<TimeMode>('full');
+  const [timeMode, setTimeMode] = useState<TimeMode>('single_month');
   const [singleMonth, setSingleMonth] = useState(new Date().getMonth() + 1);
   const [singleYear, setSingleYear] = useState(new Date().getFullYear());
   const [rangeStartMonth, setRangeStartMonth] = useState(1);
@@ -98,13 +100,11 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
     setSelectedPlatform('');
     setChannelMode('all');
     setSelectedChannelIds(new Set());
-    setTimeMode('full');
+    setTimeMode('single_month');
   };
 
-  /** Get the connections that will actually be synced. */
   const getTargetConnections = (): Connection[] => {
     let pool: Connection[] = [];
-
     switch (scope) {
       case 'channel':
         return activeConnections.filter(c => c.id === selectedConnectionId);
@@ -118,15 +118,12 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
         pool = activeConnections.filter(c => c.platform === selectedPlatform);
         break;
     }
-
     if (channelMode === 'selected' && selectedChannelIds.size > 0) {
       pool = pool.filter(c => selectedChannelIds.has(c.id));
     }
-
     return pool;
   };
 
-  /** The pool of connections available for channel multi-select. */
   const selectableChannels = useMemo(() => {
     switch (scope) {
       case 'client':
@@ -151,20 +148,27 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
 
   const targetCount = isReady() ? getTargetConnections().length : 0;
 
+  const hasPinterest = useMemo(() => {
+    if (!isReady()) return false;
+    return getTargetConnections().some(c => c.platform === 'pinterest');
+  }, [scope, selectedClientId, selectedConnectionId, selectedPlatform, channelMode, selectedChannelIds, activeConnections]);
+
+  const needsClientSelect = scope === 'channel' || scope === 'client';
+  const needsChannelSelect = scope === 'channel' && selectedClientId;
+  const showChannelFilter = scope !== 'channel' && selectableChannels.length > 0;
+
   const handleSync = async () => {
     const targets = getTargetConnections();
     if (targets.length === 0) {
       toast.info('No active connections to sync');
       return;
     }
-
     setIsSyncing(true);
 
     const payload: Record<string, unknown> = {
       connections: targets.map(c => ({ id: c.id, platform: c.platform })),
       mode: timeMode,
     };
-
     if (timeMode === 'single_month') {
       payload.month = singleMonth;
       payload.year = singleYear;
@@ -178,10 +182,7 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-sync', {
-        body: payload,
-      });
-
+      const { data, error } = await supabase.functions.invoke('admin-sync', { body: payload });
       if (error) {
         toast.error(`Sync failed: ${error.message}`);
       } else if (data?.error) {
@@ -195,9 +196,8 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
         }
         onComplete();
       }
-    } catch (e) {
+    } catch {
       toast.error('Sync request failed');
-      console.error(e);
     } finally {
       setIsSyncing(false);
       setOpen(false);
@@ -215,6 +215,16 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
 
   const years = getYearOptions();
 
+  const summaryText = (() => {
+    if (!isReady() || targetCount === 0) return 'Select scope and target to continue';
+    const timeLabel = timeMode === 'single_month'
+      ? `1 month (${MONTHS[singleMonth - 1]} ${singleYear})`
+      : timeMode === 'date_range'
+        ? `${MONTHS[rangeStartMonth - 1]} ${rangeStartYear} – ${MONTHS[rangeEndMonth - 1]} ${rangeEndYear}`
+        : '24 months (full history)';
+    return `${targetCount} connection${targetCount !== 1 ? 's' : ''} × ${timeLabel} — server-side`;
+  })();
+
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { resetSelections(); setScope('organisation'); } }}>
       <DialogTrigger asChild>
@@ -225,154 +235,183 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="font-display">Sync Data (Server-Side)</DialogTitle>
+          <DialogTitle className="font-display">Sync Data</DialogTitle>
           <DialogDescription>
-            Choose scope, channels, and time range. Sync runs server-side — you can navigate away safely.
+            Server-side sync — safe to navigate away once started.
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-5 pb-2">
+          <div className="space-y-6 pb-2">
+
             {/* ── Step 1: Scope ── */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">1. Sync scope</Label>
-              <RadioGroup value={scope} onValueChange={(v) => { setScope(v as SyncScope); resetSelections(); }}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="channel" id="scope-channel" />
-                  <Label htmlFor="scope-channel" className="font-normal cursor-pointer">Single Channel</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="client" id="scope-client" />
-                  <Label htmlFor="scope-client" className="font-normal cursor-pointer">Single Client</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="organisation" id="scope-org" />
-                  <Label htmlFor="scope-org" className="font-normal cursor-pointer">Whole Organisation</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="platform" id="scope-platform" />
-                  <Label htmlFor="scope-platform" className="font-normal cursor-pointer">Whole Platform (across clients)</Label>
-                </div>
+            <section className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Step 1 — Scope</p>
+              <RadioGroup value={scope} onValueChange={(v) => { setScope(v as SyncScope); resetSelections(); }} className="grid grid-cols-2 gap-2">
+                {([
+                  ['channel', 'Single Channel'],
+                  ['client', 'Single Client'],
+                  ['organisation', 'Whole Org'],
+                  ['platform', 'By Platform'],
+                ] as const).map(([val, label]) => (
+                  <label
+                    key={val}
+                    htmlFor={`scope-${val}`}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer text-sm transition-colors ${scope === val ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}`}
+                  >
+                    <RadioGroupItem value={val} id={`scope-${val}`} />
+                    {label}
+                  </label>
+                ))}
               </RadioGroup>
-            </div>
+            </section>
 
-            {/* ── Scope-specific selectors ── */}
-            {(scope === 'channel' || scope === 'client') && (
-              <div className="space-y-2">
-                <Label>Client</Label>
-                <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedConnectionId(''); setSelectedChannelIds(new Set()); }}>
-                  <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* ── Step 2: Target ── */}
+            <section className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Step 2 — Target</p>
 
-            {scope === 'channel' && selectedClientId && (
-              <div className="space-y-2">
-                <Label>Channel</Label>
-                {clientConnections.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No active connections for this client</p>
-                ) : (
-                  <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
-                    <SelectTrigger><SelectValue placeholder="Select a channel" /></SelectTrigger>
+              {needsClientSelect && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Client</Label>
+                  <Select value={selectedClientId} onValueChange={(v) => { setSelectedClientId(v); setSelectedConnectionId(''); setSelectedChannelIds(new Set()); }}>
+                    <SelectTrigger><SelectValue placeholder="Choose a client…" /></SelectTrigger>
                     <SelectContent>
-                      {clientConnections.map(c => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {PLATFORM_LABELS[c.platform] ?? c.platform} — {c.account_name || c.account_id}
-                        </SelectItem>
+                      {clients.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {scope === 'platform' && (
-              <div className="space-y-2">
-                <Label>Platform</Label>
-                <Select value={selectedPlatform} onValueChange={(v) => { setSelectedPlatform(v); setSelectedChannelIds(new Set()); }}>
-                  <SelectTrigger><SelectValue placeholder="Select a platform" /></SelectTrigger>
+              {needsChannelSelect && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Channel</Label>
+                  {clientConnections.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic">No active connections for this client</p>
+                  ) : (
+                    <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
+                      <SelectTrigger><SelectValue placeholder="Choose a channel…" /></SelectTrigger>
+                      <SelectContent>
+                        {clientConnections.map(c => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {PLATFORM_LABELS[c.platform] ?? c.platform} — {c.account_name || c.account_id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
+              {scope === 'platform' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Platform</Label>
+                  <Select value={selectedPlatform} onValueChange={(v) => { setSelectedPlatform(v); setSelectedChannelIds(new Set()); }}>
+                    <SelectTrigger><SelectValue placeholder="Choose a platform…" /></SelectTrigger>
+                    <SelectContent>
+                      {distinctPlatforms.map(p => (
+                        <SelectItem key={p} value={p}>{PLATFORM_LABELS[p] ?? p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {scope === 'organisation' && (
+                <p className="text-sm text-muted-foreground">All <strong>{activeConnections.length}</strong> active connection{activeConnections.length !== 1 ? 's' : ''} will be synced.</p>
+              )}
+
+              {/* Channel multi-select filter */}
+              {showChannelFilter && (
+                <div className="space-y-2 pt-1 border-t border-border/50">
+                  <Label className="text-xs text-muted-foreground">Channels</Label>
+                  <RadioGroup value={channelMode} onValueChange={(v) => { setChannelMode(v as 'all' | 'selected'); setSelectedChannelIds(new Set()); }} className="flex gap-4">
+                    <label htmlFor="ch-all" className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <RadioGroupItem value="all" id="ch-all" />
+                      All ({selectableChannels.length})
+                    </label>
+                    <label htmlFor="ch-selected" className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <RadioGroupItem value="selected" id="ch-selected" />
+                      Pick specific
+                    </label>
+                  </RadioGroup>
+
+                  {channelMode === 'selected' && (
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto rounded-md border border-border/50 p-2">
+                      {selectableChannels.map(c => {
+                        const clientName = clients.find(cl => cl.id === c.client_id)?.company_name ?? '';
+                        return (
+                          <label key={c.id} htmlFor={`ch-${c.id}`} className="flex items-center gap-2 py-0.5 cursor-pointer text-sm">
+                            <Checkbox
+                              id={`ch-${c.id}`}
+                              checked={selectedChannelIds.has(c.id)}
+                              onCheckedChange={() => toggleChannel(c.id)}
+                            />
+                            <span>
+                              {clientName && <span className="text-muted-foreground">{clientName} — </span>}
+                              {PLATFORM_LABELS[c.platform] ?? c.platform}
+                              {c.account_name && <span className="text-muted-foreground"> ({c.account_name})</span>}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* ── Step 3: Time range ── */}
+            <section className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Step 3 — Time Range</p>
+              <RadioGroup value={timeMode} onValueChange={(v) => setTimeMode(v as TimeMode)} className="space-y-1">
+                <label htmlFor="tm-single" className="flex items-center gap-2 text-sm cursor-pointer">
+                  <RadioGroupItem value="single_month" id="tm-single" />
+                  Single month
+                </label>
+                <label htmlFor="tm-range" className="flex items-center gap-2 text-sm cursor-pointer">
+                  <RadioGroupItem value="date_range" id="tm-range" />
+                  Date range
+                </label>
+                <label htmlFor="tm-full" className="flex items-center gap-2 text-sm cursor-pointer">
+                  <RadioGroupItem value="full" id="tm-full" />
+                  Full history (24 months)
+                </label>
+              </RadioGroup>
+
+              {/* Month/year pickers — always rendered, visibility controlled */}
+              <div className={timeMode === 'single_month' ? 'flex gap-2 pl-6' : 'hidden'}>
+                <Select value={String(singleMonth)} onValueChange={(v) => setSingleMonth(Number(v))}>
+                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {distinctPlatforms.map(p => (
-                      <SelectItem key={p} value={p}>{PLATFORM_LABELS[p] ?? p}</SelectItem>
+                    {MONTHS.map((m, i) => (
+                      <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={String(singleYear)} onValueChange={(v) => setSingleYear(Number(v))}>
+                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {years.map(y => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            {/* ── Step 2: Channel selection (multi-select for non-single scopes) ── */}
-            {scope !== 'channel' && selectableChannels.length > 0 && (
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">2. Channels</Label>
-                <RadioGroup value={channelMode} onValueChange={(v) => { setChannelMode(v as 'all' | 'selected'); setSelectedChannelIds(new Set()); }}>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="all" id="ch-all" />
-                    <Label htmlFor="ch-all" className="font-normal cursor-pointer">All channels ({selectableChannels.length})</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="selected" id="ch-selected" />
-                    <Label htmlFor="ch-selected" className="font-normal cursor-pointer">Select specific channels</Label>
-                  </div>
-                </RadioGroup>
-
-                {channelMode === 'selected' && (
-                  <div className="space-y-2 ml-6 max-h-40 overflow-y-auto">
-                    {selectableChannels.map(c => {
-                      const clientName = clients.find(cl => cl.id === c.client_id)?.company_name ?? '';
-                      return (
-                        <div key={c.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`ch-${c.id}`}
-                            checked={selectedChannelIds.has(c.id)}
-                            onCheckedChange={() => toggleChannel(c.id)}
-                          />
-                          <Label htmlFor={`ch-${c.id}`} className="font-normal cursor-pointer text-sm">
-                            {clientName && <span className="text-muted-foreground">{clientName} — </span>}
-                            {PLATFORM_LABELS[c.platform] ?? c.platform}
-                            {c.account_name && <span className="text-muted-foreground"> ({c.account_name})</span>}
-                          </Label>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── Step 3: Time range ── */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">{scope === 'channel' ? '2' : '3'}. Time range</Label>
-              <RadioGroup value={timeMode} onValueChange={(v) => setTimeMode(v as TimeMode)}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="single_month" id="tm-single" />
-                  <Label htmlFor="tm-single" className="font-normal cursor-pointer">Single month</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="date_range" id="tm-range" />
-                  <Label htmlFor="tm-range" className="font-normal cursor-pointer">Date range</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="full" id="tm-full" />
-                  <Label htmlFor="tm-full" className="font-normal cursor-pointer">Full history (24 months)</Label>
-                </div>
-              </RadioGroup>
-
-              {timeMode === 'single_month' && (
-                <div className="flex gap-2 ml-6">
-                  <Select value={String(singleMonth)} onValueChange={(v) => setSingleMonth(Number(v))}>
-                    <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <div className={timeMode === 'date_range' ? 'pl-6 space-y-2' : 'hidden'}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-10">From</span>
+                  <Select value={String(rangeStartMonth)} onValueChange={(v) => setRangeStartMonth(Number(v))}>
+                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {MONTHS.map((m, i) => (
                         <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={String(singleYear)} onValueChange={(v) => setSingleYear(Number(v))}>
+                  <Select value={String(rangeStartYear)} onValueChange={(v) => setRangeStartYear(Number(v))}>
                     <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {years.map(y => (
@@ -381,85 +420,48 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
                     </SelectContent>
                   </Select>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-10">To</span>
+                  <Select value={String(rangeEndMonth)} onValueChange={(v) => setRangeEndMonth(Number(v))}>
+                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((m, i) => (
+                        <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(rangeEndYear)} onValueChange={(v) => setRangeEndYear(Number(v))}>
+                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {years.map(y => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-              {timeMode === 'date_range' && (
-                <div className="ml-6 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-10">From</span>
-                    <Select value={String(rangeStartMonth)} onValueChange={(v) => setRangeStartMonth(Number(v))}>
-                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {MONTHS.map((m, i) => (
-                          <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={String(rangeStartYear)} onValueChange={(v) => setRangeStartYear(Number(v))}>
-                      <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {years.map(y => (
-                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-10">To</span>
-                    <Select value={String(rangeEndMonth)} onValueChange={(v) => setRangeEndMonth(Number(v))}>
-                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {MONTHS.map((m, i) => (
-                          <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={String(rangeEndYear)} onValueChange={(v) => setRangeEndYear(Number(v))}>
-                      <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {years.map(y => (
-                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {hasPinterest && timeMode !== 'single_month' && (
+                <div className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 p-2 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  Pinterest connections will be capped to {PINTEREST_MAX_MONTHS} months automatically.
                 </div>
               )}
-
-              {timeMode === 'full' && (
-                <p className="text-xs text-muted-foreground ml-6">
-                  Pinterest connections will be capped to 3 months automatically.
-                </p>
-              )}
-            </div>
+            </section>
 
             {/* ── Summary ── */}
-            {isReady() && targetCount > 0 && (
-              <p className="text-xs text-muted-foreground border-t pt-3">
-                Will sync <strong>{targetCount}</strong> connection{targetCount !== 1 ? 's' : ''} ×{' '}
-                {timeMode === 'single_month'
-                  ? '1 month'
-                  : timeMode === 'full'
-                  ? '24 months'
-                  : 'date range'}{' '}
-                — runs server-side
-              </p>
-            )}
+            <div className="rounded-md bg-muted/50 border border-border/50 px-3 py-2 text-xs text-muted-foreground">
+              {summaryText}
+            </div>
           </div>
         </ScrollArea>
 
         <DialogFooter>
-          <Button onClick={handleSync} disabled={!isReady() || targetCount === 0 || isSyncing} className="gap-2">
+          <Button onClick={handleSync} disabled={!isReady() || targetCount === 0 || isSyncing} className="gap-2 w-full sm:w-auto">
             {isSyncing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Syncing…
-              </>
+              <><Loader2 className="h-4 w-4 animate-spin" /> Syncing…</>
             ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                Start Sync
-              </>
+              <><RefreshCw className="h-4 w-4" /> Start Sync ({targetCount})</>
             )}
           </Button>
         </DialogFooter>

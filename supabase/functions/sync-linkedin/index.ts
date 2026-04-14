@@ -106,7 +106,7 @@ async function getFollowerCount(orgUrn: string, token: string): Promise<number> 
 }
 
 /** Get follower gains (organic + paid) for a time period. Non-critical — won't fail sync. */
-async function getFollowerGains(orgUrn: string, token: string, startMs: number, endMs: number): Promise<{ organic: number; paid: number }> {
+async function getFollowerGains(orgUrn: string, token: string, startMs: number, endMs: number, granularity: string): Promise<{ organic: number; paid: number }> {
   try {
     const url = buildLinkedInUrl(
       "/rest/organizationalEntityFollowerStatistics",
@@ -115,7 +115,7 @@ async function getFollowerGains(orgUrn: string, token: string, startMs: number, 
         organizationalEntity: orgUrn,
       },
       {
-        timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
+        timeIntervals: buildTimeIntervals(startMs, endMs, granularity),
       }
     );
     const data = await fetchLinkedIn(url, token);
@@ -145,7 +145,7 @@ interface ShareStats {
 }
 
 /** Get share/post statistics for a time period — CRITICAL, will throw on failure. */
-async function getShareStatistics(orgUrn: string, token: string, startMs: number, endMs: number): Promise<ShareStats> {
+async function getShareStatistics(orgUrn: string, token: string, startMs: number, endMs: number, granularity: string): Promise<ShareStats> {
   const result: ShareStats = { clicks: 0, comments: 0, likes: 0, shares: 0, impressions: 0, uniqueImpressions: 0, engagement: 0 };
   const url = buildLinkedInUrl(
     "/rest/organizationalEntityShareStatistics",
@@ -154,7 +154,7 @@ async function getShareStatistics(orgUrn: string, token: string, startMs: number
       organizationalEntity: orgUrn,
     },
     {
-      timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
+      timeIntervals: buildTimeIntervals(startMs, endMs, granularity),
     }
   );
   const data = await fetchLinkedIn(url, token);
@@ -179,7 +179,7 @@ interface PageViews { total: number; desktop: number; mobile: number }
  * Get page view statistics — CRITICAL, will throw on failure.
  * Routes to organizationPageStatistics or brandPageStatistics based on entity type.
  */
-async function getPageStatistics(orgUrn: string, entityType: string, token: string, startMs: number, endMs: number): Promise<PageViews> {
+async function getPageStatistics(orgUrn: string, entityType: string, token: string, startMs: number, endMs: number, granularity: string): Promise<PageViews> {
   const result: PageViews = { total: 0, desktop: 0, mobile: 0 };
 
   const url = entityType === "organizationBrand"
@@ -190,7 +190,7 @@ async function getPageStatistics(orgUrn: string, entityType: string, token: stri
           brand: orgUrn,
         },
         {
-          timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
+          timeIntervals: buildTimeIntervals(startMs, endMs, granularity),
         }
       )
     : buildLinkedInUrl(
@@ -200,7 +200,7 @@ async function getPageStatistics(orgUrn: string, entityType: string, token: stri
           organization: orgUrn,
         },
         {
-          timeIntervals: buildTimeIntervals(startMs, endMs, timeGranularity),
+          timeIntervals: buildTimeIntervals(startMs, endMs, granularity),
         }
       );
 
@@ -426,13 +426,13 @@ Deno.serve(async (req) => {
     // ── Fetch all data — critical endpoints fail-fast ──
     const [followers, shareStats, pageStats] = await Promise.all([
       getFollowerCount(orgUrn, accessToken),
-      getShareStatistics(orgUrn, accessToken, monthStartMs, monthEndMs),
-      getPageStatistics(orgUrn, entityType, accessToken, monthStartMs, monthEndMs),
+      getShareStatistics(orgUrn, accessToken, monthStartMs, monthEndMs, timeGranularity),
+      getPageStatistics(orgUrn, entityType, accessToken, monthStartMs, monthEndMs, timeGranularity),
     ]);
 
     // Non-critical — won't fail the sync
     const [gains, topContentRaw] = await Promise.all([
-      getFollowerGains(orgUrn, accessToken, monthStartMs, monthEndMs),
+      getFollowerGains(orgUrn, accessToken, monthStartMs, monthEndMs, timeGranularity),
       getTopContent(orgUrn, accessToken, monthStartMs, monthEndMs),
     ]);
 
