@@ -224,12 +224,6 @@
   display: none;
 }
 
-/* KPI Card Glassmorphism */
-.kpi-card-glass {
-  background: hsla(var(--card), 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
 
 @keyframes glow-pulse {
   0%, 100% { opacity: 0.06; }
