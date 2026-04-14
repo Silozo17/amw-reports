@@ -1,16 +1,11 @@
-import { useState, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plug } from 'lucide-react';
 import { format } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
 import AdminSyncDialog from '@/components/admin/AdminSyncDialog';
-import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import type { Tables } from '@/integrations/supabase/types';
-import type { SyncProgress } from '@/lib/triggerSync';
-import type { QueueState } from '@/lib/syncQueue';
 
 interface AdminOrgClientsProps {
   orgId: string;
@@ -20,22 +15,6 @@ interface AdminOrgClientsProps {
 
 const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) => {
   const queryClient = useQueryClient();
-  const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncProgress>>(new Map());
-  const [syncStartTime, setSyncStartTime] = useState(0);
-
-  const handleSyncStart = useCallback((syncs: Map<string, SyncProgress>, startTime: number) => {
-    setActiveSyncs(syncs);
-    setSyncStartTime(startTime);
-  }, []);
-
-  const handleSyncProgress = useCallback((syncs: Map<string, SyncProgress>) => {
-    setActiveSyncs(new Map(syncs));
-  }, []);
-
-  const handleSyncEnd = useCallback(() => {
-    setActiveSyncs(new Map());
-    setSyncStartTime(0);
-  }, []);
 
   const connectionsByClient = connections.reduce<Record<string, Tables<'platform_connections'>[]>>((acc, c) => {
     (acc[c.client_id] ??= []).push(c);
@@ -44,17 +23,6 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
 
   return (
     <>
-      {activeSyncs.size > 0 && (() => {
-        const entries = [...activeSyncs.entries()];
-        const active = entries.find(([, p]) => p.completed < p.total) ?? entries[0];
-        const qs: QueueState = {
-          currentJob: active ? { connectionId: '', platform: active[0] as any, months: active[1].total } : null,
-          queuedJobs: [],
-          currentProgress: active ? active[1] : null,
-        };
-        return <SyncProgressBar queueState={qs} startTime={syncStartTime} />;
-      })()}
-
       <Card>
         <CardHeader><CardTitle className="font-display text-lg">Clients</CardTitle></CardHeader>
         <CardContent>
@@ -109,9 +77,6 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
                 clients={clients}
                 connections={connections}
                 onComplete={() => queryClient.invalidateQueries({ queryKey: ['admin-org-connections', orgId] })}
-                onSyncStart={handleSyncStart}
-                onSyncProgress={handleSyncProgress}
-                onSyncEnd={handleSyncEnd}
               />
             </div>
           </CardHeader>
