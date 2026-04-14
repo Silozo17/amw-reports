@@ -1,29 +1,28 @@
 
 
-## Plan: Remove Reach from Facebook Entirely
+## Plan: Fix Video Views Hero KPI and Update Tooltips
 
-### What and Why
-Facebook's reach metrics (`page_total_media_view_unique`) are unreliable for distinguishing organic vs paid. Rather than continuing to fix the subtraction model, we'll remove reach from Facebook entirely — both the sync logic and the frontend display.
+### Problem
+The "Video Views" hero KPI currently sums `video_views` from **all** platforms, including Meta Ads (paid). This inflates the number with paid video plays. The user wants it to only show organic video views.
+
+Additionally, the info tooltips need updating:
+- **Video Views**: should clarify "Organic video views"
+- **Reach**: should clarify "Organic + paid reach"
 
 ### Changes
 
-**1. `supabase/functions/sync-facebook-page/index.ts`**
-- Remove variable declarations `totalUniqueViewers` and `totalUniqueViewersOrganic` (lines 238-239)
-- Remove the entire reach try/catch block (lines 291-333)
-- Remove `reach` and `reach_total` from `metricsData` object (lines 479-480)
-- Remove `reach=${totalUniqueViewers}` from the final console.log (line 550)
+**1. `src/lib/dashboardCalcs.ts`** — Exclude `meta_ads` from Video Views aggregation
 
-**2. `src/components/clients/dashboard/PlatformSection.tsx`**
-- Remove `'reach'` from `FACEBOOK_KEY_METRICS` array (line 95)
+- Line 31: Filter out `meta_ads` when summing `video_views`
+- Line 42: Same exclusion for previous period comparison
+- Line 57: Same exclusion for platform icon detection
+- Line 115 (sparklines): Exclude `meta_ads` from `video_views` sparkline aggregation
 
-**3. `src/components/clients/PlatformMetricsCard.tsx`**
-- Add a filter to hide `reach` and `reach_total` metrics when platform is `facebook`
+**2. `src/types/metrics.ts`** — Update tooltip descriptions
 
-No database changes needed. Other platforms' reach metrics are untouched.
+- Line 37: Change `video_views` from `'Number of times your videos were watched'` → `'Total organic video views across your social platforms'`
+- Line 19: Change `reach` from `'Number of unique people who saw your content (includes both organic and paid reach)'` → `'Unique people who saw your content — includes both organic and paid reach'`
 
-### Technical Detail
-- The `PlatformMetricsCard` will filter out metric keys `reach` and `reach_total` only when `platform === 'facebook'`
-- The sync function will no longer make any API calls for `page_total_media_view_unique`
-- Existing stored snapshot data with reach values will still exist but won't display
-- Edge function will be redeployed after changes
+### No other changes
+No backend, database, or other frontend files affected. Meta Ads will still sync and store `video_views` — it just won't be included in the hero KPI aggregation.
 
