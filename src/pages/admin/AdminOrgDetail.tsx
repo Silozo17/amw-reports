@@ -71,7 +71,7 @@ const AdminOrgDetail = () => {
     queryFn: async () => {
       const clientIds = clients.map((c) => c.id);
       if (clientIds.length === 0) return [];
-      const { data } = await supabase.from('platform_connections').select('*').in('client_id', clientIds);
+      const { data } = await supabase.from('platform_connections').select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at').in('client_id', clientIds);
       return data ?? [];
     },
     enabled: clients.length > 0,

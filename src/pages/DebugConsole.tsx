@@ -96,7 +96,7 @@ const DebugConsole = () => {
     setLoading(l => ({ ...l, connections: true }));
     const { data } = await supabase
       .from('platform_connections')
-      .select('*')
+      .select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at')
       .eq('client_id', selectedClientId)
       .order('platform');
     setConnections((data as PlatformConnection[]) ?? []);

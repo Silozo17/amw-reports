@@ -72,7 +72,7 @@ const ClientPortalAuth = () => {
     const [clientRes, orgRes, connRes] = await Promise.all([
       supabase.from('clients').select('id, company_name, full_name, logo_url, preferred_currency').eq('id', client_id).single(),
       supabase.from('organisations').select('id, name, logo_url, primary_color, heading_font, body_font').eq('id', org_id).single(),
-      supabase.from('platform_connections').select('*').eq('client_id', client_id),
+      supabase.from('platform_connections').select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at').eq('client_id', client_id),
     ]);
 
     if (clientRes.error || !clientRes.data) {
@@ -147,7 +147,7 @@ const ClientPortalAuth = () => {
       setSearchParams({}, { replace: true });
       supabase
         .from('platform_connections')
-        .select('*')
+        .select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at')
         .eq('id', pendingConnectionId)
         .single()
         .then(({ data }) => {

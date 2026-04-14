@@ -94,7 +94,7 @@ const ClientDetail = () => {
       setSearchParams({}, { replace: true });
       supabase
         .from('platform_connections')
-        .select('*')
+        .select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at')
         .eq('id', oauthConnected)
         .single()
         .then(async ({ data }) => {
@@ -120,7 +120,7 @@ const ClientDetail = () => {
       setSearchParams({}, { replace: true });
       supabase
         .from('platform_connections')
-        .select('*')
+        .select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at')
         .eq('id', pendingConnectionId)
         .single()
         .then(({ data }) => {
@@ -169,7 +169,7 @@ const ClientDetail = () => {
     const [clientRes, recipientsRes, connectionsRes, clientUsersRes] = await Promise.all([
       supabase.from('clients').select('*').eq('id', id).single(),
       supabase.from('client_recipients').select('*').eq('client_id', id),
-      supabase.from('platform_connections').select('*').eq('client_id', id),
+      supabase.from('platform_connections').select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at').eq('client_id', id),
       supabase.from('client_users').select('id, invited_email, user_id, created_at').eq('client_id', id),
     ]);
     setClient(clientRes.data as Client | null);
@@ -282,7 +282,7 @@ const ClientDetail = () => {
 
     // Re-fetch only the specific connection that was just configured
     const { data: conn } = await supabase
-      .from('platform_connections').select('*')
+      .from('platform_connections').select('id, client_id, platform, account_name, account_id, is_connected, last_sync_at, last_sync_status, last_error, metadata, token_expires_at, created_at, updated_at')
       .eq('id', pickerConnection.id).single();
     if (!conn || !conn.account_id || !conn.is_connected) return;
 
