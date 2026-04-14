@@ -1,6 +1,5 @@
 import { cn } from '@/lib/utils';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
-import {
 import MetricTooltip from '@/components/clients/MetricTooltip';
 import { PLATFORM_LOGOS, PLATFORM_LABELS } from '@/types/database';
 import type { PlatformType } from '@/types/database';
