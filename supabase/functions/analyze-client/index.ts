@@ -12,7 +12,7 @@ const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 60_000;
 
 const PLATFORM_CATEGORIES: Record<string, string[]> = {
-  "Paid Advertising": ["google_ads", "meta_ads", "tiktok_ads"],
+  "Paid Advertising": ["google_ads", "meta_ads", "tiktok_ads", "linkedin_ads"],
   "Organic Social": ["facebook", "instagram", "tiktok", "linkedin", "youtube", "pinterest"],
   "SEO & Web Analytics": ["google_search_console", "google_analytics", "google_business_profile"]
 };
