@@ -310,6 +310,27 @@ Deno.serve(async (req) => {
       throw new Error("No location selected. Please select a business location in the Account Picker.");
     }
 
+    // ── Resolve accountName for reviews API ────────────────────
+    const meta = conn.metadata as Record<string, unknown> | null;
+    let accountName: string | null = null;
+    // Try from metadata.locations (stored by oauth-callback)
+    if (meta?.locations && Array.isArray(meta.locations)) {
+      const matchingLoc = (meta.locations as Array<{ id: string; accountName?: string }>).find(l => l.id === locationId);
+      if (matchingLoc?.accountName) accountName = matchingLoc.accountName;
+    }
+    // Fallback: discover via Account Management API
+    if (!accountName) {
+      console.log("accountName not in metadata — discovering via API...");
+      accountName = await discoverAccountName(locationId, accessToken);
+      // Cache it in metadata for future syncs
+      if (accountName && meta?.locations && Array.isArray(meta.locations)) {
+        const updatedLocations = (meta.locations as Array<Record<string, unknown>>).map(l =>
+          (l as { id: string }).id === locationId ? { ...l, accountName } : l
+        );
+        await supabase.from("platform_connections").update({ metadata: { ...meta, locations: updatedLocations } }).eq("id", connectionId);
+      }
+    }
+
     const lastDay = new Date(year, month, 0).getDate();
 
     // ── Fetch all daily metrics ──────────────────────────────────
@@ -340,7 +361,7 @@ Deno.serve(async (req) => {
     const gbpViews = totalMaps + totalSearches;
 
     // ── Fetch reviews via GMB API + Places API ─────────────────
-    const reviews = await fetchReviewsData(locationId, accessToken, googleApiKey);
+    const reviews = await fetchReviewsData(locationId, accountName, accessToken, googleApiKey);
     const reviewsCount = reviews.reviewsCount;
     const avgRating = reviews.averageRating;
     const latestReviews = reviews.latestReviews;
