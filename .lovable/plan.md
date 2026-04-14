@@ -1,49 +1,33 @@
 
 
-## Plan: Add Sync Queue for Sequential Platform Syncing
+## Plan: Server-Side Admin Sync with Granular Controls
 
-### Problem
-When a user connects multiple platforms in quick succession, each platform's 24-month sync fires concurrently. This causes:
-- API rate limit failures (especially for Meta Ads)
-- Incomplete syncs due to overlapping requests
-- No visibility into which platform is waiting vs actively syncing
+### Implemented
 
-### Solution
-Create a client-side sync queue that ensures only one platform syncs at a time. When a new connection triggers a sync while another is already running, it gets queued and starts automatically when the current one finishes.
+**1. New Edge Function: `supabase/functions/admin-sync/index.ts`**
+- Server-side sync orchestrator — runs independently of the browser
+- Processes connections sequentially (one at a time), then months sequentially within each connection
+- 1.5s delay between months, 3s delay between connections to respect API rate limits
+- Supports 3 modes: `single_month`, `date_range`, `full` (24 months)
+- Auto-caps Pinterest to 3 months
+- Validates caller is a platform admin via JWT + `is_platform_admin` RPC
+- Returns full results summary when complete
 
-### Changes
+**2. Redesigned `src/components/admin/AdminSyncDialog.tsx`**
+- Step 1: Scope — Single Channel / Single Client / Whole Org / Whole Platform
+- Step 2: Channel selection — All channels or multi-select specific ones (checkbox list)
+- Step 3: Time range — Single month (with month/year picker), Date range (from/to), Full 24 months
+- Calls `admin-sync` edge function — sync runs server-side, page can be closed
+- Loading spinner during sync call
+- Pinterest cap noted in UI
 
-**1. New file: `src/lib/syncQueue.ts`**
-- Create a `SyncQueue` singleton class that manages a FIFO queue of sync jobs
-- Each job holds: `connectionId`, `platform`, `months`, `onProgress` callback
-- `enqueue(job)` adds to queue; if nothing is running, starts immediately
-- `processNext()` picks the next job, runs `triggerInitialSync`, then calls `processNext()` again
-- Exposes observable state: `currentJob`, `queuedJobs`, `onStateChange` callback
-- The queue is scoped per-page (not truly global) — created once in `ClientDetail`
+**3. Simplified `src/components/admin/AdminOrgClients.tsx`**
+- Removed all client-side sync state (activeSyncs, syncStartTime, SyncProgressBar)
+- Removed sync callback props — sync is now fully server-side
+- Clean, focused component
 
-**2. Update: `src/pages/clients/ClientDetail.tsx`**
-- Replace the two direct `triggerInitialSync` calls (line ~106 and ~291) with `syncQueue.enqueue(...)`
-- The queue ensures platform B waits for platform A to finish before starting
-- Update `activeSyncs` state to show both the currently syncing platform and queued platforms (with a "queued" indicator)
-- Progress bar continues to work as before — just one platform at a time
-
-**3. Update: `src/components/clients/SyncProgressBar.tsx`**
-- Add visual indicator for queued syncs (e.g. "Meta Ads — Queued" shown dimmed below the active sync bar)
-
-### How it works
-```text
-User connects Google Ads  →  Queue: [Google Ads]  →  Syncing Google Ads (24 months)
-User connects Meta Ads    →  Queue: [Meta Ads]    →  "Meta Ads — Queued" shown
-Google Ads finishes        →  Queue: []            →  Syncing Meta Ads (24 months)
-Meta Ads finishes          →  Queue: []            →  All done
-```
-
-### What stays the same
-- `triggerInitialSync` and `triggerSync` functions unchanged
-- `getSyncMonths` logic unchanged (already returns 24 for Agency)
-- Admin sync dialog unchanged (it already runs sequentially)
-- Edge functions unchanged
-
-### Technical detail
-The queue is a simple class with an array and a `processing` flag. No database table needed — this is purely client-side coordination to prevent concurrent API hammering. If the user navigates away, queued syncs are lost (same as current behavior where in-progress syncs are lost on navigation).
-
+### Architecture
+- Each connection is processed one at a time (sequential queue)
+- Within each connection, each month is processed one at a time (sequential queue)
+- No concurrent API calls — prevents rate limiting
+- Navigating away does NOT stop the sync
