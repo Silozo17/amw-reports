@@ -48,7 +48,7 @@ export interface Entitlements {
   gracePeriodEnd: Date | null;
 }
 
-const STARTER_LIMITS = {
+const CREATOR_LIMITS = {
   maxClients: 1,
   maxConnections: 5,
 };
@@ -138,8 +138,8 @@ export function useEntitlements(): Entitlements {
 
   if (isLocked) {
     // Locked: fall back to Starter limits
-    maxClients = STARTER_LIMITS.maxClients;
-    maxConnections = STARTER_LIMITS.maxConnections;
+    maxClients = CREATOR_LIMITS.maxClients;
+    maxConnections = CREATOR_LIMITS.maxConnections;
     hasWhitelabel = false;
   } else {
     maxClients = subscription?.override_max_clients === -1
