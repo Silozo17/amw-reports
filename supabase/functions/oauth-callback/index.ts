@@ -1036,7 +1036,7 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
         if (locData.locations?.length > 0) {
           for (const loc of locData.locations) {
             const locId = loc.name;
-            locations.push({ id: locId, name: loc.title || locId });
+            locations.push({ id: locId, name: loc.title || locId, accountName: acct.name });
           }
         }
       }

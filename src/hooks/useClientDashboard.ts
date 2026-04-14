@@ -136,18 +136,60 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
   useEffect(() => { setHasAutoDetected(hasExplicitPeriod); }, [clientId, hasExplicitPeriod]);
 
   // ─── Aggregation helpers ───────────────────────────────────
+  const LATEST_VALUE_METRICS = new Set([
+    'gbp_average_rating', 'gbp_reviews_count', 'total_followers',
+    'followers', 'subscribers', 'following', 'total_pins',
+    'total_boards', 'total_video_count', 'media_count',
+  ]);
+
   const aggregateMultiMonth = (snaps: SnapshotData[], month: number, year: number): SnapshotData[] => {
     const grouped = new Map<PlatformType, Record<string, number>>();
+    // Track snapshots per platform sorted newest-first for latest-value metrics
+    const sortedByPlatform = new Map<PlatformType, SnapshotData[]>();
+    // Merge top_content per platform
+    const topContentByPlatform = new Map<PlatformType, TopContentItem[]>();
+
+    for (const s of snaps) {
+      if (!sortedByPlatform.has(s.platform)) sortedByPlatform.set(s.platform, []);
+      sortedByPlatform.get(s.platform)!.push(s);
+      // Collect top_content
+      if (Array.isArray(s.top_content) && s.top_content.length > 0) {
+        if (!topContentByPlatform.has(s.platform)) topContentByPlatform.set(s.platform, []);
+        topContentByPlatform.get(s.platform)!.push(...s.top_content);
+      }
+    }
+
+    // Sort each platform's snapshots newest-first
+    for (const [, arr] of sortedByPlatform) {
+      arr.sort((a, b) => (b.report_year - a.report_year) || (b.report_month - a.report_month));
+    }
+
     for (const s of snaps) {
       const existing = grouped.get(s.platform) || {};
       for (const [k, v] of Object.entries(s.metrics_data)) {
         if (typeof v === "number") {
-          if (k === "total_followers") existing[k] = Math.max(existing[k] || 0, v);
-          else existing[k] = (existing[k] || 0) + v;
+          if (LATEST_VALUE_METRICS.has(k)) {
+            // Skip — handled below from sorted snapshots
+          } else {
+            existing[k] = (existing[k] || 0) + v;
+          }
         }
       }
       grouped.set(s.platform, existing);
     }
+
+    // Apply latest-value logic for cumulative metrics
+    for (const [platform, sorted] of sortedByPlatform) {
+      const metrics = grouped.get(platform) || {};
+      for (const metricKey of LATEST_VALUE_METRICS) {
+        const snap = sorted.find(s => s.metrics_data?.[metricKey] != null);
+        if (snap) {
+          metrics[metricKey] = snap.metrics_data[metricKey];
+        }
+      }
+      grouped.set(platform, metrics);
+    }
+
     return Array.from(grouped.entries()).map(([platform, metrics]) => {
       const a = { ...metrics };
       if (a.spend && a.clicks) a.cpc = a.spend / a.clicks;
@@ -155,7 +197,13 @@ export const useClientDashboard = ({ clientId, currencyCode, portalToken, initia
       if (a.spend && a.leads) a.cost_per_lead = a.spend / a.leads;
       if (a.clicks && a.impressions) a.ctr = (a.clicks / a.impressions) * 100;
       if (a.engagement && a.impressions) a.engagement_rate = (a.engagement / a.impressions) * 100;
-      return { platform, metrics_data: a, report_month: month, report_year: year };
+      return {
+        platform,
+        metrics_data: a,
+        top_content: topContentByPlatform.get(platform) || [],
+        report_month: month,
+        report_year: year,
+      };
     });
   };
 

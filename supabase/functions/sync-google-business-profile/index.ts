@@ -63,9 +63,36 @@ async function fetchDailyMetricTotal(
   }
 }
 
+/** Discover the GBP account name for a location via the Account Management API */
+async function discoverAccountName(
+  locationId: string,
+  accessToken: string
+): Promise<string | null> {
+  try {
+    const acctRes = await fetch("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!acctRes.ok) { console.warn("Account discovery failed:", acctRes.status); return null; }
+    const acctData = await acctRes.json();
+    for (const acct of (acctData.accounts || [])) {
+      const locRes = await fetch(
+        `https://mybusinessbusinessinformation.googleapis.com/v1/${acct.name}/locations?readMask=name`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!locRes.ok) continue;
+      const locData = await locRes.json();
+      for (const loc of (locData.locations || [])) {
+        if (loc.name === locationId) return acct.name as string;
+      }
+    }
+  } catch (e) { console.warn("Account name discovery error:", e); }
+  return null;
+}
+
 /** Fetch reviews count, rating, and latest reviews */
 async function fetchReviewsData(
   locationId: string,
+  accountName: string | null,
   accessToken: string,
   apiKey: string
 ): Promise<{
@@ -109,34 +136,38 @@ async function fetchReviewsData(
     }
   }
 
-  // Fetch reviews sorted by newest using GMB API
+  // Fetch reviews sorted by newest using GMB API — requires accounts/{id}/locations/{id} path
   const latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }> = [];
-  try {
-    const reviewsUrl = `https://mybusiness.googleapis.com/v4/${locationId}/reviews?pageSize=5&orderBy=updateTime+desc`;
-    console.log(`GMB reviews URL: ${reviewsUrl}`);
-    const reviewsRes = await fetch(reviewsUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!reviewsRes.ok) {
-      const errText = await reviewsRes.text();
-      console.warn(`GMB reviews failed (${reviewsRes.status}):`, errText);
-    } else {
-      const reviewsData = await reviewsRes.json();
-      for (const r of (reviewsData.reviews || []).slice(0, 5)) {
-        const starMap: Record<string, number> = {
-          ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5,
-        };
-        latestReviews.push({
-          type: "review",
-          author: r.reviewer?.displayName || "Anonymous",
-          rating: starMap[r.starRating] ?? 0,
-          text: (r.comment || "").slice(0, 300),
-          relative_time: r.updateTime
-            ? new Date(r.updateTime).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-            : "",
-        });
+  if (accountName) {
+    try {
+      const reviewsUrl = `https://mybusiness.googleapis.com/v4/${accountName}/${locationId}/reviews?pageSize=5&orderBy=updateTime+desc`;
+      console.log(`GMB reviews URL: ${reviewsUrl}`);
+      const reviewsRes = await fetch(reviewsUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!reviewsRes.ok) {
+        const errText = await reviewsRes.text();
+        console.warn(`GMB reviews failed (${reviewsRes.status}):`, errText);
+      } else {
+        const reviewsData = await reviewsRes.json();
+        for (const r of (reviewsData.reviews || []).slice(0, 5)) {
+          const starMap: Record<string, number> = {
+            ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5,
+          };
+          latestReviews.push({
+            type: "review",
+            author: r.reviewer?.displayName || "Anonymous",
+            rating: starMap[r.starRating] ?? 0,
+            text: (r.comment || "").slice(0, 300),
+            relative_time: r.updateTime
+              ? new Date(r.updateTime).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : "",
+          });
+        }
       }
+    } catch (e) {
+      console.warn("Could not fetch GMB reviews:", e);
     }
-  } catch (e) {
-    console.warn("Could not fetch GMB reviews:", e);
+  } else {
+    console.warn("No accountName available — skipping reviews fetch");
   }
 
   return { reviewsCount, averageRating, latestReviews };
