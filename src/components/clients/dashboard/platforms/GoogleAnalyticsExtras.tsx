@@ -18,14 +18,14 @@ const GoogleAnalyticsExtras = ({ rawData }: GoogleAnalyticsExtrasProps) => {
     <>
       {((rawData.geoCountries as RawDataItem[])?.length > 0 || (rawData.geoCities as RawDataItem[])?.length > 0) && (
         <GeoHeatmap
-          countries={((rawData.geoCountries as RawDataItem[]) || []) as GeoProps['countries']}
-          cities={((rawData.geoCities as RawDataItem[]) || []) as GeoProps['cities']}
+          countries={((rawData.geoCountries as RawDataItem[]) || []) as unknown as GeoProps['countries']}
+          cities={((rawData.geoCities as RawDataItem[]) || []) as unknown as GeoProps['cities']}
         />
       )}
       {((rawData.devices as RawDataItem[])?.length > 0 || (rawData.newVsReturning as RawDataItem[])?.length > 0) && (
         <DeviceBreakdown
-          devices={((rawData.devices as RawDataItem[]) || []) as DeviceProps['devices']}
-          newVsReturning={((rawData.newVsReturning as RawDataItem[]) || []) as DeviceProps['newVsReturning']}
+          devices={((rawData.devices as RawDataItem[]) || []) as unknown as DeviceProps['devices']}
+          newVsReturning={((rawData.newVsReturning as RawDataItem[]) || []) as unknown as DeviceProps['newVsReturning']}
         />
       )}
       {(rawData.landingPages as RawDataItem[])?.length > 0 && (

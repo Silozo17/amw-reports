@@ -12,16 +12,16 @@ const LinkedInAdsExtras = ({ rawData, currSymbol }: LinkedInAdsExtrasProps) => {
   if (!((rawData.campaignGroups as RawDataItem[])?.length || (rawData.campaigns as RawDataItem[])?.length)) return null;
 
   const mapped: RawDataProp = {
-    campaigns: ((rawData.campaignGroups as RawDataItem[]) || []) as RawDataProp['campaigns'],
+    campaigns: ((rawData.campaignGroups as RawDataItem[]) || []) as unknown as RawDataProp['campaigns'],
     adSets: ((rawData.campaigns as RawDataItem[])?.map((c) => ({
       ...c,
       campaign_id: c.campaignGroupId || '',
-    })) || []) as RawDataProp['adSets'],
+    })) || []) as unknown as RawDataProp['adSets'],
     ads: ((rawData.ads as RawDataItem[])?.map((a) => ({
       ...a,
       adset_id: a.campaignId || '',
       adset_name: a.campaign_name || '',
-    })) || []) as RawDataProp['ads'],
+    })) || []) as unknown as RawDataProp['ads'],
   };
 
   return (

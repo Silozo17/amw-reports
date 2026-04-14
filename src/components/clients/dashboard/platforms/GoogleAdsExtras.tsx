@@ -14,9 +14,9 @@ const GoogleAdsExtras = ({ rawData, currSymbol }: GoogleAdsExtrasProps) => {
   const mapped: RawDataProp = {
     campaigns: ((rawData.campaigns as RawDataItem[]) ?? []).map((c) => ({
       ...c, spend: c.spend ?? c.cost, cpc: c.cpc ?? c.avg_cpc,
-    })) as RawDataProp['campaigns'],
-    adSets: ((rawData.adGroups as RawDataItem[]) || []) as RawDataProp['adSets'],
-    ads: ((rawData.ads as RawDataItem[]) || []) as RawDataProp['ads'],
+    })) as unknown as RawDataProp['campaigns'],
+    adSets: ((rawData.adGroups as RawDataItem[]) || []) as unknown as RawDataProp['adSets'],
+    ads: ((rawData.ads as RawDataItem[]) || []) as unknown as RawDataProp['ads'],
   };
 
   return (
