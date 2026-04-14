@@ -3,9 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
+  "X-Frame-Options": "DENY"
 };
 
 interface ReportRequest {
@@ -586,7 +586,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     optionA: 'MULIGHED A',
     optionB: 'MULIGHED B',
     interestedCall: 'Interesseret? Svar på denne e-mail eller ring til os på',
-  },
+  }
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -620,7 +620,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   google_ads: "Google Ads", meta_ads: "Meta Ads", facebook: "Facebook",
   instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn",
   google_search_console: "Google Search Console", google_analytics: "Google Analytics",
-  google_business_profile: "Google Business Profile", youtube: "YouTube", pinterest: "Pinterest",
+  google_business_profile: "Google Business Profile", youtube: "YouTube", pinterest: "Pinterest"
 };
 
 const PLATFORM_DESCRIPTIONS: Record<string, string> = {
@@ -634,7 +634,7 @@ const PLATFORM_DESCRIPTIONS: Record<string, string> = {
   google_analytics: "your website traffic — how many people visit, where they come from, and what they do on your site.",
   google_business_profile: "your Google Business listing — how people find your business on Google Maps and Search, and the actions they take.",
   youtube: "your YouTube channel — video views, subscriber growth, and how long people watch your content.",
-  pinterest: "your Pinterest presence — how your pins perform, how many people save them, and the traffic they drive.",
+  pinterest: "your Pinterest presence — how your pins perform, how many people save them, and the traffic they drive."
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -677,7 +677,7 @@ const METRIC_LABELS: Record<string, string> = {
   average_time_watched: "Avg. Watch Time (s)", new_followers: "New Followers",
   cta_clicks: "CTA Clicks", engaged_users: "Engaged Users",
   paid_reach: "Paid Reach", paid_video_views: "Paid Video Views",
-  total_impressions: "Total Impressions", total_video_views: "Total Video Views",
+  total_impressions: "Total Impressions", total_video_views: "Total Video Views"
 };
 
 /** Platform-specific metrics order — max 12 shown in grid */
@@ -692,7 +692,7 @@ const PLATFORM_AVAILABLE_METRICS: Record<string, string[]> = {
   google_analytics: ["sessions", "active_users", "new_users", "ga_page_views", "bounce_rate", "avg_session_duration", "pages_per_session"],
   google_business_profile: ["gbp_views", "gbp_searches", "gbp_calls", "gbp_direction_requests", "gbp_website_clicks", "gbp_reviews_count", "gbp_average_rating"],
   youtube: ["subscribers", "views", "watch_time", "videos_published", "avg_view_duration"],
-  pinterest: ["impressions", "saves", "pin_clicks", "outbound_clicks", "engagement", "engagement_rate", "total_followers", "total_pins", "total_boards"],
+  pinterest: ["impressions", "saves", "pin_clicks", "outbound_clicks", "engagement", "engagement_rate", "total_followers", "total_pins", "total_boards"]
 };
 
 /** Key metrics per platform for traffic light and summary generation */
@@ -707,7 +707,7 @@ const PLATFORM_KEY_METRICS: Record<string, string[]> = {
   google_analytics: ["sessions", "active_users", "bounce_rate", "avg_session_duration"],
   google_business_profile: ["gbp_views", "gbp_searches", "gbp_calls", "gbp_website_clicks"],
   youtube: ["views", "subscribers", "watch_time", "avg_view_duration"],
-  pinterest: ["impressions", "saves", "pin_clicks", "outbound_clicks"],
+  pinterest: ["impressions", "saves", "pin_clicks", "outbound_clicks"]
 };
 
 /** Metrics where a decrease is positive */
@@ -814,7 +814,7 @@ const DEFAULTS = {
   metricLabel: [156, 163, 175] as [number, number, number],
   metricValue: [17, 24, 39] as [number, number, number],
   sectionLabel: [156, 163, 175] as [number, number, number],
-  sectionDivider: [243, 244, 246] as [number, number, number],
+  sectionDivider: [243, 244, 246] as [number, number, number]
 };
 
 interface PlatformData {

@@ -4,9 +4,9 @@ import { encryptToken } from "../_shared/tokenCrypto.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",,
+    "authorization, x-client-info, apikey, content-type",
   "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
+  "X-Frame-Options": "DENY"
 };
 
 Deno.serve(async (req) => {

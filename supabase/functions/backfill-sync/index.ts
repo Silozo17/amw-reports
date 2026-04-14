@@ -3,9 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",,
+    "authorization, x-client-info, apikey, content-type",
   "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
+  "X-Frame-Options": "DENY"
 };
 
 const SYNC_FUNCTION_MAP: Record<string, string> = {
@@ -21,7 +21,7 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
   google_analytics: "sync-google-analytics",
   google_business_profile: "sync-google-business-profile",
   youtube: "sync-youtube",
-  pinterest: "sync-pinterest",
+  pinterest: "sync-pinterest"
 };
 
 const DELAY_BETWEEN_SYNCS_MS = 1_500;
@@ -29,7 +29,7 @@ const DEFAULT_MONTHS = 12;
 
 /** Platform-specific caps — Pinterest API limits analytics to 90 days. */
 const PLATFORM_MAX_MONTHS: Record<string, number> = {
-  pinterest: 3,
+  pinterest: 3
 };
 
 interface BackfillResult {
