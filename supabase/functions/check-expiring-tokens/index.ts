@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { decryptToken, encryptToken } from "../_shared/tokenCrypto.ts";
 
 // Cron-only function — no CORS needed (never called from browser)
 
@@ -10,6 +11,9 @@ const AUTO_REFRESH_PLATFORMS = [
   "google_ads", "google_search_console", "google_analytics",
   "google_business_profile", "youtube", "pinterest", "tiktok", "linkedin",
 ];
+
+/** Platforms that use long-lived token refresh (no refresh_token, just re-exchange) */
+const LONG_LIVED_REFRESH_PLATFORMS = ["threads"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -30,6 +34,41 @@ Deno.serve(async (req) => {
     const sixDaysAgoEnd = new Date(sixDaysAgoStart.getTime() + 24 * 60 * 60 * 1000);
 
     const results: Array<{ type: string; success: boolean; error?: string }> = [];
+
+    // ─── 0. Auto-refresh Threads long-lived tokens (within 14 days of expiry) ───
+    const fourteenDaysFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const { data: threadsConns } = await supabase
+      .from("platform_connections")
+      .select("id, platform, access_token, token_expires_at")
+      .eq("is_connected", true)
+      .in("platform", LONG_LIVED_REFRESH_PLATFORMS)
+      .gt("token_expires_at", now.toISOString())
+      .lt("token_expires_at", fourteenDaysFromNow.toISOString());
+
+    for (const conn of threadsConns ?? []) {
+      try {
+        const currentToken = await decryptToken(conn.access_token);
+        const refreshUrl = `https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(currentToken)}`;
+        const refreshRes = await fetch(refreshUrl);
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          if (refreshData.access_token) {
+            const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 5184000) * 1000).toISOString();
+            await supabase.from("platform_connections").update({
+              access_token: await encryptToken(refreshData.access_token),
+              token_expires_at: newExpiresAt,
+            }).eq("id", conn.id);
+            results.push({ type: "threads_token_refresh", success: true });
+          }
+        } else {
+          const errBody = await refreshRes.text();
+          console.error(`Threads token refresh failed for ${conn.id}:`, errBody);
+          results.push({ type: "threads_token_refresh", success: false, error: errBody });
+        }
+      } catch (e) {
+        results.push({ type: "threads_token_refresh", success: false, error: String(e) });
+      }
+    }
 
     // ─── 1. Token Expiring (within 7 days) ───
     // Only alert for connections that CANNOT auto-refresh (meta_ads user tokens)
