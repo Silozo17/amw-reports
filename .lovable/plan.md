@@ -1,61 +1,43 @@
 
 
-## Plan: GBP Star Ratings, Latest Reviews, and Hero KPI Icon Fix
+## Plan: Harden check-subscription with rate limiting and org-ownership scoping
 
-### 1. Display average rating as stars in GBP metric card
+### Problem
 
-**File: `src/components/clients/dashboard/PlatformSection.tsx`**
+The `check-subscription` function is callable by any authenticated user. While it reads from Stripe (source of truth) and writes to `org_subscriptions` using a service-role client, there are two risks:
 
-- In the `MetricCard` component (or as a special-case render for `gbp_average_rating`), render filled/half/empty star icons instead of a plain number. Example: 4.3 becomes ★★★★☆ with the numeric value shown alongside.
-- Add a check: if `metricKey === 'gbp_average_rating'`, render a `StarRating` inline component instead of the standard `formatMetricValue` output.
+1. **No rate limiting** — a user could spam the endpoint, hammering the Stripe API and causing unnecessary DB writes.
+2. **Org ownership not verified** — the function writes to whatever `org_id` is on the caller's profile. While this is their own org, the function should explicitly verify the caller is a member of that org before writing.
 
-### 2. Add new reviews count and latest 5 reviews
+### Changes
 
-**Backend: `supabase/functions/sync-google-business-profile/index.ts`**
+**File: `supabase/functions/check-subscription/index.ts`**
 
-- Expand the `fetchReviewsData` function to also call the Places API reviews endpoint:
-  ```
-  GET https://places.googleapis.com/v1/places/{placeId}?fields=rating,userRatingCount,reviews
-  ```
-  This returns the 5 most relevant reviews with `author`, `rating`, `text`, `relativePublishTimeDescription`, and `publishTime`.
-- Add `gbp_new_reviews` to `metricsData` (calculated as difference from previous snapshot's `gbp_reviews_count`, or just stored as the raw count for now).
-- Store the reviews array in `top_content` alongside existing search keywords. Format:
-  ```json
-  { "type": "review", "author": "...", "rating": 5, "text": "...", "relative_time": "a week ago" }
-  ```
-  Merge with existing keyword entries (keywords get `type: "keyword"`).
+1. **Add in-memory rate limiter** — Track calls per user ID with a sliding window (max 5 calls per 60 seconds). Return 429 if exceeded. Same pattern used in other edge functions.
 
-**Frontend: `src/components/clients/dashboard/PlatformSection.tsx`**
+2. **Add org membership check** — After resolving `profile.org_id`, verify the caller belongs to that org via an `org_members` lookup before allowing any writes to `org_subscriptions`.
 
-- Add a `TopContentItem` field for `rating` and `author` and `relative_time`.
-- Filter GBP top content by `type === 'review'` and render a collapsible "Latest Reviews" table showing: star rating (as stars), author name, review snippet, and time ago.
-- Filter by `type === 'keyword'` for the existing search keywords display (add a separate collapsible "Top Search Keywords" for GBP).
+3. **Make DB writes idempotent** — Before writing, compare current DB state with what Stripe returned. Skip the update if status and period_end already match, reducing unnecessary writes from repeated calls.
 
-**Frontend: `src/types/metrics.ts`**
+### Technical detail
 
-- Add tooltip for `gbp_new_reviews`.
+```text
+Request flow (after change):
 
-**Frontend: `src/types/database.ts`**
+  Auth check (existing)
+    ↓
+  Rate limit check (NEW — 5 req/60s per user_id)
+    ↓ pass          ↓ fail
+  Stripe lookup     429 Too Many Requests
+    ↓
+  Org membership verify (NEW)
+    ↓ pass          ↓ fail
+  Compare DB state  403 Forbidden
+    ↓ changed       ↓ same
+  Write to DB       Skip write, return cached
+    ↓
+  Return response
+```
 
-- Add `gbp_new_reviews` label to `METRIC_LABELS` and `PLATFORM_METRICS`.
-
-### 3. Fix hero KPI icons clipped on smaller screens
-
-**File: `src/components/clients/dashboard/HeroKPIs.tsx`**
-
-- The icon container (line 98-103) uses fixed `h-8 w-8` which gets clipped when the card is narrow. Add `shrink-0` to the icon wrapper div to prevent it from being crushed by flex layout.
-- The platform logo images (line 109-127) also need `shrink-0` on the container to prevent clipping.
-
-### Files changed
-
-| File | Change |
-|---|---|
-| `supabase/functions/sync-google-business-profile/index.ts` | Fetch reviews from Places API, add to top_content, add gbp_new_reviews metric |
-| `src/components/clients/dashboard/PlatformSection.tsx` | Star rating display for gbp_average_rating, reviews table for GBP, keywords table for GBP |
-| `src/components/clients/dashboard/HeroKPIs.tsx` | Add `shrink-0` to icon wrapper and platform logos container |
-| `src/types/database.ts` | Add `gbp_new_reviews` label |
-| `src/types/metrics.ts` | Add `gbp_new_reviews` tooltip |
-
-### Database
-- Update `metric_defaults` for `google_business_profile` to include `gbp_new_reviews` in `available_metrics`.
+### No other files change.
 
