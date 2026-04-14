@@ -16,7 +16,7 @@ import { Trash2 } from 'lucide-react';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
-import { triggerInitialSync, SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
+import { SYNC_FUNCTION_MAP } from '@/lib/triggerSync';
 import { hexToHsl } from '@/lib/colorUtils';
 import usePageMeta from '@/hooks/usePageMeta';
 
@@ -190,7 +190,15 @@ const ClientPortalAuth = () => {
         const planSlug = (sub?.subscription_plans as unknown as { slug: string } | null)?.slug;
         if (planSlug === 'agency') syncMonths = 24;
       }
-      await triggerInitialSync(conn.id, conn.platform, syncMonths);
+      // Sync is now handled server-side via sync_jobs queue
+      await supabase.from('sync_jobs').insert({
+        connection_id: conn.id,
+        client_id: conn.client_id,
+        org_id: org.id,
+        platform: conn.platform,
+        months: syncMonths,
+      });
+      supabase.functions.invoke('process-sync-queue').catch(() => {});
     }
     fetchData();
   };
