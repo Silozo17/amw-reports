@@ -58,12 +58,38 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "backfill-sync", method: req.method, connection_id: null }));
+  console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "backfill-sync", method: req.method, connection_id: null }));
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // ── Authentication ──
+    // Allow service-role calls (e.g. from scheduled-sync) to bypass user auth.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.replace("Bearer ", "");
+    const isServiceRole = token === serviceRoleKey;
+
+    let callerUserId: string | null = null;
+
+    if (!isServiceRole) {
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return new Response(
+          JSON.stringify({ error: "Missing authorization" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token);
+      if (claimsError || !claimsData?.user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      callerUserId = claimsData.user.id;
+    }
 
     const { connection_id, months = DEFAULT_MONTHS, start_offset = 0 } = await req.json();
 
@@ -86,6 +112,36 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Connection not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ── Authorisation: verify caller belongs to the org that owns the connection ──
+    if (!isServiceRole && callerUserId) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("org_id")
+        .eq("id", conn.client_id)
+        .single();
+
+      if (!client) {
+        return new Response(
+          JSON.stringify({ error: "Client not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: membership } = await supabase
+        .from("org_members")
+        .select("id")
+        .eq("org_id", client.org_id)
+        .eq("user_id", callerUserId)
+        .maybeSingle();
+
+      if (!membership) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden — you do not belong to this organisation" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     if (!conn.is_connected || !conn.account_id) {
