@@ -1,28 +1,46 @@
 
+## Plan: Make Facebook count toward the hero stats as Views
 
-## Plan: Fix Video Views Hero KPI and Update Tooltips
+### What I found
+You were right to call this out.
 
-### Problem
-The "Video Views" hero KPI currently sums `video_views` from **all** platforms, including Meta Ads (paid). This inflates the number with paid video plays. The user wants it to only show organic video views.
+The current code already makes the **hero Reach KPI** use Facebook `views` instead of Facebook `reach`:
+- `src/lib/dashboardCalcs.ts`
+  - `totalReach` uses `m.views` when `s.platform === 'facebook'`
+  - `prevReach` does the same
+  - `reachPlatforms` does the same
+  - reach sparkline aggregation does the same
 
-Additionally, the info tooltips need updating:
-- **Video Views**: should clarify "Organic video views"
-- **Reach**: should clarify "Organic + paid reach"
+But the current **hero Video Views KPI** does **not** pull Facebook page views. It only sums `metrics_data.video_views`, and the Facebook sync does not save a `video_views` field at all — it saves:
+- `views`
+- `views_total`
 
-### Changes
+So Facebook is contributing to the hero **Reach** card, not the hero **Video Views** card.
 
-**1. `src/lib/dashboardCalcs.ts`** — Exclude `meta_ads` from Video Views aggregation
+### Minimal fix
+Update the hero Video Views aggregation so that:
+- for `facebook`, it uses `metrics_data.views`
+- for all other organic platforms, it keeps using `metrics_data.video_views`
+- `meta_ads` stays excluded from the hero Video Views KPI
+- the previous-period comparison, platform badges, and sparkline logic use the same rule
 
-- Line 31: Filter out `meta_ads` when summing `video_views`
-- Line 42: Same exclusion for previous period comparison
-- Line 57: Same exclusion for platform icon detection
-- Line 115 (sparklines): Exclude `meta_ads` from `video_views` sparkline aggregation
+### Files to update
+**1. `src/lib/dashboardCalcs.ts`**
+Adjust only the Video Views logic:
+- `totalVideoViews`
+- `prevVideoViews`
+- `videoViewsPlatforms`
+- `computeSparklines()` → `existing.video_views`
 
-**2. `src/types/metrics.ts`** — Update tooltip descriptions
+### Intended behavior after the change
+- **Hero Reach**: still includes Facebook Views and other platforms’ reach/impressions logic
+- **Hero Video Views**: includes Facebook Views instead of ignoring Facebook entirely
+- **Meta Ads**: still excluded from hero Video Views
+- No backend changes needed
 
-- Line 37: Change `video_views` from `'Number of times your videos were watched'` → `'Total organic video views across your social platforms'`
-- Line 19: Change `reach` from `'Number of unique people who saw your content (includes both organic and paid reach)'` → `'Unique people who saw your content — includes both organic and paid reach'`
+### Important note
+This means Facebook Views would appear in **both**:
+- the hero **Reach** card
+- the hero **Video Views** card
 
-### No other changes
-No backend, database, or other frontend files affected. Meta Ads will still sync and store `video_views` — it just won't be included in the hero KPI aggregation.
-
+If that is exactly what you want, I can implement it as a very small frontend-only change. If instead you want Facebook Views to move from Reach into Video Views and no longer count in Reach, that would be a different change.
