@@ -285,6 +285,7 @@ Deno.serve(async (req) => {
     // ── Fetch reviews via Places API ─────────────────────────────
     let reviewsCount: number | null = null;
     let avgRating: number | null = null;
+    let latestReviews: Array<{ type: string; author: string; rating: number; text: string; relative_time: string }> = [];
 
     if (googleApiKey) {
       // Try to get placeId from connection metadata first
@@ -305,6 +306,7 @@ Deno.serve(async (req) => {
         const reviews = await fetchReviewsData(placeId, googleApiKey);
         reviewsCount = reviews.reviewsCount;
         avgRating = reviews.averageRating;
+        latestReviews = reviews.latestReviews;
       }
     }
 
