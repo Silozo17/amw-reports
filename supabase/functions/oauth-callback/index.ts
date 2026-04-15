@@ -1241,12 +1241,12 @@ async function handlePinterest(supabase: any, code: string, connectionId: string
 
 // ── Threads ──
 async function handleThreads(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
-  const appId = Deno.env.get("META_APP_ID")!;
-  const appSecret = Deno.env.get("META_APP_SECRET")!;
+  const appId = Deno.env.get("THREADS_APP_ID")!;
+  const appSecret = Deno.env.get("THREADS_APP_SECRET")!;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
   // Exchange code for short-lived token
-  const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
+  const tokenRes = await fetch("https://graph.threads.net/oauth/access_token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
