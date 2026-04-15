@@ -1,38 +1,24 @@
 
 
-# Threads Integration Fix — Sync Pipeline Missing Entry
+# Health Score Card — Reduce Tilt & Dynamic Sub-Score Colors
 
-## Problem
+## Changes
 
-Threads is successfully connected (OAuth complete, account selected), but no data appears on the dashboard because **the sync pipeline doesn't recognise `threads` as a valid platform**.
+### 1. Reduce tilt effect
+In `src/components/clients/dashboard/HealthScore.tsx` line 111, change `useTilt(6)` to `useTilt(2)` and remove the `scale(1.02)` in the tilt hook by also reducing maxTilt default. Since 6 is passed explicitly, just changing to 2 is sufficient — the scale bump in `useTilt.ts` (line 29) should also be reduced from `1.02` to `1.005`.
 
-The sync job `04704350-6d22-4c04-a341-a67e0715291b` failed with:
-> `Unsupported platform: threads`
+### 2. Dynamic sub-score bar colors
+Replace the 3-bucket `getScoreColor` function in `src/lib/healthScore.ts` (lines 268-272) with a smooth gradient interpolation from dark red (score ~0) through orange/yellow to green (score 100). This will affect both the sub-score progress bars and the circular gauge — all score-colored elements will use the continuous scale.
 
-## Root Cause
+New `getScoreColor` implementation:
+- Score 0: dark red `hsl(0, 80%, 40%)`
+- Score 50: orange `hsl(30, 90%, 50%)`
+- Score 75: yellow-green `hsl(60, 80%, 45%)`
+- Score 100: green `hsl(120, 60%, 45%)`
+- Interpolate linearly between these stops
 
-Three edge functions each have their own `SYNC_FUNCTION_MAP` that maps platform keys to sync function names. All three are **missing the `threads` entry**:
-
-1. **`supabase/functions/process-sync-queue/index.ts`** (line 25) — processes queued sync jobs
-2. **`supabase/functions/backfill-sync/index.ts`** (line 24) — fills historical data gaps
-3. **`supabase/functions/scheduled-sync/index.ts`** (line 5) — cron-based recurring syncs
-
-Additionally, the **dashboard platform filter dropdown** in `src/components/clients/DashboardHeader.tsx` (line 13) has a local `PLATFORM_CATEGORIES` that is missing `threads` from the 'Organic Social' list — so even once data syncs, the user can't filter by Threads.
-
-## Plan
-
-### Step 1 — Add `threads` to all three sync maps
-Add `threads: "sync-threads"` to the `SYNC_FUNCTION_MAP` in:
-- `supabase/functions/process-sync-queue/index.ts`
-- `supabase/functions/backfill-sync/index.ts`
-- `supabase/functions/scheduled-sync/index.ts`
-
-### Step 2 — Add `threads` to DashboardHeader filter
-In `src/components/clients/DashboardHeader.tsx` line 13, add `'threads'` to the Organic Social platforms array.
-
-### Step 3 — Deploy updated edge functions
-Redeploy `process-sync-queue`, `backfill-sync`, and `scheduled-sync`.
-
-### Step 4 — Re-queue the failed sync job
-Reset the failed sync job to `pending` so it gets picked up on the next queue run, or trigger a manual sync.
+### Files touched
+- `src/hooks/useTilt.ts` — reduce scale from `1.02` to `1.005`
+- `src/components/clients/dashboard/HealthScore.tsx` — change `useTilt(6)` → `useTilt(2)`
+- `src/lib/healthScore.ts` — replace `getScoreColor` with smooth interpolation
 
