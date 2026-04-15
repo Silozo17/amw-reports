@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
       }
 
       console.log(
-        `Processing job ${job.id}: ${job.platform} for connection ${job.connection_id}`
+        `Processing job ${job.id}: ${job.platform} for connection ${job.connection_id} (force_resync=${job.force_resync ?? false})`
       );
 
       // Verify connection is still active
@@ -150,30 +150,45 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Calculate months to sync
-      const cappedMonths = Math.min(
-        job.months,
-        PLATFORM_MAX_MONTHS[job.platform] ?? job.months
-      );
-      const monthsRange = getMonthsRange(cappedMonths);
+      // Determine months to sync: use target_months if provided, otherwise calculate from months count
+      let monthsRange: Array<{ month: number; year: number }>;
 
-      // Check existing snapshots to skip
-      const { data: existingSnapshots } = await supabase
-        .from("monthly_snapshots")
-        .select("report_month, report_year")
-        .eq("client_id", conn.client_id)
-        .eq("platform", job.platform);
+      if (job.target_months && Array.isArray(job.target_months) && job.target_months.length > 0) {
+        monthsRange = job.target_months as Array<{ month: number; year: number }>;
+        // Apply platform cap
+        const maxMonths = PLATFORM_MAX_MONTHS[job.platform];
+        if (maxMonths && monthsRange.length > maxMonths) {
+          monthsRange = monthsRange.slice(0, maxMonths);
+        }
+      } else {
+        const cappedMonths = Math.min(
+          job.months,
+          PLATFORM_MAX_MONTHS[job.platform] ?? job.months
+        );
+        monthsRange = getMonthsRange(cappedMonths);
+      }
 
-      const existingSet = new Set(
-        (existingSnapshots || []).map(
-          (s: { report_month: number; report_year: number }) =>
-            `${s.report_month}-${s.report_year}`
-        )
-      );
+      // Filter out existing snapshots unless force_resync is enabled
+      let missingMonths = monthsRange;
 
-      const missingMonths = monthsRange.filter(
-        ({ month, year }) => !existingSet.has(`${month}-${year}`)
-      );
+      if (!job.force_resync) {
+        const { data: existingSnapshots } = await supabase
+          .from("monthly_snapshots")
+          .select("report_month, report_year")
+          .eq("client_id", conn.client_id)
+          .eq("platform", job.platform);
+
+        const existingSet = new Set(
+          (existingSnapshots || []).map(
+            (s: { report_month: number; report_year: number }) =>
+              `${s.report_month}-${s.report_year}`
+          )
+        );
+
+        missingMonths = monthsRange.filter(
+          ({ month, year }) => !existingSet.has(`${month}-${year}`)
+        );
+      }
 
       const totalToSync = missingMonths.length;
 

@@ -188,12 +188,8 @@ export default function AdminSyncDialog({ clients, connections, onComplete }: Ad
       } else if (data?.error) {
         toast.error(`Sync failed: ${data.error}`);
       } else {
-        const s = data?.summary;
-        if (s?.failed > 0) {
-          toast.error(`Sync done: ${s.synced} ok, ${s.failed} failed`);
-        } else {
-          toast.success(`Sync complete: ${s?.synced ?? 0} month-syncs succeeded`);
-        }
+        const enqueued = data?.jobs_enqueued ?? 0;
+        toast.success(`Sync started: ${enqueued} job${enqueued !== 1 ? 's' : ''} enqueued — processing server-side`);
         onComplete();
       }
     } catch {

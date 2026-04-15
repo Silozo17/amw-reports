@@ -1178,6 +1178,7 @@ export type Database = {
           current_month: number | null
           current_year: number | null
           error_message: string | null
+          force_resync: boolean
           id: string
           months: number
           org_id: string
@@ -1187,6 +1188,7 @@ export type Database = {
           progress_total: number
           started_at: string | null
           status: Database["public"]["Enums"]["sync_job_status"]
+          target_months: Json | null
         }
         Insert: {
           client_id: string
@@ -1196,6 +1198,7 @@ export type Database = {
           current_month?: number | null
           current_year?: number | null
           error_message?: string | null
+          force_resync?: boolean
           id?: string
           months?: number
           org_id: string
@@ -1205,6 +1208,7 @@ export type Database = {
           progress_total?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["sync_job_status"]
+          target_months?: Json | null
         }
         Update: {
           client_id?: string
@@ -1214,6 +1218,7 @@ export type Database = {
           current_month?: number | null
           current_year?: number | null
           error_message?: string | null
+          force_resync?: boolean
           id?: string
           months?: number
           org_id?: string
@@ -1223,6 +1228,7 @@ export type Database = {
           progress_total?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["sync_job_status"]
+          target_months?: Json | null
         }
         Relationships: []
       }

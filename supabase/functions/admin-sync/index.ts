@@ -13,6 +13,42 @@ interface ConnectionTarget {
   platform: string;
 }
 
+interface SyncPayload {
+  connections: ConnectionTarget[];
+  mode?: "single_month" | "date_range" | "full";
+  month?: number;
+  year?: number;
+  start_month?: number;
+  start_year?: number;
+  end_month?: number;
+  end_year?: number;
+  months?: number;
+}
+
+function computeTargetMonths(payload: SyncPayload): { month: number; year: number }[] | null {
+  const { mode } = payload;
+
+  if (mode === "single_month" && payload.month && payload.year) {
+    return [{ month: payload.month, year: payload.year }];
+  }
+
+  if (mode === "date_range" && payload.start_month && payload.start_year && payload.end_month && payload.end_year) {
+    const months: { month: number; year: number }[] = [];
+    let m = payload.start_month;
+    let y = payload.start_year;
+    const endKey = payload.end_year * 12 + payload.end_month;
+    while (y * 12 + m <= endKey) {
+      months.push({ month: m, year: y });
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+    return months;
+  }
+
+  // "full" mode or no mode specified — return null to use the months count approach
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -48,9 +84,8 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
-    const { data: claimsData, error: claimsError } =
-      await anonClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await anonClient.auth.getUser();
+    if (userError || !userData?.user) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         {
@@ -59,7 +94,7 @@ Deno.serve(async (req) => {
         }
       );
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = userData.user.id;
 
     const { data: isAdmin } = await supabase.rpc("is_platform_admin", {
       _user_id: userId,
@@ -74,11 +109,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const body = await req.json();
-    const { connections, months = 24 } = body as {
-      connections: ConnectionTarget[];
-      months?: number;
-    };
+    const body: SyncPayload = await req.json();
+    const { connections, months = 24 } = body;
 
     if (
       !connections ||
@@ -93,6 +125,9 @@ Deno.serve(async (req) => {
         }
       );
     }
+
+    // Compute target months from the time mode
+    const targetMonths = computeTargetMonths(body);
 
     // Look up client_id and org_id for each connection
     const connIds = connections.map((c) => c.id);
@@ -123,6 +158,8 @@ Deno.serve(async (req) => {
         platform: row.platform,
         months,
         priority: 10, // Admin jobs get high priority
+        force_resync: true, // Admin syncs always overwrite existing data
+        target_months: targetMonths,
       };
     });
 
@@ -148,7 +185,7 @@ Deno.serve(async (req) => {
       });
 
     console.log(
-      `Admin sync: enqueued ${jobsToInsert.length} job(s) for ${connections.length} connection(s)`
+      `Admin sync: enqueued ${jobsToInsert.length} job(s) for ${connections.length} connection(s), mode=${body.mode ?? "full"}`
     );
 
     return new Response(
