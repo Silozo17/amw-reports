@@ -111,23 +111,45 @@ async function notifySyncFailure(
   }
 }
 
+/** Parse UK time components from a UTC Date */
+function getUkTime(now: Date) {
+  const ukStr = now.toLocaleString("en-GB", { timeZone: "Europe/London" });
+  // Format: "DD/MM/YYYY, HH:MM:SS"
+  const [datePart, timePart] = ukStr.split(", ");
+  const [day, month, year] = datePart.split("/").map(Number);
+  const [hour] = timePart.split(":").map(Number);
+  // 0=Sun … 6=Sat — construct a Date in UK local to get day-of-week
+  const ukDate = new Date(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${timePart}`);
+  return { ukHour: hour, ukDay: ukDate.getDay(), ukDayOfMonth: day, ukMonth: month, ukYear: year };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204 });
   }
 
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "scheduled-sync", method: req.method, connection_id: null }));
+  console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "scheduled-sync", method: req.method, connection_id: null }));
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Determine which months to sync
     const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    const dayOfMonth = now.getDate();
+    const uk = getUkTime(now);
+
+    // Gate: only proceed when it is 5 AM UK time (covers both GMT and BST cron triggers)
+    if (uk.ukHour !== 5) {
+      return new Response(
+        JSON.stringify({ message: `Skipped: UK hour is ${uk.ukHour}, not 5` }),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Use UK-derived month/year for sync targets
+    const currentMonth = uk.ukMonth;
+    const currentYear = uk.ukYear;
+    const dayOfMonth = uk.ukDayOfMonth;
 
     const monthsToSync: Array<{ month: number; year: number }> = [
       { month: currentMonth, year: currentYear },
