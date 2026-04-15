@@ -1,49 +1,55 @@
 
 
-# Instagram Integration — Zero Reach/Impressions for Current Month
+# Fix: Sync Queue Drops Jobs After 10 — 4 Platforms Left Pending
 
 ## Root Cause
 
-Instagram data **is syncing and stored correctly**. The problem is specifically that **reach and impressions are 0 for April 2026**, while all other metrics (engagement, video_views, profile_visits, followers, website_clicks) have data.
+`process-sync-queue` has `MAX_JOBS_PER_INVOCATION = 10`. AMW Media has 14 connections. The queue processor ran once, completed 10 jobs, then exited. The remaining 4 (Instagram, Pinterest, TikTok Ads, LinkedIn Ads) are still `pending` with no mechanism to resume them.
 
-Looking at the sync function (`sync-instagram/index.ts` line 130):
-```
-/insights?metric=reach&period=day&since=...&until=...
-```
-
-This calls the **IG User-level Insights API** with `metric=reach` and `period=day`. For the **current incomplete month**, Meta's API returns 0 for future/incomplete day values, and the sum ends up being 0 or significantly undercounted. This has happened before (May 2024 also shows all zeros).
-
-The real problem: the function uses `reach` as the **sole source** for both `impressions` and `reach` at the account level (line 276: `impressions: totalReach`). When this API call returns 0, both metrics are wiped out.
+The single fire-and-forget call from `useSyncJobs.enqueueSync` triggers `process-sync-queue` once. After it finishes 10 jobs and returns, nobody calls it again for the leftovers.
 
 ## Fix
 
-Update `supabase/functions/sync-instagram/index.ts` to:
+Two changes to `supabase/functions/process-sync-queue/index.ts`:
 
-1. **Use per-post reach as fallback** — The function already fetches per-media `reach` values (line 207-229) but never aggregates them into the account-level reach. When account-level reach returns 0, sum the individual post reach values instead.
+1. **Self-continuation**: After the processing loop, check if there are still pending jobs in the queue. If so, fire-and-forget a new invocation of `process-sync-queue` before returning the response. This creates a chain that continues until the queue is drained.
 
-2. **Add `impressions` as a separate metric** — Currently `impressions` is just a copy of `reach` (line 276). Instagram's API supports `impressions` as a separate user-level insight metric. Fetch it alongside reach:
-   ```
-   /insights?metric=reach,impressions&period=day&since=...&until=...
-   ```
+2. **Increase batch size**: Raise `MAX_JOBS_PER_INVOCATION` from 10 to 25. Each single-month sync takes ~2-5 seconds, so 25 jobs fits well within the edge function timeout (~150s). This reduces the number of self-invocations needed.
 
-3. **Aggregate post-level reach into account reach when API returns 0** — Sum `postReach` from all media items as a floor value, so even if the user-level API fails, we have per-post data.
+### Code changes
 
-## Technical Changes
+**File: `supabase/functions/process-sync-queue/index.ts`**
 
-### File: `supabase/functions/sync-instagram/index.ts`
+- Line 35: Change `MAX_JOBS_PER_INVOCATION` from `10` to `25`
+- After line 274 (end of while loop), before the return: Add a check for remaining pending jobs and self-invoke if any exist:
 
-- **Line 130**: Change `metric=reach` to `metric=reach,impressions` to fetch both metrics separately
-- **Lines 275-277**: Use `impressions` from the API when available, fall back to post-level reach aggregation, and keep `reach` and `impressions` as independent values
-- **After line 255**: Add aggregation of per-post reach as `postLevelReach`, use as fallback when account-level reach is 0:
-  ```typescript
-  const postLevelReach = allTopMedia.reduce((sum, m) => sum + (m.reach || 0), 0);
-  // Use post-level reach as floor when account-level API returns 0
-  if (totalReach === 0 && postLevelReach > 0) {
-    totalReach = postLevelReach;
-  }
-  ```
+```typescript
+// Self-continuation: if there are still pending jobs, trigger another run
+const { data: remaining } = await supabase
+  .from("sync_jobs")
+  .select("id")
+  .eq("status", "pending")
+  .limit(1);
 
-### No database or frontend changes needed
+if (remaining && remaining.length > 0) {
+  console.log("More pending jobs remain — triggering continuation...");
+  fetch(`${supabaseUrl}/functions/v1/process-sync-queue`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+  }).catch((err) => console.warn("Self-continuation failed:", err));
+}
+```
 
-The metrics keys (`reach`, `impressions`) are already displayed correctly by the dashboard. This is purely a data-fetching fix in the edge function.
+This ensures no jobs are ever orphaned regardless of queue size.
+
+## Summary
+
+| What | Before | After |
+|------|--------|-------|
+| Max jobs per run | 10 | 25 |
+| Leftover handling | None — jobs orphaned | Self-continuation until queue empty |
+| 14-connection client | 4 platforms skipped | All 14 guaranteed |
 
