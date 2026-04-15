@@ -1,80 +1,50 @@
 
 
-# Fix: Scope client-logos Storage Policies to Organisation Members
+# Fix: Token Exposure and User Roles Visibility
 
-## Problem
-The `client-logos` bucket policies only check `bucket_id = 'client-logos'`, allowing any authenticated user to upload, update, or delete logos belonging to other organisations.
+## Finding 1: OAuth tokens readable by org members
 
-## Approach
-Since files are currently uploaded with flat UUID paths (`{random-uuid}.ext`), there's no way to derive ownership from the path alone. The fix requires two changes:
+**Current state**: The `platform_connections` table has `access_token` and `refresh_token` columns that are technically readable via the org-member SELECT policy. However, the frontend already excludes these columns from all queries (every `.select()` call explicitly lists columns without tokens). Tokens are only read by edge functions using the service role key.
 
-1. **Change upload path convention** to `{client_id}/{filename}` so the storage policy can extract the client_id from the path and verify org membership.
-2. **Replace storage policies** with org-scoped versions that check the first path segment against the `clients` table.
+**Fix**: Use a Postgres column-level security approach — create a database view that excludes token columns, then restrict the SELECT policies to use this pattern. However, the simplest and most effective fix is to use **column-level grants**: revoke SELECT on the token columns from the `authenticated` role so even if someone crafts a manual query, they cannot read them.
 
-## Changes
-
-### 1. Database migration — Replace storage policies
-Drop the four existing unscoped policies and create org-scoped replacements:
-
+**Migration SQL**:
 ```sql
--- DROP existing unscoped policies
-DROP POLICY "Authenticated users can upload client logos" ON storage.objects;
-DROP POLICY "Authenticated users can update client logos" ON storage.objects;
-DROP POLICY "Authenticated users can delete client logos" ON storage.objects;
--- Keep public SELECT policy unchanged (logos are public-readable by design)
-
--- INSERT: org members only, path must start with a client_id they own
-CREATE POLICY "Org members can upload client logos"
-ON storage.objects FOR INSERT TO authenticated
-WITH CHECK (
-  bucket_id = 'client-logos'
-  AND EXISTS (
-    SELECT 1 FROM public.clients c
-    WHERE c.id = (storage.foldername(name))[1]::uuid
-      AND public.user_belongs_to_org(auth.uid(), c.org_id)
-  )
-);
-
--- UPDATE: same org check
-CREATE POLICY "Org members can update client logos"
-ON storage.objects FOR UPDATE TO authenticated
-USING (
-  bucket_id = 'client-logos'
-  AND EXISTS (
-    SELECT 1 FROM public.clients c
-    WHERE c.id = (storage.foldername(name))[1]::uuid
-      AND public.user_belongs_to_org(auth.uid(), c.org_id)
-  )
-);
-
--- DELETE: same org check
-CREATE POLICY "Org members can delete client logos"
-ON storage.objects FOR DELETE TO authenticated
-USING (
-  bucket_id = 'client-logos'
-  AND EXISTS (
-    SELECT 1 FROM public.clients c
-    WHERE c.id = (storage.foldername(name))[1]::uuid
-      AND public.user_belongs_to_org(auth.uid(), c.org_id)
-  )
-);
+-- Revoke SELECT on sensitive token columns from authenticated role
+REVOKE SELECT (access_token, refresh_token) ON public.platform_connections FROM authenticated;
+REVOKE SELECT (access_token, refresh_token) ON public.platform_connections FROM anon;
 ```
 
-### 2. Update `src/pages/clients/ClientForm.tsx`
-Change the upload path from `{uuid}.ext` to `{clientId}/{uuid}.ext`. Since this is a new client (not yet created), we'll need to create the client first, get the ID, then upload the logo and update the record. Alternatively, use a temporary org-scoped prefix — but since ClientForm inserts a new client, the simplest approach is to upload under a temporary path using the org_id, or restructure to create client first.
+This is non-breaking because:
+- No frontend query selects these columns
+- Edge functions use the service role key (which bypasses RLS and column grants)
+- The columns remain writable for edge functions
 
-**Simpler approach**: Use the client_id that will be known after insert. Restructure to:
-1. Insert client without logo
-2. Upload logo to `{client.id}/{uuid}.ext`
-3. Update client with logo_url
+## Finding 2: All authenticated users can read every user's roles
 
-### 3. Update `src/components/clients/ClientEditDialog.tsx`
-Change upload path from `{uuid}.ext` to `{client.id}/{uuid}.ext` (client.id is already available here).
+**Current state**: The `user_roles` table policy uses `USING (true)`, letting any authenticated user see all role assignments. This table is used by `is_platform_admin()` and `has_role()` functions (both `SECURITY DEFINER`), so the policy isn't needed for those checks.
 
-### Files to modify
-- New migration SQL file
-- `src/pages/clients/ClientForm.tsx` — restructure upload to use `{clientId}/` prefix
-- `src/components/clients/ClientEditDialog.tsx` — prefix upload path with `client.id`
+**Fix**: Restrict SELECT to own roles only.
 
-### Risk
-Existing logos uploaded with flat paths will remain accessible (public SELECT is unchanged) but cannot be deleted/updated through the new policies. This is acceptable since old logos are referenced by URL in `clients.logo_url` and don't need policy-gated access.
+**Migration SQL**:
+```sql
+DROP POLICY "Authenticated can view roles" ON public.user_roles;
+
+CREATE POLICY "Users can view own roles"
+ON public.user_roles FOR SELECT TO authenticated
+USING (user_id = auth.uid());
+```
+
+This is safe because:
+- `is_platform_admin()` and `has_role()` are `SECURITY DEFINER` — they bypass RLS
+- No frontend code queries `user_roles` directly (only referenced in auto-generated types)
+
+## Summary
+
+| Change | Risk | Impact |
+|--------|------|--------|
+| Revoke token column SELECT | Very low | No frontend reads these columns |
+| Restrict user_roles SELECT | Very low | SECURITY DEFINER functions unaffected |
+
+**Files**: One new migration file. No application code changes needed.
+
