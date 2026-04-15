@@ -32,14 +32,14 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const portalToken = req.headers.get("x-portal-token");
 
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "analyze-client", method: req.method, connection_id: null }));
+
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.replace("Bearer ", "");
       const { data: userData, error: userError } = await supabase.auth.getUser(token);
       if (!userError && userData?.user?.id) {
         callerId = userData.user.id;
       }
-
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "analyze-client", method: req.method, connection_id: null }));
     }
 
     if (!callerId && portalToken) {
