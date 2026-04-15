@@ -50,6 +50,9 @@ Deno.serve(async (req) => {
     // Get org_id from client
     const { data: client } = await supabase.from("clients").select("org_id").eq("id", conn.client_id).single();
     const orgId = client?.org_id;
+    if (!orgId) {
+      throw new Error("Could not resolve org_id for client — sync aborted");
+    }
 
     // Require authorization
     const authHeader = req.headers.get("Authorization");
