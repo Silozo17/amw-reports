@@ -1,50 +1,61 @@
 
 
-# Fix: Token Exposure and User Roles Visibility
+# SEO Content Expansion Plan — Keyword-Rich Copy for All Public Pages
 
-## Finding 1: OAuth tokens readable by org members
+## Overview
 
-**Current state**: The `platform_connections` table has `access_token` and `refresh_token` columns that are technically readable via the org-member SELECT policy. However, the frontend already excludes these columns from all queries (every `.select()` call explicitly lists columns without tokens). Tokens are only read by edge functions using the service role key.
+This plan adds 400–1000 words of keyword-targeted, semantically relevant content to each of the 12 public marketing pages. The content will be added as new `<section>` blocks that follow the existing design patterns (alternating `section-light` backgrounds, consistent typography classes, max-width containers). No existing content will be modified or removed.
 
-**Fix**: Use a Postgres column-level security approach — create a database view that excludes token columns, then restrict the SELECT policies to use this pattern. However, the simplest and most effective fix is to use **column-level grants**: revoke SELECT on the token columns from the `authenticated` role so even if someone crafts a manual query, they cannot read them.
+## Pages and Target Keywords
 
-**Migration SQL**:
-```sql
--- Revoke SELECT on sensitive token columns from authenticated role
-REVOKE SELECT (access_token, refresh_token) ON public.platform_connections FROM authenticated;
-REVOKE SELECT (access_token, refresh_token) ON public.platform_connections FROM anon;
-```
+| Page | File | Current ~Words | Target Keywords |
+|------|------|---------------|-----------------|
+| **Home** | `HomePage.tsx` | ~350 | marketing reporting tool, automated client reports, multi-platform analytics dashboard, agency reporting software |
+| **About** | `AboutPage.tsx` | ~400 | about AMW Reports, marketing agency reporting, UK marketing tool, agency automation |
+| **Pricing** | `PricingPage.tsx` | ~300 | marketing report pricing, free reporting tool, agency report cost, freelancer reporting plan |
+| **Features** | `FeaturesPage.tsx` | ~350 | marketing report features, branded PDF reports, automated report delivery, client portal dashboard |
+| **Social Media Reporting** | `SocialMediaReportingPage.tsx` | ~350 | social media reporting tool, Instagram analytics report, Facebook reporting, TikTok analytics |
+| **SEO Reporting** | `SeoReportingPage.tsx` | ~250 | SEO reporting tool, Google Search Console report, GA4 analytics report, keyword ranking report |
+| **PPC Reporting** | `PpcReportingPage.tsx` | ~250 | PPC reporting tool, Google Ads report, Meta Ads report, ad spend tracking |
+| **White-Label Reports** | `WhiteLabelReportsPage.tsx` | ~300 | white-label reporting, branded client reports, custom domain reports, agency white-label tool |
+| **For Agencies** | `ForAgenciesPage.tsx` | ~300 | agency reporting software, multi-client reporting, automated agency reports |
+| **For Freelancers** | `ForFreelancersPage.tsx` | ~200 | freelancer reporting tool, freelance marketing reports, client reporting for freelancers |
+| **For Creators** | `ForCreatorsPage.tsx` | ~200 | creator analytics, social media analytics for creators, sponsor-ready reports |
+| **For Small Businesses** | `ForSmbsPage.tsx` | ~300 | small business marketing analytics, SMB reporting tool, marketing dashboard for small businesses |
+| **Integrations** | `IntegrationsPage.tsx` | ~150 | marketing integrations, Google Ads integration, Meta Ads integration, platform connections |
+| **How It Works** | `HowItWorksPage.tsx` | ~250 | how marketing reports work, automated report generation, marketing data sync |
 
-This is non-breaking because:
-- No frontend query selects these columns
-- Edge functions use the service role key (which bypasses RLS and column grants)
-- The columns remain writable for edge functions
+## Content Strategy Per Page
 
-## Finding 2: All authenticated users can read every user's roles
+Each page gets **1–3 new sections** added before the final CTA, containing:
 
-**Current state**: The `user_roles` table policy uses `USING (true)`, letting any authenticated user see all role assignments. This table is used by `is_platform_admin()` and `has_role()` functions (both `SECURITY DEFINER`), so the policy isn't needed for those checks.
+1. **Long-form explanatory copy** — 2–4 paragraphs of natural, keyword-rich text explaining the value proposition in depth
+2. **"Why" or "Who It's For" section** — addressing specific user pain points with targeted search phrases
+3. **FAQ expansion** (where FAQs don't already exist) — 3–5 Q&A pairs using long-tail question keywords (e.g., "What is the best social media reporting tool for agencies?")
 
-**Fix**: Restrict SELECT to own roles only.
+Content will be written in the existing brand voice: professional, direct, no jargon, UK English spelling.
 
-**Migration SQL**:
-```sql
-DROP POLICY "Authenticated can view roles" ON public.user_roles;
+## Technical Approach
 
-CREATE POLICY "Users can view own roles"
-ON public.user_roles FOR SELECT TO authenticated
-USING (user_id = auth.uid());
-```
+- **No new components** — all content uses existing HTML elements (`<section>`, `<h2>`, `<h3>`, `<p>`) with existing Tailwind classes
+- **No new dependencies**
+- **Preserves existing layout** — new sections inserted between existing content and the final CTA
+- **SEO meta descriptions** will be reviewed and expanded where currently under 150 characters
+- All heading tags will follow proper hierarchy (h1 → h2 → h3)
+- Keywords will be naturally integrated, not stuffed — targeting 1–2% keyword density
 
-This is safe because:
-- `is_platform_admin()` and `has_role()` are `SECURITY DEFINER` — they bypass RLS
-- No frontend code queries `user_roles` directly (only referenced in auto-generated types)
+## Implementation Order
 
-## Summary
+1. Home page (highest priority — landing page)
+2. Features page
+3. Solution pages (Social, SEO, PPC, White-Label)
+4. Audience pages (Agencies, Freelancers, Creators, SMBs)
+5. Supporting pages (Pricing, About, Integrations, How It Works)
 
-| Change | Risk | Impact |
-|--------|------|--------|
-| Revoke token column SELECT | Very low | No frontend reads these columns |
-| Restrict user_roles SELECT | Very low | SECURITY DEFINER functions unaffected |
+## Estimated Scope
 
-**Files**: One new migration file. No application code changes needed.
+- 12–14 files modified
+- ~6,000–10,000 total words of new content
+- No database or backend changes
+- No visual design changes — uses existing section patterns
 
