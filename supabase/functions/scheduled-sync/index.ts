@@ -16,6 +16,7 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
   google_business_profile: "sync-google-business-profile",
   youtube: "sync-youtube",
   pinterest: "sync-pinterest",
+  threads: "sync-threads",
 };
 
 const SYNC_TIMEOUT_MS = 60_000; // 60 seconds per sync

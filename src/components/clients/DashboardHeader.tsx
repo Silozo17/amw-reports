@@ -10,7 +10,7 @@ import type { PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 
 const PLATFORM_CATEGORIES: Array<{ label: string; platforms: PlatformType[] }> = [
-  { label: 'Organic Social', platforms: ['facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'pinterest'] },
+  { label: 'Organic Social', platforms: ['facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'pinterest', 'threads'] },
   { label: 'Paid Advertising', platforms: ['google_ads', 'meta_ads', 'tiktok_ads', 'linkedin_ads'] },
   { label: 'SEO & Web Analytics', platforms: ['google_search_console', 'google_analytics', 'google_business_profile'] },
 ];
