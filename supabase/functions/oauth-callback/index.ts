@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   // TikTok uses "auth_code" param
   const authCode = code || url.searchParams.get("auth_code");
 
-  let frontendUrl = "https://amw-reports.lovable.app";
+  let frontendUrl = "https://reports.amwmedia.co.uk";
   let connectionId = "";
   let platform = "";
 

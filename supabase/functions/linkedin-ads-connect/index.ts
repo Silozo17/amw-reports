@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         connection_id,
         platform: "linkedin_ads",
-        redirect_url: redirect_url || "https://amw-reports.lovable.app",
+        redirect_url: redirect_url || "https://reports.amwmedia.co.uk",
       })
     );
 
