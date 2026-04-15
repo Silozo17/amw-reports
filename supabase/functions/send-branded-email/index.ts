@@ -58,6 +58,8 @@ interface OrgBrand {
   darkBg: string;
   lightBg: string;
   mutedText: string;
+  /** Sender email address — must be from a domain verified in Resend */
+  sender_email: string;
 }
 
 function buildOrgBrand(org: Record<string, unknown> | null): OrgBrand {
@@ -68,6 +70,14 @@ function buildOrgBrand(org: Record<string, unknown> | null): OrgBrand {
   const accent_color = (org?.accent_color as string) ?? null;
   const heading_font = (org?.heading_font as string) ?? null;
   const body_font = (org?.body_font as string) ?? null;
+
+  // Resolve sender email: org report_settings.email > org.email > AMW default
+  const reportSettings = (org?.report_settings ?? {}) as Record<string, unknown>;
+  const settingsEmail = reportSettings.email as string | undefined;
+  const rawSenderEmail =
+    (settingsEmail && settingsEmail.includes("@")) ? settingsEmail :
+    (org?.email as string | undefined) ??
+    "reports@amwmedia.co.uk";
 
   return {
     name,
@@ -84,6 +94,7 @@ function buildOrgBrand(org: Record<string, unknown> | null): OrgBrand {
     darkBg: "#241f21",
     lightBg: "#f4ede3",
     mutedText: "#787878",
+    sender_email: rawSenderEmail,
   };
 }
 
@@ -687,7 +698,7 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: `${brand.name} <reports@amwmedia.co.uk>`,
+        from: `${brand.name} <${brand.sender_email}>`,
         to: [recipient_email],
         subject,
         html,
