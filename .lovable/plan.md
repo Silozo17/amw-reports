@@ -1,77 +1,42 @@
 
 
-# Fix Scheduled Sync Reliability & Add Data Reconciliation
+# Add Platform Logos to All Platform Listing Sections
 
-## Root Cause Analysis
+## What Changes
 
-The scheduled-sync function has **51 active connections** to process. It invokes each sync function inline with a 60s timeout, in batches of 4. That means a full run needs ~13 batches × ~60s = **~13 minutes**, but Supabase Edge Functions have a **~150s wall-clock limit**. The function silently dies partway through, leaving connections like `tiktok_ads`, `linkedin_ads`, `pinterest`, `youtube`, `meta_ads`, `instagram`, `google_business_profile`, and `facebook` for AMW Media unsynced.
+Every section across the site that lists marketing platforms as text-only pills will be updated to include the platform logo beside the name. The logos already exist in `src/types/database.ts` as `PLATFORM_LOGOS` (keyed by `PlatformType`).
 
-Today (April 15th), only 6 of AMW Media's ~14 connections synced at 5 AM. The rest still show April 14th timestamps.
+## Affected Files (7 pages)
 
-## Plan
+| File | Section | Current |
+|------|---------|---------|
+| `src/pages/HomePage.tsx` | "Our Integrations" strip | Text-only pills |
+| `src/pages/ForAgenciesPage.tsx` | "All the Platforms Your Clients Use" | Text-only pills |
+| `src/pages/ForCreatorsPage.tsx` | "Platforms for Creators" | Text-only pills |
+| `src/pages/ForSmbsPage.tsx` | "All Your Marketing Tools in One Place" | Text-only pills |
+| `src/pages/HowItWorksPage.tsx` | Step 1 platform list | Text-only pills |
+| `src/pages/IntegrationsPage.tsx` | Platform detail cards | No logos on card headers |
+| `src/pages/SeoReportingPage.tsx` | Platform detail cards | No logos on card headers |
+| `src/pages/SocialMediaReportingPage.tsx` | Platform detail cards | No logos on card headers |
+| `src/pages/PpcReportingPage.tsx` | Platform detail cards | No logos on card headers |
 
-### 1. Refactor `scheduled-sync` to enqueue jobs instead of invoking directly
+## Approach
 
-Instead of calling each sync function inline (which times out), the function will:
-- Query eligible connections (same plan-gating logic)
-- Insert rows into the `sync_jobs` table with `status: 'pending'`
-- Call `process-sync-queue` once at the end
+1. **Create a shared mapping** — A simple `NAME_TO_KEY` lookup (e.g. `'Google Ads' → 'google_ads'`) to bridge the string-based `PLATFORMS` arrays to `PLATFORM_LOGOS` keys. This avoids refactoring every page's data structure.
 
-This way the queue processor handles syncs sequentially across multiple invocations, immune to the 150s limit. The scheduled-sync function becomes a lightweight "scheduler" that completes in seconds.
+2. **Update pill rendering** — Add an `<img>` tag (h-4 w-4) before the text in each pill:
+   ```tsx
+   <img src={PLATFORM_LOGOS[NAME_TO_KEY[p]]} alt="" className="h-4 w-4 object-contain" />
+   ```
 
-### 2. Add month-end reconciliation logic
+3. **Update detail card headers** — On IntegrationsPage, SeoReportingPage, SocialMediaReportingPage, and PpcReportingPage, add the logo next to the platform name in each card's `<h3>`.
 
-**Problem:** Platforms like Meta, Google, and LinkedIn have 24–72 hour reporting delays. Data for the last days of a month may not be final until days into the next month.
+4. **Import** `PLATFORM_LOGOS` from `@/types/database` in each affected file.
 
-**Solution:** Add a reconciliation window:
-- On the **7th of each month** (or the first Monday on/after the 7th for weekly plans), enqueue a `force_resync` job for the **previous month** for every active connection
-- This overwrites the snapshot with final, accurate data
-- For weekly plans (Creator/Freelancer), the first sync on or after the 7th will also include the previous month
+## Technical Details
 
-### 3. Extend "previous month overlap" to weekly plans
-
-Currently, the "first 7 days also sync previous month" logic only fires for daily syncs. Weekly plans skip entirely on non-Mondays, so if a Monday falls on the 1st–7th, the previous month should also be synced. This is already partially there but the weekly plan gating runs before the month logic — needs reordering.
-
-## Technical Changes
-
-### File: `supabase/functions/scheduled-sync/index.ts`
-
-Complete rewrite of the main loop:
-
-```
-// Instead of:
-//   invokeWithTimeout(supabase, fnName, ...) per connection
-
-// New approach:
-//   1. Build list of eligible connections (same plan gating)
-//   2. For each: INSERT INTO sync_jobs (connection_id, client_id, org_id, platform, months, target_months, priority, force_resync)
-//   3. Deduplicate: skip if pending/processing job already exists for same connection+month
-//   4. Trigger process-sync-queue once
-//   5. Return summary of enqueued jobs
-```
-
-Key changes:
-- Remove `invokeWithTimeout`, `BATCH_SIZE`, `SYNC_TIMEOUT_MS`
-- Remove `notifySyncFailure` (process-sync-queue already handles failures)
-- Add `force_resync: true` for reconciliation jobs on the 7th
-- Extend previous-month logic to weekly plans when Monday falls in first 7 days
-- Function completes in <5 seconds regardless of connection count
-
-### No database changes needed
-
-The `sync_jobs` table already has all required columns (`target_months`, `force_resync`, `priority`).
-
-### No cron changes needed
-
-The `0 4,5 * * *` schedule is correct — the UK-time guard handles DST.
-
-## Summary
-
-| What | Before | After |
-|------|--------|-------|
-| Sync execution | Inline, times out at ~24 connections | Queue-based, unlimited |
-| AMW Media coverage | ~6/14 platforms synced | All 14 guaranteed |
-| Month-end accuracy | Hope for the best | Forced re-sync on 7th |
-| Weekly plan overlap | Previous month not synced | Previous month included on first eligible Monday |
-| Function runtime | 150s+ (killed) | <5 seconds |
+- The `NAME_TO_KEY` reverse lookup will be defined as a shared constant (or inline per file since it's small) mapping display names to `PlatformType` keys
+- All logos are already optimised `.webp` files imported in `src/types/database.ts`
+- Decorative usage — `alt=""` since the platform name is already displayed as text
+- No new dependencies, no design changes beyond adding the logo icon
 
