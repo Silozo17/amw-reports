@@ -109,8 +109,8 @@ const HomePage = () => {
                 src={dashboardSnapshot}
                 alt="AMW Reports dashboard showing multi-platform marketing analytics with KPI cards, charts, and performance metrics"
                 className="w-full max-w-xl rounded-xl border border-sidebar-border/30 shadow-2xl"
-                width={576}
-                height={400}
+                width={1152}
+                height={917}
                 fetchPriority="high"
               />
             </div>
@@ -203,8 +203,8 @@ const HomePage = () => {
               src={perfOverview}
               alt="AMW Reports performance overview showing monthly trends, engagement charts, and platform comparison data"
               className="w-full max-w-5xl mx-auto rounded-xl border border-sidebar-border/30 shadow-2xl"
-              width={1024}
-              height={600}
+               width={1920}
+               height={883}
               loading="lazy"
             />
           </div>
