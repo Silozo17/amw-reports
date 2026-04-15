@@ -210,11 +210,8 @@ Deno.serve(async (req) => {
       const orgId = connClientData.org_id;
       const planSlug = orgPlanMap[orgId] || "creator";
 
-      if (planSlug === "creator" && now.getDate() !== 4) {
-        skippedCount++;
-        continue;
-      }
-      if (planSlug === "freelance" && now.getDay() !== 1) {
+      // Creator & Freelancer: sync only on Mondays (UK time)
+      if ((planSlug === "creator" || planSlug === "freelance") && uk.ukDay !== 1) {
         skippedCount++;
         continue;
       }
