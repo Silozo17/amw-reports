@@ -1243,7 +1243,7 @@ async function handlePinterest(supabase: any, code: string, connectionId: string
 async function handleThreads(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const appId = Deno.env.get("THREADS_APP_ID")!;
   const appSecret = Deno.env.get("THREADS_APP_SECRET")!;
-  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+  const redirectUri = `https://reports.amwmedia.co.uk/auth/threads/callback`;
 
   // Exchange code for short-lived token
   const tokenRes = await fetch("https://graph.threads.net/oauth/access_token", {
