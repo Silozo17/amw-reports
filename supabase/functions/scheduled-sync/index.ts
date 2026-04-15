@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
     let backfillTriggered = 0;
     const MAX_BACKFILLS_PER_RUN = 50;
 
-    if (now.getDay() === 0) {
+    if (uk.ukDay === 0) {
       // Build list of months to check (last 12)
       const checkMonths: Array<{ month: number; year: number }> = [];
       for (let i = 0; i < 12; i++) {
