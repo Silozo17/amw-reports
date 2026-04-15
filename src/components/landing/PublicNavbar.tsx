@@ -51,7 +51,7 @@ const PublicNavbar = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" width={112} height={28} />
-            <span className="text-xs tracking-[0.25em] text-amw-offwhite/60 uppercase font-body">Reports</span>
+            <span className="text-xs tracking-[0.25em] text-amw-offwhite/65 uppercase font-body">Reports</span>
           </Link>
 
           {/* Desktop links */}
