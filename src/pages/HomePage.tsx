@@ -88,7 +88,7 @@ const HomePage = () => {
               <p className="font-body text-lg max-w-lg leading-relaxed text-amw-offwhite/70">
                 AMW Reports pulls data from Google, Meta, TikTok, LinkedIn and more into clean, client-ready reports — automatically. Built for agencies, freelancers, and creators.
               </p>
-              <div className="flex items-center gap-3 text-xs font-body text-amw-offwhite/50 tracking-wide uppercase">
+              <div className="flex items-center gap-3 text-xs font-body text-amw-offwhite/65 tracking-wide uppercase">
                 <span>14 Platforms</span>
                 <span className="w-1 h-1 rounded-full bg-primary" />
                 <span>70+ Metrics</span>
@@ -124,7 +124,7 @@ const HomePage = () => {
       <section className="py-12 section-light">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="font-accent text-lg text-primary mb-2">Our Integrations</p>
-          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/40 font-body mb-6">Connects with the tools you already use</p>
+          <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/60 font-body mb-6">Connects with the tools you already use</p>
           <div className="flex flex-wrap justify-center gap-3">
             {PLATFORMS.map((p) => (
               <span key={p} className="px-4 py-2 rounded-full bg-sidebar-accent/40 border border-sidebar-border/50 text-xs font-body text-amw-offwhite/70">
@@ -189,7 +189,7 @@ const HomePage = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-6 w-6 text-primary" />
                 </div>
-                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/50">0{i + 1}</span>
+                <span className="absolute top-4 left-4 text-xs font-body text-amw-offwhite/65">0{i + 1}</span>
                 <h3 className="text-lg font-body font-semibold mb-2">{title}</h3>
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
@@ -330,7 +330,7 @@ const HomePage = () => {
             <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-heading text-lg">A</div>
             <div className="text-left">
               <p className="text-sm font-body font-semibold text-amw-offwhite">Amir</p>
-              <p className="text-xs font-body text-amw-offwhite/50">Founder, AMW Media</p>
+              <p className="text-xs font-body text-amw-offwhite/65">Founder, AMW Media</p>
             </div>
           </div>
         </div>

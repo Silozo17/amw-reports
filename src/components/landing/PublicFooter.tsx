@@ -9,12 +9,12 @@ const PublicFooter = () => (
         <div className="col-span-2 md:col-span-1 space-y-3">
           <div className="flex items-center gap-2">
             <img src={amwLogo} alt="AMW Reports" className="h-7 w-auto" width={112} height={28} />
-            <span className="text-xs tracking-[0.25em] text-amw-offwhite/50 uppercase font-body">Reports</span>
+            <span className="text-xs tracking-[0.25em] text-amw-offwhite/65 uppercase font-body">Reports</span>
           </div>
           <p className="text-xs font-body leading-relaxed max-w-xs">
             Client-ready marketing reports that consolidate all your data into one clean, branded format.
           </p>
-          <p className="text-xs text-amw-offwhite/40 font-body">
+          <p className="text-xs text-amw-offwhite/60 font-body">
             Operated by{' '}
             <a href="https://amwmedia.co.uk" target="_blank" rel="noopener noreferrer" aria-label="Visit AMW Media website" className="text-amw-offwhite/60 hover:text-primary transition-colors underline">
               AMW Media
@@ -67,7 +67,7 @@ const PublicFooter = () => (
         </div>
       </div>
 
-      <div className="mt-10 pt-6 border-t border-sidebar-border/30 text-xs text-amw-offwhite/40 font-body">
+      <div className="mt-10 pt-6 border-t border-sidebar-border/30 text-xs text-amw-offwhite/60 font-body">
         © {new Date().getFullYear()} AMW Reports. All rights reserved.
       </div>
     </div>
