@@ -26,7 +26,7 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
 };
 
 const DELAY_BETWEEN_MONTHS_MS = 1_500;
-const MAX_JOBS_PER_INVOCATION = 10;
+const MAX_JOBS_PER_INVOCATION = 25;
 
 const PLATFORM_MAX_MONTHS: Record<string, number> = {
   pinterest: 3,
