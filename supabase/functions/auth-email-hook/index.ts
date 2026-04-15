@@ -39,6 +39,16 @@ function buildActionUrl(
     : base;
 }
 
+async function getPlatformDefaultOrgId(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from("organisations")
+    .select("id")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? "00000000-0000-0000-0000-000000000000";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -197,6 +207,8 @@ Deno.serve(async (req) => {
     const recipientEmail =
       action === "email_change" ? (newEmail || email) : email;
 
+    const resolvedOrgId = orgId ?? await getPlatformDefaultOrgId(supabase);
+
     const { data: result, error } = await supabase.functions.invoke(
       "send-branded-email",
       {
@@ -204,7 +216,7 @@ Deno.serve(async (req) => {
           template_name: templateName,
           recipient_email: recipientEmail,
           recipient_name: recipientName,
-          org_id: orgId ?? "00000000-0000-0000-0000-000000000000",
+          org_id: resolvedOrgId,
           data: templateData,
         },
       },
