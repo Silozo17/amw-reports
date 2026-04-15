@@ -42,15 +42,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const appId = Deno.env.get("META_APP_ID")!;
+    const appId = Deno.env.get("THREADS_APP_ID")!;
     if (!appId) {
       return new Response(
-        JSON.stringify({ error: "META_APP_ID is not configured" }),
+        JSON.stringify({ error: "THREADS_APP_ID is not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+    const redirectUri = `https://reports.amwmedia.co.uk/auth/threads/callback`;
 
     const state = btoa(
       JSON.stringify({
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       })
     );
 
-    const authUrl = new URL("https://api.instagram.com/oauth/authorize");
+    const authUrl = new URL("https://threads.net/oauth/authorize");
     authUrl.searchParams.set("client_id", appId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("scope", "threads_basic,threads_manage_insights");
