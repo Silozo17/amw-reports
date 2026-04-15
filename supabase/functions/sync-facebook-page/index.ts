@@ -498,7 +498,7 @@ Deno.serve(async (req) => {
         .eq("id", syncLog.id);
     }
 
-    console.log(`Facebook sync complete (${finalStatus}). organic_views=${totalViews}, total_views=${totalViewsAll}, engagement=${totalEngagement}, followers=${followerEnd}, growth=${followerGrowth}, posts=${allTopPosts.length}`);
+    console.log(`Facebook sync complete (${finalStatus}). views=${totalViews}, engagement=${totalEngagement}, followers=${followerEnd}, growth=${followerGrowth}, posts=${allTopPosts.length}`);
 
     return new Response(JSON.stringify({ success: true, status: finalStatus, metrics: metricsData, pages_synced: pages.length, posts_count: allTopPosts.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
