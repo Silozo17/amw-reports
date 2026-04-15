@@ -37,6 +37,7 @@ import OnboardingPage from "./pages/OnboardingPage";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import ThreadsCallback from "./pages/ThreadsCallback";
+import OAuthCallback from "./pages/OAuthCallback";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrgList from "./pages/admin/AdminOrgList";
 import AdminOrgDetail from "./pages/admin/AdminOrgDetail";
@@ -115,6 +116,7 @@ const AppRoutes = () => (
     <Route path="/about" element={<PublicPageRoute><AboutPage /></PublicPageRoute>} />
     <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
     <Route path="/auth/threads/callback" element={<ThreadsCallback />} />
+    <Route path="/auth/callback" element={<OAuthCallback />} />
     <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
