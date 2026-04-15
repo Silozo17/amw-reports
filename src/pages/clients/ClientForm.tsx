@@ -128,21 +128,6 @@ const ClientForm = () => {
 
     setIsSubmitting(true);
 
-    let logoUrl: string | null = null;
-
-    if (logoFile) {
-      const ext = logoFile.name.split('.').pop();
-      const path = `${crypto.randomUUID()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage.from('client-logos').upload(path, logoFile);
-      if (uploadErr) {
-        toast.error('Failed to upload logo');
-        setIsSubmitting(false);
-        return;
-      }
-      const { data: urlData } = supabase.storage.from('client-logos').getPublicUrl(path);
-      logoUrl = urlData.publicUrl;
-    }
-
     if (isOrgLoading) {
       toast.error('Still loading organisation — please try again');
       setIsSubmitting(false);
@@ -155,21 +140,38 @@ const ClientForm = () => {
       return;
     }
 
-    const { error } = await supabase.from('clients').insert({
+    // Insert client first (without logo) so we have a client_id for the storage path
+    const { data: newClient, error } = await supabase.from('clients').insert({
       ...form,
       phone: formatPhone(form.phone),
-      logo_url: logoUrl,
+      logo_url: null,
       created_by: user?.id,
       org_id: orgId,
-    });
+    }).select('id').single();
 
-    if (error) {
+    if (error || !newClient) {
       console.error('Client creation error:', error);
-      toast.error(error.message || 'Failed to create client');
-    } else {
-      toast.success('Client created');
-      navigate('/clients');
+      toast.error(error?.message || 'Failed to create client');
+      setIsSubmitting(false);
+      return;
     }
+
+    // Upload logo under {client_id}/ prefix for org-scoped storage policies
+    if (logoFile) {
+      const ext = logoFile.name.split('.').pop();
+      const path = `${newClient.id}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from('client-logos').upload(path, logoFile);
+      if (uploadErr) {
+        console.error('Logo upload error:', uploadErr);
+        toast.warning('Client created but logo upload failed');
+      } else {
+        const { data: urlData } = supabase.storage.from('client-logos').getPublicUrl(path);
+        await supabase.from('clients').update({ logo_url: urlData.publicUrl }).eq('id', newClient.id);
+      }
+    }
+
+    toast.success('Client created');
+    navigate('/clients');
     setIsSubmitting(false);
   };
 

@@ -101,7 +101,7 @@ const ClientEditDialog = ({ client, onUpdate }: ClientEditDialogProps) => {
 
     if (logoFile) {
       const ext = logoFile.name.split('.').pop();
-      const path = `${crypto.randomUUID()}.${ext}`;
+      const path = `${client.id}/${crypto.randomUUID()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('client-logos').upload(path, logoFile);
       if (uploadErr) {
         toast.error('Failed to upload logo');
