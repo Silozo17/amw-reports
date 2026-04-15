@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       if (targetEmail === "unknown") continue;
 
       // Deduplicate: check if we already notified
-      const refId = await hashString(`failed_login_${targetEmail}_${fifteenMinAgo}`);
+      const refId = await hashToUuid(`failed_login_${targetEmail}_${fifteenMinAgo}`);
       const { data: existing } = await supabase
         .from("notification_tracking")
         .select("id")
@@ -199,4 +199,13 @@ async function hashString(input: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hashToUuid(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
 }
