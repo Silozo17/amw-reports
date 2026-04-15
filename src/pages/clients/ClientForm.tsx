@@ -171,8 +171,7 @@ const ClientForm = () => {
     }
 
     toast.success('Client created');
-      navigate('/clients');
-    }
+    navigate('/clients');
     setIsSubmitting(false);
   };
 
