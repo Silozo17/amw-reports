@@ -8,13 +8,46 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204 });
   }
 
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "migrate-encrypt-tokens", method: req.method, connection_id: null }));
+  console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "migrate-encrypt-tokens", method: req.method, connection_id: null }));
+
+  // Platform admin auth gate
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const anonClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: { user }, error: userError } = await anonClient.auth.getUser();
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: isAdmin } = await supabase.rpc("is_platform_admin", {
+    _user_id: user.id,
+  });
+
+  if (!isAdmin) {
+    return new Response(
+      JSON.stringify({ error: "Forbidden — platform admin required" }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
     // Verify TOKEN_ENCRYPTION_KEY is set
     const keyHex = Deno.env.get("TOKEN_ENCRYPTION_KEY");
     if (!keyHex || keyHex.length !== 64) {
