@@ -3,6 +3,7 @@ import { ArrowRight, Plug, RefreshCw, FileText, Check, Quote, BarChart3, Palette
 import { Button } from '@/components/ui/button';
 import WarpedGrid from '@/components/landing/WarpedGrid';
 import StarDecoration from '@/components/landing/StarDecoration';
+import { getPlatformLogo } from '@/lib/platformLogos';
 import amwLogo from '@/assets/AMW_Logo_White.png';
 import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
 import perfOverview from '@/assets/screenshots/Performance_Overview.webp';
@@ -128,7 +129,8 @@ const HomePage = () => {
           <p className="text-xs tracking-[0.2em] uppercase text-amw-offwhite/60 font-body mb-6">Connects with the tools you already use</p>
           <div className="flex flex-wrap justify-center gap-3">
             {PLATFORMS.map((p) => (
-              <span key={p} className="px-4 py-2 rounded-full bg-sidebar-accent/40 border border-sidebar-border/50 text-xs font-body text-amw-offwhite/70">
+              <span key={p} className="flex items-center gap-2 px-4 py-2 rounded-full bg-sidebar-accent/40 border border-sidebar-border/50 text-xs font-body text-amw-offwhite/70">
+                {getPlatformLogo(p) && <img src={getPlatformLogo(p)} alt="" className="h-4 w-4 object-contain" />}
                 {p}
               </span>
             ))}
