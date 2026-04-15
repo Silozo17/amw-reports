@@ -21,7 +21,8 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
   google_analytics: "sync-google-analytics",
   google_business_profile: "sync-google-business-profile",
   youtube: "sync-youtube",
-  pinterest: "sync-pinterest"
+  pinterest: "sync-pinterest",
+  threads: "sync-threads"
 };
 
 const DELAY_BETWEEN_SYNCS_MS = 1_500;
