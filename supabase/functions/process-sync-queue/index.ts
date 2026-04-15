@@ -26,7 +26,7 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
 };
 
 const DELAY_BETWEEN_MONTHS_MS = 1_500;
-const MAX_JOBS_PER_INVOCATION = 10;
+const MAX_JOBS_PER_INVOCATION = 25;
 
 const PLATFORM_MAX_MONTHS: Record<string, number> = {
   pinterest: 3,
@@ -271,6 +271,24 @@ Deno.serve(async (req) => {
       );
 
       jobsProcessed++;
+    }
+
+    // Self-continuation: if there are still pending jobs, trigger another run
+    const { data: remaining } = await supabase
+      .from("sync_jobs")
+      .select("id")
+      .eq("status", "pending")
+      .limit(1);
+
+    if (remaining && remaining.length > 0) {
+      console.log("More pending jobs remain — triggering continuation...");
+      fetch(`${supabaseUrl}/functions/v1/process-sync-queue`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
+        },
+      }).catch((err) => console.warn("Self-continuation failed:", err));
     }
 
     return new Response(
