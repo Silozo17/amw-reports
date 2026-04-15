@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     }
 
     const appId = Deno.env.get("PINTEREST_APP_ID")!;
-    const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+    const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
 
     const state = btoa(
       JSON.stringify({
