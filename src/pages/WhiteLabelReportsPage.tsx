@@ -135,6 +135,26 @@ const WhiteLabelReportsPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">What White-Label Reporting Means for Your Agency</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            White-label reporting allows marketing agencies to deliver professional client reports under their own brand identity, without clients ever seeing the underlying reporting tool. With AMW Reports, every touchpoint — from the PDF cover page to the client portal URL to the email that delivers the report — features your agency's logo, colour scheme, and typography. On the Agency plan, you can even serve the client portal from your own custom domain, creating a seamless branded experience.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            This matters because client trust is built through consistency. When every report, dashboard, and communication carries your brand, it reinforces your agency's professionalism and creates a perception of a fully custom, in-house reporting solution. Clients do not need to know that the data collection, report generation, and dashboard infrastructure are handled by AMW Reports — they simply see your brand delivering excellent work.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Setting up white-label branding in AMW Reports takes minutes, not hours. Upload your logo, set your primary and secondary brand colours, choose your heading and body fonts from a curated library, and optionally configure a custom domain. You can even use the automatic branding extraction feature — enter your agency's website URL and the platform will analyse your site to suggest colours, logos, and fonts automatically. Once configured, branding is applied to every report and portal page across all your clients.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            Unlike other reporting tools that charge extra for white-label features or limit branding to just the PDF, AMW Reports applies your brand consistently across the entire platform. PDF reports, the interactive client portal, email delivery templates, and even the chart colour palette all reflect your agency identity. This comprehensive approach to white-label marketing reports is what sets AMW Reports apart from tools that offer only surface-level branding customisation.
+          </p>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

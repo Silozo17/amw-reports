@@ -128,6 +128,50 @@ const HowItWorksPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">How Automated Marketing Report Generation Works</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The entire AMW Reports workflow is designed around a simple principle: you should never have to manually pull data from a marketing platform again. The process begins when you connect your client's marketing platforms using secure OAuth — a one-time authorisation that grants read-only access to analytics data. No passwords are stored, and connections can be revoked at any time from the platform settings.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Once connected, the automated data sync engine takes over. Depending on your plan tier, data is pulled from all connected platforms on a daily (Agency), weekly (Freelance), or monthly (Creator) schedule. Each sync retrieves over seventy possible metrics across fourteen platforms — from Google Ads spend and Meta Ads ROAS to Instagram engagement and YouTube watch time. The data is normalised, stored securely, and made available in your client's dashboard immediately.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Report generation is triggered either automatically on a monthly schedule or manually from your dashboard. When a report is requested, it enters a three-stage pipeline: first it is queued for processing, then the engine generates the branded PDF by compiling data from all connected platforms into formatted sections with charts, key metrics, month-over-month comparisons, and top-performing content. Finally, the completed report is stored in your dashboard and optionally emailed directly to your client.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            Every report is branded with your logo, colours, and fonts — applied consistently across the cover page, section headers, charts, and footer. On the Agency plan, the client portal where clients can view their interactive dashboard is also branded and can be served from your own custom domain. The entire process — from data collection to branded report delivery — happens without any manual intervention, freeing you to focus on the strategic marketing work that actually grows your clients' businesses.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SEO: FAQ ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">How It Works FAQ</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'How long does it take to set up AMW Reports?', a: 'Most users are fully set up in under 5 minutes. Create an account, add a client, connect their platforms, and your first report can be generated immediately.' },
+              { q: 'Do I need technical skills to use the platform?', a: 'No. Connecting platforms uses simple one-click OAuth. The dashboard and report generation are fully automated — no coding, spreadsheets, or technical configuration required.' },
+              { q: 'Can I customise what appears in each report?', a: 'Yes. Each client has a configurable dashboard where you can enable or disable specific platforms and metrics, toggle month-over-month comparisons, and control AI-powered insights.' },
+              { q: 'What happens if a platform connection breaks?', a: 'AMW Reports monitors connection health and notifies you if a platform requires re-authentication. Re-connecting takes seconds and does not affect historical data.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

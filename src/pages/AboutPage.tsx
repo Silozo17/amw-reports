@@ -87,6 +87,26 @@ const AboutPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">Our approach</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">How We Built a Marketing Reporting Tool That Actually Works</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            When we set out to build AMW Reports, we had one core principle: build the reporting tool we wished we had when we were drowning in manual data collection every month. As a UK marketing agency managing multiple clients across Google Ads, Meta Ads, Instagram, LinkedIn, YouTube, and more, we knew exactly which features mattered and which were unnecessary complexity.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The result is a platform that focuses on what marketing professionals actually need: reliable data syncing from fourteen platforms, branded PDF reports that look like they came from a design team, automated email delivery that removes the monthly "send reports" task from your to-do list, and a client portal that gives clients transparent access to their performance data. We deliberately avoided feature bloat — every capability in AMW Reports exists because we needed it for our own agency workflow.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            We also believe that professional reporting should be accessible to everyone, not just agencies with large budgets. That is why we offer a genuinely free plan — not a limited trial, but a permanent free tier with branded PDF reports, a client portal, and five platform connections. When your business grows, our paid plans scale with you, offering more clients, more connections, daily data syncing, AI-powered analysis, and full white-label branding at transparent, flat monthly rates with no per-seat fees.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            Today, AMW Reports serves marketing agencies, freelancers, content creators, and small businesses across the UK and beyond. We continue to use the platform ourselves every day for our own client reporting at AMW Media, which means every update, improvement, and new feature is driven by real-world agency experience — not theoretical product roadmaps.
+          </p>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

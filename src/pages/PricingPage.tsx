@@ -258,6 +258,26 @@ const PricingPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Understanding Marketing Report Pricing</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Marketing reporting tool pricing varies widely across the industry. Some platforms charge per dashboard, others charge per user seat, and many require annual contracts with significant upfront commitments. AMW Reports takes a different approach: simple, flat monthly pricing with no per-seat fees, no per-dashboard charges, and no annual contracts. Your entire team can access the platform for one transparent price.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The free Creator plan is not a limited trial — it is a permanent free tier that includes one client, five platform connections, branded PDF reports with your logo, and a client portal with a shareable link. There is no credit card required and no expiration date. This makes it ideal for freelancers testing the platform, small businesses tracking their own marketing, or creators monitoring their social media growth.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The Freelance plan at £29.99 per month is designed for marketing professionals managing two to ten clients. It includes five clients, twenty-five platform connections, weekly data syncing, twelve months of historical data imports, AI-powered marketing analysis, and automated email delivery. For freelancers, this represents exceptional value — professional reporting capabilities that rival enterprise tools, at a fraction of the cost.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            The Agency plan at £49.99 per month adds everything agencies need for a premium client experience: full white-label branding (your logo, colours, fonts across all reports and the portal), custom domain support, daily data syncing for always-current dashboards, and twenty-four months of historical data. Additional clients can be added at £9.99 per month each, and extra connection packs are available at the same price. This scalable pricing model means you only pay for what you use, with no hidden fees or surprise charges.
+          </p>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       {/* CTA */}

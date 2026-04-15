@@ -112,6 +112,50 @@ const ForCreatorsPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Why Creators Need Analytics Reports</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            As a content creator, your social media analytics are more than vanity metrics — they are your currency when negotiating brand deals and sponsorships. Sponsors want to see follower counts, engagement rates, video view averages, audience demographics, and growth trends before they commit to a partnership. Having this data readily available in a clean, professional format gives you a significant advantage over creators who rely on screenshots or verbal estimates.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports consolidates your analytics from YouTube, Instagram, TikTok, LinkedIn, Facebook, Pinterest, and Threads into a single dashboard. Instead of switching between YouTube Studio, Instagram Insights, TikTok Analytics, and other platform-specific tools, you see all your growth data in one place. The platform tracks key creator metrics including subscriber and follower growth, video views and watch time, engagement rate, likes, comments, shares, saves, and top-performing content.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            When a brand or agency asks for your stats, you can generate a branded PDF report in seconds. The report includes your logo, your brand colours, and professional charts showing your performance trends — making it far more impressive than a collection of mobile screenshots. Month-over-month comparisons clearly demonstrate your growth trajectory, which is exactly what sponsors look for when evaluating potential partnerships.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            The Creator plan is completely free — connect up to five platforms, track your growth, and generate branded reports at no cost. There are no watermarks, no trial periods, and no credit card required. As your creator career grows and you need to track more platforms or access AI-powered insights, you can upgrade to a paid plan. AMW Reports is designed to grow with you, from your first thousand followers to your first million.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SEO: FAQ ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Creator Analytics FAQ</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'Is AMW Reports free for content creators?', a: 'Yes. The Creator plan is completely free — 5 platform connections, branded PDF reports, and a dashboard. No credit card, no time limit.' },
+              { q: 'Can I share my analytics report with sponsors?', a: 'Absolutely. Generate a branded PDF with your stats and growth trends, then share it directly with sponsors or brand partners. You can also share your client portal link.' },
+              { q: 'Which platforms can I track as a creator?', a: 'YouTube, Instagram, TikTok, LinkedIn, Facebook, Pinterest, and Threads. You can connect up to 5 platforms on the free plan.' },
+              { q: 'Does AMW Reports show engagement rate?', a: 'Yes. The platform calculates and displays engagement rates alongside raw metrics like likes, comments, shares, and views for each connected platform.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

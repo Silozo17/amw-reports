@@ -135,6 +135,26 @@ const PpcReportingPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Why PPC Agencies Need Automated Ad Reporting</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Pay-per-click advertising generates more data than almost any other marketing channel. Between Google Ads, Meta Ads, TikTok Ads, and LinkedIn Ads, a single client campaign can produce dozens of metrics — ad spend, impressions, clicks, click-through rate, cost per click, conversions, conversion value, return on ad spend, frequency, reach, and more. Manually pulling this data from each platform, consolidating it into a readable format, and presenting it to clients is one of the most time-consuming tasks a PPC manager faces.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports automates the entire PPC reporting workflow. The platform connects to Google Ads, Meta Ads (covering both Facebook and Instagram advertising), TikTok Ads, and LinkedIn Ads via secure OAuth integrations. Once connected, it pulls all key advertising metrics automatically — including campaign-level breakdowns showing performance by individual campaigns, ad sets, and ads. This granular reporting hierarchy lets you show clients exactly where their budget is going and which campaigns deliver the best results.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            For performance marketing agencies, the ability to combine paid advertising data with organic social and SEO metrics in a single client report is invaluable. Clients want to understand their total marketing performance, not just their ad spend. AMW Reports lets you include Google Ads ROAS alongside Instagram engagement, Google Analytics traffic, and Search Console rankings — all in one branded PDF that demonstrates holistic marketing value.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            The platform also supports month-over-month comparison for all PPC metrics, making it straightforward to show clients how their ad performance is trending. Whether spend is increasing while cost per conversion drops, or click-through rates are improving across campaigns, the data tells the story clearly. Combined with automated email delivery and a branded client portal, AMW Reports ensures your PPC clients always have access to up-to-date advertising performance data.
+          </p>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

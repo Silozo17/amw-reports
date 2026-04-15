@@ -134,6 +134,26 @@ const SeoReportingPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">The Complete SEO Reporting Solution</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Effective SEO reporting requires bringing together data from multiple Google properties into a single, coherent narrative for your clients. AMW Reports integrates with Google Search Console, Google Analytics (GA4), and Google Business Profile to give you a complete view of organic search performance — from keyword rankings and click-through rates to website traffic patterns and local business visibility.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Google Search Console data reveals which search queries drive traffic to your client's website, their average position in search results, and how many impressions and clicks they receive. AMW Reports pulls this data automatically and presents it alongside top pages by traffic, enabling you to identify which content performs well and where there are opportunities to improve rankings. The search performance trend chart shows how clicks, impressions, and CTR evolve month over month, making it easy to demonstrate the value of your SEO work.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Google Analytics integration adds website behaviour metrics — sessions, active users, new versus returning visitors, bounce rate, average session duration, pages per session, and traffic source breakdowns. Together with Search Console data, this paints a complete picture: not just how people find the website through search, but what they do once they arrive. For local businesses, Google Business Profile data adds calls, direction requests, website clicks, and review ratings.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            All of this data flows into a branded PDF report that is generated automatically and can be delivered to clients via email. For SEO agencies and consultants, AMW Reports eliminates the hours spent manually exporting data from Google tools, formatting spreadsheets, and building slide decks. The result is a professional, consistent SEO report that clearly demonstrates search performance improvements and justifies ongoing SEO investment.
+          </p>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
