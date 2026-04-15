@@ -1,66 +1,80 @@
 
 
-# Sync Failure Analysis — Root Causes and Fix Plan
+# Fix: Scope client-logos Storage Policies to Organisation Members
 
-## What happened
+## Problem
+The `client-logos` bucket policies only check `bucket_id = 'client-logos'`, allowing any authenticated user to upload, update, or delete logos belonging to other organisations.
 
-You triggered a Meta Ads sync via the admin panel. The job was enqueued and processed, but **0 months were synced** because all 24 months of Meta Ads snapshots already exist in the database. The queue processor skips any month that already has a snapshot — there is no "re-sync" or "overwrite" capability.
+## Approach
+Since files are currently uploaded with flat UUID paths (`{random-uuid}.ext`), there's no way to derive ownership from the path alone. The fix requires two changes:
 
-## Root Causes Found
+1. **Change upload path convention** to `{client_id}/{filename}` so the storage policy can extract the client_id from the path and verify org membership.
+2. **Replace storage policies** with org-scoped versions that check the first path segment against the `clients` table.
 
-### 1. Admin-sync ignores time mode parameters (CRITICAL)
-The `AdminSyncDialog` sends `mode`, `month`, `year`, `start_month`, `start_year`, `end_month`, `end_year` in the payload — but `admin-sync/index.ts` **only reads `connections` and `months`** (line 78). All time-mode parameters are silently discarded. Every admin sync becomes a "full 24 months" job regardless of what you select.
+## Changes
 
-### 2. Queue processor always skips existing snapshots (CRITICAL)
-`process-sync-queue/index.ts` lines 160-175 filter out any month that already has a snapshot. There is **no way to force a re-sync** of existing data. This is the direct cause of "0 synced, 0 failed out of 0".
+### 1. Database migration — Replace storage policies
+Drop the four existing unscoped policies and create org-scoped replacements:
 
-### 3. Admin-sync uses `getClaims()` which may not exist (MODERATE)
-Line 52 calls `anonClient.auth.getClaims()` — this method doesn't exist in standard Supabase JS v2. It should use `getUser()` instead (same fix applied to `migrate-encrypt-tokens` earlier). Currently it works by coincidence if the SDK version includes it, but could break on SDK updates.
+```sql
+-- DROP existing unscoped policies
+DROP POLICY "Authenticated users can upload client logos" ON storage.objects;
+DROP POLICY "Authenticated users can update client logos" ON storage.objects;
+DROP POLICY "Authenticated users can delete client logos" ON storage.objects;
+-- Keep public SELECT policy unchanged (logos are public-readable by design)
 
-## Fix Plan
+-- INSERT: org members only, path must start with a client_id they own
+CREATE POLICY "Org members can upload client logos"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'client-logos'
+  AND EXISTS (
+    SELECT 1 FROM public.clients c
+    WHERE c.id = (storage.foldername(name))[1]::uuid
+      AND public.user_belongs_to_org(auth.uid(), c.org_id)
+  )
+);
 
-### Step 1: Update `admin-sync/index.ts` — Parse time mode and pass to sync jobs
+-- UPDATE: same org check
+CREATE POLICY "Org members can update client logos"
+ON storage.objects FOR UPDATE TO authenticated
+USING (
+  bucket_id = 'client-logos'
+  AND EXISTS (
+    SELECT 1 FROM public.clients c
+    WHERE c.id = (storage.foldername(name))[1]::uuid
+      AND public.user_belongs_to_org(auth.uid(), c.org_id)
+  )
+);
 
-- Read `mode`, `month`, `year`, `start_month/year`, `end_month/year` from the request body
-- For `single_month` mode: store `target_month` and `target_year` on each sync job
-- For `date_range` mode: calculate the specific months list
-- For `full` mode: keep current behaviour (months = 24)
-- Replace `getClaims()` with `getUser()` for auth validation
+-- DELETE: same org check
+CREATE POLICY "Org members can delete client logos"
+ON storage.objects FOR DELETE TO authenticated
+USING (
+  bucket_id = 'client-logos'
+  AND EXISTS (
+    SELECT 1 FROM public.clients c
+    WHERE c.id = (storage.foldername(name))[1]::uuid
+      AND public.user_belongs_to_org(auth.uid(), c.org_id)
+  )
+);
+```
 
-### Step 2: Add `force_resync` and `target_months` to `sync_jobs` table
+### 2. Update `src/pages/clients/ClientForm.tsx`
+Change the upload path from `{uuid}.ext` to `{clientId}/{uuid}.ext`. Since this is a new client (not yet created), we'll need to create the client first, get the ID, then upload the logo and update the record. Alternatively, use a temporary org-scoped prefix — but since ClientForm inserts a new client, the simplest approach is to upload under a temporary path using the org_id, or restructure to create client first.
 
-Run a migration to add:
-- `force_resync boolean NOT NULL DEFAULT false` — when true, the queue processor won't skip existing snapshots
-- `target_months jsonb` — optional array of `{month, year}` objects for specific month targeting (null = use the `months` count from current date)
+**Simpler approach**: Use the client_id that will be known after insert. Restructure to:
+1. Insert client without logo
+2. Upload logo to `{client.id}/{uuid}.ext`
+3. Update client with logo_url
 
-### Step 3: Update `process-sync-queue/index.ts` — Support re-sync and targeted months
+### 3. Update `src/components/clients/ClientEditDialog.tsx`
+Change upload path from `{uuid}.ext` to `{client.id}/{uuid}.ext` (client.id is already available here).
 
-- When `force_resync` is true, skip the "existing snapshots" filter
-- When `target_months` is provided, use those specific months instead of `getMonthsRange()`
-- Admin-triggered syncs (priority >= 10) should always set `force_resync = true`
+### Files to modify
+- New migration SQL file
+- `src/pages/clients/ClientForm.tsx` — restructure upload to use `{clientId}/` prefix
+- `src/components/clients/ClientEditDialog.tsx` — prefix upload path with `client.id`
 
-### Step 4: Update `AdminSyncDialog` payload handling
-
-- For `single_month`: send `target_months: [{month, year}]` and `force_resync: true`
-- For `date_range`: compute month list from start→end, send as `target_months`
-- For `full`: send `months: 24` and `force_resync: true`
-- Fix the response handling — admin-sync returns `jobs_enqueued`, not `summary.synced/failed`
-
-### Step 5: Fix `getClaims()` in admin-sync
-
-Replace with `getUser()` pattern matching the fix already applied to `migrate-encrypt-tokens`.
-
----
-
-### Technical Details
-
-**Files to modify:**
-- `supabase/functions/admin-sync/index.ts` — parse time params, pass to jobs, fix auth
-- `supabase/functions/process-sync-queue/index.ts` — support force_resync + target_months
-- `src/components/admin/AdminSyncDialog.tsx` — fix response handling (lines 191-195)
-- Database migration: add columns to `sync_jobs`
-
-**Files to redeploy:**
-- `admin-sync`
-- `process-sync-queue`
-
+### Risk
+Existing logos uploaded with flat paths will remain accessible (public SELECT is unchanged) but cannot be deleted/updated through the new policies. This is acceptable since old logos are referenced by URL in `clients.logo_url` and don't need policy-gated access.
