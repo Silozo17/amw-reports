@@ -108,7 +108,7 @@ const SubScoreRow = ({ sub }: { sub: SubScore }) => {
 const HealthScore = ({ current, previous, prePrevious }: HealthScoreProps) => {
   const result = useMemo(() => computeHealthScore(current, previous, prePrevious), [current, previous, prePrevious]);
   const activeSubScores = result.subScores.filter(s => s.hasData);
-  const { ref, style, overlayStyle, handleMouseMove, handleMouseLeave } = useTilt(6);
+  const { ref, style, overlayStyle, handleMouseMove, handleMouseLeave } = useTilt(2);
 
   if (activeSubScores.length === 0) return null;
 

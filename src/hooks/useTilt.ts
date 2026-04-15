@@ -26,7 +26,7 @@ const useTilt = (maxTilt = 8) => {
         const rotateX = (y - 0.5) * -maxTilt;
         const rotateY = (x - 0.5) * maxTilt;
         setState({
-          transform: `perspective(800px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale(1.02)`,
+          transform: `perspective(800px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale(1.005)`,
           overlayBackground: `radial-gradient(circle at ${(x * 100).toFixed(0)}% ${(y * 100).toFixed(0)}%, hsla(0,0%,100%,0.15) 0%, transparent 60%)`,
         });
       });

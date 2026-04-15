@@ -265,10 +265,29 @@ export function computeHealthScore(
   };
 }
 
+/** Smooth color interpolation: 0 = dark red → 50 = orange → 75 = yellow-green → 100 = green */
 export function getScoreColor(score: number): string {
-  if (score >= 75) return "hsl(var(--amw-green))";
-  if (score >= 50) return "hsl(var(--amw-orange))";
-  return "hsl(var(--destructive))";
+  const stops = [
+    { at: 0, h: 0, s: 80, l: 40 },
+    { at: 50, h: 30, s: 90, l: 50 },
+    { at: 75, h: 60, s: 80, l: 45 },
+    { at: 100, h: 120, s: 60, l: 45 },
+  ];
+  const clamped = Math.max(0, Math.min(100, score));
+  let lo = stops[0];
+  let hi = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (clamped >= stops[i].at && clamped <= stops[i + 1].at) {
+      lo = stops[i];
+      hi = stops[i + 1];
+      break;
+    }
+  }
+  const t = hi.at === lo.at ? 1 : (clamped - lo.at) / (hi.at - lo.at);
+  const h = Math.round(lo.h + (hi.h - lo.h) * t);
+  const s = Math.round(lo.s + (hi.s - lo.s) * t);
+  const l = Math.round(lo.l + (hi.l - lo.l) * t);
+  return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
 export function getScoreLabel(score: number): string {
