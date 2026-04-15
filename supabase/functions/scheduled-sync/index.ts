@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
       const orgId = connClientData.org_id;
       const planSlug = orgPlanMap[orgId] || "creator";
 
-      if (planSlug === "creator" && now.getDay() !== 1) {
+      if (planSlug === "creator" && now.getDate() !== 4) {
         skippedCount++;
         continue;
       }

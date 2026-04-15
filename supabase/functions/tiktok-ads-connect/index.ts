@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     const state = btoa(
       JSON.stringify({
         connection_id,
-        platform: "tiktok",
+        platform: "tiktok_ads",
         redirect_url: redirect_url || "https://amw-reports.lovable.app",
       })
     );
