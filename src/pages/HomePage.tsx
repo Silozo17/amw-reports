@@ -111,6 +111,7 @@ const HomePage = () => {
                 className="w-full max-w-xl rounded-xl border border-sidebar-border/30 shadow-2xl"
                 width={576}
                 height={400}
+                fetchPriority="high"
               />
             </div>
           </div>
