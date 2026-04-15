@@ -1,126 +1,64 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Cron-only function — no CORS needed
+/**
+ * Scheduled-sync: lightweight scheduler that enqueues sync_jobs
+ * instead of invoking sync functions inline. Completes in <5s
+ * regardless of connection count.
+ *
+ * Cron: 0 4,5 * * * (covers GMT & BST)
+ * Gate: only proceeds when UK hour === 5
+ *
+ * Plan frequency:
+ *   - Agency: daily at 5 AM UK
+ *   - Creator / Freelancer: Mondays only at 5 AM UK
+ *
+ * Reconciliation: on the 7th of every month, enqueues force_resync
+ * for the previous month to capture delayed platform reporting data.
+ */
 
-const SYNC_FUNCTION_MAP: Record<string, string> = {
-  google_ads: "sync-google-ads",
-  meta_ads: "sync-meta-ads",
-  facebook: "sync-facebook-page",
-  instagram: "sync-instagram",
-  tiktok: "sync-tiktok-business",
-  tiktok_ads: "sync-tiktok-ads",
-  linkedin: "sync-linkedin",
-  linkedin_ads: "sync-linkedin-ads",
-  google_search_console: "sync-google-search-console",
-  google_analytics: "sync-google-analytics",
-  google_business_profile: "sync-google-business-profile",
-  youtube: "sync-youtube",
-  pinterest: "sync-pinterest",
-  threads: "sync-threads",
-};
+const SUPPORTED_PLATFORMS = new Set([
+  "google_ads", "meta_ads", "facebook", "instagram", "tiktok",
+  "tiktok_ads", "linkedin", "linkedin_ads", "google_search_console",
+  "google_analytics", "google_business_profile", "youtube", "pinterest", "threads",
+]);
 
-const SYNC_TIMEOUT_MS = 60_000; // 60 seconds per sync
-const BATCH_SIZE = 4; // Process 4 connections in parallel
-
-interface SyncResult {
-  connection_id: string;
-  platform: string;
-  month: number;
-  year: number;
-  success: boolean;
-  error?: string;
-}
-
-/** Invoke a sync function with an AbortController timeout */
-async function invokeWithTimeout(
-  supabase: ReturnType<typeof createClient>,
-  fnName: string,
-  body: Record<string, unknown>,
-  timeoutMs: number
-): Promise<{ data?: any; error?: any }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const { data, error } = await supabase.functions.invoke(fnName, {
-      body,
-      // @ts-ignore — AbortSignal support
-    });
-    clearTimeout(timer);
-    return { data, error };
-  } catch (e) {
-    clearTimeout(timer);
-    if (e instanceof DOMException && e.name === "AbortError") {
-      return { error: { message: `Sync timed out after ${timeoutMs / 1000}s` } };
-    }
-    return { error: { message: e instanceof Error ? e.message : "Unknown error" } };
-  }
-}
-
-/** Send a sync_failed email to the org owner (fire-and-forget) */
-async function notifySyncFailure(
-  supabase: ReturnType<typeof createClient>,
-  orgId: string,
-  clientId: string,
-  platform: string,
-  errorMsg: string,
-  month: number,
-  year: number
-) {
-  try {
-    const { data: ownerMember } = await supabase
-      .from("org_members")
-      .select("user_id")
-      .eq("org_id", orgId)
-      .eq("role", "owner")
-      .limit(1)
-      .maybeSingle();
-
-    if (!ownerMember?.user_id) return;
-
-    const { data: ownerProfile } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("user_id", ownerMember.user_id)
-      .maybeSingle();
-
-    if (!ownerProfile?.email) return;
-
-    const { data: clientData } = await supabase
-      .from("clients")
-      .select("company_name")
-      .eq("id", clientId)
-      .maybeSingle();
-
-    await supabase.functions.invoke("send-branded-email", {
-      body: {
-        template_name: "sync_failed",
-        recipient_email: ownerProfile.email,
-        org_id: orgId,
-        data: {
-          platform,
-          client_name: clientData?.company_name ?? "Unknown client",
-          error_message: errorMsg,
-          month,
-          year,
-        },
-      },
-    });
-  } catch (emailErr) {
-    console.error("Failed to send sync_failed email:", emailErr);
-  }
-}
+const MAX_BACKFILLS_PER_RUN = 50;
 
 /** Parse UK time components from a UTC Date */
 function getUkTime(now: Date) {
   const ukStr = now.toLocaleString("en-GB", { timeZone: "Europe/London" });
-  // Format: "DD/MM/YYYY, HH:MM:SS"
   const [datePart, timePart] = ukStr.split(", ");
   const [day, month, year] = datePart.split("/").map(Number);
   const [hour] = timePart.split(":").map(Number);
-  // 0=Sun … 6=Sat — construct a Date in UK local to get day-of-week
-  const ukDate = new Date(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${timePart}`);
-  return { ukHour: hour, ukDay: ukDate.getDay(), ukDayOfMonth: day, ukMonth: month, ukYear: year };
+  const ukDate = new Date(
+    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${timePart}`
+  );
+  return {
+    ukHour: hour,
+    ukDay: ukDate.getDay(), // 0=Sun … 6=Sat
+    ukDayOfMonth: day,
+    ukMonth: month,
+    ukYear: year,
+  };
+}
+
+/** Build target months array for a sync job */
+function buildTargetMonths(
+  uk: ReturnType<typeof getUkTime>,
+  isReconciliation: boolean
+): Array<{ month: number; year: number }> {
+  const months: Array<{ month: number; year: number }> = [
+    { month: uk.ukMonth, year: uk.ukYear },
+  ];
+
+  // First 7 days of month OR reconciliation day: also sync previous month
+  if (uk.ukDayOfMonth <= 7 || isReconciliation) {
+    const prevMonth = uk.ukMonth === 1 ? 12 : uk.ukMonth - 1;
+    const prevYear = uk.ukMonth === 1 ? uk.ukYear - 1 : uk.ukYear;
+    months.push({ month: prevMonth, year: prevYear });
+  }
+
+  return months;
 }
 
 Deno.serve(async (req) => {
@@ -128,7 +66,9 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 204 });
   }
 
-  console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "scheduled-sync", method: req.method, connection_id: null }));
+  console.log(
+    JSON.stringify({ ts: new Date().toISOString(), fn: "scheduled-sync", method: req.method })
+  );
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -138,7 +78,7 @@ Deno.serve(async (req) => {
     const now = new Date();
     const uk = getUkTime(now);
 
-    // Gate: only proceed when it is 5 AM UK time (covers both GMT and BST cron triggers)
+    // Gate: only proceed at 5 AM UK
     if (uk.ukHour !== 5) {
       return new Response(
         JSON.stringify({ message: `Skipped: UK hour is ${uk.ukHour}, not 5` }),
@@ -146,23 +86,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use UK-derived month/year for sync targets
-    const currentMonth = uk.ukMonth;
-    const currentYear = uk.ukYear;
-    const dayOfMonth = uk.ukDayOfMonth;
+    const isReconciliationDay = uk.ukDayOfMonth === 7;
+    const isMonday = uk.ukDay === 1;
 
-    const monthsToSync: Array<{ month: number; year: number }> = [
-      { month: currentMonth, year: currentYear },
-    ];
-
-    // First 7 days: also sync previous month for late-reporting data
-    if (dayOfMonth <= 7) {
-      const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-      const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-      monthsToSync.push({ month: prevMonth, year: prevYear });
-    }
-
-    // Fetch all active connections
+    // Fetch all active connections with org info
     const { data: connections, error: connError } = await supabase
       .from("platform_connections")
       .select("id, platform, client_id, clients!inner(org_id)")
@@ -172,161 +99,113 @@ Deno.serve(async (req) => {
     if (connError) throw connError;
     if (!connections || connections.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No active connections to sync", synced: 0 }),
+        JSON.stringify({ message: "No active connections", enqueued: 0 }),
         { headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Build org plan map for schedule gating
-    const orgIds = [...new Set(connections.map((c) => {
-      const clientData = (c as Record<string, unknown>).clients as { org_id: string };
-      return clientData.org_id;
-    }))];
-    const { data: subscriptions, error: subError } = await supabase
+    // Build org → plan map
+    const orgIds = [
+      ...new Set(
+        connections.map((c) => ((c as Record<string, unknown>).clients as { org_id: string }).org_id)
+      ),
+    ];
+    const { data: subscriptions } = await supabase
       .from("org_subscriptions")
       .select("org_id, subscription_plans!inner(slug)")
       .in("org_id", orgIds)
       .eq("status", "active");
 
-    if (subError) throw subError;
-
     const orgPlanMap: Record<string, string> = {};
     for (const sub of subscriptions || []) {
-      const subData = sub as Record<string, unknown>;
-      orgPlanMap[subData.org_id as string] = ((subData.subscription_plans as { slug: string }).slug);
+      const s = sub as Record<string, unknown>;
+      orgPlanMap[s.org_id as string] = (s.subscription_plans as { slug: string }).slug;
     }
 
-    // Filter connections by plan schedule
-    const eligibleTasks: Array<{
-      conn: (typeof connections)[0];
-      month: number;
-      year: number;
-    }> = [];
+    // Fetch existing pending/processing jobs to deduplicate
+    const { data: existingJobs } = await supabase
+      .from("sync_jobs")
+      .select("connection_id, platform")
+      .in("status", ["pending", "processing"]);
 
-    let skippedCount = 0;
+    const activeJobSet = new Set(
+      (existingJobs || []).map(
+        (j: { connection_id: string; platform: string }) => `${j.connection_id}:${j.platform}`
+      )
+    );
+
+    // Build jobs to enqueue
+    const jobsToInsert: Array<Record<string, unknown>> = [];
+    let skippedPlan = 0;
+    let skippedDuplicate = 0;
 
     for (const conn of connections) {
-      const connClientData = (conn as Record<string, unknown>).clients as { org_id: string };
-      const orgId = connClientData.org_id;
+      if (!SUPPORTED_PLATFORMS.has(conn.platform)) continue;
+
+      const orgId = ((conn as Record<string, unknown>).clients as { org_id: string }).org_id;
       const planSlug = orgPlanMap[orgId] || "creator";
 
-      // Creator & Freelancer: sync only on Mondays (UK time)
-      if ((planSlug === "creator" || planSlug === "freelance") && uk.ukDay !== 1) {
-        skippedCount++;
+      // Weekly plans: only sync on Mondays
+      const isWeeklyPlan = planSlug === "creator" || planSlug === "freelance";
+      if (isWeeklyPlan && !isMonday) {
+        skippedPlan++;
         continue;
       }
 
-      const fnName = SYNC_FUNCTION_MAP[conn.platform];
-      if (!fnName) continue;
-
-      for (const { month, year } of monthsToSync) {
-        eligibleTasks.push({ conn, month, year });
+      // Deduplicate
+      const jobKey = `${conn.id}:${conn.platform}`;
+      if (activeJobSet.has(jobKey)) {
+        skippedDuplicate++;
+        continue;
       }
+
+      const targetMonths = buildTargetMonths(uk, isReconciliationDay);
+      const forceResync = isReconciliationDay;
+
+      jobsToInsert.push({
+        connection_id: conn.id,
+        client_id: conn.client_id,
+        org_id: orgId,
+        platform: conn.platform,
+        months: targetMonths.length,
+        target_months: targetMonths,
+        force_resync: forceResync,
+        priority: forceResync ? 5 : 1,
+      });
+
+      // Mark as in-flight for dedup within this loop
+      activeJobSet.add(jobKey);
     }
 
-    // Process in parallel batches
-    const results: SyncResult[] = [];
-
-    for (let i = 0; i < eligibleTasks.length; i += BATCH_SIZE) {
-      const batch = eligibleTasks.slice(i, i + BATCH_SIZE);
-
-      const batchResults = await Promise.allSettled(
-        batch.map(async ({ conn, month, year }) => {
-          const fnName = SYNC_FUNCTION_MAP[conn.platform];
-          const { data, error } = await invokeWithTimeout(
-            supabase,
-            fnName,
-            { connection_id: conn.id, month, year },
-            SYNC_TIMEOUT_MS
-          );
-
-          if (error) throw new Error(error.message || "Unknown error");
-          if (data?.error) throw new Error(data.error);
-
-          return { connection_id: conn.id, platform: conn.platform, month, year, success: true } as SyncResult;
-        })
-      );
-
-      for (let j = 0; j < batchResults.length; j++) {
-        const result = batchResults[j];
-        const task = batch[j];
-
-        if (result.status === "fulfilled") {
-          results.push(result.value);
-        } else {
-          const errorMsg = result.reason instanceof Error ? result.reason.message : "Unknown error";
-
-          // Cross-check sync_logs before treating as failure — the sync
-          // function may have succeeded even if the invoke relay timed out.
-          const { data: lastLog } = await supabase
-            .from("sync_logs")
-            .select("status")
-            .eq("client_id", task.conn.client_id)
-            .eq("platform", task.conn.platform)
-            .eq("report_month", task.month)
-            .eq("report_year", task.year)
-            .order("started_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (lastLog?.status === "success" || lastLog?.status === "partial") {
-            // Sync actually succeeded — record as success, skip failure email
-            results.push({
-              connection_id: task.conn.id,
-              platform: task.conn.platform,
-              month: task.month,
-              year: task.year,
-              success: true,
-            });
-          } else {
-            results.push({
-              connection_id: task.conn.id,
-              platform: task.conn.platform,
-              month: task.month,
-              year: task.year,
-              success: false,
-              error: errorMsg,
-            });
-
-            // Fire-and-forget failure notification
-            const taskClientData = (task.conn as Record<string, unknown>).clients as { org_id: string };
-            const orgId = taskClientData.org_id;
-            notifySyncFailure(supabase, orgId, task.conn.client_id, task.conn.platform, errorMsg, task.month, task.year);
-          }
-        }
+    // Insert all jobs in one batch
+    let enqueuedCount = 0;
+    if (jobsToInsert.length > 0) {
+      const { error: insertErr } = await supabase.from("sync_jobs").insert(jobsToInsert);
+      if (insertErr) {
+        console.error("Failed to insert sync jobs:", insertErr);
+        throw insertErr;
       }
+      enqueuedCount = jobsToInsert.length;
     }
 
-    const successCount = results.filter((r) => r.success).length;
-    const failCount = results.filter((r) => !r.success).length;
-
-    // --- Weekly gap detection (runs on Sundays) ---
+    // --- Weekly gap detection (Sundays) ---
     let backfillTriggered = 0;
-    const MAX_BACKFILLS_PER_RUN = 50;
 
     if (uk.ukDay === 0) {
-      // Build list of months to check (last 12)
       const checkMonths: Array<{ month: number; year: number }> = [];
       for (let i = 0; i < 12; i++) {
-        const d = new Date(currentYear, currentMonth - 1 - i, 1);
+        const d = new Date(uk.ukYear, uk.ukMonth - 1 - i, 1);
         checkMonths.push({ month: d.getMonth() + 1, year: d.getFullYear() });
       }
 
-      // For each active connection, check for missing snapshots
-      const jobsToInsert: Array<{
-        connection_id: string;
-        client_id: string;
-        org_id: string;
-        platform: string;
-        months: number;
-        priority: number;
-      }> = [];
+      const backfillJobs: Array<Record<string, unknown>> = [];
 
       for (const conn of connections) {
-        if (jobsToInsert.length >= MAX_BACKFILLS_PER_RUN) break;
+        if (backfillJobs.length >= MAX_BACKFILLS_PER_RUN) break;
+        if (!SUPPORTED_PLATFORMS.has(conn.platform)) continue;
 
-        const fnName = SYNC_FUNCTION_MAP[conn.platform];
-        if (!fnName) continue;
+        const jobKey = `${conn.id}:${conn.platform}`;
+        if (activeJobSet.has(jobKey)) continue;
 
         const { data: snapshots } = await supabase
           .from("monthly_snapshots")
@@ -335,8 +214,8 @@ Deno.serve(async (req) => {
           .eq("platform", conn.platform);
 
         const existingSet = new Set(
-          (snapshots || []).map((s: { report_month: number; report_year: number }) =>
-            `${s.report_month}-${s.report_year}`
+          (snapshots || []).map(
+            (s: { report_month: number; report_year: number }) => `${s.report_month}-${s.report_year}`
           )
         );
 
@@ -345,37 +224,22 @@ Deno.serve(async (req) => {
         );
 
         if (hasMissing) {
-          // Check no pending/processing job already exists
-          const { data: existingJob } = await supabase
-            .from("sync_jobs")
-            .select("id")
-            .eq("connection_id", conn.id)
-            .eq("platform", conn.platform)
-            .in("status", ["pending", "processing"])
-            .limit(1);
-
-          if (!existingJob || existingJob.length === 0) {
-            const connClientData = (conn as Record<string, unknown>).clients as { org_id: string };
-            jobsToInsert.push({
-              connection_id: conn.id,
-              client_id: conn.client_id,
-              org_id: connClientData.org_id,
-              platform: conn.platform,
-              months: 12,
-              priority: 0,
-            });
-          }
+          const orgId = ((conn as Record<string, unknown>).clients as { org_id: string }).org_id;
+          backfillJobs.push({
+            connection_id: conn.id,
+            client_id: conn.client_id,
+            org_id: orgId,
+            platform: conn.platform,
+            months: 12,
+            priority: 0,
+          });
+          activeJobSet.add(jobKey);
         }
       }
 
-      if (jobsToInsert.length > 0) {
-        await supabase.from("sync_jobs").insert(jobsToInsert);
-        backfillTriggered = jobsToInsert.length;
-
-        // Trigger the queue processor
-        supabase.functions.invoke("process-sync-queue").catch((err: unknown) => {
-          console.warn("Failed to trigger process-sync-queue:", err);
-        });
+      if (backfillJobs.length > 0) {
+        await supabase.from("sync_jobs").insert(backfillJobs);
+        backfillTriggered = backfillJobs.length;
       }
     }
 
@@ -387,14 +251,24 @@ Deno.serve(async (req) => {
       .eq("status", "processing")
       .lt("started_at", staleThreshold);
 
+    // Trigger the queue processor (fire-and-forget)
+    if (enqueuedCount > 0 || backfillTriggered > 0) {
+      supabase.functions.invoke("process-sync-queue").catch((err: unknown) => {
+        console.warn("Failed to trigger process-sync-queue:", err);
+      });
+    }
+
+    const summary = `Enqueued ${enqueuedCount} sync jobs, ${skippedPlan} skipped (plan), ${skippedDuplicate} skipped (duplicate)${backfillTriggered > 0 ? `, ${backfillTriggered} backfills` : ""}${isReconciliationDay ? " [RECONCILIATION DAY]" : ""}`;
+    console.log(JSON.stringify({ fn: "scheduled-sync", summary }));
+
     return new Response(
       JSON.stringify({
-        message: `Scheduled sync complete: ${successCount} succeeded, ${failCount} failed, ${skippedCount} skipped (plan schedule)${backfillTriggered > 0 ? `, ${backfillTriggered} backfills triggered` : ""}`,
-        months_synced: monthsToSync,
-        total_connections: connections.length,
-        skipped_count: skippedCount,
+        message: summary,
+        enqueued: enqueuedCount,
+        skipped_plan: skippedPlan,
+        skipped_duplicate: skippedDuplicate,
         backfill_triggered: backfillTriggered,
-        results,
+        is_reconciliation: isReconciliationDay,
       }),
       { headers: { "Content-Type": "application/json" } }
     );
