@@ -65,7 +65,7 @@ serve(async (req) => {
       logStep("Created new customer", { customerId });
     }
 
-    const origin = req.headers.get("origin") || "https://amw-reports.lovable.app";
+    const origin = req.headers.get("origin") || "https://reports.amwmedia.co.uk";
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
