@@ -3,6 +3,7 @@ import { ArrowRight, TrendingUp, Video, Users, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
+import { getPlatformLogo } from '@/lib/platformLogos';
 import youtubePlatform from '@/assets/screenshots/YouTube.webp';
 import instagramPlatform from '@/assets/screenshots/instagram.webp';
 
@@ -83,7 +84,10 @@ const ForCreatorsPage = () => {
           <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-8">Platforms for Creators</h2>
           <div className="flex flex-wrap justify-center gap-3">
             {PLATFORMS.map(p => (
-              <span key={p} className="px-4 py-2 rounded-full bg-sidebar-accent/40 border border-sidebar-border/50 text-xs font-body text-amw-offwhite/70">{p}</span>
+              <span key={p} className="flex items-center gap-2 px-4 py-2 rounded-full bg-sidebar-accent/40 border border-sidebar-border/50 text-xs font-body text-amw-offwhite/70">
+                {getPlatformLogo(p) && <img src={getPlatformLogo(p)} alt="" className="h-4 w-4 object-contain" />}
+                {p}
+              </span>
             ))}
           </div>
         </div>

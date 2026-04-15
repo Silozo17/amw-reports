@@ -3,6 +3,7 @@ import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
+import { getPlatformLogo } from '@/lib/platformLogos';
 import gscPlatform from '@/assets/screenshots/gsc.webp';
 import gaPlatform from '@/assets/screenshots/G4A.webp';
 
@@ -71,7 +72,10 @@ const SeoReportingPage = () => {
             <div className="grid grid-cols-1 gap-6">
               {PLATFORMS.map(({ name, metrics }) => (
                 <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
-                  <h3 className="text-lg font-body font-semibold text-amw-offwhite mb-3">{name}</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    {getPlatformLogo(name) && <img src={getPlatformLogo(name)} alt="" className="h-5 w-5 object-contain" />}
+                    <h3 className="text-lg font-body font-semibold text-amw-offwhite">{name}</h3>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {metrics.map(m => <span key={m} className="px-2.5 py-1 rounded-full bg-amw-orange/15 text-amw-orange text-xs font-body">{m}</span>)}
                   </div>

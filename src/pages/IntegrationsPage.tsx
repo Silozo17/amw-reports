@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
+import { getPlatformLogo } from '@/lib/platformLogos';
 
 const PLATFORMS = [
   { name: 'Google Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'], link: '/ppc-reporting' },
@@ -60,6 +61,7 @@ const IntegrationsPage = () => {
             {PLATFORMS.map(({ name, category, metrics, link }) => (
               <div key={name} className="p-6 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 hover:border-primary/50 transition-colors">
                 <div className="flex items-center gap-2 mb-1">
+                  {getPlatformLogo(name) && <img src={getPlatformLogo(name)} alt="" className="h-5 w-5 object-contain" />}
                   <h3 className="text-lg font-body font-semibold text-amw-offwhite">{name}</h3>
                   <span className="px-2 py-0.5 rounded-full bg-sidebar-accent/60 text-[10px] font-body text-amw-offwhite/50 uppercase tracking-wider">{category}</span>
                 </div>

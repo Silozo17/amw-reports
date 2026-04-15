@@ -3,6 +3,7 @@ import { ArrowRight, Plug, RefreshCw, FileText, Mail, Share2 } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
+import { getPlatformLogo } from '@/lib/platformLogos';
 
 const PLATFORMS = ['Google Ads', 'Meta Ads', 'LinkedIn Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile', 'Threads'];
 
@@ -46,7 +47,10 @@ const HowItWorksPage = () => {
               </p>
               <div className="flex flex-wrap gap-2">
                 {PLATFORMS.map(p => (
-                  <span key={p} className="px-3 py-1.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border/50 text-xs font-body text-amw-offwhite/70">{p}</span>
+                  <span key={p} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-sidebar-accent/40 border border-sidebar-border/50 text-xs font-body text-amw-offwhite/70">
+                    {getPlatformLogo(p) && <img src={getPlatformLogo(p)} alt="" className="h-4 w-4 object-contain" />}
+                    {p}
+                  </span>
                 ))}
               </div>
             </div>
