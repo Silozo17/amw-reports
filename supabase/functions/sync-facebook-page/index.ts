@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
 
     // ── Accumulators ──
     let totalViews = 0;       // organic only
-    let totalViewsAll = 0;    // organic + paid
+    
     let followerStart = 0;
     let followerEnd = 0;
     let coreInsightsFetched = false;
@@ -262,38 +262,27 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Batch 1a: Organic views via is_from_ads breakdown ──
+      // ── Fetch total views using page_total_media_view_unique ──
       try {
-        const viewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_media_view&breakdown=is_from_ads&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        const viewsRes = await fetchWithTimeout(viewsUrl);
-        const viewsBody = await viewsRes.json();
-
-        console.log(`page_media_view breakdown response for ${pageId}:`, JSON.stringify(viewsBody).slice(0, 500));
-
-        if (viewsRes.ok && viewsBody.data) {
-          for (const metric of viewsBody.data) {
-            if (metric.name === 'page_media_view') {
-              for (const dayEntry of (metric.values || [])) {
-                const dayVal = Number(dayEntry.value || 0);
-                const fromAds = String(dayEntry.is_from_ads ?? '');
-                if (fromAds === '0' || fromAds === 'false' || fromAds === 'False') {
-                  totalViews += dayVal;    // organic
-                } else if (fromAds === '1' || fromAds === 'true' || fromAds === 'True') {
-                  totalViewsAll += dayVal; // paid (add to total later)
-                } else {
-                  totalViews += dayVal;
-                }
-              }
+        const reachUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_total_media_view_unique&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const reachRes = await fetchWithTimeout(reachUrl);
+        if (reachRes.ok) {
+          const reachBody = await reachRes.json();
+          for (const metric of reachBody.data || []) {
+            if (metric.name === "page_total_media_view_unique") {
+              totalViews = (metric.values || []).reduce(
+                (sum: number, v: any) => sum + (Number(v.value) || 0), 0
+              );
             }
           }
-          totalViewsAll += totalViews;
-          console.log(`Views for ${pageId}: organic=${totalViews}, total=${totalViewsAll}`);
           coreInsightsFetched = true;
+          console.log(`Reach for ${pageId}: total=${totalViews}`);
         } else {
-          console.error(`page_media_view breakdown failed for ${pageId}:`, JSON.stringify(viewsBody));
+          const errBody = await reachRes.text();
+          console.error(`page_total_media_view_unique failed for ${pageId}:`, errBody);
         }
       } catch (err) {
-        console.error(`Organic views exception ${pageId}:`, err instanceof Error ? err.message : err);
+        console.error(`Reach fetch exception ${pageId}:`, err instanceof Error ? err.message : err);
       }
 
       // ── Followers: first and last daily value for growth calculation ──
@@ -439,7 +428,7 @@ Deno.serve(async (req) => {
 
     const metricsData = {
       views:           totalViews,
-      views_total:     totalViewsAll,
+      reach:           totalViews,
       engagement:      totalEngagement,
       engagement_rate: totalViews > 0 ? parseFloat(((totalEngagement / totalViews) * 100).toFixed(2)) : 0,
       total_followers: followerEnd,
