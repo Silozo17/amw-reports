@@ -6,13 +6,6 @@ import StarDecoration from '@/components/landing/StarDecoration';
 import { getPlatformLogo } from '@/lib/platformLogos';
 
 const PLATFORMS = [
-  { name: 'Google Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'], link: '/ppc-reporting' },
-  { name: 'Meta Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Reach', 'Clicks', 'Link Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'ROAS', 'Frequency', 'Leads'], link: '/ppc-reporting' },
-  { name: 'TikTok Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'], link: '/ppc-reporting' },
-  { name: 'LinkedIn Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conversion Rate', 'Cost/Conv.', 'Engagement'], link: '/ppc-reporting' },
-  { name: 'Google Analytics', category: 'SEO', metrics: ['Sessions', 'Active Users', 'New Users', 'Page Views', 'Bounce Rate', 'Avg. Session Duration', 'Pages/Session', 'Traffic Sources'], link: '/seo-reporting' },
-  { name: 'Google Search Console', category: 'SEO', metrics: ['Search Clicks', 'Search Impressions', 'Search CTR', 'Avg. Position', 'Top Queries', 'Top Pages'], link: '/seo-reporting' },
-  { name: 'Google Business Profile', category: 'SEO', metrics: ['Views', 'Searches', 'Calls', 'Direction Requests', 'Website Clicks', 'Reviews Count', 'Avg. Rating'], link: '/seo-reporting' },
   { name: 'Facebook', category: 'Social', metrics: ['Page Likes', 'Followers', 'Reach', 'Impressions', 'Engagement', 'Reactions', 'Comments', 'Shares', 'Video Views'], link: '/social-media-reporting' },
   { name: 'Instagram', category: 'Social', metrics: ['Followers', 'Reach', 'Impressions', 'Engagement', 'Likes', 'Comments', 'Saves', 'Shares', 'Reels', 'Carousels'], link: '/social-media-reporting' },
   { name: 'LinkedIn', category: 'Social', metrics: ['Followers', 'Follower Growth', 'Impressions', 'Engagement', 'Clicks', 'Reactions', 'Comments', 'Shares'], link: '/social-media-reporting' },
@@ -20,6 +13,13 @@ const PLATFORMS = [
   { name: 'TikTok', category: 'Social', metrics: ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Video Views'], link: '/social-media-reporting' },
   { name: 'Pinterest', category: 'Social', metrics: ['Impressions', 'Engagements', 'Pin Clicks', 'Saves', 'Outbound Clicks', 'Total Audience'], link: '/social-media-reporting' },
   { name: 'Threads', category: 'Social', metrics: ['Followers', 'Views', 'Likes', 'Replies', 'Reposts', 'Quotes', 'Clicks', 'Engagement Rate'], link: '/social-media-reporting' },
+  { name: 'Google Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'Conv. Value', 'CPC', 'CPM', 'ROAS', 'Cost/Conv.', 'Search Imp. Share'], link: '/ppc-reporting' },
+  { name: 'Meta Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Reach', 'Clicks', 'Link Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'ROAS', 'Frequency', 'Leads'], link: '/ppc-reporting' },
+  { name: 'TikTok Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conv. Value', 'Reach', 'Video Views', 'Conversion Rate'], link: '/ppc-reporting' },
+  { name: 'LinkedIn Ads', category: 'Ads', metrics: ['Spend', 'Impressions', 'Clicks', 'CTR', 'CPC', 'CPM', 'Conversions', 'Conversion Rate', 'Cost/Conv.', 'Engagement'], link: '/ppc-reporting' },
+  { name: 'Google Search Console', category: 'SEO', metrics: ['Search Clicks', 'Search Impressions', 'Search CTR', 'Avg. Position', 'Top Queries', 'Top Pages'], link: '/seo-reporting' },
+  { name: 'Google Analytics', category: 'SEO', metrics: ['Sessions', 'Active Users', 'New Users', 'Page Views', 'Bounce Rate', 'Avg. Session Duration', 'Pages/Session', 'Traffic Sources'], link: '/seo-reporting' },
+  { name: 'Google Business Profile', category: 'SEO', metrics: ['Views', 'Searches', 'Calls', 'Direction Requests', 'Website Clicks', 'Reviews Count', 'Avg. Rating'], link: '/seo-reporting' },
 ];
 
 const COMING_SOON = ['X (Twitter)', 'Shopify', 'Bing Ads', 'Snapchat Ads', 'Mailchimp'];

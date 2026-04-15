@@ -5,7 +5,7 @@ import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
 import { getPlatformLogo } from '@/lib/platformLogos';
 
-const PLATFORMS = ['Google Ads', 'Meta Ads', 'LinkedIn Ads', 'Google Analytics', 'Google Search Console', 'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads', 'Pinterest', 'Google Business Profile', 'Threads'];
+const PLATFORMS = ['Facebook', 'Instagram', 'LinkedIn', 'YouTube', 'TikTok', 'Pinterest', 'Threads', 'Google Ads', 'Meta Ads', 'TikTok Ads', 'LinkedIn Ads', 'Google Search Console', 'Google Analytics', 'Google Business Profile'];
 
 const HowItWorksPage = () => {
   usePageMeta({

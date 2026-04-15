@@ -10,9 +10,9 @@ import perfOverview from '@/assets/screenshots/Performance_Overview.webp';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const PLATFORMS = [
-  'Google Ads', 'Meta Ads', 'Google Analytics', 'Google Search Console',
-  'YouTube', 'Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'TikTok Ads',
-  'LinkedIn Ads', 'Pinterest', 'Google Business Profile', 'Threads',
+  'Facebook', 'Instagram', 'LinkedIn', 'YouTube', 'TikTok', 'Pinterest', 'Threads',
+  'Google Ads', 'Meta Ads', 'TikTok Ads', 'LinkedIn Ads',
+  'Google Search Console', 'Google Analytics', 'Google Business Profile',
 ];
 
 const STEPS = [
