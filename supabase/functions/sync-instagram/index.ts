@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
     ].filter(r => r.since <= r.until);
 
     let totalReach = 0;
+    let totalImpressions = 0;
     let totalProfileViews = 0;
     let totalFollowerCount = 0;
     let totalMediaCount = 0;
@@ -127,7 +128,7 @@ Deno.serve(async (req) => {
       // Fetch IG User Insights: reach (day period)
       try {
         for (const range of dateRanges) {
-          const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach&period=day&since=${range.since}&until=${range.until}&access_token=${page_token}`;
+          const insightsUrl = `${GRAPH_BASE}/${ig_id}/insights?metric=reach,impressions&period=day&since=${range.since}&until=${range.until}&access_token=${page_token}`;
           const insightsRes = await fetch(insightsUrl);
           if (!insightsRes.ok) {
             const errorBody = await insightsRes.text();
@@ -142,6 +143,7 @@ Deno.serve(async (req) => {
           }
         }
         totalReach += globalMetricsMap.reach || 0;
+        totalImpressions += globalMetricsMap.impressions || 0;
       } catch (pageError) {
         const errorMsg = pageError instanceof Error ? pageError.message : "Unknown error";
         console.error(`IG insights sync error:`, errorMsg);
@@ -263,6 +265,15 @@ Deno.serve(async (req) => {
     const imageCount = allTopMedia.filter(m => m.media_type === 'IMAGE').length;
     const carouselCount = allTopMedia.filter(m => m.media_type === 'CAROUSEL_ALBUM').length;
 
+    // Use per-post reach as fallback when account-level API returns 0
+    const postLevelReach = allTopMedia.reduce((sum, m) => sum + (m.reach || 0), 0);
+    if (totalReach === 0 && postLevelReach > 0) {
+      totalReach = postLevelReach;
+    }
+    if (totalImpressions === 0 && postLevelReach > 0) {
+      totalImpressions = postLevelReach;
+    }
+
     const topContent = allTopMedia
       .sort((a, b) => b.total_engagement - a.total_engagement)
       .slice(0, 10);
@@ -273,7 +284,7 @@ Deno.serve(async (req) => {
     }).length;
 
     const metricsData: Record<string, number> = {
-      impressions: totalReach, // IG reach ≈ impressions for organic
+      impressions: totalImpressions,
       reach: totalReach,
       profile_visits: totalProfileViews,
       website_clicks: globalMetricsMap['website_clicks'] || 0,
