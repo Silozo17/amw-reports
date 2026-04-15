@@ -14,10 +14,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        heading: ["var(--font-heading, Anton)", "sans-serif"],
-        display: ["var(--font-display, Anton)", "sans-serif"],
-        body: ["var(--font-body, Montserrat)", "sans-serif"],
-        accent: ["Slowdex", "cursive"],
+        heading: ["var(--font-heading, Anton)", "Anton Fallback", "sans-serif"],
+        display: ["var(--font-display, Anton)", "Anton Fallback", "sans-serif"],
+        body: ["var(--font-body, Montserrat)", "Montserrat Fallback", "sans-serif"],
+        accent: ["Slowdex", "Slowdex Fallback", "cursive"],
       },
       colors: {
         border: "hsl(var(--border))",

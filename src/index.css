@@ -1,5 +1,33 @@
 /* Google Fonts loaded non-render-blocking in index.html — no @import here */
 
+/* Metric-adjusted fallback fonts to minimize CLS during web font swap */
+@font-face {
+  font-family: 'Montserrat Fallback';
+  src: local('Arial');
+  size-adjust: 112.4%;
+  ascent-override: 84%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Anton Fallback';
+  src: local('Arial Black'), local('Arial');
+  size-adjust: 88%;
+  ascent-override: 103%;
+  descent-override: 27%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Slowdex Fallback';
+  src: local('Georgia'), local('Times New Roman');
+  size-adjust: 105%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
 @font-face {
   font-family: 'Slowdex';
   src: url('/fonts/Slowdex.otf') format('opentype');
