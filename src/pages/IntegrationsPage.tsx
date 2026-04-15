@@ -92,6 +92,50 @@ const IntegrationsPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">How Marketing Platform Integrations Work</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports connects to each marketing platform using official OAuth integrations — the same secure authentication method recommended by Google, Meta, LinkedIn, TikTok, and Pinterest. When you connect a platform, you authorise AMW Reports to read your analytics data through the platform's official API. Your passwords are never stored or transmitted — we use encrypted access tokens that can be revoked at any time from your platform settings.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Once connected, data syncing happens automatically on a schedule that depends on your plan. Agency plans sync data daily, ensuring your dashboards and reports always reflect the most recent performance. Freelance plans sync weekly (every Monday), and the free Creator plan syncs monthly. During each sync, AMW Reports pulls the latest metrics from every connected platform — ad spend, impressions, clicks, conversions, followers, engagement, video views, website traffic, search rankings, and more.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The platform currently supports fourteen marketing integrations spanning three categories. Paid advertising integrations include Google Ads, Meta Ads (Facebook and Instagram advertising), TikTok Ads, and LinkedIn Ads — covering spend tracking, conversion metrics, ROAS, and campaign-level breakdowns. SEO and web analytics integrations include Google Search Console, Google Analytics (GA4), and Google Business Profile — tracking search rankings, website traffic, and local business visibility. Organic social integrations include Facebook Pages, Instagram, LinkedIn, YouTube, TikTok, Pinterest, and Threads — monitoring follower growth, engagement, and content performance.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            Each integration pulls platform-specific metrics that are meaningful for that channel. For example, Google Ads tracks metrics like Search Impression Share and Cost per Conversion, while Instagram tracks Saves, Reels performance, and Carousel engagement. This platform-specific depth, combined with the ability to view all data in one unified dashboard and generate a single branded report, is what makes AMW Reports a comprehensive marketing integration hub rather than a shallow data aggregator.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SEO: FAQ ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Integration FAQ</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'Is connecting my platforms secure?', a: 'Yes. We use official OAuth connections from each platform. Your passwords are never stored. Access tokens are encrypted at rest and can be revoked at any time.' },
+              { q: 'How long does it take to connect a platform?', a: 'Most platforms connect in under 30 seconds. Click "Connect", authorise access in the platform popup, and your data starts syncing immediately.' },
+              { q: 'What if a platform I need is not listed?', a: 'We are actively building new integrations. X (Twitter), Shopify, Bing Ads, Snapchat Ads, and Mailchimp are on our roadmap. Contact us if you have a specific request.' },
+              { q: 'Can I connect multiple accounts for the same platform?', a: 'Yes. You can connect different accounts to different clients. For example, Client A can have one Google Ads account and Client B can have a different one.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

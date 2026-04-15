@@ -221,6 +221,51 @@ const FeaturesPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Deep Dive ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">Why it matters</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Why Automated Marketing Reports Matter</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Marketing agencies and freelancers spend an average of four to six hours per client each month manually building reports. That time is spent logging into platforms like Google Ads, Meta Ads, Google Analytics, and Instagram, copying data into spreadsheets, formatting charts, and assembling slides or PDFs. For an agency with twenty clients, that could mean over a hundred hours lost to reporting every single month — hours that should be spent on strategy, creative work, and growing your business.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports eliminates that manual work entirely. The platform connects to fourteen marketing platforms via secure OAuth integrations — the same authentication method recommended by Google, Meta, and LinkedIn. Once connected, data is synced automatically on a schedule that matches your plan tier: daily for Agency users, weekly for Freelance, and monthly for the free Creator plan. Every metric is pulled directly from the platform API, ensuring accuracy that manual screenshots and copy-pasting simply cannot match.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The branded PDF report feature transforms raw data into professional, client-ready documents. Each report includes a branded cover page with your agency logo, platform-by-platform sections with key metrics and charts, month-over-month comparisons, top-performing content breakdowns, and an executive summary. The report generation pipeline processes data through a three-stage queue — Queued, Generating, and Delivered — ensuring reliability even when generating reports for dozens of clients simultaneously.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            Beyond static reports, AMW Reports provides an interactive client portal where clients can explore their data through charts and metric cards via a unique shareable link — no login required for them. For agencies on the Agency plan, the portal can be served from a custom domain, creating a fully white-labelled experience. Combined with automated email delivery, AI-powered marketing analysis, and configurable per-client dashboards, AMW Reports provides everything a marketing professional needs to deliver exceptional client reporting at scale.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SEO: FAQ ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Marketing Report Features FAQ</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'What features are included in the free plan?', a: 'The free Creator plan includes 1 client, 5 platform connections, branded PDF reports with your logo, a client portal with a shareable link, and monthly data syncing. It is a fully functional marketing reporting tool with no time limit and no credit card required.' },
+              { q: 'How does the automated report delivery feature work?', a: 'On paid plans, AMW Reports generates PDF reports automatically each month and emails them directly to your clients using branded email templates. You can also trigger report generation manually at any time from your dashboard.' },
+              { q: 'Can I choose which metrics appear in each client report?', a: 'Yes. Every client has a configurable dashboard where you can enable or disable specific platforms and metrics. You can also toggle features like month-over-month comparisons, AI-powered explanations, and health scores.' },
+              { q: 'What is the client portal feature?', a: 'The client portal is an interactive, branded dashboard that your clients can access via a unique shareable link — no account or login needed. They see charts, metrics, and can download their latest PDF report. On the Agency plan, you can serve it from your own custom domain.' },
+              { q: 'Does AMW Reports offer AI-powered marketing analysis?', a: 'Yes. On paid plans, the AI assistant analyses your marketing data and provides plain-English insights, trend identification, and actionable recommendations. It can answer questions about specific metrics, compare performance across periods, and highlight opportunities.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       {/* CTA */}

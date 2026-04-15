@@ -111,6 +111,50 @@ const ForFreelancersPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Why Freelance Marketers Need a Reporting Tool</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            As a freelance marketer, your time is your most valuable asset. Every hour spent manually pulling data from Google Ads, Instagram Insights, Facebook Analytics, or Google Search Console is an hour you could spend on strategy, client communication, or finding new business. A freelancer reporting tool like AMW Reports automates the data collection and report generation process, giving you back those hours every month.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Client perception matters enormously for freelancers. Delivering a professionally branded PDF report — with your logo, colours, and consistent formatting — creates the impression of a well-organised, established business. AMW Reports generates these branded reports automatically from real-time data across fourteen marketing platforms, so your deliverables look like they came from a full-service agency even if you are a one-person operation.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The platform's pricing is designed with freelancers in mind. The free Creator plan lets you get started with one client and five platform connections at no cost — ideal for testing the platform or managing a single account. When you grow, the Freelance plan at just £29.99 per month supports five clients with twenty-five connections, weekly data syncing, twelve months of historical data, AI-powered analysis, and automated email delivery. No per-seat fees mean you pay one price regardless of whether you bring on a virtual assistant or subcontractor.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            Beyond reports, the client portal feature lets your clients access their own interactive dashboard via a shareable link — no account or login needed. This adds a layer of transparency that builds trust and reduces the number of "How did my Instagram do this month?" emails you receive. For freelancers managing marketing across social media, paid advertising, SEO, and web analytics, AMW Reports provides a single tool that covers all your client reporting needs.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SEO: FAQ ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Freelancer Reporting FAQ</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'Is AMW Reports really free for freelancers?', a: 'Yes. The Creator plan is free forever — 1 client, 5 platform connections, branded PDF reports, and a client portal. No credit card required. Upgrade to Freelance at £29.99/month when you need more clients.' },
+              { q: 'Can I white-label reports as a freelancer?', a: 'All plans include your logo on PDF reports. For full white-label branding (custom colours, fonts, domain), you would need the Agency plan at £49.99/month.' },
+              { q: 'How does AMW Reports help me win new clients?', a: 'Professional branded reports demonstrate competence and build trust. The client portal gives prospects a preview of the reporting experience they will receive, which can be a strong selling point during pitches.' },
+              { q: 'What happens if I outgrow the Freelance plan?', a: 'You can add extra clients at £9.99/month each, or upgrade to the Agency plan for full white-label branding, daily syncing, and custom domain support.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

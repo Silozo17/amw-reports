@@ -337,6 +337,68 @@ const HomePage = () => {
         </div>
       </section>
 
+      {/* ── WHAT IS AMW REPORTS ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">About the platform</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">What Is AMW Reports?</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports is a marketing reporting tool designed for agencies, freelancers, and creators who need to consolidate data from multiple advertising and social media platforms into a single, client-ready dashboard. Instead of logging into Google Ads, Meta Ads, LinkedIn, Instagram, TikTok, YouTube, Pinterest, and more separately, AMW Reports pulls all your marketing data into one place automatically.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The platform generates branded PDF reports that feature your agency logo, colour palette, and fonts — making every client deliverable look like it came from a professional design team. Reports are emailed to your clients on schedule, or they can access their data through an interactive client portal with a shareable link. On the Agency plan, you can even serve the portal from your own custom domain.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports was built by AMW Media, a UK-based marketing agency that experienced the pain of manual reporting first-hand. Every feature — from automated data syncing to white-label branding to the AI-powered marketing analysis — exists because we needed it for our own clients. That real-world agency experience means the platform solves problems that generic business intelligence tools simply miss.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            Whether you manage one client or fifty, AMW Reports scales with you. The free Creator plan lets you get started with one client and five platform connections at no cost. As your business grows, the Freelance and Agency plans unlock additional clients, daily data syncing, AI-powered insights, automated email delivery, and full white-label capabilities — all at a transparent, flat monthly rate with no per-seat fees.
+          </p>
+        </div>
+      </section>
+
+      {/* ── WHO IS IT FOR ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">Who it's for</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Who Should Use a Marketing Reporting Tool?</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            If you spend time pulling data from marketing platforms and presenting it to clients, stakeholders, or sponsors, AMW Reports is built for you. Marketing agencies use it to automate monthly client reports across their entire roster — saving hours of manual work and ensuring every report is consistent and professionally branded. Freelance marketers use it to look bigger than a one-person operation, delivering PDF reports that rival what large agencies produce.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Content creators use AMW Reports to track their growth across YouTube, Instagram, TikTok, and other platforms, generating sponsor-ready analytics reports for brand partnerships. Small business owners who run their own marketing use it to see all their performance data — from Google Ads spend to Instagram engagement to website traffic — in one clean, easy-to-understand dashboard without needing marketing expertise.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            The platform supports fourteen marketing platforms including Google Ads, Meta Ads, LinkedIn Ads, TikTok Ads, Google Analytics, Google Search Console, Google Business Profile, YouTube, Facebook, Instagram, LinkedIn, TikTok, Pinterest, and Threads. With over seventy metrics tracked across paid advertising, organic social media, SEO, and web analytics, AMW Reports gives you a complete picture of marketing performance in a single multi-platform analytics dashboard.
+          </p>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Frequently Asked Questions</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'What is a marketing reporting tool?', a: 'A marketing reporting tool is software that automatically collects data from your advertising and social media platforms and presents it in a clear, visual format. AMW Reports goes further by generating branded PDF reports and providing an interactive client portal, so you can share results with clients without manual data entry.' },
+              { q: 'How many platforms does AMW Reports support?', a: 'AMW Reports integrates with 14 marketing platforms: Google Ads, Meta Ads, LinkedIn Ads, TikTok Ads, Google Analytics, Google Search Console, Google Business Profile, YouTube, Facebook, Instagram, LinkedIn, TikTok, Pinterest, and Threads.' },
+              { q: 'Is AMW Reports free to use?', a: 'Yes. The Creator plan is completely free and includes 1 client, 5 platform connections, branded PDF reports, and a client portal. No credit card is required. You can upgrade to paid plans when your needs grow.' },
+              { q: 'Can I use my own branding on client reports?', a: 'All plans include your logo on PDF reports. The Agency plan adds full white-label branding — custom colours, fonts, email templates, and a custom domain for the client portal — so clients see your brand everywhere.' },
+              { q: 'How does automated report delivery work?', a: 'On paid plans, AMW Reports generates PDF reports automatically each month and emails them directly to your clients. You can also generate reports on demand at any time from your dashboard.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── GRADIENT DIVIDER ── */}
       <div className="gradient-divider w-full" />
 

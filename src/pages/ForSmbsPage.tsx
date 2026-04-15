@@ -95,6 +95,50 @@ const ForSmbsPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Marketing Analytics Made Simple for Small Businesses</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Running a small business means wearing many hats, and marketing analytics often falls to the bottom of the priority list — not because it is unimportant, but because it feels overwhelming. Google Ads has one dashboard, Facebook has another, Instagram has its own insights, Google Analytics is a maze of menus, and Google Business Profile has yet another interface. For a small business owner without a marketing background, making sense of all this data can feel impossible.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports solves this by bringing all your marketing data into a single, clean dashboard that presents information in plain language with clear charts. You do not need to understand marketing jargon or know how to navigate complex analytics platforms. The dashboard shows you the metrics that matter — how much you are spending on ads, how many people visited your website, whether your social media following is growing, and how customers are finding your business on Google.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The platform generates branded PDF reports that you can share with business partners, investors, or keep for your own records. If you work with a marketing agency or freelancer, the client portal gives you a shareable link to view your performance data at any time without needing to log in or create an account. This transparency helps you understand what your marketing spend is actually achieving.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            The free Creator plan is perfectly suited for small businesses — connect up to five marketing platforms, see your data in one dashboard, and generate PDF reports at no cost. Whether you run a local restaurant tracking Google Business Profile reviews and direction requests, an e-commerce store monitoring Google Ads and Meta Ads performance, or a service business watching LinkedIn engagement and website traffic, AMW Reports gives you the marketing dashboard for small businesses that actually makes sense.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SEO: FAQ ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Small Business Marketing FAQ</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'Do I need marketing experience to use AMW Reports?', a: 'No. The platform presents your data in plain language with clear charts. No marketing expertise is needed to understand your results.' },
+              { q: 'Is AMW Reports free for small businesses?', a: 'Yes. The Creator plan is completely free — connect up to 5 platforms, see your data in one dashboard, and generate PDF reports. No credit card required.' },
+              { q: 'Can I track my Google Business Profile reviews?', a: 'Yes. AMW Reports integrates with Google Business Profile and tracks views, searches, calls, direction requests, website clicks, review counts, and average ratings.' },
+              { q: 'How is this different from just checking each platform myself?', a: 'AMW Reports saves you time by pulling data from all platforms into one place, presenting it in a consistent format, and generating professional reports automatically. No more switching between dashboards.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

@@ -133,6 +133,50 @@ const ForAgenciesPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28 section-light">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Why Agencies Choose AMW Reports for Client Reporting</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Marketing agencies face a unique reporting challenge: every client uses a different combination of platforms, every stakeholder wants different metrics highlighted, and every report needs to look professionally branded. Traditional approaches — spreadsheets, manual data exports, slide decks — do not scale beyond a handful of clients without dedicating significant team time to reporting each month.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            AMW Reports was built specifically for this multi-client reality. Each client gets their own configurable dashboard with only the platforms and metrics relevant to them. One client might need Google Ads spend data alongside Instagram engagement; another might focus on SEO performance from Google Search Console and Google Analytics. The platform handles all fourteen supported platforms across paid advertising, organic social media, SEO, and web analytics — so no matter what services you offer, the reporting is covered.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The Agency plan includes full white-label branding, which means your clients see your agency identity on every report, email, and portal page. Combined with custom domain support, unlimited team members, daily data syncing, and twenty-four months of historical data imports, the platform provides everything a growing agency needs to deliver automated client reports at scale. There are no per-seat fees — your entire team accesses the platform for one flat monthly price.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            AMW Reports also includes AI-powered marketing analysis that generates plain-English insights from your client data, a client portal with shareable links for transparent reporting, and automated email delivery that sends branded reports to clients on schedule. For agencies that want to reduce manual reporting work, improve report quality, and scale their client base without proportionally scaling their operations team, AMW Reports provides the automated agency reporting software to make that possible.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SEO: FAQ ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary text-center mb-2">Questions</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase text-center mb-10">Agency Reporting FAQ</h2>
+          <div className="space-y-3">
+            {[
+              { q: 'How many clients can I manage with AMW Reports?', a: 'The Agency plan includes 5 clients with the option to add more at £9.99 per month each. There is no hard upper limit — agencies can scale to dozens of clients.' },
+              { q: 'Can different team members access the platform?', a: 'Yes. Both the Freelance and Agency plans support unlimited team members at no extra cost. You can invite colleagues and assign roles.' },
+              { q: 'How does AMW Reports compare to AgencyAnalytics or DashThis?', a: 'Unlike tools that charge per dashboard or per user, AMW Reports offers a flat monthly price. Full white-label branding, automated PDF generation, and a client portal are all included — not sold as add-ons.' },
+              { q: 'Can I report on both organic and paid channels in one report?', a: 'Absolutely. AMW Reports consolidates organic social media, paid advertising, SEO, and web analytics data into a single branded report for each client.' },
+            ].map(({ q, a }) => (
+              <details key={q} className="border border-sidebar-border/40 rounded-xl overflow-hidden group">
+                <summary className="p-4 text-sm font-body font-semibold text-amw-offwhite/90 cursor-pointer hover:bg-sidebar-accent/20 transition-colors list-none flex items-center justify-between">
+                  {q}
+                  <span className="text-amw-offwhite/40 group-open:rotate-180 transition-transform text-lg leading-none">▾</span>
+                </summary>
+                <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">

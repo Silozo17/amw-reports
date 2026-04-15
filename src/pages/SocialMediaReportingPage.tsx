@@ -183,6 +183,26 @@ const SocialMediaReportingPage = () => {
         </div>
       </section>
 
+      {/* ── SEO: Long-form ── */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="font-accent text-lg text-primary mb-2">In depth</p>
+          <h2 className="text-2xl lg:text-4xl font-heading uppercase mb-4">Why You Need a Social Media Reporting Tool</h2>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            Managing social media for clients means juggling multiple platforms, each with its own analytics dashboard, different metric definitions, and varying date ranges. A dedicated social media reporting tool like AMW Reports brings all that data together into a single, consistent view. Instead of logging into Facebook Business Suite, Instagram Insights, LinkedIn Analytics, TikTok Analytics, YouTube Studio, and Pinterest Analytics separately, you connect each platform once and AMW Reports handles the rest.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            For social media managers and agencies, the real value lies in the time saved and the quality of the output. AMW Reports generates branded PDF reports that include follower growth trends, engagement rate breakdowns, reach and impressions data, top-performing posts, video view analytics, and audience demographics — all formatted with your agency logo, colours, and fonts. These reports are designed to be client-ready from the moment they are generated, with no additional formatting or design work needed.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed mb-6">
+            The platform supports both organic social media analytics and paid social advertising. You can track organic metrics like Instagram followers, Facebook page likes, LinkedIn engagement, TikTok views, YouTube subscribers, Pinterest pin clicks, and Threads engagement alongside paid metrics from Meta Ads and TikTok Ads — all within the same client report. This gives clients a complete picture of their social media performance without needing separate reporting tools for organic and paid.
+          </p>
+          <p className="text-amw-offwhite/60 font-body leading-relaxed">
+            AMW Reports also includes month-over-month comparison data so you can demonstrate the impact of your social media strategy over time. Whether you are a social media agency managing dozens of accounts, a freelance social media manager with a handful of clients, or a content creator tracking your own growth, the platform adapts to your needs with configurable dashboards, customisable metric selections, and flexible reporting schedules.
+          </p>
+        </div>
+      </section>
+
       <div className="gradient-divider w-full" />
 
       <section className="py-20 bg-gradient-to-b from-transparent to-primary/5 text-center">
