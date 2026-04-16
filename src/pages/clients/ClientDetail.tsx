@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,8 @@ const ClientDetail = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const entitlements = useEntitlements();
+  const { isOwner, isManager, isClientUser } = useAuth();
+  const isOrgMember = isOwner || isManager;
 
   // Server-side sync queue
   const { activeJobs, isAnySyncing, enqueueSync } = useSyncJobs(id);
@@ -440,6 +443,9 @@ const ClientDetail = () => {
               onUpdate={fetchData}
               onOpenPicker={handleOpenPicker}
               onRemoveConnection={handleRemoveConnection}
+              orgId={client.org_id}
+              planSlug={entitlements.plan?.slug}
+              isOrgMember={isOrgMember}
             />
           </TabsContent>
 

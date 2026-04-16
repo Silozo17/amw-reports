@@ -1,12 +1,16 @@
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Trash2, RefreshCw } from 'lucide-react';
 import type { PlatformConnection, PlatformType } from '@/types/database';
 import { PLATFORM_LABELS, PLATFORM_LOGOS } from '@/types/database';
 import ConnectionDialog from '@/components/clients/ConnectionDialog';
 import ConnectionDisclaimer from '@/components/clients/ConnectionDisclaimer';
+import { useSyncJobs } from '@/hooks/useSyncJobs';
+import { toast } from 'sonner';
 
 const CONNECTION_CATEGORIES: Array<{ label: string; platforms: PlatformType[] }> = [
   { label: 'Organic Social', platforms: ['facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'pinterest', 'threads'] },
@@ -14,16 +18,49 @@ const CONNECTION_CATEGORIES: Array<{ label: string; platforms: PlatformType[] }>
   { label: 'SEO & Web Analytics', platforms: ['google_search_console', 'google_analytics', 'google_business_profile'] },
 ];
 
+const COOLDOWN_MS_DAILY = 24 * 60 * 60 * 1000;
+const COOLDOWN_MS_WEEKLY = 7 * 24 * 60 * 60 * 1000;
+
+function getCooldownMs(planSlug: string | undefined): number {
+  return planSlug === 'creator' ? COOLDOWN_MS_WEEKLY : COOLDOWN_MS_DAILY;
+}
+
+function getSyncCooldownInfo(lastSyncAt: string | null, planSlug: string | undefined): { canSync: boolean; nextAvailable: Date | null } {
+  if (!lastSyncAt) return { canSync: true, nextAvailable: null };
+  const cooldown = getCooldownMs(planSlug);
+  const lastSync = new Date(lastSyncAt);
+  const nextAvailable = new Date(lastSync.getTime() + cooldown);
+  return { canSync: nextAvailable <= new Date(), nextAvailable };
+}
+
 interface ClientConnectionsTabProps {
   clientId: string;
   connections: PlatformConnection[];
   onUpdate: () => void;
   onOpenPicker: (conn: PlatformConnection) => void;
   onRemoveConnection: (conn: PlatformConnection) => void;
+  orgId?: string;
+  planSlug?: string;
+  isOrgMember?: boolean;
 }
 
-const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection }: { conn: PlatformConnection; onOpenPicker: (c: PlatformConnection) => void; onRemoveConnection: (c: PlatformConnection) => void }) => {
+interface ConnectionRowProps {
+  conn: PlatformConnection;
+  onOpenPicker: (c: PlatformConnection) => void;
+  onRemoveConnection: (c: PlatformConnection) => void;
+  isOrgMember: boolean;
+  planSlug: string | undefined;
+  orgId: string | undefined;
+  isSyncing: boolean;
+  onSync: (conn: PlatformConnection) => void;
+}
+
+const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection, isOrgMember, planSlug, isSyncing, onSync }: ConnectionRowProps) => {
   const needsSelection = conn.is_connected && !conn.account_id;
+  const isFullyConnected = conn.is_connected && !!conn.account_id;
+  const { canSync, nextAvailable } = getSyncCooldownInfo(conn.last_sync_at, planSlug);
+  const showSyncButton = isOrgMember && isFullyConnected;
+
   return (
     <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
       <div>
@@ -38,18 +75,45 @@ const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection }: { conn: Platf
         {conn.last_error && <p className="text-xs text-destructive mt-1">{conn.last_error}</p>}
       </div>
       <div className="flex items-center gap-2">
+        {showSyncButton && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    disabled={!canSync || isSyncing}
+                    onClick={() => onSync(conn)}
+                    aria-label={`Sync ${PLATFORM_LABELS[conn.platform]}`}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isSyncing
+                  ? 'Syncing…'
+                  : canSync
+                    ? 'Sync now'
+                    : `Next sync: ${nextAvailable?.toLocaleDateString()} ${nextAvailable?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {needsSelection && (
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onOpenPicker(conn)}>
             Select Account
           </Button>
         )}
-        {conn.is_connected && conn.account_id && (
+        {isFullyConnected && (
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onOpenPicker(conn)}>
             Change
           </Button>
         )}
-        <Badge variant={conn.is_connected && conn.account_id ? 'default' : needsSelection ? 'secondary' : 'destructive'}>
-          {conn.is_connected && conn.account_id ? 'Connected' : needsSelection ? 'Select Account' : 'Disconnected'}
+        <Badge variant={isFullyConnected ? 'default' : needsSelection ? 'secondary' : 'destructive'}>
+          {isFullyConnected ? 'Connected' : needsSelection ? 'Select Account' : 'Disconnected'}
         </Badge>
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -77,7 +141,41 @@ const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection }: { conn: Platf
   );
 };
 
-const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, onRemoveConnection }: ClientConnectionsTabProps) => {
+const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, onRemoveConnection, orgId, planSlug, isOrgMember = false }: ClientConnectionsTabProps) => {
+  const { activeJobs, enqueueSync } = useSyncJobs(clientId);
+  const [syncingConnectionIds, setSyncingConnectionIds] = useState<Set<string>>(new Set());
+
+  const handleSync = async (conn: PlatformConnection) => {
+    if (!orgId) return;
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+
+    setSyncingConnectionIds(prev => new Set(prev).add(conn.id));
+    try {
+      await enqueueSync({
+        connectionId: conn.id,
+        clientId: conn.client_id,
+        orgId,
+        platform: conn.platform,
+        months: 1,
+        priority: 3,
+      });
+      toast.success(`Sync started for ${PLATFORM_LABELS[conn.platform]}`);
+    } catch {
+      toast.error(`Failed to sync ${PLATFORM_LABELS[conn.platform]}`);
+    } finally {
+      setSyncingConnectionIds(prev => {
+        const next = new Set(prev);
+        next.delete(conn.id);
+        return next;
+      });
+    }
+  };
+
+  const isConnectionSyncing = (connId: string) =>
+    syncingConnectionIds.has(connId) || activeJobs.some(j => j.connection_id === connId);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -100,7 +198,17 @@ const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, o
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{category.label}</p>
                   <div className="space-y-3">
                     {catConnections.map(conn => (
-                      <ConnectionRow key={conn.id} conn={conn} onOpenPicker={onOpenPicker} onRemoveConnection={onRemoveConnection} />
+                      <ConnectionRow
+                        key={conn.id}
+                        conn={conn}
+                        onOpenPicker={onOpenPicker}
+                        onRemoveConnection={onRemoveConnection}
+                        isOrgMember={isOrgMember}
+                        planSlug={planSlug}
+                        orgId={orgId}
+                        isSyncing={isConnectionSyncing(conn.id)}
+                        onSync={handleSync}
+                      />
                     ))}
                   </div>
                 </div>
