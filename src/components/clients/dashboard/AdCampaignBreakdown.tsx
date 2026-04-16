@@ -209,7 +209,7 @@ const AdSetsTable = ({ items, currSymbol, label = 'Ad Set' }: { items: AdSetItem
 );
 
 const AdCard = ({ ad, currSymbol }: { ad: AdItem; currSymbol: string }) => {
-  const thumbUrl = ad.creative?.thumbnail_url || ad.creative?.image_url;
+  const thumbUrl = ad.creative?.image_url || ad.creative?.thumbnail_url;
   return (
     <Card className="overflow-hidden">
       {/* Creative image */}
