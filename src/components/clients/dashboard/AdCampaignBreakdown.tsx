@@ -118,6 +118,12 @@ const fmtNum = (val: number | undefined | null) => {
 
 const fmtPct = (val: number | undefined | null) => `${safe(val).toFixed(2)}%`;
 
+const fmtCPL = (spend: number | undefined | null, leads: number | undefined | null, sym: string) => {
+  const l = safe(leads);
+  if (l <= 0) return '—';
+  return fmtCurrency(safe(spend) / l, sym);
+};
+
 // ─── Sub-components ────────────────────────────────────────────
 
 const CampaignsTable = ({ items, currSymbol }: { items: CampaignItem[]; currSymbol: string }) => (
