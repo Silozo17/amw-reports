@@ -19,6 +19,7 @@ import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 import { useSyncJobs } from '@/hooks/useSyncJobs';
 import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
