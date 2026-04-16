@@ -1,50 +1,21 @@
 
 
-# Fix: Realtime Channel Crash on Client Detail Page
+# Add Cost Per Lead to Campaign Breakdown
 
-## Problem
+## What It Does
+Adds a "Cost Per Lead" (CPL) column/metric to all three levels of the Campaign Breakdown: Campaigns table, Ad Sets table, and Ad Cards. CPL is calculated as `spend / leads` (shows "—" when leads is 0).
 
-The `useSyncJobs` hook creates a Supabase realtime channel named `sync-jobs-${clientId}`. When React's strict mode (or fast re-renders) unmounts and remounts the effect, `supabase.channel()` returns the **already-subscribed** channel object. Calling `.on()` on an already-subscribed channel throws the error shown in the screenshot, which bubbles up to the ErrorBoundary and kills the entire page.
+## Changes
 
-## Fix
+### `src/components/clients/dashboard/AdCampaignBreakdown.tsx`
 
-**File: `src/hooks/useSyncJobs.ts`** (lines 54-78)
+1. **Add `fmtCPL` helper**: A small function that returns `currSymbol + (spend / leads)` formatted to 2 decimal places, or `'—'` when leads is 0.
 
-Before creating the channel, remove any existing channel with the same name. This ensures a fresh channel is always created:
+2. **CampaignsTable**: Add a `Cost/Lead` column header after the existing `Leads` column. Each row displays `fmtCPL(c.spend, c.leads, currSymbol)`. Update `colSpan` on the empty-state row from 9 to 10.
 
-```typescript
-useEffect(() => {
-  if (!clientId) return;
+3. **AdSetsTable**: Same — add `Cost/Lead` column after `Leads`. Update `colSpan` from 9 to 10.
 
-  fetchJobs();
+4. **AdCard**: Add a `Cost/Lead` row in the 2-column grid (after the existing Leads row), displaying the calculated CPL value.
 
-  const channelName = `sync-jobs-${clientId}`;
-
-  // Remove any stale channel with the same name before creating a new one
-  const existing = supabase.channel(channelName);
-  supabase.removeChannel(existing);
-
-  const channel = supabase
-    .channel(channelName)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'sync_jobs',
-        filter: `client_id=eq.${clientId}`,
-      },
-      () => {
-        fetchJobs();
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [clientId, fetchJobs]);
-```
-
-One file, ~3 lines changed. No other changes needed.
+No backend changes, no new types, no other files affected. The `leads` and `spend` fields already exist on all three interfaces (`CampaignItem`, `AdSetItem`, `AdItem`).
 
