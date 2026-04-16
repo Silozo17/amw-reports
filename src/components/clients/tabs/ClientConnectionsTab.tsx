@@ -144,13 +144,13 @@ const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection, isOrgMember, is
   );
 };
 
-const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, onRemoveConnection, orgId, planSlug, isOrgMember = false }: ClientConnectionsTabProps) => {
+const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, onRemoveConnection, orgId, planSlug, isOrgMember = false, isPlatformAdmin = false }: ClientConnectionsTabProps) => {
   const { activeJobs, enqueueSync } = useSyncJobs(clientId);
   const [syncingConnectionIds, setSyncingConnectionIds] = useState<Set<string>>(new Set());
   const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   const fullyConnected = connections.filter(c => c.is_connected && !!c.account_id);
-  const syncableConnections = fullyConnected.filter(c => getSyncCooldownInfo(c.last_sync_at, planSlug).canSync);
+  const syncableConnections = fullyConnected.filter(c => getSyncCooldownInfo(c.last_sync_at, planSlug, isPlatformAdmin).canSync);
 
   const handleSyncAll = async () => {
     if (!orgId || syncableConnections.length === 0) return;
@@ -271,6 +271,7 @@ const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, o
                         onOpenPicker={onOpenPicker}
                         onRemoveConnection={onRemoveConnection}
                         isOrgMember={isOrgMember}
+                        isPlatformAdmin={isPlatformAdmin}
                         planSlug={planSlug}
                         orgId={orgId}
                         isSyncing={isConnectionSyncing(conn.id)}
