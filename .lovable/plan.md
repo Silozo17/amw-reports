@@ -1,21 +1,23 @@
 
 
-# Add Cost Per Lead to Campaign Breakdown
+# Fix: Pixelated Ad Creative Images
 
-## What It Does
-Adds a "Cost Per Lead" (CPL) column/metric to all three levels of the Campaign Breakdown: Campaigns table, Ad Sets table, and Ad Cards. CPL is calculated as `spend / leads` (shows "—" when leads is 0).
+## Problem
+The `AdCard` component (line 212) uses `thumbnail_url || image_url` — preferring the thumbnail. Meta's thumbnail URLs are low-resolution (64-128px), which looks pixelated when stretched to fill the `aspect-video` container.
 
-## Changes
+## Fix
 
-### `src/components/clients/dashboard/AdCampaignBreakdown.tsx`
+**File: `src/components/clients/dashboard/AdCampaignBreakdown.tsx`** — line 212
 
-1. **Add `fmtCPL` helper**: A small function that returns `currSymbol + (spend / leads)` formatted to 2 decimal places, or `'—'` when leads is 0.
+Swap the priority so `image_url` is preferred over `thumbnail_url`:
 
-2. **CampaignsTable**: Add a `Cost/Lead` column header after the existing `Leads` column. Each row displays `fmtCPL(c.spend, c.leads, currSymbol)`. Update `colSpan` on the empty-state row from 9 to 10.
+```typescript
+// Before
+const thumbUrl = ad.creative?.thumbnail_url || ad.creative?.image_url;
 
-3. **AdSetsTable**: Same — add `Cost/Lead` column after `Leads`. Update `colSpan` from 9 to 10.
+// After
+const thumbUrl = ad.creative?.image_url || ad.creative?.thumbnail_url;
+```
 
-4. **AdCard**: Add a `Cost/Lead` row in the 2-column grid (after the existing Leads row), displaying the calculated CPL value.
-
-No backend changes, no new types, no other files affected. The `leads` and `spend` fields already exist on all three interfaces (`CampaignItem`, `AdSetItem`, `AdItem`).
+One line change. No other files affected.
 
