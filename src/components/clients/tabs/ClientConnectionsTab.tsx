@@ -25,7 +25,8 @@ function getCooldownMs(planSlug: string | undefined): number {
   return planSlug === 'creator' ? COOLDOWN_MS_WEEKLY : COOLDOWN_MS_DAILY;
 }
 
-function getSyncCooldownInfo(lastSyncAt: string | null, planSlug: string | undefined): { canSync: boolean; nextAvailable: Date | null } {
+function getSyncCooldownInfo(lastSyncAt: string | null, planSlug: string | undefined, isPlatformAdmin = false): { canSync: boolean; nextAvailable: Date | null } {
+  if (isPlatformAdmin) return { canSync: true, nextAvailable: null };
   if (!lastSyncAt) return { canSync: true, nextAvailable: null };
   const cooldown = getCooldownMs(planSlug);
   const lastSync = new Date(lastSyncAt);
@@ -42,6 +43,7 @@ interface ClientConnectionsTabProps {
   orgId?: string;
   planSlug?: string;
   isOrgMember?: boolean;
+  isPlatformAdmin?: boolean;
 }
 
 interface ConnectionRowProps {
@@ -49,17 +51,18 @@ interface ConnectionRowProps {
   onOpenPicker: (c: PlatformConnection) => void;
   onRemoveConnection: (c: PlatformConnection) => void;
   isOrgMember: boolean;
+  isPlatformAdmin: boolean;
   planSlug: string | undefined;
   orgId: string | undefined;
   isSyncing: boolean;
   onSync: (conn: PlatformConnection) => void;
 }
 
-const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection, isOrgMember, planSlug, isSyncing, onSync }: ConnectionRowProps) => {
+const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection, isOrgMember, isPlatformAdmin, planSlug, isSyncing, onSync }: ConnectionRowProps) => {
   const needsSelection = conn.is_connected && !conn.account_id;
   const isFullyConnected = conn.is_connected && !!conn.account_id;
-  const { canSync, nextAvailable } = getSyncCooldownInfo(conn.last_sync_at, planSlug);
-  const showSyncButton = isOrgMember && isFullyConnected;
+  const { canSync, nextAvailable } = getSyncCooldownInfo(conn.last_sync_at, planSlug, isPlatformAdmin);
+  const showSyncButton = (isOrgMember || isPlatformAdmin) && isFullyConnected;
 
   return (
     <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
