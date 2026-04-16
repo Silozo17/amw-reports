@@ -1,51 +1,39 @@
 
 
-# Fix: Daily Syncs Skip All Work — Snapshots Never Updated
+# Add Per-Connection Sync Button with Rate Limiting
 
-## Root Cause
+## What It Does
+Adds a "Sync" button to each connection row in the Connections tab. The button is only visible to org owners and managers (hidden from client users). Syncing is rate-limited based on the subscription plan:
+- **Freelancer & Agency**: once per day per connection
+- **Creator**: once per week per connection
 
-The `process-sync-queue` function (lines 171-190) filters out months that already have snapshots unless `force_resync` is true. Daily scheduled syncs set `force_resync: false` and `target_months: [April 2026]`. Since April 2026 snapshots already exist from previous syncs, the filter removes all months, leaving `missingMonths = []`. The job completes instantly with `progress_total: 0` — no API calls are made, no data is updated.
+The cooldown is determined by checking `last_sync_at` on the connection record.
 
-**Evidence from today (April 16):**
-- 49 jobs enqueued at 04:00 UTC (05:00 BST) — scheduler worked correctly
-- All 49 completed within 8 seconds (04:00:07 → 04:00:15) — impossibly fast
-- All have `progress_total: 0, progress_completed: 0`
-- Zero `monthly_snapshots` rows updated today
+## Changes
 
-The snapshot-existence filter is correct for **backfill** jobs (filling gaps in historical data), but wrong for **daily syncs** which need to re-fetch the current month to get updated metrics.
+### 1. `src/components/clients/tabs/ClientConnectionsTab.tsx`
 
-## Fix
+- **Add props**: Pass `orgId`, `planSlug`, and `isOrgMember` (owner/manager) into the component and down to `ConnectionRow`
+- **Add sync button** to each `ConnectionRow` for connected platforms (has `account_id` and `is_connected`):
+  - Uses `useSyncJobs().enqueueSync` to trigger a single-month sync (current month, priority 3)
+  - Shows a `RefreshCw` icon button with tooltip
+  - Disabled + tooltip explains cooldown when rate limit not met
+  - Hidden entirely when `isOrgMember` is false (client users)
+- **Rate limit logic**: Inline helper compares `conn.last_sync_at` against:
+  - Creator: 7 days ago
+  - Freelancer/Agency: 24 hours ago
+  - If `last_sync_at` is within the window, button is disabled with "Next sync available: [date]"
+- **Spinning state**: Button shows spinning icon when there's an active sync job for that connection (checked against `activeJobs`)
 
-**File: `supabase/functions/process-sync-queue/index.ts`** (lines 171-190)
+### 2. `src/pages/clients/ClientDetail.tsx` (minor)
 
-Change the snapshot filter logic to only apply when the job is a backfill (priority 0) or has `months > 2`. For daily/weekly jobs targeting 1-2 months, always sync regardless of existing snapshots — the sync functions already handle upserting.
+- Pass `orgId`, `planSlug` (from `useEntitlements`), and `isOrgMember` (from `useAuth`) as props to `ClientConnectionsTab`
 
-```typescript
-// Filter out existing snapshots ONLY for backfill jobs (priority 0 or large month ranges)
-// Daily/weekly jobs (1-2 target months) must always re-sync to get updated data
-const isBackfillJob = job.priority === 0 || (!job.target_months && job.months > 2);
-let missingMonths = monthsRange;
+## Technical Details
 
-if (!job.force_resync && isBackfillJob) {
-  // ... existing snapshot filter logic stays the same
-}
-```
-
-This means:
-- **Daily syncs** (target_months with 1-2 entries, priority 1): always sync — data gets upserted
-- **Reconciliation day** (force_resync true, priority 5): always sync — already works
-- **Backfill jobs** (priority 0, no target_months, months=12): skip existing months — correct behavior
-- **Manual syncs** (from UI, have target_months): always sync — correct behavior
-
-## Summary
-
-| What | Before | After |
-|------|--------|-------|
-| Daily sync for current month | Skipped (snapshot exists) | Always re-synced |
-| Backfill gap detection | Re-syncs everything | Still skips existing months |
-| Today's 49 jobs | 0 API calls, 0 data | All platforms updated |
-
-## Deployment
-
-Redeploy `process-sync-queue` edge function after the code change.
+- No new hooks or files needed — reuses `useSyncJobs` and `useEntitlements` already in scope at `ClientDetail`
+- Rate limiting is purely UI-enforced via `last_sync_at` comparison (server-side the sync queue already deduplicates pending jobs)
+- `planSlug` values: `'creator'`, `'freelancer'`, `'agency'`
+- Current month/year calculated via `new Date()` at click time
+- The sync enqueues with `months: 1` and `target_months` for current month only
 
