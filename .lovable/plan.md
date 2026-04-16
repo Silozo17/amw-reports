@@ -1,39 +1,21 @@
 
 
-# Add Per-Connection Sync Button with Rate Limiting
+# Add "Sync All" Button to Connections Tab
 
 ## What It Does
-Adds a "Sync" button to each connection row in the Connections tab. The button is only visible to org owners and managers (hidden from client users). Syncing is rate-limited based on the subscription plan:
-- **Freelancer & Agency**: once per day per connection
-- **Creator**: once per week per connection
-
-The cooldown is determined by checking `last_sync_at` on the connection record.
+Adds a "Sync All" button in the CardHeader next to the existing "Connect" button. It syncs all fully-connected connections that are not on cooldown, in a single click. Same visibility and rate-limiting rules as individual sync buttons.
 
 ## Changes
 
-### 1. `src/components/clients/tabs/ClientConnectionsTab.tsx`
+### `src/components/clients/tabs/ClientConnectionsTab.tsx`
 
-- **Add props**: Pass `orgId`, `planSlug`, and `isOrgMember` (owner/manager) into the component and down to `ConnectionRow`
-- **Add sync button** to each `ConnectionRow` for connected platforms (has `account_id` and `is_connected`):
-  - Uses `useSyncJobs().enqueueSync` to trigger a single-month sync (current month, priority 3)
-  - Shows a `RefreshCw` icon button with tooltip
-  - Disabled + tooltip explains cooldown when rate limit not met
-  - Hidden entirely when `isOrgMember` is false (client users)
-- **Rate limit logic**: Inline helper compares `conn.last_sync_at` against:
-  - Creator: 7 days ago
-  - Freelancer/Agency: 24 hours ago
-  - If `last_sync_at` is within the window, button is disabled with "Next sync available: [date]"
-- **Spinning state**: Button shows spinning icon when there's an active sync job for that connection (checked against `activeJobs`)
+1. **Derive syncable connections**: Filter `connections` to those that are fully connected (`is_connected && account_id`) and pass cooldown check via `getSyncCooldownInfo`.
 
-### 2. `src/pages/clients/ClientDetail.tsx` (minor)
+2. **Add `handleSyncAll`**: Iterates over syncable connections, calls `enqueueSync` for each (same params as individual sync: `months: 1, priority: 3`). Shows a single toast summarising how many were queued.
 
-- Pass `orgId`, `planSlug` (from `useEntitlements`), and `isOrgMember` (from `useAuth`) as props to `ClientConnectionsTab`
+3. **Add button in CardHeader**: Place a "Sync All" button (with `RefreshCw` icon) between the title and the ConnectionDialog button. Only visible when `isOrgMember` is true and there's at least one fully connected connection. Disabled when no connections are eligible (all on cooldown) or any sync-all is in progress. Tooltip explains state.
 
-## Technical Details
+4. **Track sync-all state**: A simple `isSyncingAll` boolean state to disable the button and show spinner during the batch enqueue.
 
-- No new hooks or files needed — reuses `useSyncJobs` and `useEntitlements` already in scope at `ClientDetail`
-- Rate limiting is purely UI-enforced via `last_sync_at` comparison (server-side the sync queue already deduplicates pending jobs)
-- `planSlug` values: `'creator'`, `'freelancer'`, `'agency'`
-- Current month/year calculated via `new Date()` at click time
-- The sync enqueues with `months: 1` and `target_months` for current month only
+No other files need changes — all props are already passed from `ClientDetail.tsx`.
 
