@@ -169,9 +169,12 @@ Deno.serve(async (req) => {
       }
 
       // Filter out existing snapshots unless force_resync is enabled
+      // Filter out existing snapshots ONLY for backfill jobs (priority 0 or large month ranges)
+      // Daily/weekly jobs (1-2 target months) must always re-sync to get updated data
+      const isBackfillJob = job.priority === 0 || (!job.target_months && job.months > 2);
       let missingMonths = monthsRange;
 
-      if (!job.force_resync) {
+      if (!job.force_resync && isBackfillJob) {
         const { data: existingSnapshots } = await supabase
           .from("monthly_snapshots")
           .select("report_month, report_year")
