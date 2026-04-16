@@ -2,7 +2,7 @@
   "name": "AMW Reports",
   "short_name": "AMW",
   "description": "Automated marketing reports for agencies, freelancers and creators.",
-  "start_url": "/",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
