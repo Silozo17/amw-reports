@@ -144,6 +144,41 @@ const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection, isOrgMember, pl
 const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, onRemoveConnection, orgId, planSlug, isOrgMember = false }: ClientConnectionsTabProps) => {
   const { activeJobs, enqueueSync } = useSyncJobs(clientId);
   const [syncingConnectionIds, setSyncingConnectionIds] = useState<Set<string>>(new Set());
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  const fullyConnected = connections.filter(c => c.is_connected && !!c.account_id);
+  const syncableConnections = fullyConnected.filter(c => getSyncCooldownInfo(c.last_sync_at, planSlug).canSync);
+
+  const handleSyncAll = async () => {
+    if (!orgId || syncableConnections.length === 0) return;
+    setIsSyncingAll(true);
+    let queued = 0;
+    try {
+      for (const conn of syncableConnections) {
+        if (isConnectionSyncing(conn.id)) continue;
+        try {
+          await enqueueSync({
+            connectionId: conn.id,
+            clientId: conn.client_id,
+            orgId,
+            platform: conn.platform,
+            months: 1,
+            priority: 3,
+          });
+          queued++;
+        } catch {
+          console.error(`Failed to enqueue sync for ${conn.platform}`);
+        }
+      }
+      if (queued > 0) {
+        toast.success(`Sync started for ${queued} platform${queued > 1 ? 's' : ''}`);
+      } else {
+        toast.info('All platforms are already syncing or on cooldown');
+      }
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
 
   const handleSync = async (conn: PlatformConnection) => {
     if (!orgId) return;
