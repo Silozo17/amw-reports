@@ -140,12 +140,13 @@ const CampaignsTable = ({ items, currSymbol }: { items: CampaignItem[]; currSymb
           <TableHead className="text-right">CTR</TableHead>
           <TableHead className="text-right">CPC</TableHead>
           <TableHead className="text-right">Leads</TableHead>
+          <TableHead className="text-right">Cost/Lead</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {items.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">No campaigns found.</TableCell>
+            <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-6">No campaigns found.</TableCell>
           </TableRow>
         ) : items.map(c => (
           <TableRow key={c.id}>
@@ -158,6 +159,7 @@ const CampaignsTable = ({ items, currSymbol }: { items: CampaignItem[]; currSymb
             <TableCell className="text-right text-sm tabular-nums">{fmtPct(c.ctr)}</TableCell>
             <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(c.cpc, currSymbol)}</TableCell>
             <TableCell className="text-right text-sm tabular-nums">{safe(c.leads) > 0 ? fmtNum(c.leads) : '—'}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtCPL(c.spend, c.leads, currSymbol)}</TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -178,13 +180,14 @@ const AdSetsTable = ({ items, currSymbol, label = 'Ad Set' }: { items: AdSetItem
           <TableHead className="text-right">Clicks</TableHead>
           <TableHead className="text-right">CTR</TableHead>
           <TableHead className="text-right">CPC</TableHead>
-          <TableHead className="text-right">Leads</TableHead>
+           <TableHead className="text-right">Leads</TableHead>
+           <TableHead className="text-right">Cost/Lead</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {items.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">No ad sets found.</TableCell>
+            <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-6">No ad sets found.</TableCell>
           </TableRow>
         ) : items.map(a => (
           <TableRow key={a.id}>
@@ -197,6 +200,7 @@ const AdSetsTable = ({ items, currSymbol, label = 'Ad Set' }: { items: AdSetItem
             <TableCell className="text-right text-sm tabular-nums">{fmtPct(a.ctr)}</TableCell>
             <TableCell className="text-right text-sm tabular-nums">{fmtCurrency(a.cpc, currSymbol)}</TableCell>
             <TableCell className="text-right text-sm tabular-nums">{safe(a.leads) > 0 ? fmtNum(a.leads) : '—'}</TableCell>
+            <TableCell className="text-right text-sm tabular-nums">{fmtCPL(a.spend, a.leads, currSymbol)}</TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -258,9 +262,13 @@ const AdCard = ({ ad, currSymbol }: { ad: AdItem; currSymbol: string }) => {
             <span className="text-muted-foreground">Reach</span>
             <span className="tabular-nums font-medium">{fmtNum(ad.reach)}</span>
           </div>
-          <div className="flex justify-between">
+           <div className="flex justify-between">
             <span className="text-muted-foreground">Leads</span>
             <span className="tabular-nums font-medium">{safe(ad.leads) > 0 ? fmtNum(ad.leads) : '—'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Cost/Lead</span>
+            <span className="tabular-nums font-medium">{fmtCPL(ad.spend, ad.leads, currSymbol)}</span>
           </div>
         </div>
       </CardContent>
