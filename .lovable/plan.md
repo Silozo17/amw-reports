@@ -1,23 +1,24 @@
 
 
-# Fix: Pixelated Ad Creative Images
+# Bypass Sync Limits for Platform Admins
 
-## Problem
-The `AdCard` component (line 212) uses `thumbnail_url || image_url` — preferring the thumbnail. Meta's thumbnail URLs are low-resolution (64-128px), which looks pixelated when stretched to fill the `aspect-video` container.
+## What It Does
+Platform Admins (e.g. info@amwmedia.co.uk) will have no sync cooldown limits and no client/connection entitlement restrictions. All other users keep their plan-based limits.
 
-## Fix
+## Changes
 
-**File: `src/components/clients/dashboard/AdCampaignBreakdown.tsx`** — line 212
+### 1. `src/pages/clients/ClientDetail.tsx`
+- Import `usePlatformAdmin` hook
+- Pass `isPlatformAdmin` as a new prop to `ClientConnectionsTab`
 
-Swap the priority so `image_url` is preferred over `thumbnail_url`:
+### 2. `src/components/clients/tabs/ClientConnectionsTab.tsx`
+- Add `isPlatformAdmin?: boolean` to the props interface
+- Update `getSyncCooldownInfo` to accept an `isPlatformAdmin` flag — when true, always return `{ canSync: true, nextAvailable: null }`
+- Pass `isPlatformAdmin` through to `ConnectionRow` and all cooldown checks
 
-```typescript
-// Before
-const thumbUrl = ad.creative?.thumbnail_url || ad.creative?.image_url;
+### 3. `src/hooks/useEntitlements.ts`
+- Import `usePlatformAdmin`
+- When `isPlatformAdmin` is true, override entitlements: set `maxClients` and `maxConnections` to `Infinity`, `canAddClient` and `canAddConnection` to `true`, `isUnlimited` to `true`, `isLocked` to `false`
 
-// After
-const thumbUrl = ad.creative?.image_url || ad.creative?.thumbnail_url;
-```
-
-One line change. No other files affected.
+This ensures platform admins bypass both sync cooldowns and client/connection caps. No database changes needed — `platform_admins` table already exists and is checked via the `usePlatformAdmin` hook.
 
