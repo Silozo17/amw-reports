@@ -19,6 +19,7 @@ import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { generateReport, getCurrentReportPeriod } from '@/lib/reports';
 import { removeConnectionAndData } from '@/lib/connectionHelpers';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 import { useSyncJobs } from '@/hooks/useSyncJobs';
 import SyncProgressBar from '@/components/clients/SyncProgressBar';
 import ShareDialog from '@/components/clients/ShareDialog';
@@ -51,6 +52,7 @@ const ClientDetail = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const entitlements = useEntitlements();
+  const { isPlatformAdmin } = usePlatformAdmin();
   const { isOwner, isManager, isClientUser } = useAuth();
   const isOrgMember = isOwner || isManager;
 
@@ -446,6 +448,7 @@ const ClientDetail = () => {
               orgId={client.org_id}
               planSlug={entitlements.plan?.slug}
               isOrgMember={isOrgMember}
+              isPlatformAdmin={isPlatformAdmin}
             />
           </TabsContent>
 

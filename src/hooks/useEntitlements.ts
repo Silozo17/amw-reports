@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/contexts/OrgContext';
+import { usePlatformAdmin } from '@/hooks/usePlatformAdmin';
 
 interface SubscriptionPlan {
   name: string;
@@ -55,6 +56,7 @@ const CREATOR_LIMITS = {
 
 export function useEntitlements(): Entitlements {
   const { orgId } = useOrg();
+  const { isPlatformAdmin } = usePlatformAdmin();
 
   const { data: subscription, isLoading: subLoading } = useQuery({
     queryKey: ['org-subscription', orgId],
@@ -165,6 +167,27 @@ export function useEntitlements(): Entitlements {
   const canAddConnection = isInGracePeriod
     ? false
     : !isLocked && currentConnections < maxConnections;
+
+  // Platform admins bypass all limits
+  if (isPlatformAdmin) {
+    return {
+      plan,
+      subscription: subscription ?? null,
+      maxClients: Infinity,
+      maxConnections: Infinity,
+      currentClients,
+      currentConnections,
+      canAddClient: true,
+      canAddConnection: true,
+      isUnlimited: true,
+      isLoading,
+      hasWhitelabel: true,
+      subscriptionStatus,
+      isInGracePeriod: false,
+      isLocked: false,
+      gracePeriodEnd,
+    };
+  }
 
   return {
     plan,
