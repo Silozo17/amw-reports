@@ -1,21 +1,50 @@
 
 
-# Add "Sync All" Button to Connections Tab
+# Fix: Realtime Channel Crash on Client Detail Page
 
-## What It Does
-Adds a "Sync All" button in the CardHeader next to the existing "Connect" button. It syncs all fully-connected connections that are not on cooldown, in a single click. Same visibility and rate-limiting rules as individual sync buttons.
+## Problem
 
-## Changes
+The `useSyncJobs` hook creates a Supabase realtime channel named `sync-jobs-${clientId}`. When React's strict mode (or fast re-renders) unmounts and remounts the effect, `supabase.channel()` returns the **already-subscribed** channel object. Calling `.on()` on an already-subscribed channel throws the error shown in the screenshot, which bubbles up to the ErrorBoundary and kills the entire page.
 
-### `src/components/clients/tabs/ClientConnectionsTab.tsx`
+## Fix
 
-1. **Derive syncable connections**: Filter `connections` to those that are fully connected (`is_connected && account_id`) and pass cooldown check via `getSyncCooldownInfo`.
+**File: `src/hooks/useSyncJobs.ts`** (lines 54-78)
 
-2. **Add `handleSyncAll`**: Iterates over syncable connections, calls `enqueueSync` for each (same params as individual sync: `months: 1, priority: 3`). Shows a single toast summarising how many were queued.
+Before creating the channel, remove any existing channel with the same name. This ensures a fresh channel is always created:
 
-3. **Add button in CardHeader**: Place a "Sync All" button (with `RefreshCw` icon) between the title and the ConnectionDialog button. Only visible when `isOrgMember` is true and there's at least one fully connected connection. Disabled when no connections are eligible (all on cooldown) or any sync-all is in progress. Tooltip explains state.
+```typescript
+useEffect(() => {
+  if (!clientId) return;
 
-4. **Track sync-all state**: A simple `isSyncingAll` boolean state to disable the button and show spinner during the batch enqueue.
+  fetchJobs();
 
-No other files need changes — all props are already passed from `ClientDetail.tsx`.
+  const channelName = `sync-jobs-${clientId}`;
+
+  // Remove any stale channel with the same name before creating a new one
+  const existing = supabase.channel(channelName);
+  supabase.removeChannel(existing);
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'sync_jobs',
+        filter: `client_id=eq.${clientId}`,
+      },
+      () => {
+        fetchJobs();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [clientId, fetchJobs]);
+```
+
+One file, ~3 lines changed. No other changes needed.
 
