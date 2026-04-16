@@ -51,6 +51,8 @@ const ClientDetail = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const entitlements = useEntitlements();
+  const { isOwner, isManager, isClientUser } = useAuth();
+  const isOrgMember = isOwner || isManager;
 
   // Server-side sync queue
   const { activeJobs, isAnySyncing, enqueueSync } = useSyncJobs(id);
@@ -441,6 +443,9 @@ const ClientDetail = () => {
               onUpdate={fetchData}
               onOpenPicker={handleOpenPicker}
               onRemoveConnection={handleRemoveConnection}
+              orgId={client.org_id}
+              planSlug={entitlements.plan?.slug}
+              isOrgMember={isOrgMember}
             />
           </TabsContent>
 
