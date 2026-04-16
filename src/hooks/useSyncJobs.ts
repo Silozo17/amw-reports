@@ -56,8 +56,14 @@ export function useSyncJobs(clientId: string | undefined): UseSyncJobsResult {
 
     fetchJobs();
 
+    const channelName = `sync-jobs-${clientId}`;
+
+    // Remove any stale channel with the same name before creating a new one
+    const existing = supabase.channel(channelName);
+    supabase.removeChannel(existing);
+
     const channel = supabase
-      .channel(`sync-jobs-${clientId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
