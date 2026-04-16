@@ -144,6 +144,41 @@ const ConnectionRow = ({ conn, onOpenPicker, onRemoveConnection, isOrgMember, pl
 const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, onRemoveConnection, orgId, planSlug, isOrgMember = false }: ClientConnectionsTabProps) => {
   const { activeJobs, enqueueSync } = useSyncJobs(clientId);
   const [syncingConnectionIds, setSyncingConnectionIds] = useState<Set<string>>(new Set());
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  const fullyConnected = connections.filter(c => c.is_connected && !!c.account_id);
+  const syncableConnections = fullyConnected.filter(c => getSyncCooldownInfo(c.last_sync_at, planSlug).canSync);
+
+  const handleSyncAll = async () => {
+    if (!orgId || syncableConnections.length === 0) return;
+    setIsSyncingAll(true);
+    let queued = 0;
+    try {
+      for (const conn of syncableConnections) {
+        if (isConnectionSyncing(conn.id)) continue;
+        try {
+          await enqueueSync({
+            connectionId: conn.id,
+            clientId: conn.client_id,
+            orgId,
+            platform: conn.platform,
+            months: 1,
+            priority: 3,
+          });
+          queued++;
+        } catch {
+          console.error(`Failed to enqueue sync for ${conn.platform}`);
+        }
+      }
+      if (queued > 0) {
+        toast.success(`Sync started for ${queued} platform${queued > 1 ? 's' : ''}`);
+      } else {
+        toast.info('All platforms are already syncing or on cooldown');
+      }
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
 
   const handleSync = async (conn: PlatformConnection) => {
     if (!orgId) return;
@@ -180,7 +215,36 @@ const ClientConnectionsTab = ({ clientId, connections, onUpdate, onOpenPicker, o
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="font-display text-lg">Platform Connections</CardTitle>
-        <ConnectionDialog clientId={clientId} connections={connections} onUpdate={onUpdate} />
+        <div className="flex items-center gap-2">
+          {isOrgMember && fullyConnected.length > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs gap-1.5"
+                      disabled={syncableConnections.length === 0 || isSyncingAll}
+                      onClick={handleSyncAll}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isSyncingAll ? 'animate-spin' : ''}`} />
+                      Sync All
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isSyncingAll
+                    ? 'Syncing all platforms…'
+                    : syncableConnections.length === 0
+                      ? 'All connections are on cooldown'
+                      : `Sync ${syncableConnections.length} eligible connection${syncableConnections.length > 1 ? 's' : ''}`}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <ConnectionDialog clientId={clientId} connections={connections} onUpdate={onUpdate} />
+        </div>
       </CardHeader>
       <CardContent>
         {connections.length === 0 ? (
