@@ -126,7 +126,11 @@ const PortalUpsellsSettings = ({ clientId }: PortalUpsellsSettingsProps) => {
             <p className="text-sm font-medium">Show offers on share link</p>
             <p className="text-xs text-muted-foreground">Master toggle for this client</p>
           </div>
-          <Switch checked={showPortalUpsells} onCheckedChange={onToggleShow} />
+          <Switch checked={showPortalUpsells} onCheckedChange={async (v) => {
+            setShowPortalUpsells(v);
+            const { error } = await supabase.from('clients').update({ show_portal_upsells: v }).eq('id', clientId);
+            if (error) { toast.error('Failed to update toggle'); setShowPortalUpsells(!v); }
+          }} />
         </div>
 
         <div className="flex items-center justify-between border-t pt-4">
