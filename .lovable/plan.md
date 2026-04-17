@@ -1,26 +1,27 @@
 
-User wants the PWA `start_url` to be `/login` instead of `/`. This means when users tap the installed app icon, it opens directly at the login page.
+The user reports `show_health_score` setting is ignored on the public portal share link.
 
-Note: `start_url` is relative to `scope`. If I set `start_url: "/login"`, scope should remain `/` so the app can navigate to all routes after login. Auth-gated routes will redirect to login anyway if the user isn't signed in, so this is mostly a small UX refinement.
+Looking at `ClientPortal.tsx`: it passes `showHealthScore={client.show_health_score !== false}` to `ClientDashboard`. So the portal page reads it correctly.
 
-One consideration: once a user is logged in, opening the app at `/login` will likely redirect them to the dashboard automatically (existing auth guard behaviour). That's fine and matches current web behaviour.
+But — the data comes from `portal-data` edge function. Let me check what it returns. In the `clients` select: `"id, company_name, full_name, logo_url, preferred_currency, org_id"` — **`show_health_score` is NOT included**. So `client.show_health_score` is always `undefined`, and `undefined !== false` is `true`, so health score always shows.
 
-# Plan: Update PWA start URL to /login
+Fix: add `show_health_score` to the clients select in `supabase/functions/portal-data/index.ts`.
 
-## Change
+I should also verify ClientDashboard actually respects the `showHealthScore` prop — but that's the same component used in the agency view where the toggle does work, so it's fine. The bug is purely the missing field in the edge function select.
 
-**File: `public/manifest.webmanifest`** — single field change:
+## Plan
 
-```json
-"start_url": "/login"
+**Single fix** in `supabase/functions/portal-data/index.ts`:
+
+Change the clients query select from:
+```
+"id, company_name, full_name, logo_url, preferred_currency, org_id"
+```
+to:
+```
+"id, company_name, full_name, logo_url, preferred_currency, org_id, show_health_score"
 ```
 
-Everything else stays the same (`scope: "/"`, icons, theme colours, display mode).
+That's it. One field added to one select statement. The frontend (`ClientPortal.tsx`) already reads `client.show_health_score` and passes it down correctly — it just never receives the value today.
 
-## Why scope stays `/`
-`scope` controls which URLs the installed app is allowed to navigate within. Keeping it at `/` means the app can move freely between login → dashboard → clients → settings without falling out of standalone mode.
-
-## Notes
-- Logged-in users opening the installed app will hit `/login` and be redirected to the dashboard by the existing auth guard — same as the web flow.
-- No code changes, no icon regeneration, no `index.html` changes needed.
-- Users who already installed the PWA will pick up the new `start_url` the next time the manifest is re-fetched (usually within 24h, or immediately on reinstall).
+No DB changes, no UI changes, no new types.
