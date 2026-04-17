@@ -7,6 +7,7 @@ import ClientDashboard from '@/components/clients/ClientDashboard';
 import { hexToHsl } from '@/lib/colorUtils';
 import usePageMeta from '@/hooks/usePageMeta';
 import type { SelectedPeriod, PeriodType } from '@/components/clients/DashboardHeader';
+import type { ClientPortalUpsell } from '@/types/database';
 
 interface PortalOrg {
   id: string;
@@ -27,6 +28,7 @@ interface PortalClient {
   preferred_currency: string;
   org_id: string;
   show_health_score?: boolean;
+  show_portal_upsells?: boolean;
 }
 
 const applyBranding = (org: PortalOrg) => {
@@ -103,6 +105,7 @@ const ClientPortal = () => {
 
   const [client, setClient] = useState<PortalClient | null>(null);
   const [org, setOrg] = useState<PortalOrg | null>(null);
+  const [portalUpsells, setPortalUpsells] = useState<ClientPortalUpsell[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -122,6 +125,7 @@ const ClientPortal = () => {
 
       setClient(data.client);
       setOrg(data.org);
+      setPortalUpsells((data.portalUpsells ?? []) as ClientPortalUpsell[]);
       if (data.org) applyBranding(data.org);
       setIsLoading(false);
     };
@@ -181,6 +185,7 @@ const ClientPortal = () => {
           initialPeriod={initialPeriod ?? undefined}
           disableAutoDetect={!!initialPeriod}
           showHealthScore={client.show_health_score !== false}
+          portalUpsells={client.show_portal_upsells !== false ? portalUpsells : []}
         />
       </main>
 

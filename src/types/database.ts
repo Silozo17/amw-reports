@@ -115,7 +115,35 @@ export interface Client {
   unique_selling_points: string | null;
   brand_voice: string | null;
   show_health_score: boolean;
+  show_portal_upsells: boolean;
 }
+
+export type PortalUpsellCategory = 'paid_ads' | 'seo' | 'organic_content' | 'email' | 'web' | 'other';
+
+export interface ClientPortalUpsell {
+  id: string;
+  org_id: string;
+  client_id: string;
+  category: PortalUpsellCategory;
+  title: string;
+  description: string | null;
+  price_label: string | null;
+  cta_label: string;
+  cta_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const PORTAL_UPSELL_CATEGORY_LABELS: Record<PortalUpsellCategory, string> = {
+  paid_ads: 'Paid Ads',
+  seo: 'SEO',
+  organic_content: 'Organic Content',
+  email: 'Email',
+  web: 'Web',
+  other: 'Other',
+};
 
 export interface ClientRecipient {
   id: string;

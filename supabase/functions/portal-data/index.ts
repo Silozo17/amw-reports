@@ -146,8 +146,8 @@ Deno.serve(async (req) => {
     const startTrendYear = sixMonthsAgo.getFullYear();
 
     // Fetch all data in parallel
-    const [clientRes, orgRes, currentRes, prevRes, trendRes, configsRes, connectionsRes] = await Promise.all([
-      supabase.from("clients").select("id, company_name, full_name, logo_url, preferred_currency, org_id, show_health_score").eq("id", client_id).single(),
+    const [clientRes, orgRes, currentRes, prevRes, trendRes, configsRes, connectionsRes, upsellsRes] = await Promise.all([
+      supabase.from("clients").select("id, company_name, full_name, logo_url, preferred_currency, org_id, show_health_score, show_portal_upsells").eq("id", client_id).single(),
       supabase.from("organisations").select("id, name, logo_url, primary_color, secondary_color, accent_color, heading_font, body_font").eq("id", org_id).single(),
       currentQuery,
       showComparison
@@ -161,6 +161,12 @@ Deno.serve(async (req) => {
         .order("report_month", { ascending: true }),
       supabase.from("client_platform_config").select("platform, is_enabled, enabled_metrics").eq("client_id", client_id).eq("is_enabled", true),
       supabase.from("platform_connections").select("platform, last_sync_at, last_sync_status, last_error").eq("client_id", client_id).eq("is_connected", true),
+      supabase.from("client_portal_upsells")
+        .select("id, org_id, client_id, category, title, description, price_label, cta_label, cta_url, sort_order, is_active, created_at, updated_at")
+        .eq("client_id", client_id)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
     ]);
 
     return new Response(JSON.stringify({
@@ -171,6 +177,7 @@ Deno.serve(async (req) => {
       trendData: trendRes.data ?? [],
       configs: configsRes.data ?? [],
       connections: connectionsRes.data ?? [],
+      portalUpsells: upsellsRes.data ?? [],
       period: { month: m, year: y, type: periodType },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 

@@ -21,6 +21,8 @@ import AiChatDrawer from "./dashboard/AiChatDrawer";
 import VoiceBriefing from "./dashboard/VoiceBriefing";
 import { useClientDashboard } from "@/hooks/useClientDashboard";
 import type { SelectedPeriod } from "@/components/clients/DashboardHeader";
+import type { ClientPortalUpsell } from "@/types/database";
+import PortalUpsells from "./dashboard/PortalUpsells";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   'Paid Advertising': DollarSign,
@@ -136,9 +138,10 @@ interface ClientDashboardProps {
   initialPeriod?: SelectedPeriod;
   disableAutoDetect?: boolean;
   onPeriodChange?: (period: SelectedPeriod) => void;
+  portalUpsells?: ClientPortalUpsell[];
 }
 
-const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect, showHealthScore = true, onPeriodChange }: ClientDashboardProps) => {
+const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect, showHealthScore = true, onPeriodChange, portalUpsells }: ClientDashboardProps) => {
   const dashboard = useClientDashboard({ clientId, currencyCode, portalToken, initialMonth, initialYear, initialPeriod, disableAutoDetect });
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -438,6 +441,10 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
               );
             })}
           </div>
+
+          {isPortal && portalUpsells && portalUpsells.length > 0 && (
+            <PortalUpsells upsells={portalUpsells} />
+          )}
         </div>
       )}
     </div>

@@ -55,6 +55,69 @@ export type Database = {
           },
         ]
       }
+      client_portal_upsells: {
+        Row: {
+          category: Database["public"]["Enums"]["portal_upsell_category"]
+          client_id: string
+          created_at: string
+          cta_label: string
+          cta_url: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          org_id: string
+          price_label: string | null
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["portal_upsell_category"]
+          client_id: string
+          created_at?: string
+          cta_label?: string
+          cta_url?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          org_id: string
+          price_label?: string | null
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["portal_upsell_category"]
+          client_id?: string
+          created_at?: string
+          cta_label?: string
+          cta_url?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          price_label?: string | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_upsells_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_portal_upsells_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_recipients: {
         Row: {
           client_id: string
@@ -228,6 +291,7 @@ export type Database = {
           service_areas: string | null
           services_subscribed: string[] | null
           show_health_score: boolean
+          show_portal_upsells: boolean
           social_handles: Json | null
           target_audience: string | null
           unique_selling_points: string | null
@@ -272,6 +336,7 @@ export type Database = {
           service_areas?: string | null
           services_subscribed?: string[] | null
           show_health_score?: boolean
+          show_portal_upsells?: boolean
           social_handles?: Json | null
           target_audience?: string | null
           unique_selling_points?: string | null
@@ -316,6 +381,7 @@ export type Database = {
           service_areas?: string | null
           services_subscribed?: string[] | null
           show_health_score?: boolean
+          show_portal_upsells?: boolean
           social_handles?: Json | null
           target_audience?: string | null
           unique_selling_points?: string | null
@@ -1446,6 +1512,13 @@ export type Database = {
         | "tiktok_ads"
         | "linkedin_ads"
         | "threads"
+      portal_upsell_category:
+        | "paid_ads"
+        | "seo"
+        | "organic_content"
+        | "email"
+        | "web"
+        | "other"
       sync_job_status: "pending" | "processing" | "completed" | "failed"
     }
     CompositeTypes: {
@@ -1591,6 +1664,14 @@ export const Constants = {
         "tiktok_ads",
         "linkedin_ads",
         "threads",
+      ],
+      portal_upsell_category: [
+        "paid_ads",
+        "seo",
+        "organic_content",
+        "email",
+        "web",
+        "other",
       ],
       sync_job_status: ["pending", "processing", "completed", "failed"],
     },
