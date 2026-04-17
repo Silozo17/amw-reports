@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
@@ -103,14 +103,12 @@ const ClientPortal = () => {
 
   const initialPeriod = useMemo(() => parsePeriodFromQuery(searchParams), [searchParams]);
 
-  const handlePeriodChange = (period: SelectedPeriod) => {
+  const handlePeriodChange = useCallback((period: SelectedPeriod) => {
     const params = new URLSearchParams();
     if (period.type === 'monthly') {
       const now = new Date();
-      const currentMonth = now.getMonth() + 1;
-      const currentYear = now.getFullYear();
-      const offset = (currentYear - period.year) * 12 +
-                     (currentMonth - period.month);
+      const offset = (now.getFullYear() - period.year) * 12 +
+                     (now.getMonth() + 1 - period.month);
       params.set('period', String(Math.max(0, offset)));
     } else if (period.type === 'custom' &&
                period.startDate && period.endDate) {
@@ -123,7 +121,7 @@ const ClientPortal = () => {
       params.set('type', period.type);
     }
     setSearchParams(params, { replace: true });
-  };
+  }, [setSearchParams]);
 
   const [client, setClient] = useState<PortalClient | null>(null);
   const [org, setOrg] = useState<PortalOrg | null>(null);
