@@ -62,21 +62,8 @@ const parsePeriodFromQuery = (searchParams: URLSearchParams): SelectedPeriod | n
   const startDateStr = searchParams.get('startDate');
   const endDateStr = searchParams.get('endDate');
 
-  // New explicit format: type + month + year
-  if (type && VALID_PERIOD_TYPES.has(type) && monthStr && yearStr) {
-    const month = parseInt(monthStr, 10);
-    const year = parseInt(yearStr, 10);
-    if (!isNaN(month) && !isNaN(year) && month >= 1 && month <= 12) {
-      const period: SelectedPeriod = { type, month, year };
-      if (type === 'custom' && startDateStr && endDateStr) {
-        period.startDate = new Date(startDateStr);
-        period.endDate = new Date(endDateStr);
-      }
-      return period;
-    }
-  }
-
-  // Legacy format: period=N (rolling monthly offset)
+  // Period offset takes priority over explicit month/year
+  // period=0 = current month, period=1 = last month, etc.
   if (periodStr !== null) {
     const offset = parseInt(periodStr, 10);
     if (!isNaN(offset) && offset >= 0) {
@@ -87,6 +74,20 @@ const parsePeriodFromQuery = (searchParams: URLSearchParams): SelectedPeriod | n
         month: target.getMonth() + 1,
         year: target.getFullYear(),
       };
+    }
+  }
+
+  // Explicit format: type + month + year
+  if (type && VALID_PERIOD_TYPES.has(type) && monthStr && yearStr) {
+    const month = parseInt(monthStr, 10);
+    const year = parseInt(yearStr, 10);
+    if (!isNaN(month) && !isNaN(year) && month >= 1 && month <= 12) {
+      const period: SelectedPeriod = { type, month, year };
+      if (type === 'custom' && startDateStr && endDateStr) {
+        period.startDate = new Date(startDateStr);
+        period.endDate = new Date(endDateStr);
+      }
+      return period;
     }
   }
 
