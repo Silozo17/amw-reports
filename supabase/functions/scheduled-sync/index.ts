@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
 
       // Weekly plans: only sync on Mondays
       const isWeeklyPlan = planSlug === "creator" || planSlug === "freelance";
-      if (isWeeklyPlan && !isMonday) {
+      if (isWeeklyPlan && !isMonday && !isReconciliationDay) {
         skippedPlan++;
         continue;
       }
@@ -168,8 +168,6 @@ Deno.serve(async (req) => {
         org_id: orgId,
         platform: conn.platform,
         months: targetMonths.length,
-        target_months: targetMonths,
-        force_resync: forceResync,
         priority: forceResync ? 5 : 1,
       });
 
