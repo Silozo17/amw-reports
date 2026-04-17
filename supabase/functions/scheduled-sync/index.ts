@@ -78,8 +78,10 @@ Deno.serve(async (req) => {
     const now = new Date();
     const uk = getUkTime(now);
 
-    // Gate: only proceed at 5 AM UK
-    if (uk.ukHour !== 5) {
+    // Gate: only proceed at 5 AM UK (bypass with ?force=1 for testing)
+    const url = new URL(req.url);
+    const force = url.searchParams.get("force") === "1";
+    if (!force && uk.ukHour !== 5) {
       return new Response(
         JSON.stringify({ message: `Skipped: UK hour is ${uk.ukHour}, not 5` }),
         { headers: { "Content-Type": "application/json" } }
