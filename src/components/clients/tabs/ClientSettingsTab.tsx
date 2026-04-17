@@ -125,6 +125,7 @@ const ClientSettingsTab = ({
           </div>
           {[
             { key: 'show_health_score', label: 'Health Score', desc: 'Show marketing health score on dashboard & portal' },
+            { key: 'show_portal_upsells', label: 'Portal Offers', desc: 'Show service offers on the shared portal link' },
             { key: 'enable_mom_comparison', label: 'MoM Comparison', desc: 'Compare with previous month' },
             { key: 'enable_yoy_comparison', label: 'YoY Comparison', desc: 'Compare with same month last year' },
             { key: 'enable_explanations', label: 'AI Explanations', desc: 'Plain-English insights in reports' },
