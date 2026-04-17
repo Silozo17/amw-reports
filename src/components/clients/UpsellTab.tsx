@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Pencil, Trash2, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import PortalUpsellsSettings from './PortalUpsellsSettings';
 
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -290,7 +291,9 @@ const UpsellTab = ({ clientId }: UpsellTabProps) => {
   }
 
   return (
-    <Card>
+    <div className="space-y-4">
+      <PortalUpsellsSettings clientId={clientId} />
+      <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="font-display text-lg">Scheduled Upsells</CardTitle>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
@@ -473,6 +476,7 @@ const UpsellTab = ({ clientId }: UpsellTabProps) => {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };
 
