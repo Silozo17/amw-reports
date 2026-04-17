@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
 
     // Fetch all data in parallel
     const [clientRes, orgRes, currentRes, prevRes, trendRes, configsRes, connectionsRes] = await Promise.all([
-      supabase.from("clients").select("id, company_name, full_name, logo_url, preferred_currency, org_id").eq("id", client_id).single(),
+      supabase.from("clients").select("id, company_name, full_name, logo_url, preferred_currency, org_id, show_health_score").eq("id", client_id).single(),
       supabase.from("organisations").select("id, name, logo_url, primary_color, secondary_color, accent_color, heading_font, body_font").eq("id", org_id).single(),
       currentQuery,
       showComparison
