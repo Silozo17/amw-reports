@@ -99,9 +99,31 @@ const parsePeriodFromQuery = (searchParams: URLSearchParams): SelectedPeriod | n
 const ClientPortal = () => {
   usePageMeta({ title: 'Client Dashboard — AMW Reports', description: 'View your marketing performance dashboard.' });
   const { token } = useParams<{ token: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const initialPeriod = useMemo(() => parsePeriodFromQuery(searchParams), [searchParams]);
+
+  const handlePeriodChange = (period: SelectedPeriod) => {
+    const params = new URLSearchParams();
+    if (period.type === 'monthly') {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const offset = (currentYear - period.year) * 12 +
+                     (currentMonth - period.month);
+      params.set('period', String(Math.max(0, offset)));
+    } else if (period.type === 'custom' &&
+               period.startDate && period.endDate) {
+      params.set('type', 'custom');
+      params.set('startDate',
+        period.startDate.toISOString().slice(0, 10));
+      params.set('endDate',
+        period.endDate.toISOString().slice(0, 10));
+    } else {
+      params.set('type', period.type);
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   const [client, setClient] = useState<PortalClient | null>(null);
   const [org, setOrg] = useState<PortalOrg | null>(null);
@@ -186,6 +208,7 @@ const ClientPortal = () => {
           disableAutoDetect={!!initialPeriod}
           showHealthScore={client.show_health_score !== false}
           portalUpsells={client.show_portal_upsells !== false ? portalUpsells : []}
+          onPeriodChange={handlePeriodChange}
         />
       </main>
 
