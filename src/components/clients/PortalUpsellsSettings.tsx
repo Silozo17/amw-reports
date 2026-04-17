@@ -16,8 +16,6 @@ import { PORTAL_UPSELL_CATEGORY_LABELS, type ClientPortalUpsell, type PortalUpse
 
 interface PortalUpsellsSettingsProps {
   clientId: string;
-  showPortalUpsells: boolean;
-  onToggleShow: (value: boolean) => void;
 }
 
 const emptyForm = (): Omit<ClientPortalUpsell, 'id' | 'org_id' | 'client_id' | 'created_at' | 'updated_at' | 'sort_order'> => ({
@@ -30,9 +28,10 @@ const emptyForm = (): Omit<ClientPortalUpsell, 'id' | 'org_id' | 'client_id' | '
   is_active: true,
 });
 
-const PortalUpsellsSettings = ({ clientId, showPortalUpsells, onToggleShow }: PortalUpsellsSettingsProps) => {
+const PortalUpsellsSettings = ({ clientId }: PortalUpsellsSettingsProps) => {
   const { orgId } = useOrg();
   const [items, setItems] = useState<ClientPortalUpsell[]>([]);
+  const [showPortalUpsells, setShowPortalUpsells] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ClientPortalUpsell | null>(null);
@@ -41,15 +40,14 @@ const PortalUpsellsSettings = ({ clientId, showPortalUpsells, onToggleShow }: Po
 
   const fetchItems = useCallback(async () => {
     if (!orgId) return;
-    const { data, error } = await supabase
-      .from('client_portal_upsells')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('org_id', orgId)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true });
-    if (error) { toast.error('Failed to load offers'); return; }
-    setItems((data ?? []) as ClientPortalUpsell[]);
+    const [itemsRes, clientRes] = await Promise.all([
+      supabase.from('client_portal_upsells').select('*').eq('client_id', clientId).eq('org_id', orgId)
+        .order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
+      supabase.from('clients').select('show_portal_upsells').eq('id', clientId).single(),
+    ]);
+    if (itemsRes.error) { toast.error('Failed to load offers'); return; }
+    setItems((itemsRes.data ?? []) as ClientPortalUpsell[]);
+    if (clientRes.data) setShowPortalUpsells(clientRes.data.show_portal_upsells !== false);
     setIsLoading(false);
   }, [clientId, orgId]);
 
