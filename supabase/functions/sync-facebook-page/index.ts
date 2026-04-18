@@ -360,34 +360,26 @@ Deno.serve(async (req) => {
       // END DIAGNOSTIC MODE
       // ══════════════════════════════════════════════════════════════════
 
-      // ── Fetch organic views: page_media_view with is_from_ads breakdown ──
-      // page_posts_impressions_organic_unique was deprecated 2025-06-15.
-      // page_media_view returns total content views; subtract paid (is_from_ads=true) to isolate organic.
+      // ── Fetch organic views: page_media_view (total) − page_posts_impressions_paid ──
+      // Audit (Meta v25 docs) confirmed: is_from_ads breakdown on page_media_view returns 0
+      // because media views and ad impressions are different surfaces. Instead, subtract
+      // page_posts_impressions_paid (the reliable paid signal) from total media views.
+      // Floor at 0 defensively in case paid > total in edge cases.
       try {
         const viewsUrl = `${GRAPH_BASE}/${pageId}/insights` +
-          `?metric=page_media_view` +
-          `&breakdown=is_from_ads` +
+          `?metric=page_media_view,page_posts_impressions_paid` +
           `&period=day` +
           `&since=${startDate}&until=${endDate}` +
           `&access_token=${pageToken}`;
         const viewsRes = await fetchWithTimeout(viewsUrl);
         if (viewsRes.ok) {
           const viewsBody = await viewsRes.json();
-          const metric = viewsBody.data?.find((d: any) => d.name === "page_media_view");
-          let totalMediaViews = 0;
-          let paidMediaViews = 0;
-          for (const v of metric?.values || []) {
-            const n = Number(v?.value || 0);
-            totalMediaViews += n;
-            const breakdownKey = v?.breakdown?.is_from_ads ?? v?.dimension_values?.[0];
-            if (breakdownKey === true || breakdownKey === "true" || breakdownKey === "1" || breakdownKey === 1) {
-              paidMediaViews += n;
-            }
-          }
-          const organicMediaViews = Math.max(0, totalMediaViews - paidMediaViews);
-          totalViews = organicMediaViews;
+          const totalMediaViews = sumDailyValues(viewsBody.data || [], "page_media_view");
+          const paidPostImpressions = sumDailyValues(viewsBody.data || [], "page_posts_impressions_paid");
+          const organicViews = Math.max(0, totalMediaViews - paidPostImpressions);
+          totalViews = organicViews;
           coreInsightsFetched = true;
-          console.log(`Facebook organic views for ${pageId}: total=${totalMediaViews} paid=${paidMediaViews} organic=${organicMediaViews}`);
+          console.log(`Facebook organic views for ${pageId}: total_media_view=${totalMediaViews} paid_post_impressions=${paidPostImpressions} organic=${organicViews}`);
         } else {
           const errBody = await viewsRes.text();
           console.error(`page_media_view fetch failed (${viewsRes.status}):`, errBody.slice(0, 300));
