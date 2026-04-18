@@ -268,6 +268,7 @@ Deno.serve(async (req) => {
         const reachRes = await fetchWithTimeout(reachUrl);
         if (reachRes.ok) {
           const reachBody = await reachRes.json();
+          console.log("REACH DEBUG:", JSON.stringify(reachBody).slice(0, 2000));
           const value = reachBody.data?.[0]?.values?.[0]?.value || 0;
           totalViews = Number(value);
           coreInsightsFetched = true;
