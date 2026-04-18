@@ -262,23 +262,29 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Fetch total views using page_total_media_view_unique (total_over_range) ──
+      // ── Fetch organic views = views_all - views_paid ──
       try {
-        const reachUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_total_media_view_unique&period=total_over_range&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        const reachRes = await fetchWithTimeout(reachUrl);
-        if (reachRes.ok) {
-          const reachBody = await reachRes.json();
-          console.log("REACH DEBUG:", JSON.stringify(reachBody).slice(0, 2000));
-          const value = reachBody.data?.[0]?.values?.[0]?.value || 0;
-          totalViews = Number(value);
+        const viewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_views_total,page_views_total_paid&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const viewsRes = await fetchWithTimeout(viewsUrl);
+        if (viewsRes.ok) {
+          const viewsBody = await viewsRes.json();
+          console.log("VIEWS DEBUG:", JSON.stringify(viewsBody).slice(0, 2000));
+          const sumValues = (name: string) => {
+            const series = viewsBody.data?.find((d: any) => d.name === name);
+            return (series?.values || []).reduce((s: number, v: any) => s + Number(v?.value || 0), 0);
+          };
+          const viewsAll = sumValues("page_views_total");
+          const viewsPaid = sumValues("page_views_total_paid");
+          const organicViews = Math.max(0, viewsAll - viewsPaid);
+          totalViews += organicViews;
           coreInsightsFetched = true;
-          console.log(`Reach for ${pageId}: total=${totalViews}`);
+          console.log(`Views for ${pageId}: all=${viewsAll}, paid=${viewsPaid}, organic=${organicViews}`);
         } else {
-          const errBody = await reachRes.text();
-          console.error(`Reach failed for ${pageId}:`, errBody);
+          const errBody = await viewsRes.text();
+          console.error(`Views failed for ${pageId}:`, errBody);
         }
       } catch (err) {
-        console.error(`Reach fetch exception ${pageId}:`, err instanceof Error ? err.message : err);
+        console.error(`Views fetch exception ${pageId}:`, err instanceof Error ? err.message : err);
       }
 
       // ── Followers: first and last daily value for growth calculation ──
