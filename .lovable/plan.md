@@ -1,35 +1,36 @@
 
-The user wants to add the `ads_read` scope to the Facebook page connection so the `is_from_ads` breakdown returns paid data (not silent zeros), enabling proper organic vs. paid view separation.
+User approved all three recommendations from the audit. Plan covers all three in one go.
 
-## Current state
-- `supabase/functions/facebook-connect/index.ts` requests scope: `pages_show_list,pages_read_engagement,read_insights`
-- Missing: `ads_read` (and arguably `ads_management` for completeness, but `ads_read` is sufficient for insights breakdowns)
-- The Meta App ID is already configured; no Meta dashboard work needed by us — but the user must reconnect the Facebook page after the change so Meta re-issues a token with the new scope.
+## Files to change
 
-## The plan
+### 1. `supabase/functions/sync-facebook-page/index.ts` — Apply organic formula + remove deprecated probes
 
-**1. Add `ads_read` to the Facebook OAuth scope**
-- File: `supabase/functions/facebook-connect/index.ts`
-- Change scope string from:
-  `pages_show_list,pages_read_engagement,read_insights`
-  to:
-  `pages_show_list,pages_read_engagement,read_insights,ads_read`
+**A. Switch Views metric to organic = total − paid_post_impressions**
+- Locate where `page_media_view` is written into `metrics_data` (the "views" field)
+- Change formula: `views = page_media_view − page_posts_impressions_paid` (floor at 0)
+- Keep raw values stored in `raw_data` for diagnostic/debug purposes
+- Drop reliance on the `is_from_ads` breakdown for the headline number (we proved it returns 0 for media_view)
 
-**2. Redeploy `facebook-connect` edge function** (automatic on save).
+**B. Remove deprecated metric probes (June 15, 2025 deprecations)**
+- Remove from page-level metric requests: `page_impressions`, `page_impressions_unique`, `page_impressions_paid`, `page_impressions_organic_unique`, `page_fans`, `page_fan_adds`, `page_fan_removes`, `page_follows`, `page_daily_follows`, `page_daily_follows_unique`, `page_daily_unfollows_unique`
+- Keep working metrics: `page_media_view`, `page_posts_impressions_paid`, `page_posts_impressions_organic_unique`, `page_video_views`, `page_video_views_paid`, `post_media_view`, post engagement metrics
+- This stops the 11 rejected-metric warnings cluttering every sync log
 
-**3. User action required (I'll guide them in chat):**
-- Go to AMW Media client → Connections → Facebook Page
-- Click "Disconnect"
-- Click "Connect" again → Meta will show a permission screen now including "Access ads-related stats" — they must approve it
-- After reconnect, trigger a fresh April 2026 resync
-- I'll then verify `page_media_view` with `is_from_ads=1` returns a non-zero paid number, confirming the breakdown finally works
+### 2. `supabase/functions/facebook-connect/index.ts` — Drop unnecessary `ads_read` scope
 
-**4. Once confirmed working** (separate follow-up, not in this plan):
-- Decide whether to switch the dashboard formula to `page_media_view` (total) − `is_from_ads=1` portion = true organic views.
+- Revert scope from `pages_show_list,pages_read_engagement,read_insights,ads_read` back to `pages_show_list,pages_read_engagement,read_insights`
+- Reasoning confirmed by audit: `page_posts_impressions_paid` returns non-zero **without** `ads_read` (it's a page insight, not an ads insight). Keeping `ads_read` only adds friction to the Meta consent screen for future client connections without adding any data we use.
 
-## Scope of this plan
-- **In scope:** Single one-line scope change to `facebook-connect/index.ts` + reconnect guidance.
-- **Out of scope:** Changing the sync formula or dashboard metric — we do that only after we confirm the new scope actually returns paid breakdown data.
+## Out of scope
+- No dashboard UI changes — `views` field name stays the same, only the underlying number changes
+- No DB schema changes
+- No changes to other sync functions
 
-## Risk flag
-Adding `ads_read` means Meta will show users a more sensitive permission screen on connect. For AMW Media's own page this is fine, but for future client connections, end-clients may hesitate. Acceptable trade-off since it's the only way to separate organic from paid views accurately.
+## User action required after deploy
+1. Trigger a fresh April 2026 Facebook resync for AMW Media
+2. Verify dashboard shows ~9,182 views (was 11,703) — confirms organic formula applied
+3. Verify sync logs no longer list 11 rejected deprecated metrics
+4. (Optional) Disconnect + reconnect Facebook — Meta consent screen should now be lighter (no "Access ads-related stats")
+
+## Risk
+- **Low.** Subtraction formula is defensive (floored at 0), so any edge case where paid > total just returns 0 instead of negative. Removing `ads_read` is purely a scope reduction. Removing deprecated metric probes only stops noise — those metrics already returned errors and weren't used.
