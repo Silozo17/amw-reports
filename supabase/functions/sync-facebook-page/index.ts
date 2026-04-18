@@ -502,10 +502,10 @@ Deno.serve(async (req) => {
       const postMap = new Map(postEntries.map(p => [p.id, p]));
 
       // ══════════════════════════════════════════════════════════════════
-      // POST DIAGNOSTIC MODE — probe first 3 posts only (read-only)
+      // POST DIAGNOSTIC MODE — probe ALL posts with all non-deprecated metrics
       // ══════════════════════════════════════════════════════════════════
       try {
-        const sampleIds = postIds.slice(0, 3);
+        const sampleIds = postIds; // ALL posts now
         if (sampleIds.length > 0) {
           const probePost = async (label: string, metrics: string[], extraQS = "") => {
             const url = `${GRAPH_BASE}/?ids=${sampleIds.join(",")}&fields=insights.metric(${metrics.join(",")})${extraQS}&access_token=${pageToken}`;
@@ -523,7 +523,7 @@ Deno.serve(async (req) => {
                 summary[pid] = insights.map((i: any) => ({
                   name: i.name,
                   total: (i.values || []).reduce((s: number, v: any) => s + (Number(v?.value) || 0), 0),
-                  firstValue: i.values?.[0] ?? null,
+                  values: (i.values || []).map((v: any) => v?.value),
                 }));
               }
               console.log(JSON.stringify({ diag: "post_batch", label, status: res.status, summary }));
@@ -542,17 +542,65 @@ Deno.serve(async (req) => {
             }
           };
 
-          await probePost("post_views", ["post_total_media_view_unique", "post_media_view"]);
-          await probePost("post_impressions", [
-            "post_impressions", "post_impressions_paid", "post_impressions_organic",
-            "post_impressions_unique", "post_impressions_paid_unique", "post_impressions_organic_unique",
-          ]);
-          await probePost("post_video", [
-            "post_video_views", "post_video_views_paid", "post_video_views_organic",
-          ]);
-          await probePost("post_engagement", ["post_clicks_by_type", "post_reactions_by_type_total"]);
+          // Probe raw post-object fields (NOT insights endpoint)
+          try {
+            const fieldUrl = `${GRAPH_BASE}/?ids=${sampleIds.join(",")}&fields=id,views,total_video_views,reach&access_token=${pageToken}`;
+            const fr = await fetchWithTimeout(fieldUrl);
+            const fbody = await fr.text();
+            console.log(JSON.stringify({ diag: "post_object_fields", status: fr.status, body: fbody.slice(0, 3000) }));
+          } catch (e) {
+            console.log(JSON.stringify({ diag: "post_object_fields_exception", error: e instanceof Error ? e.message : String(e) }));
+          }
+
+          // Currently used (baseline)
+          await probePost("post_views_baseline", ["post_total_media_view_unique", "post_media_view"]);
+
+          // post_media_view with all supported breakdowns (Meta's official "Views" replacement)
           await probePost("post_media_view_breakdown_ads", ["post_media_view"], ".breakdown(is_from_ads)");
           await probePost("post_media_view_breakdown_followers", ["post_media_view"], ".breakdown(is_from_followers)");
+
+          // Video metrics (still supported per docs)
+          await probePost("post_video_full", [
+            "post_video_views",
+            "post_video_views_paid",
+            "post_video_views_organic",
+            "post_video_views_unique",
+            "post_video_views_paid_unique",
+            "post_video_views_organic_unique",
+            "post_video_views_clicked_to_play",
+            "post_video_views_autoplayed",
+            "post_video_complete_views_organic",
+            "post_video_complete_views_paid",
+            "post_video_avg_time_watched",
+            "post_video_view_time",
+            "post_video_view_time_organic",
+          ]);
+
+          // Engagement (still supported)
+          await probePost("post_engagement_full", [
+            "post_clicks",
+            "post_clicks_unique",
+            "post_clicks_by_type",
+            "post_clicks_by_type_unique",
+            "post_reactions_by_type_total",
+            "post_reactions_like_total",
+            "post_reactions_love_total",
+            "post_reactions_wow_total",
+            "post_reactions_haha_total",
+            "post_reactions_sorry_total",
+            "post_reactions_anger_total",
+          ]);
+
+          // Negative feedback / quality
+          await probePost("post_quality", [
+            "post_negative_feedback",
+            "post_negative_feedback_unique",
+          ]);
+
+          // Sanity check — verify deprecated still rejected
+          await probePost("post_impressions_deprecated_check", [
+            "post_impressions", "post_impressions_organic", "post_impressions_paid",
+          ]);
         }
       } catch (e) {
         console.log(JSON.stringify({ diag: "post_outer_exception", error: e instanceof Error ? e.message : String(e) }));
