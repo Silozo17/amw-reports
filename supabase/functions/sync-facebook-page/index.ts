@@ -262,36 +262,40 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Fetch organic reach: page_posts_impressions_organic_unique ──
-      // Per Meta docs: unique people who saw posts via unpaid distribution.
-      // Daily values are rolling unique counts; summing overcounts.
-      // Use max daily value as best monthly approximation.
+      // ── Fetch organic views: page_media_view with is_from_ads breakdown ──
+      // page_posts_impressions_organic_unique was deprecated 2025-06-15.
+      // page_media_view returns total content views; subtract paid (is_from_ads=true) to isolate organic.
       try {
-        const organicUrl = `${GRAPH_BASE}/${pageId}/insights` +
-          `?metric=page_posts_impressions_organic_unique` +
+        const viewsUrl = `${GRAPH_BASE}/${pageId}/insights` +
+          `?metric=page_media_view` +
+          `&breakdown=is_from_ads` +
           `&period=day` +
           `&since=${startDate}&until=${endDate}` +
           `&access_token=${pageToken}`;
-        const organicRes = await fetchWithTimeout(organicUrl);
-        if (organicRes.ok) {
-          const organicBody = await organicRes.json();
-          const metric = organicBody.data?.find(
-            (d: any) => d.name === "page_posts_impressions_organic_unique"
-          );
-          if (metric?.values) {
-            const values = metric.values.filter((v: any) => Number(v.value) > 0);
-            if (values.length > 0) {
-              totalViews = Math.max(...values.map((v: any) => Number(v.value)));
+        const viewsRes = await fetchWithTimeout(viewsUrl);
+        if (viewsRes.ok) {
+          const viewsBody = await viewsRes.json();
+          const metric = viewsBody.data?.find((d: any) => d.name === "page_media_view");
+          let totalMediaViews = 0;
+          let paidMediaViews = 0;
+          for (const v of metric?.values || []) {
+            const n = Number(v?.value || 0);
+            totalMediaViews += n;
+            const breakdownKey = v?.breakdown?.is_from_ads ?? v?.dimension_values?.[0];
+            if (breakdownKey === true || breakdownKey === "true" || breakdownKey === "1" || breakdownKey === 1) {
+              paidMediaViews += n;
             }
-            coreInsightsFetched = true;
-            console.log(`Organic reach for ${pageId}: ${totalViews}`);
           }
+          const organicMediaViews = Math.max(0, totalMediaViews - paidMediaViews);
+          totalViews = organicMediaViews;
+          coreInsightsFetched = true;
+          console.log(`Facebook organic views for ${pageId}: total=${totalMediaViews} paid=${paidMediaViews} organic=${organicMediaViews}`);
         } else {
-          const errBody = await organicRes.text();
-          console.error(`Organic reach failed (${organicRes.status}):`, errBody.slice(0, 300));
+          const errBody = await viewsRes.text();
+          console.error(`page_media_view fetch failed (${viewsRes.status}):`, errBody.slice(0, 300));
         }
       } catch (err) {
-        console.error(`Organic reach exception:`, err instanceof Error ? err.message : err);
+        console.error(`page_media_view exception:`, err instanceof Error ? err.message : err);
       }
 
       // ── Followers: first and last daily value for growth calculation ──
