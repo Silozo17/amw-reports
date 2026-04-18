@@ -97,13 +97,6 @@ const CustomDomainSection = () => {
     }
   };
 
-  const copyToken = (domain: CustomDomain) => {
-    navigator.clipboard.writeText(`amw-verify=${domain.verification_token}`);
-    setCopiedId(domain.id);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
   return (
     <Card>
       <CardHeader>
