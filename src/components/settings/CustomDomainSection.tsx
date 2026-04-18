@@ -148,31 +148,47 @@ const CustomDomainSection = () => {
             {!domain.verified_at && (
               <div className="space-y-2 bg-muted/50 rounded-md p-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">DNS Setup Instructions</p>
-                <p className="text-sm">Add this TXT record to your DNS provider:</p>
+                <p className="text-sm">Add this CNAME record at your DNS provider:</p>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
+                    <Label className="text-xs w-12 shrink-0">Type:</Label>
+                    <code className="text-xs bg-background px-2 py-1 rounded border">CNAME</code>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Label className="text-xs w-12 shrink-0">Name:</Label>
-                    <code className="text-xs bg-background px-2 py-1 rounded border">_amw-verify</code>
+                    <code className="text-xs bg-background px-2 py-1 rounded border">
+                      {domain.domain.includes('.')
+                        ? domain.domain.split('.').slice(0, -2).join('.') || '@'
+                        : '@'}
+                    </code>
                   </div>
                   <div className="flex items-center gap-2">
                     <Label className="text-xs w-12 shrink-0">Value:</Label>
                     <code className="text-xs bg-background px-2 py-1 rounded border flex-1 truncate">
-                      amw-verify={domain.verification_token}
+                      clients.amwreports.com
                     </code>
                     <Button
                       size="icon"
                       variant="ghost"
                       className="h-7 w-7 shrink-0"
-                      onClick={() => copyToken(domain)}
+                      onClick={() => {
+                        navigator.clipboard.writeText('clients.amwreports.com');
+                        setCopiedId(domain.id);
+                        toast.success('Copied');
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }}
                     >
                       {copiedId === domain.id ? (
-                        <Check className="h-3.5 w-3.5 text-green-500" />
+                        <Check className="h-3.5 w-3.5 text-primary" />
                       ) : (
                         <Copy className="h-3.5 w-3.5" />
                       )}
                     </Button>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Once added, click Verify below. SSL is provisioned automatically — usually takes 2–5 minutes.
+                </p>
                 <Button
                   size="sm"
                   variant="outline"
@@ -181,7 +197,7 @@ const CustomDomainSection = () => {
                   disabled={verifyingId === domain.id}
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${verifyingId === domain.id ? 'animate-spin' : ''}`} />
-                  {verifyingId === domain.id ? 'Checking...' : 'Verify DNS'}
+                  {verifyingId === domain.id ? 'Checking...' : 'Verify & Activate'}
                 </Button>
                 <p className="text-xs text-muted-foreground">DNS changes can take up to 48 hours to propagate.</p>
               </div>
