@@ -44,13 +44,13 @@ Deno.serve(async (req) => {
     }
 
     const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
-    const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+    const redirectUri = `https://amwreports.com/auth/callback`;
 
     const state = btoa(
       JSON.stringify({
         connection_id,
         platform: conn.platform,
-        redirect_url: redirect_url || "https://reports.amwmedia.co.uk",
+        redirect_url: redirect_url || "https://amwreports.com",
       })
     );
 

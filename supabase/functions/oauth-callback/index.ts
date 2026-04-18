@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   // TikTok uses "auth_code" param
   const authCode = code || url.searchParams.get("auth_code");
 
-  let frontendUrl = "https://reports.amwmedia.co.uk";
+  let frontendUrl = "https://amwreports.com";
   let connectionId = "";
   let platform = "";
 
@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
 async function handleGoogleAds(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
   const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -333,7 +333,7 @@ async function handleGoogleAds(supabase: any, code: string, connectionId: string
 async function handleMetaAds(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const appId = Deno.env.get("META_APP_ID")!;
   const appSecret = Deno.env.get("META_APP_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch(
     `https://graph.facebook.com/v25.0/oauth/access_token?` +
@@ -400,7 +400,7 @@ async function handleMetaAds(supabase: any, code: string, connectionId: string, 
 async function handleFacebook(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const appId = Deno.env.get("META_APP_ID")!;
   const appSecret = Deno.env.get("META_APP_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch(
     `https://graph.facebook.com/v25.0/oauth/access_token?` +
@@ -473,7 +473,7 @@ async function handleFacebook(supabase: any, code: string, connectionId: string,
 async function handleInstagram(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const appId = Deno.env.get("META_APP_ID")!;
   const appSecret = Deno.env.get("META_APP_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch(
     `https://graph.facebook.com/v25.0/oauth/access_token?` +
@@ -551,7 +551,7 @@ async function handleTikTok(supabase: any, authCode: string, connectionId: strin
   const clientKey = Deno.env.get("TIKTOK_APP_ID")!;
   const clientSecret = Deno.env.get("TIKTOK_APP_SECRET")!;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   // Login Kit v2 token exchange
   const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
@@ -698,7 +698,7 @@ async function handleTikTokAds(supabase: any, authCode: string, connectionId: st
 async function handleLinkedIn(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("LINKEDIN_CLIENT_ID")!;
   const clientSecret = Deno.env.get("LINKEDIN_CLIENT_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
     method: "POST",
@@ -813,7 +813,7 @@ async function handleLinkedIn(supabase: any, code: string, connectionId: string,
 async function handleLinkedInAds(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("LINKEDIN_ADS_CLIENT_ID")!;
   const clientSecret = Deno.env.get("LINKEDIN_ADS_CLIENT_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
     method: "POST",
@@ -887,7 +887,7 @@ async function handleLinkedInAds(supabase: any, code: string, connectionId: stri
 async function handleGoogleSearchConsole(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
   const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -940,7 +940,7 @@ async function handleGoogleSearchConsole(supabase: any, code: string, connection
 async function handleGoogleAnalytics(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
   const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -1018,7 +1018,7 @@ async function handleGoogleAnalytics(supabase: any, code: string, connectionId: 
 async function handleGoogleBusinessProfile(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
   const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -1111,7 +1111,7 @@ async function handleGoogleBusinessProfile(supabase: any, code: string, connecti
 async function handleYouTube(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
   const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -1180,7 +1180,7 @@ async function handleYouTube(supabase: any, code: string, connectionId: string, 
 async function handlePinterest(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const appId = Deno.env.get("PINTEREST_APP_ID")!;
   const appSecret = Deno.env.get("PINTEREST_APP_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/callback`;
+  const redirectUri = `https://amwreports.com/auth/callback`;
   const basicAuth = btoa(`${appId}:${appSecret}`);
 
   const tokenRes = await fetch("https://api.pinterest.com/v5/oauth/token", {
@@ -1243,7 +1243,7 @@ async function handlePinterest(supabase: any, code: string, connectionId: string
 async function handleThreads(supabase: any, code: string, connectionId: string, supabaseUrl: string) {
   const appId = Deno.env.get("THREADS_APP_ID")!;
   const appSecret = Deno.env.get("THREADS_APP_SECRET")!;
-  const redirectUri = `https://reports.amwmedia.co.uk/auth/threads/callback`;
+  const redirectUri = `https://amwreports.com/auth/threads/callback`;
 
   // Exchange code for short-lived token
   const tokenRes = await fetch("https://graph.threads.net/oauth/access_token", {
