@@ -1,14 +1,22 @@
 
-Replace the current broken/diagnostic views fetch block in `supabase/functions/sync-facebook-page/index.ts` with the documented organic reach fetch using `page_posts_impressions_organic_unique`, and remove all debug/diagnostic logs added during this session.
+Switch Facebook organic views from the deprecated `page_posts_impressions_organic_unique` to `page_media_view` with the `is_from_ads` breakdown, and display `total - is_from_ads=true = organic` as Views.
 
 **Plan:**
-1. In `supabase/functions/sync-facebook-page/index.ts`:
-   - Remove the temporary `ORGANIC DIAGNOSTIC` block (added after `pageToken` decryption).
-   - Remove any remaining `VIEWS DEBUG` / `REACH DEBUG` console.logs from prior debugging.
-   - Replace the current views fetch block (the `page_views_total` / `page_views_total_paid` block that returns 0) with the new `page_posts_impressions_organic_unique` fetch exactly as specified — using max daily value as the monthly organic reach approximation, setting `totalViews` and `coreInsightsFetched = true`.
-2. Redeploy `sync-facebook-page`.
-3. User manually triggers April 2026 resync for the AMW Media Facebook connection; I then pull logs to confirm `Organic reach for <pageId>: <value>` is non-zero and close to the expected ~1,026.
+1. In `supabase/functions/sync-facebook-page/index.ts`, replace the current organic reach fetch block with:
+   - Endpoint: `GET {GRAPH_BASE}/{pageId}/insights?metric=page_media_view&breakdown=is_from_ads&period=day&since={startDate}&until={endDate}&access_token={pageToken}`
+   - Sum daily `value` entries to get `totalMediaViews`.
+   - Sum daily `value` entries where the `is_from_ads` breakdown key === `true` (or `"1"`) to get `paidMediaViews`.
+   - `organicMediaViews = Math.max(0, totalMediaViews - paidMediaViews)`.
+   - Assign `totalViews = organicMediaViews` and set `coreInsightsFetched = true`.
+   - Log a single concise line: `Facebook organic views for {pageId}: total={x} paid={y} organic={z}` for verification, then plan to remove after confirmation.
+   - Handle non-OK responses with a single `console.error` containing status + truncated body.
+2. Leave all other logic (posts loop, video metrics, storage shape) untouched.
+3. Redeploy `sync-facebook-page`.
+4. User triggers an April 2026 resync for AMW Media; I pull logs to confirm the organic value is sensible (and matches Meta Business Suite's "From organic"). Once confirmed, remove the temporary log and update `mem://integrations/facebook-data-logic` to record:
+   - Source: `page_media_view` with `is_from_ads` breakdown
+   - Formula: `total - paid = organic`
+   - Reason: `page_posts_impressions_organic_unique` deprecated 2025-06-15
 
 **Notes:**
-- No other logic, no DB or frontend changes.
-- Memory `mem://integrations/facebook-data-logic` should be updated after verification to reflect the new organic-reach source (single metric, max-daily approximation), but only once logs confirm the fix.
+- No DB or frontend changes — only the sync function.
+- Exact response shape for the `is_from_ads` breakdown key (`true` vs `"1"`) will be validated from the live April 2026 response; the code will defensively handle both.
