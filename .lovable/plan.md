@@ -1,50 +1,61 @@
 
-User wants to add a race-condition guard to the bulk-claim step. PostgREST `.update().in().eq("status","pending")` is atomic per-row at the DB level — only rows still pending will be updated. Then re-fetch to confirm what we actually claimed.
+The sync is still showing because there are stale `sync_jobs` rows (status `pending` or `processing`) for client `c2b194b6-3b2c-4f5a-9f00-95e13ca28027`. The progress bar shows whenever any such row exists. The user wants a **clean restart**.
 
-## Updated plan for `supabase/functions/process-sync-queue/index.ts`
+## Plan (3 SQL ops + 1 function ping, no code changes)
 
-### Constants
-- `MAX_JOBS_PER_INVOCATION = 20`
-- `PARALLEL_BATCH_SIZE = 5`
+All run via the insert tool (data ops, not migrations). All scoped to this one client.
 
-### Flow
-1. **Stale-job reset** (unchanged) — reset `processing` jobs older than 10 min back to `pending`.
+### Step 1 — Inspect (read-only) what's actually in the queue
+```sql
+SELECT id, platform, status, started_at, current_month, current_year,
+       progress_completed, progress_total, error_message, created_at
+FROM sync_jobs
+WHERE client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'
+  AND status IN ('pending','processing')
+ORDER BY created_at;
+```
+This confirms what's stuck before we touch anything.
 
-2. **Fetch up to 20 pending jobs** (priority desc, created_at asc).
+### Step 2 — Mark all stuck rows for this client as failed
+```sql
+UPDATE sync_jobs
+SET status = 'failed',
+    completed_at = now(),
+    error_message = 'Manual clean restart by user'
+WHERE client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'
+  AND status IN ('pending','processing');
+```
+This immediately clears the "Sync in progress" bar (the realtime subscription on `sync_jobs` will refresh `useSyncJobs`).
 
-3. **Atomic bulk claim with status guard:**
-   ```ts
-   const claimTimestamp = new Date().toISOString();
-   await supabase
-     .from("sync_jobs")
-     .update({ status: "processing", started_at: claimTimestamp })
-     .in("id", jobIds)
-     .eq("status", "pending");
-   ```
-   The `.eq("status","pending")` filter ensures another concurrent invocation that already grabbed a job (flipping it to `processing`) cannot have its row overwritten.
+### Step 3 — Enqueue a fresh sync for every fully-connected platform
+Plan slug determines history depth (Agency=24, else 12). Reusing the same logic the UI uses, server-side:
+```sql
+INSERT INTO sync_jobs (connection_id, client_id, org_id, platform, months, priority)
+SELECT pc.id,
+       pc.client_id,
+       c.org_id,
+       pc.platform,
+       CASE WHEN sp.slug = 'agency' THEN 24 ELSE 12 END,
+       1
+FROM platform_connections pc
+JOIN clients c ON c.id = pc.client_id
+LEFT JOIN org_subscriptions os ON os.org_id = c.org_id AND os.status = 'active'
+LEFT JOIN subscription_plans sp ON sp.id = os.plan_id
+WHERE pc.client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'
+  AND pc.is_connected = true
+  AND pc.account_id IS NOT NULL;
+```
 
-4. **Re-fetch confirmed claims:**
-   ```ts
-   const { data: claimedJobs } = await supabase
-     .from("sync_jobs")
-     .select("*")
-     .in("id", jobIds)
-     .eq("status", "processing")
-     .gte("started_at", new Date(Date.now() - 5000).toISOString());
-   ```
-   Only these rows are ours. Discard any in the original fetch that weren't returned here (another invocation claimed them).
+### Step 4 — Kick the queue processor
+Call `process-sync-queue` once via `supabase--curl_edge_functions` (POST). The function will claim the new pending jobs and start running them. Realtime will then update the progress bar with real progress.
 
-5. **Process in parallel batches of 5** via `Promise.allSettled(batch.map(j => processJob(j, supabase)))`.
+### Step 5 — Verify
+- Re-run the SELECT from Step 1 → expect rows with `status='processing'` and progressing `progress_completed`.
+- Tail `process-sync-queue` logs to confirm it started.
 
-6. **`processJob(job, supabase)`** — extracted helper containing the existing per-job logic (connection check, platform fn lookup, months range, missing-month filter, sequential per-month invoke loop with progress updates, final status write). Per-month delay (`DELAY_BETWEEN_MONTHS_MS`) preserved inside a single job.
+## Out of scope
+- No code changes. The recently-deployed parallel queue (20 jobs / batches of 5 / atomic claim with re-fetch) stays as-is.
+- Not enabling a watchdog cron in this turn (separate decision the user previously deferred).
 
-7. **Self-continuation** — count remaining `pending` rows; fire-and-forget invoke `process-sync-queue` if any remain.
-
-### Out of scope
-- No changes to `useSyncJobs`, sync function logic, watchdog cron, or any other file.
-
-### Risk
-- **Low.** The `.eq("status","pending")` guard makes the claim safely idempotent across concurrent invocations. Re-fetch with 5s window confirms ownership. Worst case: an invocation claims 0 jobs and exits cleanly.
-
-### Deploy
-Redeploy `process-sync-queue` via `supabase--deploy_edge_functions`.
+## Risk
+- **Low.** Failing the existing rows is non-destructive (no snapshots are deleted; previously-synced months remain). The new jobs will skip already-synced months for backfill priority logic — but since these are priority 1 (treated as fresh sync, not backfill), they will re-sync the latest month plus walk the history. If you'd rather *only* requeue the previously-stuck Facebook job rather than all 13+ platforms, say so before approval and I'll narrow Step 3.
