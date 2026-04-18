@@ -1,77 +1,77 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://reports.amwmedia.co.uk/</loc>
+    <loc>https://amwreports.com/</loc>
     <priority>1.0</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/features</loc>
+    <loc>https://amwreports.com/features</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/pricing</loc>
+    <loc>https://amwreports.com/pricing</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/integrations</loc>
+    <loc>https://amwreports.com/integrations</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/social-media-reporting</loc>
+    <loc>https://amwreports.com/social-media-reporting</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/seo-reporting</loc>
+    <loc>https://amwreports.com/seo-reporting</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/ppc-reporting</loc>
+    <loc>https://amwreports.com/ppc-reporting</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/white-label-reports</loc>
+    <loc>https://amwreports.com/white-label-reports</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/for-agencies</loc>
+    <loc>https://amwreports.com/for-agencies</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/for-freelancers</loc>
+    <loc>https://amwreports.com/for-freelancers</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/for-smbs</loc>
+    <loc>https://amwreports.com/for-smbs</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/for-creators</loc>
+    <loc>https://amwreports.com/for-creators</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/how-it-works</loc>
+    <loc>https://amwreports.com/how-it-works</loc>
     <priority>0.6</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/about</loc>
+    <loc>https://amwreports.com/about</loc>
     <priority>0.6</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://reports.amwmedia.co.uk/login</loc>
+    <loc>https://amwreports.com/login</loc>
     <priority>0.5</priority>
     <changefreq>monthly</changefreq>
   </url>

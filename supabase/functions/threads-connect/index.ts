@@ -50,13 +50,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    const redirectUri = `https://reports.amwmedia.co.uk/auth/threads/callback`;
+    const redirectUri = `https://amwreports.com/auth/threads/callback`;
 
     const state = btoa(
       JSON.stringify({
         connection_id,
         platform: "threads",
-        redirect_url: redirect_url || "https://reports.amwmedia.co.uk",
+        redirect_url: redirect_url || "https://amwreports.com",
       })
     );
 
