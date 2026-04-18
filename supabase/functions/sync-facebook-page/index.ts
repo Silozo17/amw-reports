@@ -262,6 +262,45 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
+      // TEMPORARY DIAGNOSTIC - REMOVE AFTER
+      try {
+        const testMetrics = [
+          "page_impressions_organic_unique",
+          "page_impressions_organic",
+          "page_impressions_by_paid_non_paid_unique",
+          "page_impressions_by_paid_non_paid",
+          "page_video_views_organic",
+          "page_video_views_paid",
+          "page_content_activity_by_action_type_unique",
+          "page_posts_impressions_organic_unique",
+          "page_posts_impressions_paid_unique",
+          "page_posts_impressions_organic",
+          "page_posts_impressions_paid"
+        ].join(",");
+        const testUrl = `${GRAPH_BASE}/${pageId}/insights` +
+          `?metric=${testMetrics}` +
+          `&period=day` +
+          `&since=${startDate}&until=${endDate}` +
+          `&access_token=${pageToken}`;
+
+        const testRes = await fetchWithTimeout(testUrl);
+        const testBody = await testRes.json();
+
+        console.log("ORGANIC DIAGNOSTIC:", JSON.stringify({
+          status: testRes.status,
+          metrics: testBody.data?.map((d: any) => ({
+            name: d.name,
+            total: (d.values || []).reduce(
+              (s: number, v: any) => s + Number(v?.value || 0), 0
+            )
+          })),
+          error: testBody.error
+        }));
+      } catch (e) {
+        console.log("DIAGNOSTIC ERROR:", e.message);
+      }
+      // END DIAGNOSTIC
+
       // ── Fetch organic views = views_all - views_paid ──
       try {
         const viewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_views_total,page_views_total_paid&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
