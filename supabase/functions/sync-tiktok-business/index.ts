@@ -215,6 +215,20 @@ Deno.serve(async (req) => {
     await fetchWithRetry();
     console.log(`Found ${allVideos.length} TikTok videos for ${year}-${month}`);
 
+    // Fetch follower count (non-blocking — follow YouTube flexibility pattern)
+    let totalFollowers = 0;
+    try {
+      const userInfoRes = await fetch("https://open.tiktokapis.com/v2/user/info/?fields=follower_count", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfoData = await userInfoRes.json();
+      totalFollowers = Number(userInfoData?.data?.user?.follower_count ?? 0);
+      console.log(`TikTok follower_count: ${totalFollowers}`);
+    } catch (followerErr) {
+      console.warn("TikTok follower_count fetch failed (non-blocking):", followerErr instanceof Error ? followerErr.message : followerErr);
+    }
+
     // Aggregate metrics
     let totalViews = 0;
     let totalLikes = 0;

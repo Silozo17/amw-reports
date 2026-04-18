@@ -27,7 +27,17 @@ export function computeKpis(
   const totalReach = filtered.reduce((sum, s) => { const m = s.metrics_data; if (s.platform === 'facebook') return sum + (m.views || 0); return sum + (m.reach || m.impressions || m.search_impressions || m.views || m.gbp_views || 0); }, 0);
   const totalClicks = filtered.reduce((sum, s) => { const m = s.metrics_data; return sum + (m.clicks || 0) + (m.search_clicks || 0) + (m.post_clicks || 0); }, 0);
   const totalEngagement = filtered.reduce((sum, s) => { const m = s.metrics_data; return m.engagement ? sum + m.engagement : sum + (m.likes || 0) + (m.comments || 0) + (m.shares || 0); }, 0);
-  const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
+  // Sum followers across platforms: for each platform pick the latest snapshot with total_followers > 0, then sum.
+  const latestFollowersByPlatform = new Map<PlatformType, { value: number; year: number; month: number }>();
+  for (const s of filtered) {
+    const v = s.metrics_data.total_followers || 0;
+    if (v <= 0) continue;
+    const existing = latestFollowersByPlatform.get(s.platform);
+    if (!existing || s.report_year > existing.year || (s.report_year === existing.year && s.report_month > existing.month)) {
+      latestFollowersByPlatform.set(s.platform, { value: v, year: s.report_year, month: s.report_month });
+    }
+  }
+  const totalFollowers = Array.from(latestFollowersByPlatform.values()).reduce((sum, e) => sum + e.value, 0);
   const totalSessions = filtered.reduce((sum, s) => sum + (s.metrics_data.sessions || 0), 0);
   const totalVideoViews = filtered.reduce((sum, s) => { if (s.platform === 'meta_ads') return sum; if (s.platform === 'facebook') return sum + (s.metrics_data.views || 0); return sum + (s.metrics_data.video_views || 0); }, 0);
   const totalConversions = filtered.reduce((sum, s) => sum + (s.metrics_data.conversions || 0), 0);
