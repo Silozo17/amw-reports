@@ -501,6 +501,66 @@ Deno.serve(async (req) => {
       const postIds = postEntries.map(p => p.id);
       const postMap = new Map(postEntries.map(p => [p.id, p]));
 
+      // ══════════════════════════════════════════════════════════════════
+      // POST DIAGNOSTIC MODE — probe first 3 posts only (read-only)
+      // ══════════════════════════════════════════════════════════════════
+      try {
+        const sampleIds = postIds.slice(0, 3);
+        if (sampleIds.length > 0) {
+          const probePost = async (label: string, metrics: string[], extraQS = "") => {
+            const url = `${GRAPH_BASE}/?ids=${sampleIds.join(",")}&fields=insights.metric(${metrics.join(",")})${extraQS}&access_token=${pageToken}`;
+            try {
+              const res = await fetchWithTimeout(url);
+              if (!res.ok) {
+                const body = await res.text();
+                console.log(JSON.stringify({ diag: "post_batch", label, status: res.status, error: body.slice(0, 500) }));
+                return;
+              }
+              const data = await res.json();
+              const summary: Record<string, any> = {};
+              for (const pid of sampleIds) {
+                const insights = data[pid]?.insights?.data || [];
+                summary[pid] = insights.map((i: any) => ({
+                  name: i.name,
+                  total: (i.values || []).reduce((s: number, v: any) => s + (Number(v?.value) || 0), 0),
+                  firstValue: i.values?.[0] ?? null,
+                }));
+              }
+              console.log(JSON.stringify({ diag: "post_batch", label, status: res.status, summary }));
+              if (extraQS.includes("breakdown")) {
+                const firstPid = sampleIds[0];
+                const firstInsights = data[firstPid]?.insights?.data || [];
+                console.log(JSON.stringify({
+                  diag: "post_breakdown_sample",
+                  label,
+                  postId: firstPid,
+                  rawInsights: JSON.stringify(firstInsights).slice(0, 2000),
+                }));
+              }
+            } catch (e) {
+              console.log(JSON.stringify({ diag: "post_batch_exception", label, error: e instanceof Error ? e.message : String(e) }));
+            }
+          };
+
+          await probePost("post_views", ["post_total_media_view_unique", "post_media_view"]);
+          await probePost("post_impressions", [
+            "post_impressions", "post_impressions_paid", "post_impressions_organic",
+            "post_impressions_unique", "post_impressions_paid_unique", "post_impressions_organic_unique",
+          ]);
+          await probePost("post_video", [
+            "post_video_views", "post_video_views_paid", "post_video_views_organic",
+          ]);
+          await probePost("post_engagement", ["post_clicks_by_type", "post_reactions_by_type_total"]);
+          await probePost("post_media_view_breakdown_ads", ["post_media_view"], ".breakdown(is_from_ads)");
+          await probePost("post_media_view_breakdown_followers", ["post_media_view"], ".breakdown(is_from_followers)");
+        }
+      } catch (e) {
+        console.log(JSON.stringify({ diag: "post_outer_exception", error: e instanceof Error ? e.message : String(e) }));
+      }
+      // ══════════════════════════════════════════════════════════════════
+      // END POST DIAGNOSTIC MODE
+      // ══════════════════════════════════════════════════════════════════
+
       for (let i = 0; i < postIds.length; i += BATCH_SIZE) {
         if (isNearTimeout()) {
           console.warn(`Approaching timeout at batch ${i}/${postIds.length}, saving partial data.`);
