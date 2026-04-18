@@ -315,33 +315,23 @@ Deno.serve(async (req) => {
           }
         };
 
-        // Group A: media/view
+        // Group A: media/view (working)
         await probePageBatch("media_view", ["page_media_view", "page_total_media_view_unique", "page_views_total"]);
-        // Group B: impressions/reach
-        await probePageBatch("impressions", [
-          "page_impressions", "page_impressions_paid", "page_impressions_unique", "page_impressions_paid_unique",
-          "page_impressions_nonviral", "page_impressions_nonviral_unique",
-        ]);
-        // Group C: post distribution at page level
+        // Group C: post distribution (page_posts_impressions_paid is our paid signal)
         await probePageBatch("post_distribution", [
-          "page_posts_impressions", "page_posts_impressions_paid", "page_posts_impressions_unique",
-          "page_posts_impressions_paid_unique", "page_posts_impressions_organic_unique",
-          "page_posts_impressions_nonviral", "page_posts_impressions_nonviral_unique",
+          "page_posts_impressions_paid",
+          "page_posts_impressions_paid_unique",
         ]);
-        // Group D: video
+        // Group D: video (working)
         await probePageBatch("video", [
-          "page_video_views", "page_video_views_paid", "page_video_views_organic",
-          "page_video_views_by_paid_non_paid", "page_video_complete_views_30s",
-          "page_video_complete_views_30s_paid", "page_video_complete_views_30s_organic",
-          "page_video_views_unique",
+          "page_video_views", "page_video_views_paid",
+          "page_video_complete_views_30s", "page_video_views_unique",
         ]);
-        // Group E: followers/fans
-        await probePageBatch("followers", [
-          "page_follows", "page_fans", "page_fan_adds", "page_fan_adds_unique", "page_fan_removes",
-        ]);
-        // Group F: breakdown probes
-        await probePageBatch("media_view_breakdown_ads", ["page_media_view"], "&breakdown=is_from_ads");
-        await probePageBatch("media_view_breakdown_followers", ["page_media_view"], "&breakdown=is_from_followers");
+        // Removed (June 15, 2025 deprecations / confirmed-zero):
+        //   page_impressions*, page_fans, page_fan_adds*, page_fan_removes,
+        //   page_follows, page_daily_follows*, page_video_views_organic,
+        //   page_posts_impressions / _unique / _organic_unique / _nonviral*,
+        //   is_from_ads + is_from_followers breakdowns (paid bucket always 0).
 
         console.log(JSON.stringify({
           diag: "page_summary",
@@ -360,34 +350,26 @@ Deno.serve(async (req) => {
       // END DIAGNOSTIC MODE
       // ══════════════════════════════════════════════════════════════════
 
-      // ── Fetch organic views: page_media_view with is_from_ads breakdown ──
-      // page_posts_impressions_organic_unique was deprecated 2025-06-15.
-      // page_media_view returns total content views; subtract paid (is_from_ads=true) to isolate organic.
+      // ── Fetch organic views: page_media_view (total) − page_posts_impressions_paid ──
+      // Audit (Meta v25 docs) confirmed: is_from_ads breakdown on page_media_view returns 0
+      // because media views and ad impressions are different surfaces. Instead, subtract
+      // page_posts_impressions_paid (the reliable paid signal) from total media views.
+      // Floor at 0 defensively in case paid > total in edge cases.
       try {
         const viewsUrl = `${GRAPH_BASE}/${pageId}/insights` +
-          `?metric=page_media_view` +
-          `&breakdown=is_from_ads` +
+          `?metric=page_media_view,page_posts_impressions_paid` +
           `&period=day` +
           `&since=${startDate}&until=${endDate}` +
           `&access_token=${pageToken}`;
         const viewsRes = await fetchWithTimeout(viewsUrl);
         if (viewsRes.ok) {
           const viewsBody = await viewsRes.json();
-          const metric = viewsBody.data?.find((d: any) => d.name === "page_media_view");
-          let totalMediaViews = 0;
-          let paidMediaViews = 0;
-          for (const v of metric?.values || []) {
-            const n = Number(v?.value || 0);
-            totalMediaViews += n;
-            const breakdownKey = v?.breakdown?.is_from_ads ?? v?.dimension_values?.[0];
-            if (breakdownKey === true || breakdownKey === "true" || breakdownKey === "1" || breakdownKey === 1) {
-              paidMediaViews += n;
-            }
-          }
-          const organicMediaViews = Math.max(0, totalMediaViews - paidMediaViews);
-          totalViews = organicMediaViews;
+          const totalMediaViews = sumDailyValues(viewsBody.data || [], "page_media_view");
+          const paidPostImpressions = sumDailyValues(viewsBody.data || [], "page_posts_impressions_paid");
+          const organicViews = Math.max(0, totalMediaViews - paidPostImpressions);
+          totalViews = organicViews;
           coreInsightsFetched = true;
-          console.log(`Facebook organic views for ${pageId}: total=${totalMediaViews} paid=${paidMediaViews} organic=${organicMediaViews}`);
+          console.log(`Facebook organic views for ${pageId}: total_media_view=${totalMediaViews} paid_post_impressions=${paidPostImpressions} organic=${organicViews}`);
         } else {
           const errBody = await viewsRes.text();
           console.error(`page_media_view fetch failed (${viewsRes.status}):`, errBody.slice(0, 300));
