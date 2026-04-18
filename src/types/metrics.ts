@@ -20,7 +20,7 @@ export const METRIC_EXPLANATIONS: Record<string, string> = {
   frequency: 'Average number of times each person saw your ad',
   search_impression_share: 'Percentage of available search impressions you captured',
   leads: 'Number of potential customers who submitted their details',
-  total_followers: 'Current total number of followers on this platform',
+  total_followers: 'Combined total followers across all connected social accounts (Instagram, Facebook, LinkedIn, TikTok, YouTube, Threads, Pinterest).',
   follower_growth: 'New followers gained during this period',
   follower_removes: 'People who unfollowed during this period',
   audience_growth_rate: 'Percentage growth of your audience',
