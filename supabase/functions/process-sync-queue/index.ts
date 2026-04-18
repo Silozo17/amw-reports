@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +26,10 @@ const SYNC_FUNCTION_MAP: Record<string, string> = {
 };
 
 const DELAY_BETWEEN_MONTHS_MS = 1_500;
-const MAX_JOBS_PER_INVOCATION = 25;
+const MAX_JOBS_PER_INVOCATION = 20;
+const PARALLEL_BATCH_SIZE = 5;
+const CLAIM_WINDOW_MS = 5_000;
+const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000;
 
 const PLATFORM_MAX_MONTHS: Record<string, number> = {
   pinterest: 3,
@@ -46,6 +49,167 @@ function getMonthsRange(count: number): Array<{ month: number; year: number }> {
   return result;
 }
 
+interface SyncJob {
+  id: string;
+  connection_id: string;
+  client_id: string;
+  org_id: string;
+  platform: string;
+  months: number;
+  priority: number;
+  force_resync: boolean;
+  target_months: Array<{ month: number; year: number }> | null;
+}
+
+async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void> {
+  console.log(
+    `Processing job ${job.id}: ${job.platform} for connection ${job.connection_id} (force_resync=${job.force_resync ?? false})`
+  );
+
+  // Verify connection is still active
+  const { data: conn } = await supabase
+    .from("platform_connections")
+    .select("id, platform, client_id, is_connected, account_id")
+    .eq("id", job.connection_id)
+    .maybeSingle();
+
+  if (!conn || !conn.is_connected || !conn.account_id) {
+    await supabase
+      .from("sync_jobs")
+      .update({
+        status: "failed",
+        error_message: "Connection is no longer active",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    return;
+  }
+
+  const fnName = SYNC_FUNCTION_MAP[job.platform];
+  if (!fnName) {
+    await supabase
+      .from("sync_jobs")
+      .update({
+        status: "failed",
+        error_message: `Unsupported platform: ${job.platform}`,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    return;
+  }
+
+  // Determine months to sync: use target_months if provided, otherwise calculate from months count
+  let monthsRange: Array<{ month: number; year: number }>;
+
+  if (job.target_months && Array.isArray(job.target_months) && job.target_months.length > 0) {
+    monthsRange = job.target_months;
+    const maxMonths = PLATFORM_MAX_MONTHS[job.platform];
+    if (maxMonths && monthsRange.length > maxMonths) {
+      monthsRange = monthsRange.slice(0, maxMonths);
+    }
+  } else {
+    const cappedMonths = Math.min(
+      job.months,
+      PLATFORM_MAX_MONTHS[job.platform] ?? job.months
+    );
+    monthsRange = getMonthsRange(cappedMonths);
+  }
+
+  // Filter out existing snapshots ONLY for backfill jobs (priority 0 or large month ranges)
+  // Daily/weekly jobs (1-2 target months) must always re-sync to get updated data
+  const isBackfillJob = job.priority === 0 || (!job.target_months && job.months > 2);
+  let missingMonths = monthsRange;
+
+  if (!job.force_resync && isBackfillJob) {
+    const { data: existingSnapshots } = await supabase
+      .from("monthly_snapshots")
+      .select("report_month, report_year")
+      .eq("client_id", conn.client_id)
+      .eq("platform", job.platform);
+
+    const existingSet = new Set(
+      (existingSnapshots || []).map(
+        (s: { report_month: number; report_year: number }) =>
+          `${s.report_month}-${s.report_year}`
+      )
+    );
+
+    missingMonths = monthsRange.filter(
+      ({ month, year }) => !existingSet.has(`${month}-${year}`)
+    );
+  }
+
+  const totalToSync = missingMonths.length;
+
+  await supabase
+    .from("sync_jobs")
+    .update({ progress_total: totalToSync })
+    .eq("id", job.id);
+
+  let completed = 0;
+  let lastError: string | null = null;
+  let failCount = 0;
+
+  for (const { month, year } of missingMonths) {
+    await supabase
+      .from("sync_jobs")
+      .update({
+        current_month: month,
+        current_year: year,
+        progress_completed: completed,
+      })
+      .eq("id", job.id);
+
+    try {
+      const { data, error } = await supabase.functions.invoke(fnName, {
+        body: { connection_id: job.connection_id, month, year },
+      });
+
+      if (error) {
+        lastError = error.message;
+        failCount++;
+        console.error(`Failed ${job.platform} ${month}/${year}: ${error.message}`);
+      } else if (data?.error) {
+        lastError = data.error;
+        failCount++;
+        console.error(`Failed ${job.platform} ${month}/${year}: ${data.error}`);
+      }
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : "Unknown error";
+      failCount++;
+    }
+
+    completed++;
+
+    await supabase
+      .from("sync_jobs")
+      .update({ progress_completed: completed })
+      .eq("id", job.id);
+
+    if (completed < totalToSync) {
+      await sleep(DELAY_BETWEEN_MONTHS_MS);
+    }
+  }
+
+  const finalStatus = failCount === totalToSync && totalToSync > 0 ? "failed" : "completed";
+  await supabase
+    .from("sync_jobs")
+    .update({
+      status: finalStatus,
+      progress_completed: completed,
+      completed_at: new Date().toISOString(),
+      error_message:
+        failCount > 0
+          ? `${failCount}/${totalToSync} months failed. Last error: ${lastError}`
+          : null,
+    })
+    .eq("id", job.id);
+
+  console.log(
+    `Job ${job.id} ${finalStatus}: ${completed - failCount} synced, ${failCount} failed out of ${totalToSync}`
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -63,228 +227,98 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  let jobsProcessed = 0;
-
   try {
     // Reset stale processing jobs (stuck > 10 minutes)
-    const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const staleThreshold = new Date(Date.now() - STALE_JOB_THRESHOLD_MS).toISOString();
     await supabase
       .from("sync_jobs")
-      .update({ status: "pending", started_at: null, error_message: "Reset: previous attempt timed out" })
+      .update({
+        status: "pending",
+        started_at: null,
+        error_message: "Reset: previous attempt timed out",
+      })
       .eq("status", "processing")
       .lt("started_at", staleThreshold);
 
-    // Process jobs sequentially
-    while (jobsProcessed < MAX_JOBS_PER_INVOCATION) {
-      // Claim the next pending job using service role (bypasses RLS)
-      const { data: jobs, error: fetchErr } = await supabase
-        .from("sync_jobs")
-        .select("*")
-        .eq("status", "pending")
-        .order("priority", { ascending: false })
-        .order("created_at", { ascending: true })
-        .limit(1);
+    // Fetch up to MAX_JOBS_PER_INVOCATION pending jobs
+    const { data: candidateJobs, error: fetchErr } = await supabase
+      .from("sync_jobs")
+      .select("*")
+      .eq("status", "pending")
+      .order("priority", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(MAX_JOBS_PER_INVOCATION);
 
-      if (fetchErr) {
-        console.error("Failed to fetch jobs:", fetchErr);
-        break;
-      }
-
-      if (!jobs || jobs.length === 0) {
-        console.log("No pending jobs in queue");
-        break;
-      }
-
-      const job = jobs[0];
-
-      // Mark as processing
-      const { error: claimErr } = await supabase
-        .from("sync_jobs")
-        .update({
-          status: "processing",
-          started_at: new Date().toISOString(),
-        })
-        .eq("id", job.id)
-        .eq("status", "pending"); // Optimistic lock
-
-      if (claimErr) {
-        console.error("Failed to claim job:", claimErr);
-        break;
-      }
-
-      console.log(
-        `Processing job ${job.id}: ${job.platform} for connection ${job.connection_id} (force_resync=${job.force_resync ?? false})`
+    if (fetchErr) {
+      console.error("Failed to fetch jobs:", fetchErr);
+      return new Response(
+        JSON.stringify({ error: fetchErr.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
 
-      // Verify connection is still active
-      const { data: conn } = await supabase
-        .from("platform_connections")
-        .select("id, platform, client_id, is_connected, account_id")
-        .eq("id", job.connection_id)
-        .maybeSingle();
-
-      if (!conn || !conn.is_connected || !conn.account_id) {
-        await supabase
-          .from("sync_jobs")
-          .update({
-            status: "failed",
-            error_message: "Connection is no longer active",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", job.id);
-        jobsProcessed++;
-        continue;
-      }
-
-      const fnName = SYNC_FUNCTION_MAP[job.platform];
-      if (!fnName) {
-        await supabase
-          .from("sync_jobs")
-          .update({
-            status: "failed",
-            error_message: `Unsupported platform: ${job.platform}`,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", job.id);
-        jobsProcessed++;
-        continue;
-      }
-
-      // Determine months to sync: use target_months if provided, otherwise calculate from months count
-      let monthsRange: Array<{ month: number; year: number }>;
-
-      if (job.target_months && Array.isArray(job.target_months) && job.target_months.length > 0) {
-        monthsRange = job.target_months as Array<{ month: number; year: number }>;
-        // Apply platform cap
-        const maxMonths = PLATFORM_MAX_MONTHS[job.platform];
-        if (maxMonths && monthsRange.length > maxMonths) {
-          monthsRange = monthsRange.slice(0, maxMonths);
-        }
-      } else {
-        const cappedMonths = Math.min(
-          job.months,
-          PLATFORM_MAX_MONTHS[job.platform] ?? job.months
-        );
-        monthsRange = getMonthsRange(cappedMonths);
-      }
-
-      // Filter out existing snapshots unless force_resync is enabled
-      // Filter out existing snapshots ONLY for backfill jobs (priority 0 or large month ranges)
-      // Daily/weekly jobs (1-2 target months) must always re-sync to get updated data
-      const isBackfillJob = job.priority === 0 || (!job.target_months && job.months > 2);
-      let missingMonths = monthsRange;
-
-      if (!job.force_resync && isBackfillJob) {
-        const { data: existingSnapshots } = await supabase
-          .from("monthly_snapshots")
-          .select("report_month, report_year")
-          .eq("client_id", conn.client_id)
-          .eq("platform", job.platform);
-
-        const existingSet = new Set(
-          (existingSnapshots || []).map(
-            (s: { report_month: number; report_year: number }) =>
-              `${s.report_month}-${s.report_year}`
-          )
-        );
-
-        missingMonths = monthsRange.filter(
-          ({ month, year }) => !existingSet.has(`${month}-${year}`)
-        );
-      }
-
-      const totalToSync = missingMonths.length;
-
-      // Update progress_total
-      await supabase
-        .from("sync_jobs")
-        .update({ progress_total: totalToSync })
-        .eq("id", job.id);
-
-      let completed = 0;
-      let lastError: string | null = null;
-      let failCount = 0;
-
-      for (const { month, year } of missingMonths) {
-        // Update current month/year
-        await supabase
-          .from("sync_jobs")
-          .update({
-            current_month: month,
-            current_year: year,
-            progress_completed: completed,
-          })
-          .eq("id", job.id);
-
-        try {
-          const { data, error } = await supabase.functions.invoke(fnName, {
-            body: { connection_id: job.connection_id, month, year },
-          });
-
-          if (error) {
-            lastError = error.message;
-            failCount++;
-            console.error(
-              `Failed ${job.platform} ${month}/${year}: ${error.message}`
-            );
-          } else if (data?.error) {
-            lastError = data.error;
-            failCount++;
-            console.error(
-              `Failed ${job.platform} ${month}/${year}: ${data.error}`
-            );
-          }
-        } catch (e) {
-          lastError =
-            e instanceof Error ? e.message : "Unknown error";
-          failCount++;
-        }
-
-        completed++;
-
-        // Update progress
-        await supabase
-          .from("sync_jobs")
-          .update({ progress_completed: completed })
-          .eq("id", job.id);
-
-        // Delay between months
-        if (completed < totalToSync) {
-          await sleep(DELAY_BETWEEN_MONTHS_MS);
-        }
-      }
-
-      // Mark complete
-      const finalStatus = failCount === totalToSync && totalToSync > 0 ? "failed" : "completed";
-      await supabase
-        .from("sync_jobs")
-        .update({
-          status: finalStatus,
-          progress_completed: completed,
-          completed_at: new Date().toISOString(),
-          error_message:
-            failCount > 0
-              ? `${failCount}/${totalToSync} months failed. Last error: ${lastError}`
-              : null,
-        })
-        .eq("id", job.id);
-
-      console.log(
-        `Job ${job.id} ${finalStatus}: ${completed - failCount} synced, ${failCount} failed out of ${totalToSync}`
+    if (!candidateJobs || candidateJobs.length === 0) {
+      console.log("No pending jobs in queue");
+      return new Response(
+        JSON.stringify({ message: "No pending jobs", jobs_processed: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
 
-      jobsProcessed++;
+    const jobIds = candidateJobs.map((j) => j.id);
+    const claimTimestamp = new Date().toISOString();
+    const claimWindowStart = new Date(Date.now() - CLAIM_WINDOW_MS).toISOString();
+
+    // Atomic bulk claim with status guard — only rows still 'pending' get flipped
+    const { error: claimErr } = await supabase
+      .from("sync_jobs")
+      .update({ status: "processing", started_at: claimTimestamp })
+      .in("id", jobIds)
+      .eq("status", "pending");
+
+    if (claimErr) {
+      console.error("Failed to claim jobs:", claimErr);
+      return new Response(
+        JSON.stringify({ error: claimErr.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Re-fetch only the jobs we actually claimed (status=processing AND started_at within window)
+    const { data: claimedJobs, error: confirmErr } = await supabase
+      .from("sync_jobs")
+      .select("*")
+      .in("id", jobIds)
+      .eq("status", "processing")
+      .gte("started_at", claimWindowStart);
+
+    if (confirmErr) {
+      console.error("Failed to confirm claimed jobs:", confirmErr);
+      return new Response(
+        JSON.stringify({ error: confirmErr.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const ourJobs = (claimedJobs ?? []) as SyncJob[];
+    console.log(
+      `Claimed ${ourJobs.length}/${candidateJobs.length} candidate jobs (others taken by concurrent invocation)`
+    );
+
+    // Process in parallel batches
+    for (let i = 0; i < ourJobs.length; i += PARALLEL_BATCH_SIZE) {
+      const batch = ourJobs.slice(i, i + PARALLEL_BATCH_SIZE);
+      await Promise.allSettled(batch.map((job) => processJob(job, supabase)));
     }
 
     // Self-continuation: if there are still pending jobs, trigger another run
-    const { data: remaining } = await supabase
+    const { count } = await supabase
       .from("sync_jobs")
-      .select("id")
-      .eq("status", "pending")
-      .limit(1);
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
 
-    if (remaining && remaining.length > 0) {
-      console.log("More pending jobs remain — triggering continuation...");
+    if (count && count > 0) {
+      console.log(`${count} pending jobs remain — triggering continuation...`);
       fetch(`${supabaseUrl}/functions/v1/process-sync-queue`, {
         method: "POST",
         headers: {
@@ -296,17 +330,15 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: `Processed ${jobsProcessed} job(s)`,
-        jobs_processed: jobsProcessed,
+        message: `Processed ${ourJobs.length} job(s)`,
+        jobs_processed: ourJobs.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("Process sync queue error:", e);
     return new Response(
-      JSON.stringify({
-        error: e instanceof Error ? e.message : "Unknown error",
-      }),
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
