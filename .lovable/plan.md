@@ -1,12 +1,14 @@
 
-Add a temporary diagnostic block to `supabase/functions/sync-facebook-page/index.ts` to test which Facebook organic/paid insights metrics are actually valid for the AMW Media page in April 2026.
+Replace the current broken/diagnostic views fetch block in `supabase/functions/sync-facebook-page/index.ts` with the documented organic reach fetch using `page_posts_impressions_organic_unique`, and remove all debug/diagnostic logs added during this session.
 
 **Plan:**
-1. Locate the page loop in `sync-facebook-page/index.ts` and find the `pageToken` decryption line.
-2. Insert the provided diagnostic block immediately after that line — fetches 11 candidate organic/paid metrics with `period=day` and logs status, per-metric totals, and any error.
-3. Redeploy `sync-facebook-page`.
+1. In `supabase/functions/sync-facebook-page/index.ts`:
+   - Remove the temporary `ORGANIC DIAGNOSTIC` block (added after `pageToken` decryption).
+   - Remove any remaining `VIEWS DEBUG` / `REACH DEBUG` console.logs from prior debugging.
+   - Replace the current views fetch block (the `page_views_total` / `page_views_total_paid` block that returns 0) with the new `page_posts_impressions_organic_unique` fetch exactly as specified — using max daily value as the monthly organic reach approximation, setting `totalViews` and `coreInsightsFetched = true`.
+2. Redeploy `sync-facebook-page`.
+3. User manually triggers April 2026 resync for the AMW Media Facebook connection; I then pull logs to confirm `Organic reach for <pageId>: <value>` is non-zero and close to the expected ~1,026.
 
 **Notes:**
-- Diagnostic only — no production logic changes.
-- User will trigger the April 2026 resync manually after deploy, then I pull logs to identify which metrics Meta accepts and pick the correct organic/paid pair.
-- Block is clearly marked `TEMPORARY DIAGNOSTIC - REMOVE AFTER` for cleanup.
+- No other logic, no DB or frontend changes.
+- Memory `mem://integrations/facebook-data-logic` should be updated after verification to reflect the new organic-reach source (single metric, max-daily approximation), but only once logs confirm the fix.
