@@ -262,68 +262,36 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // TEMPORARY DIAGNOSTIC - REMOVE AFTER
+      // ── Fetch organic reach: page_posts_impressions_organic_unique ──
+      // Per Meta docs: unique people who saw posts via unpaid distribution.
+      // Daily values are rolling unique counts; summing overcounts.
+      // Use max daily value as best monthly approximation.
       try {
-        const testMetrics = [
-          "page_impressions_organic_unique",
-          "page_impressions_organic",
-          "page_impressions_by_paid_non_paid_unique",
-          "page_impressions_by_paid_non_paid",
-          "page_video_views_organic",
-          "page_video_views_paid",
-          "page_content_activity_by_action_type_unique",
-          "page_posts_impressions_organic_unique",
-          "page_posts_impressions_paid_unique",
-          "page_posts_impressions_organic",
-          "page_posts_impressions_paid"
-        ].join(",");
-        const testUrl = `${GRAPH_BASE}/${pageId}/insights` +
-          `?metric=${testMetrics}` +
+        const organicUrl = `${GRAPH_BASE}/${pageId}/insights` +
+          `?metric=page_posts_impressions_organic_unique` +
           `&period=day` +
           `&since=${startDate}&until=${endDate}` +
           `&access_token=${pageToken}`;
-
-        const testRes = await fetchWithTimeout(testUrl);
-        const testBody = await testRes.json();
-
-        console.log("ORGANIC DIAGNOSTIC:", JSON.stringify({
-          status: testRes.status,
-          metrics: testBody.data?.map((d: any) => ({
-            name: d.name,
-            total: (d.values || []).reduce(
-              (s: number, v: any) => s + Number(v?.value || 0), 0
-            )
-          })),
-          error: testBody.error
-        }));
-      } catch (e) {
-        console.log("DIAGNOSTIC ERROR:", e.message);
-      }
-      // END DIAGNOSTIC
-
-      // ── Fetch organic views = views_all - views_paid ──
-      try {
-        const viewsUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_views_total,page_views_total_paid&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
-        const viewsRes = await fetchWithTimeout(viewsUrl);
-        if (viewsRes.ok) {
-          const viewsBody = await viewsRes.json();
-          console.log("VIEWS DEBUG:", JSON.stringify(viewsBody).slice(0, 2000));
-          const sumValues = (name: string) => {
-            const series = viewsBody.data?.find((d: any) => d.name === name);
-            return (series?.values || []).reduce((s: number, v: any) => s + Number(v?.value || 0), 0);
-          };
-          const viewsAll = sumValues("page_views_total");
-          const viewsPaid = sumValues("page_views_total_paid");
-          const organicViews = Math.max(0, viewsAll - viewsPaid);
-          totalViews += organicViews;
-          coreInsightsFetched = true;
-          console.log(`Views for ${pageId}: all=${viewsAll}, paid=${viewsPaid}, organic=${organicViews}`);
+        const organicRes = await fetchWithTimeout(organicUrl);
+        if (organicRes.ok) {
+          const organicBody = await organicRes.json();
+          const metric = organicBody.data?.find(
+            (d: any) => d.name === "page_posts_impressions_organic_unique"
+          );
+          if (metric?.values) {
+            const values = metric.values.filter((v: any) => Number(v.value) > 0);
+            if (values.length > 0) {
+              totalViews = Math.max(...values.map((v: any) => Number(v.value)));
+            }
+            coreInsightsFetched = true;
+            console.log(`Organic reach for ${pageId}: ${totalViews}`);
+          }
         } else {
-          const errBody = await viewsRes.text();
-          console.error(`Views failed for ${pageId}:`, errBody);
+          const errBody = await organicRes.text();
+          console.error(`Organic reach failed (${organicRes.status}):`, errBody.slice(0, 300));
         }
       } catch (err) {
-        console.error(`Views fetch exception ${pageId}:`, err instanceof Error ? err.message : err);
+        console.error(`Organic reach exception:`, err instanceof Error ? err.message : err);
       }
 
       // ── Followers: first and last daily value for growth calculation ──
