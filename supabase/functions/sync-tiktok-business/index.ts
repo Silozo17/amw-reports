@@ -277,6 +277,7 @@ Deno.serve(async (req) => {
       engagement: totalEngagement,
       engagement_rate: engagementRate,
       posts_published: allVideos.length,
+      total_followers: totalFollowers,
     };
 
     // Upsert monthly snapshot
