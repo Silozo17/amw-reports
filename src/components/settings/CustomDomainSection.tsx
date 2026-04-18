@@ -89,12 +89,28 @@ const CustomDomainSection = () => {
   };
 
   const removeDomain = async (id: string) => {
-    const { error } = await supabase.from('custom_domains').delete().eq('id', id);
-    if (error) toast.error('Failed to remove domain');
-    else {
-      toast.success('Domain removed');
-      fetchDomains();
+    const domainToRemove = domains.find(d => d.id === id);
+
+    const { error } = await supabase
+      .from('custom_domains')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Failed to remove domain');
+      return;
     }
+
+    // Fire and forget — remove from Cloudflare
+    // This is best-effort, DB record is already deleted
+    if (domainToRemove) {
+      supabase.functions.invoke('remove-custom-hostname', {
+        body: { domain: domainToRemove.domain },
+      }).catch(() => {});
+    }
+
+    toast.success('Domain removed');
+    fetchDomains();
   };
 
   return (
