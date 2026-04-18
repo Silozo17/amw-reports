@@ -262,6 +262,104 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
+      // ══════════════════════════════════════════════════════════════════
+      // FACEBOOK DIAGNOSTIC MODE — temporary, read-only probes
+      // Logs everything Meta returns for this page in this period so we
+      // can determine the correct paid/organic parsing path.
+      // Does NOT change snapshot values. Remove after verification.
+      // ══════════════════════════════════════════════════════════════════
+      try {
+        const diagAcceptedPage: Record<string, { total: number; sampleValue: any }> = {};
+        const diagRejectedPage: Record<string, string> = {};
+
+        const probePageBatch = async (label: string, metrics: string[], extraQS = "") => {
+          const url = `${GRAPH_BASE}/${pageId}/insights?metric=${metrics.join(",")}&period=day&since=${startDate}&until=${endDate}${extraQS}&access_token=${pageToken}`;
+          try {
+            const res = await fetchWithTimeout(url);
+            const status = res.status;
+            if (!res.ok) {
+              const body = await res.text();
+              console.log(JSON.stringify({ diag: "page_batch", label, status, error: body.slice(0, 500) }));
+              for (const m of metrics) diagRejectedPage[m] = `${status}: ${body.slice(0, 200)}`;
+              return;
+            }
+            const data = await res.json();
+            const arr: any[] = data.data || [];
+            const returnedNames = arr.map((d) => d.name);
+            console.log(JSON.stringify({ diag: "page_batch", label, status, requested: metrics, returned: returnedNames, extraQS }));
+            for (const m of metrics) {
+              const entry = arr.find((d) => d.name === m);
+              if (!entry) {
+                diagRejectedPage[m] = "not returned";
+                continue;
+              }
+              const values = entry.values || [];
+              const total = values.reduce((s: number, v: any) => s + (Number(v?.value) || 0), 0);
+              diagAcceptedPage[m] = { total, sampleValue: values[0] ?? null };
+              // Raw shape sample for breakdown probes
+              if (extraQS.includes("breakdown")) {
+                console.log(JSON.stringify({
+                  diag: "page_breakdown_sample",
+                  metric: m,
+                  extraQS,
+                  firstValue: values[0] ?? null,
+                  secondValue: values[1] ?? null,
+                  rawEntry: JSON.stringify(entry).slice(0, 1500),
+                }));
+              }
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.log(JSON.stringify({ diag: "page_batch_exception", label, error: msg }));
+            for (const m of metrics) diagRejectedPage[m] = `exception: ${msg}`;
+          }
+        };
+
+        // Group A: media/view
+        await probePageBatch("media_view", ["page_media_view", "page_total_media_view_unique", "page_views_total"]);
+        // Group B: impressions/reach
+        await probePageBatch("impressions", [
+          "page_impressions", "page_impressions_paid", "page_impressions_unique", "page_impressions_paid_unique",
+          "page_impressions_nonviral", "page_impressions_nonviral_unique",
+        ]);
+        // Group C: post distribution at page level
+        await probePageBatch("post_distribution", [
+          "page_posts_impressions", "page_posts_impressions_paid", "page_posts_impressions_unique",
+          "page_posts_impressions_paid_unique", "page_posts_impressions_organic_unique",
+          "page_posts_impressions_nonviral", "page_posts_impressions_nonviral_unique",
+        ]);
+        // Group D: video
+        await probePageBatch("video", [
+          "page_video_views", "page_video_views_paid", "page_video_views_organic",
+          "page_video_views_by_paid_non_paid", "page_video_complete_views_30s",
+          "page_video_complete_views_30s_paid", "page_video_complete_views_30s_organic",
+          "page_video_views_unique",
+        ]);
+        // Group E: followers/fans
+        await probePageBatch("followers", [
+          "page_follows", "page_fans", "page_fan_adds", "page_fan_adds_unique", "page_fan_removes",
+        ]);
+        // Group F: breakdown probes
+        await probePageBatch("media_view_breakdown_ads", ["page_media_view"], "&breakdown=is_from_ads");
+        await probePageBatch("media_view_breakdown_followers", ["page_media_view"], "&breakdown=is_from_followers");
+
+        console.log(JSON.stringify({
+          diag: "page_summary",
+          pageId,
+          pageName: page.name,
+          period: { startDate, endDate },
+          acceptedCount: Object.keys(diagAcceptedPage).length,
+          rejectedCount: Object.keys(diagRejectedPage).length,
+          accepted: diagAcceptedPage,
+          rejected: diagRejectedPage,
+        }));
+      } catch (e) {
+        console.log(JSON.stringify({ diag: "page_outer_exception", error: e instanceof Error ? e.message : String(e) }));
+      }
+      // ══════════════════════════════════════════════════════════════════
+      // END DIAGNOSTIC MODE
+      // ══════════════════════════════════════════════════════════════════
+
       // ── Fetch organic views: page_media_view with is_from_ads breakdown ──
       // page_posts_impressions_organic_unique was deprecated 2025-06-15.
       // page_media_view returns total content views; subtract paid (is_from_ads=true) to isolate organic.
@@ -402,6 +500,66 @@ Deno.serve(async (req) => {
       // ── Phase 2: Batch-fetch post insights in chunks of BATCH_SIZE ──
       const postIds = postEntries.map(p => p.id);
       const postMap = new Map(postEntries.map(p => [p.id, p]));
+
+      // ══════════════════════════════════════════════════════════════════
+      // POST DIAGNOSTIC MODE — probe first 3 posts only (read-only)
+      // ══════════════════════════════════════════════════════════════════
+      try {
+        const sampleIds = postIds.slice(0, 3);
+        if (sampleIds.length > 0) {
+          const probePost = async (label: string, metrics: string[], extraQS = "") => {
+            const url = `${GRAPH_BASE}/?ids=${sampleIds.join(",")}&fields=insights.metric(${metrics.join(",")})${extraQS}&access_token=${pageToken}`;
+            try {
+              const res = await fetchWithTimeout(url);
+              if (!res.ok) {
+                const body = await res.text();
+                console.log(JSON.stringify({ diag: "post_batch", label, status: res.status, error: body.slice(0, 500) }));
+                return;
+              }
+              const data = await res.json();
+              const summary: Record<string, any> = {};
+              for (const pid of sampleIds) {
+                const insights = data[pid]?.insights?.data || [];
+                summary[pid] = insights.map((i: any) => ({
+                  name: i.name,
+                  total: (i.values || []).reduce((s: number, v: any) => s + (Number(v?.value) || 0), 0),
+                  firstValue: i.values?.[0] ?? null,
+                }));
+              }
+              console.log(JSON.stringify({ diag: "post_batch", label, status: res.status, summary }));
+              if (extraQS.includes("breakdown")) {
+                const firstPid = sampleIds[0];
+                const firstInsights = data[firstPid]?.insights?.data || [];
+                console.log(JSON.stringify({
+                  diag: "post_breakdown_sample",
+                  label,
+                  postId: firstPid,
+                  rawInsights: JSON.stringify(firstInsights).slice(0, 2000),
+                }));
+              }
+            } catch (e) {
+              console.log(JSON.stringify({ diag: "post_batch_exception", label, error: e instanceof Error ? e.message : String(e) }));
+            }
+          };
+
+          await probePost("post_views", ["post_total_media_view_unique", "post_media_view"]);
+          await probePost("post_impressions", [
+            "post_impressions", "post_impressions_paid", "post_impressions_organic",
+            "post_impressions_unique", "post_impressions_paid_unique", "post_impressions_organic_unique",
+          ]);
+          await probePost("post_video", [
+            "post_video_views", "post_video_views_paid", "post_video_views_organic",
+          ]);
+          await probePost("post_engagement", ["post_clicks_by_type", "post_reactions_by_type_total"]);
+          await probePost("post_media_view_breakdown_ads", ["post_media_view"], ".breakdown(is_from_ads)");
+          await probePost("post_media_view_breakdown_followers", ["post_media_view"], ".breakdown(is_from_followers)");
+        }
+      } catch (e) {
+        console.log(JSON.stringify({ diag: "post_outer_exception", error: e instanceof Error ? e.message : String(e) }));
+      }
+      // ══════════════════════════════════════════════════════════════════
+      // END POST DIAGNOSTIC MODE
+      // ══════════════════════════════════════════════════════════════════
 
       for (let i = 0; i < postIds.length; i += BATCH_SIZE) {
         if (isNearTimeout()) {
