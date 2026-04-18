@@ -315,33 +315,23 @@ Deno.serve(async (req) => {
           }
         };
 
-        // Group A: media/view
+        // Group A: media/view (working)
         await probePageBatch("media_view", ["page_media_view", "page_total_media_view_unique", "page_views_total"]);
-        // Group B: impressions/reach
-        await probePageBatch("impressions", [
-          "page_impressions", "page_impressions_paid", "page_impressions_unique", "page_impressions_paid_unique",
-          "page_impressions_nonviral", "page_impressions_nonviral_unique",
-        ]);
-        // Group C: post distribution at page level
+        // Group C: post distribution (page_posts_impressions_paid is our paid signal)
         await probePageBatch("post_distribution", [
-          "page_posts_impressions", "page_posts_impressions_paid", "page_posts_impressions_unique",
-          "page_posts_impressions_paid_unique", "page_posts_impressions_organic_unique",
-          "page_posts_impressions_nonviral", "page_posts_impressions_nonviral_unique",
+          "page_posts_impressions_paid",
+          "page_posts_impressions_paid_unique",
         ]);
-        // Group D: video
+        // Group D: video (working)
         await probePageBatch("video", [
-          "page_video_views", "page_video_views_paid", "page_video_views_organic",
-          "page_video_views_by_paid_non_paid", "page_video_complete_views_30s",
-          "page_video_complete_views_30s_paid", "page_video_complete_views_30s_organic",
-          "page_video_views_unique",
+          "page_video_views", "page_video_views_paid",
+          "page_video_complete_views_30s", "page_video_views_unique",
         ]);
-        // Group E: followers/fans
-        await probePageBatch("followers", [
-          "page_follows", "page_fans", "page_fan_adds", "page_fan_adds_unique", "page_fan_removes",
-        ]);
-        // Group F: breakdown probes
-        await probePageBatch("media_view_breakdown_ads", ["page_media_view"], "&breakdown=is_from_ads");
-        await probePageBatch("media_view_breakdown_followers", ["page_media_view"], "&breakdown=is_from_followers");
+        // Removed (June 15, 2025 deprecations / confirmed-zero):
+        //   page_impressions*, page_fans, page_fan_adds*, page_fan_removes,
+        //   page_follows, page_daily_follows*, page_video_views_organic,
+        //   page_posts_impressions / _unique / _organic_unique / _nonviral*,
+        //   is_from_ads + is_from_followers breakdowns (paid bucket always 0).
 
         console.log(JSON.stringify({
           diag: "page_summary",
