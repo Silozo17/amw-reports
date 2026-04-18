@@ -262,24 +262,19 @@ Deno.serve(async (req) => {
       }
       const pageId = page.id;
 
-      // ── Fetch total views using page_total_media_view_unique ──
+      // ── Fetch total views using page_total_media_view_unique (total_over_range) ──
       try {
-        const reachUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_total_media_view_unique&period=day&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
+        const reachUrl = `${GRAPH_BASE}/${pageId}/insights?metric=page_total_media_view_unique&period=total_over_range&since=${startDate}&until=${endDate}&access_token=${pageToken}`;
         const reachRes = await fetchWithTimeout(reachUrl);
         if (reachRes.ok) {
           const reachBody = await reachRes.json();
-          for (const metric of reachBody.data || []) {
-            if (metric.name === "page_total_media_view_unique") {
-              totalViews = (metric.values || []).reduce(
-                (sum: number, v: any) => sum + (Number(v.value) || 0), 0
-              );
-            }
-          }
+          const value = reachBody.data?.[0]?.values?.[0]?.value || 0;
+          totalViews = Number(value);
           coreInsightsFetched = true;
           console.log(`Reach for ${pageId}: total=${totalViews}`);
         } else {
           const errBody = await reachRes.text();
-          console.error(`page_total_media_view_unique failed for ${pageId}:`, errBody);
+          console.error(`Reach failed for ${pageId}:`, errBody);
         }
       } catch (err) {
         console.error(`Reach fetch exception ${pageId}:`, err instanceof Error ? err.message : err);
