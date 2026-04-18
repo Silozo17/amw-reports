@@ -1,36 +1,50 @@
 
-User approved all three recommendations from the audit. Plan covers all three in one go.
+## Three changes
 
-## Files to change
+### 1. Hero KPI: sum followers across all platforms (currently shows max of one platform)
+**File:** `src/lib/dashboardCalcs.ts` (line 30)
 
-### 1. `supabase/functions/sync-facebook-page/index.ts` — Apply organic formula + remove deprecated probes
+Currently:
+```
+const totalFollowers = Math.max(...filtered.map(s => s.metrics_data.total_followers || 0), 0);
+```
+This shows ONLY the largest single platform's count (e.g. if Instagram has 5K and LinkedIn has 3K, it shows 5K, not 8K).
 
-**A. Switch Views metric to organic = total − paid_post_impressions**
-- Locate where `page_media_view` is written into `metrics_data` (the "views" field)
-- Change formula: `views = page_media_view − page_posts_impressions_paid` (floor at 0)
-- Keep raw values stored in `raw_data` for diagnostic/debug purposes
-- Drop reliance on the `is_from_ads` breakdown for the headline number (we proved it returns 0 for media_view)
+**Fix:** For each connected platform, take the latest snapshot's follower count, then sum across platforms. (We can't simply sum every snapshot because each month re-reports the running total — that would double-count.)
 
-**B. Remove deprecated metric probes (June 15, 2025 deprecations)**
-- Remove from page-level metric requests: `page_impressions`, `page_impressions_unique`, `page_impressions_paid`, `page_impressions_organic_unique`, `page_fans`, `page_fan_adds`, `page_fan_removes`, `page_follows`, `page_daily_follows`, `page_daily_follows_unique`, `page_daily_unfollows_unique`
-- Keep working metrics: `page_media_view`, `page_posts_impressions_paid`, `page_posts_impressions_organic_unique`, `page_video_views`, `page_video_views_paid`, `post_media_view`, post engagement metrics
-- This stops the 11 rejected-metric warnings cluttering every sync log
+Logic:
+- Group snapshots by platform
+- For each platform, pick the snapshot for the most recent month/year that has `total_followers > 0`
+- Sum those latest-per-platform values → `totalFollowers`
 
-### 2. `supabase/functions/facebook-connect/index.ts` — Drop unnecessary `ads_read` scope
+### 2. Hero KPI: tooltip explainer
+**File:** `src/components/clients/dashboard/HeroKPIs.tsx` — already renders `<MetricTooltip metricKey={kpi.metricKey} />` for every card.
 
-- Revert scope from `pages_show_list,pages_read_engagement,read_insights,ads_read` back to `pages_show_list,pages_read_engagement,read_insights`
-- Reasoning confirmed by audit: `page_posts_impressions_paid` returns non-zero **without** `ads_read` (it's a page insight, not an ads insight). Keeping `ads_read` only adds friction to the Meta consent screen for future client connections without adding any data we use.
+**File to update:** `src/components/clients/MetricTooltip.tsx` — add/update the `total_followers` entry so its tooltip reads:
+> "Combined total followers across all connected social accounts (Instagram, Facebook, LinkedIn, TikTok, YouTube, Threads, Pinterest)."
+
+### 3. Per-platform follower display: always whole number with thousands separator
+**File:** `src/components/clients/dashboard/platforms/shared/formatMetricValue.ts`
+
+Currently 1,234 followers renders as "1.2K", 12,500 as "12.5K". User wants the raw count formatted as `1,234` / `12,500`.
+
+**Fix:** Add `total_followers` (and `follower_growth`) to a new `WHOLE_NUMBER_METRICS` set that bypasses the K/M shortening and returns `Math.round(value).toLocaleString()`.
+
+### 4. TikTok: add `total_followers` to sync
+**File:** `supabase/functions/sync-tiktok-business/index.ts`
+
+The `user.info.stats` scope is **already requested** in `tiktok-ads-connect/index.ts` (line 72), so no reconnect needed.
+
+**Add:** Before building `metricsData`, call TikTok's `https://open.tiktokapis.com/v2/user/info/?fields=follower_count` with the same access token. Store the returned count as `total_followers` in `metricsData`. Wrap in try/catch — if it fails, log and continue without blocking the video sync (follows YouTube flexibility pattern).
 
 ## Out of scope
-- No dashboard UI changes — `views` field name stays the same, only the underlying number changes
-- No DB schema changes
-- No changes to other sync functions
+- No DB migrations, no UI structural changes, no other platforms touched.
+- Existing per-platform follower data (Instagram/FB/LinkedIn/YouTube/Threads/Pinterest) is unchanged — only the rendering format shifts to whole numbers.
 
-## User action required after deploy
-1. Trigger a fresh April 2026 Facebook resync for AMW Media
-2. Verify dashboard shows ~9,182 views (was 11,703) — confirms organic formula applied
-3. Verify sync logs no longer list 11 rejected deprecated metrics
-4. (Optional) Disconnect + reconnect Facebook — Meta consent screen should now be lighter (no "Access ads-related stats")
+## Risks
+- **Low.** Hero sum change could surprise users who memorised the old (max) number — but the new tooltip explains it. TikTok follower fetch is wrapped in try/catch so a TikTok API hiccup won't break the video sync.
 
-## Risk
-- **Low.** Subtraction formula is defensive (floored at 0), so any edge case where paid > total just returns 0 instead of negative. Removing `ads_read` is purely a scope reduction. Removing deprecated metric probes only stops noise — those metrics already returned errors and weren't used.
+## User action after deploy
+1. Trigger a fresh TikTok resync for any client → confirm `total_followers` appears on TikTok platform card.
+2. Open dashboard for a multi-social client → confirm Hero "Followers" card now shows the sum of all platforms (not the max), and hovering the (i) shows the explainer.
+3. Confirm per-platform Followers tiles render as e.g. `12,500` not `12.5K`.
