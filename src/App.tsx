@@ -52,6 +52,9 @@ const AdminOrgList = lazy(() => import("./pages/admin/AdminOrgList"));
 const AdminOrgDetail = lazy(() => import("./pages/admin/AdminOrgDetail"));
 const AdminActivityLog = lazy(() => import("./pages/admin/AdminActivityLog"));
 const AdminUserList = lazy(() => import("./pages/admin/AdminUserList"));
+const ContentLabPage = lazy(() => import("./pages/content-lab/ContentLabPage"));
+const NicheFormPage = lazy(() => import("./pages/content-lab/NicheFormPage"));
+const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
 
 const queryClient = new QueryClient();
 
