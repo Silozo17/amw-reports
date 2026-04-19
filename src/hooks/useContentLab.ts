@@ -76,3 +76,46 @@ export const useContentLabRuns = (clientId?: string) => {
     },
   });
 };
+
+const RUN_LIMITS_BY_TIER: Record<string, number> = {
+  creator: 10,
+  studio: 25,
+  agency: 60,
+};
+const DEFAULT_RUN_LIMIT = 10;
+
+export interface ContentLabUsage {
+  runsThisMonth: number;
+  runsLimit: number;
+}
+
+export const useContentLabUsage = () => {
+  const { orgId } = useOrg();
+
+  return useQuery<ContentLabUsage>({
+    queryKey: ['content-lab-usage', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const now = new Date();
+      const [usageRes, subRes] = await Promise.all([
+        supabase
+          .from('content_lab_usage')
+          .select('runs_count')
+          .eq('org_id', orgId!)
+          .eq('year', now.getUTCFullYear())
+          .eq('month', now.getUTCMonth() + 1)
+          .maybeSingle(),
+        supabase
+          .from('org_subscriptions')
+          .select('content_lab_tier')
+          .eq('org_id', orgId!)
+          .maybeSingle(),
+      ]);
+
+      const runsThisMonth = (usageRes.data as { runs_count?: number } | null)?.runs_count ?? 0;
+      const tier = (subRes.data as { content_lab_tier?: string | null } | null)?.content_lab_tier?.toLowerCase();
+      const runsLimit = (tier && RUN_LIMITS_BY_TIER[tier]) ?? DEFAULT_RUN_LIMIT;
+      return { runsThisMonth, runsLimit };
+    },
+  });
+};

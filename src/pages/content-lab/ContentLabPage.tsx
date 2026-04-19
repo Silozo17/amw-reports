@@ -7,8 +7,18 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useContentLabNiches, useContentLabRuns, ContentLabRun } from '@/hooks/useContentLab';
+import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun } from '@/hooks/useContentLab';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: typeof Clock; tone: string }> = {
