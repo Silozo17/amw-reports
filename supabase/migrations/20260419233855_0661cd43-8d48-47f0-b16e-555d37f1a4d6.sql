@@ -1,0 +1,1 @@
+UPDATE public.content_lab_runs SET status = 'failed', error_message = 'Claude API: credit balance too low — top-up not yet reflected on this API key', completed_at = now() WHERE id = 'e28d9af5-63b0-4a33-906c-90bdc57b9e18';
