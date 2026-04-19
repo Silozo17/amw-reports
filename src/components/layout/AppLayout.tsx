@@ -62,8 +62,6 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </div>
     </div>
   );
-});
-
-AppLayout.displayName = 'AppLayout';
+};
 
 export default AppLayout;
