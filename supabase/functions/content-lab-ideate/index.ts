@@ -34,6 +34,15 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return json({ error: "ANTHROPIC_API_KEY not configured" }, 500);
+    // Non-sensitive fingerprint to verify which key the deployed function is using.
+    console.log(JSON.stringify({
+      fn: "content-lab-ideate",
+      key_fingerprint: {
+        length: apiKey.length,
+        prefix: apiKey.slice(0, 10),
+        suffix: apiKey.slice(-4),
+      },
+    }));
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
