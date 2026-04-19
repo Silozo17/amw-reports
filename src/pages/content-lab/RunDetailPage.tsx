@@ -180,6 +180,31 @@ const RunDetailPage = () => {
               ))
             )}
           </TabsContent>
+
+          <TabsContent value="export">
+            <Card className="space-y-4 p-8">
+              <h2 className="font-display text-xl">Export this report</h2>
+              {run?.pdf_storage_path ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Your branded PDF is ready. The link is private and expires after 60 seconds.
+                  </p>
+                  <Button onClick={handleDownloadPdf} disabled={downloading}>
+                    {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                    Download PDF
+                  </Button>
+                </>
+              ) : run?.status === 'rendering' ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Generating your PDF…
+                </p>
+              ) : run?.status === 'completed' ? (
+                <p className="text-sm text-muted-foreground">PDF was not generated for this run.</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">PDF will be available once the run completes.</p>
+              )}
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>
