@@ -1,0 +1,1 @@
+UPDATE public.content_lab_runs SET status = 'analysing', error_message = NULL, completed_at = NULL WHERE id = 'e28d9af5-63b0-4a33-906c-90bdc57b9e18';
