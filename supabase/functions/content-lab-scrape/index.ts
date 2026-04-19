@@ -171,31 +171,42 @@ Deno.serve(async (req) => {
       return true;
     }).slice(0, MAX_TOTAL_POSTS);
 
-    const rows = deduped.map((p) => ({
-      run_id,
-      platform: p.platform,
-      source: p.source,
-      bucket: p.bucket,
-      author_handle: p.author_handle,
-      post_url: p.post_url,
-      post_type: p.post_type,
-      caption: p.caption,
-      thumbnail_url: p.thumbnail_url,
-      likes: p.likes,
-      comments: p.comments,
-      shares: p.shares,
-      views: p.views,
-      engagement_rate: p.views > 0
+    const rows = deduped.map((p) => {
+      const raw = p.views > 0
         ? (p.likes + p.comments) / p.views
-        : (p.likes + p.comments) / 1000,
-      posted_at: p.posted_at,
-    }));
+        : (p.likes + p.comments) / Math.max(p.likes + p.comments + 1000, 1000);
+      const engagement_rate = Math.min(Math.max(raw, 0), 99.9999);
+      return {
+        run_id,
+        platform: p.platform,
+        source: p.source,
+        bucket: p.bucket,
+        author_handle: p.author_handle,
+        post_url: p.post_url,
+        post_type: p.post_type,
+        caption: p.caption,
+        thumbnail_url: p.thumbnail_url,
+        likes: p.likes,
+        comments: p.comments,
+        shares: p.shares,
+        views: p.views,
+        engagement_rate,
+        posted_at: p.posted_at,
+      };
+    });
 
-    if (rows.length > 0) {
-      const { error: insertErr } = await supabase.from("content_lab_posts").insert(rows);
+    // Chunked insert: a bad row in one chunk shouldn't kill the entire run.
+    let insertedCount = 0;
+    const CHUNK_SIZE = 50;
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const { error: insertErr } = await supabase.from("content_lab_posts").insert(chunk);
       if (insertErr) {
-        console.error("Insert posts failed:", insertErr);
-        return json({ error: insertErr.message }, 500);
+        const msg = `Insert chunk ${i / CHUNK_SIZE + 1} failed: ${insertErr.message}`;
+        console.error(msg, insertErr);
+        errors.push(msg);
+      } else {
+        insertedCount += chunk.length;
       }
     }
 
