@@ -1,10 +1,11 @@
 // content-lab-scrape: pulls posts for a run.
 // Sources, in priority order:
-//   1. Own handle via Instagram Graph API (if OAuth-connected)
+//   1. Own handle via Instagram Graph API (if OAuth-connected) OR Apify fallback
 //   2. Top competitors (from niche.top_competitors[].handle) via Apify
 //   3. Top global benchmarks (from niche.top_global_benchmarks[].handle) via Apify
-//   4. Legacy tracked_handles + competitor_urls (back-compat)
-// Per-platform isolation: a failure in one source does not abort the rest.
+// Per-bucket isolation: a failure in one bucket does not abort the rest.
+// Buckets are kicked off in parallel via Promise.allSettled and competitor/benchmark
+// handles are chunked (max 5 per Apify call) to stay under per-actor timeouts.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { decryptToken } from "../_shared/tokenCrypto.ts";
@@ -18,11 +19,13 @@ const corsHeaders = {
 };
 
 const APIFY_ACTOR = "apify~instagram-scraper";
-const MAX_POSTS_PER_HANDLE = 20;
+const MAX_POSTS_OWN = 20;
+const MAX_POSTS_OTHER = 10;
 const MAX_TOTAL_POSTS = 300;
+const APIFY_CHUNK_SIZE = 5;
+const APIFY_TIMEOUT_SEC = 90;
 
 interface DiscoveredEntity { handle: string; reason?: string }
-interface TrackedHandle { platform: string; handle: string }
 
 interface ScrapedPost {
   platform: "instagram" | "tiktok" | "facebook";
@@ -61,106 +64,39 @@ Deno.serve(async (req) => {
       own_handle: string | null;
       top_competitors: DiscoveredEntity[];
       top_global_benchmarks: DiscoveredEntity[];
-      tracked_handles: TrackedHandle[];
-      competitor_urls: string[];
       client_id: string;
-      platforms_to_scrape: string[];
     } }).niche;
+
+    const competitorHandles = (niche.top_competitors ?? [])
+      .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
+      .filter((h): h is string => !!h);
+    const benchmarkHandles = (niche.top_global_benchmarks ?? [])
+      .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
+      .filter((h): h is string => !!h);
+
+    // Run all three buckets in parallel; each handles its own errors.
+    const [ownResult, compResult, benchResult] = await Promise.allSettled([
+      scrapeOwn(supabase, niche),
+      scrapeBucket(competitorHandles, "competitor"),
+      scrapeBucket(benchmarkHandles, "benchmark"),
+    ]);
 
     const collected: ScrapedPost[] = [];
     const errors: string[] = [];
 
-    // ---------- 1. Own handle via OAuth ----------
-    if (niche.own_handle) {
-      try {
-        const { data: igConn } = await supabase
-          .from("platform_connections")
-          .select("id, access_token, account_id, account_name, is_connected")
-          .eq("client_id", niche.client_id)
-          .eq("platform", "instagram")
-          .eq("is_connected", true)
-          .maybeSingle();
-
-        const ownHandle = niche.own_handle.toLowerCase().replace(/^@/, "");
-        const connHandle = igConn?.account_name?.toLowerCase().replace(/^@/, "");
-
-        if (igConn?.access_token && igConn.account_id && connHandle === ownHandle) {
-          const token = await decryptToken(igConn.access_token);
-          const posts = await fetchOwnInstagramPosts(igConn.account_id, token, ownHandle);
-          posts.forEach((p) => { p.bucket = "own"; });
-          collected.push(...posts);
-          console.log(`Own (OAuth): ${posts.length} posts for @${ownHandle}`);
-        } else {
-          // Fallback to Apify for own handle
-          const posts = await scrapeApifyHandles([ownHandle]);
-          posts.forEach((p) => { p.bucket = "own"; });
-          collected.push(...posts);
-          console.log(`Own (Apify): ${posts.length} posts for @${ownHandle}`);
-        }
-      } catch (e) {
-        const msg = `Own handle scrape failed: ${e instanceof Error ? e.message : e}`;
+    const absorb = (label: string, result: PromiseSettledResult<BucketResult>) => {
+      if (result.status === "fulfilled") {
+        collected.push(...result.value.posts);
+        if (result.value.errors.length > 0) errors.push(...result.value.errors);
+      } else {
+        const msg = `${label} bucket crashed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
         console.error(msg);
         errors.push(msg);
       }
-    }
-
-    // ---------- 2. Top competitors ----------
-    const competitorHandles = (niche.top_competitors ?? [])
-      .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
-      .filter((h): h is string => !!h);
-    if (competitorHandles.length > 0) {
-      try {
-        const posts = await scrapeApifyHandles(competitorHandles);
-        posts.forEach((p) => { p.bucket = "competitor"; });
-        collected.push(...posts);
-        console.log(`Competitors: ${posts.length} posts from ${competitorHandles.length} handles`);
-      } catch (e) {
-        const msg = `Competitor scrape failed: ${e instanceof Error ? e.message : e}`;
-        console.error(msg);
-        errors.push(msg);
-      }
-    }
-
-    // ---------- 3. Global benchmarks ----------
-    const benchmarkHandles = (niche.top_global_benchmarks ?? [])
-      .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
-      .filter((h): h is string => !!h);
-    if (benchmarkHandles.length > 0) {
-      try {
-        const posts = await scrapeApifyHandles(benchmarkHandles);
-        posts.forEach((p) => { p.bucket = "benchmark"; });
-        collected.push(...posts);
-        console.log(`Benchmarks: ${posts.length} posts from ${benchmarkHandles.length} handles`);
-      } catch (e) {
-        const msg = `Benchmark scrape failed: ${e instanceof Error ? e.message : e}`;
-        console.error(msg);
-        errors.push(msg);
-      }
-    }
-
-    // ---------- 4. Legacy back-compat (tracked_handles + competitor_urls) ----------
-    const legacyHandles = (niche.tracked_handles ?? [])
-      .filter((h) => h.platform === "instagram")
-      .map((h) => h.handle.toLowerCase().replace(/^@/, ""));
-    const legacyUrls = niche.competitor_urls ?? [];
-    if (legacyHandles.length > 0 || legacyUrls.length > 0) {
-      try {
-        const allTargets = [
-          ...legacyHandles.map((h) => `https://www.instagram.com/${h}/`),
-          ...legacyUrls.filter((u) => u.includes("instagram.com")),
-        ];
-        if (allTargets.length > 0) {
-          const posts = await runApifyInstagramByUrls(allTargets);
-          posts.forEach((p) => { p.bucket = "legacy"; });
-          collected.push(...posts);
-          console.log(`Legacy: ${posts.length} posts`);
-        }
-      } catch (e) {
-        const msg = `Legacy scrape failed: ${e instanceof Error ? e.message : e}`;
-        console.error(msg);
-        errors.push(msg);
-      }
-    }
+    };
+    absorb("own", ownResult);
+    absorb("competitor", compResult);
+    absorb("benchmark", benchResult);
 
     // De-duplicate by post_url, then cap
     const seen = new Set<string>();
@@ -195,7 +131,6 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Chunked insert: a bad row in one chunk shouldn't kill the entire run.
     let insertedCount = 0;
     const CHUNK_SIZE = 50;
     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
@@ -210,13 +145,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Persist per-bucket counts + any non-fatal errors back to the run summary
-    // so they surface in the admin Run Detail drawer.
     const buckets = {
       own: rows.filter((r) => r.bucket === "own").length,
       competitor: rows.filter((r) => r.bucket === "competitor").length,
       benchmark: rows.filter((r) => r.bucket === "benchmark").length,
-      legacy: rows.filter((r) => r.bucket === "legacy").length,
     };
 
     const { data: existing } = await supabase
@@ -259,13 +191,86 @@ function json(body: unknown, status = 200) {
   });
 }
 
+interface BucketResult { posts: ScrapedPost[]; errors: string[] }
+
+async function scrapeOwn(
+  supabase: ReturnType<typeof createClient>,
+  niche: { own_handle: string | null; client_id: string },
+): Promise<BucketResult> {
+  if (!niche.own_handle) return { posts: [], errors: [] };
+  const errors: string[] = [];
+  try {
+    const { data: igConn } = await supabase
+      .from("platform_connections")
+      .select("id, access_token, account_id, account_name, is_connected")
+      .eq("client_id", niche.client_id)
+      .eq("platform", "instagram")
+      .eq("is_connected", true)
+      .maybeSingle();
+
+    const ownHandle = niche.own_handle.toLowerCase().replace(/^@/, "");
+    const connHandle = (igConn as { account_name?: string } | null)?.account_name?.toLowerCase().replace(/^@/, "");
+
+    if (igConn && (igConn as { access_token?: string }).access_token && (igConn as { account_id?: string }).account_id && connHandle === ownHandle) {
+      const token = await decryptToken((igConn as { access_token: string }).access_token);
+      const posts = await fetchOwnInstagramPosts((igConn as { account_id: string }).account_id, token, ownHandle);
+      posts.forEach((p) => { p.bucket = "own"; });
+      console.log(`Own (OAuth): ${posts.length} posts for @${ownHandle}`);
+      return { posts, errors };
+    }
+
+    // Fallback to Apify for own handle (full 20)
+    const posts = await runApifyForHandles([ownHandle], MAX_POSTS_OWN);
+    posts.forEach((p) => { p.bucket = "own"; });
+    console.log(`Own (Apify): ${posts.length} posts for @${ownHandle}`);
+    return { posts, errors };
+  } catch (e) {
+    const msg = `Own handle scrape failed: ${e instanceof Error ? e.message : e}`;
+    console.error(msg);
+    errors.push(msg);
+    return { posts: [], errors };
+  }
+}
+
+async function scrapeBucket(
+  handles: string[],
+  bucket: "competitor" | "benchmark",
+): Promise<BucketResult> {
+  if (handles.length === 0) return { posts: [], errors: [] };
+  const errors: string[] = [];
+  const posts: ScrapedPost[] = [];
+
+  // Chunk handles to keep individual Apify calls small + fast.
+  const chunks: string[][] = [];
+  for (let i = 0; i < handles.length; i += APIFY_CHUNK_SIZE) {
+    chunks.push(handles.slice(i, i + APIFY_CHUNK_SIZE));
+  }
+
+  // Run chunks in parallel within the bucket too.
+  const settled = await Promise.allSettled(
+    chunks.map((c) => runApifyForHandles(c, MAX_POSTS_OTHER)),
+  );
+  settled.forEach((r, idx) => {
+    if (r.status === "fulfilled") {
+      r.value.forEach((p) => { p.bucket = bucket; });
+      posts.push(...r.value);
+    } else {
+      const msg = `${bucket} chunk ${idx + 1} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
+      console.error(msg);
+      errors.push(msg);
+    }
+  });
+  console.log(`${bucket}: ${posts.length} posts from ${handles.length} handles (${chunks.length} chunks)`);
+  return { posts, errors };
+}
+
 async function fetchOwnInstagramPosts(
   igUserId: string,
   accessToken: string,
   handle: string,
 ): Promise<ScrapedPost[]> {
   const fields = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
-  const url = `https://graph.facebook.com/v25.0/${igUserId}/media?fields=${fields}&limit=${MAX_POSTS_PER_HANDLE}&access_token=${accessToken}`;
+  const url = `https://graph.facebook.com/v25.0/${igUserId}/media?fields=${fields}&limit=${MAX_POSTS_OWN}&access_token=${accessToken}`;
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -298,29 +303,25 @@ async function fetchOwnInstagramPosts(
   }
 }
 
-async function scrapeApifyHandles(handles: string[]): Promise<ScrapedPost[]> {
-  const urls = handles.map((h) => `https://www.instagram.com/${h.replace(/^@/, "")}/`);
-  return runApifyInstagramByUrls(urls);
-}
-
-async function runApifyInstagramByUrls(urls: string[]): Promise<ScrapedPost[]> {
+async function runApifyForHandles(handles: string[], resultsLimit: number): Promise<ScrapedPost[]> {
   const apifyToken = Deno.env.get("APIFY_TOKEN");
   if (!apifyToken) {
     console.error("APIFY_TOKEN not configured; skipping Apify scrape");
     return [];
   }
-
-  const igUrls = urls.filter((u) => u.includes("instagram.com"));
+  const igUrls = handles
+    .map((h) => `https://www.instagram.com/${h.replace(/^@/, "")}/`)
+    .filter((u) => u.includes("instagram.com"));
   if (igUrls.length === 0) return [];
 
   const input = {
     directUrls: igUrls,
     resultsType: "posts",
-    resultsLimit: MAX_POSTS_PER_HANDLE,
+    resultsLimit,
     addParentData: false,
   };
 
-  const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=50`;
+  const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
 
   try {
     const res = await fetch(runUrl, {
