@@ -233,14 +233,16 @@ Deno.serve(async (req) => {
           ...existingSummary,
           scrape_buckets: buckets,
           scrape_errors: errors.length > 0 ? errors : null,
-          scrape_post_count: rows.length,
+          scrape_post_count: insertedCount,
+          scrape_attempted_count: rows.length,
         },
       })
       .eq("id", run_id);
 
     return json({
       ok: true,
-      post_count: rows.length,
+      post_count: insertedCount,
+      attempted: rows.length,
       buckets,
       errors: errors.length > 0 ? errors : undefined,
     });
