@@ -153,8 +153,6 @@ const RunDetailPage = () => {
       </div>
     </AppLayout>
   );
-});
-
-RunDetailPage.displayName = 'RunDetailPage';
+};
 
 export default RunDetailPage;
