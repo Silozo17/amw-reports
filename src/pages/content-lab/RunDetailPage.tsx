@@ -1,7 +1,9 @@
 
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -23,6 +25,27 @@ const renderPreview = (platform: string | null, hook: string, caption: string | 
 const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [retrying, setRetrying] = useState(false);
+
+  const handleRetry = async () => {
+    if (!id) return;
+    setRetrying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('content-lab-resume', {
+        body: { run_id: id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Retry started — reusing existing scrape data, no new credits used.');
+      queryClient.invalidateQueries({ queryKey: ['content-lab-run', id] });
+      queryClient.invalidateQueries({ queryKey: ['content-lab-ideas', id] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Retry failed');
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' });
 
@@ -76,11 +99,22 @@ const RunDetailPage = () => {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
 
-        <header>
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Content Lab Report</p>
-          <h1 className="mt-2 font-display text-3xl">
-            {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
-          </h1>
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Content Lab Report</p>
+            <h1 className="mt-2 font-display text-3xl">
+              {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
+            </h1>
+            {run?.status === 'failed' && run?.error_message && (
+              <p className="mt-2 max-w-2xl text-sm text-destructive">{run.error_message}</p>
+            )}
+          </div>
+          {run?.status === 'failed' && posts.length > 0 && (
+            <Button onClick={handleRetry} disabled={retrying} size="sm">
+              <RefreshCw className={`mr-2 h-4 w-4 ${retrying ? 'animate-spin' : ''}`} />
+              {retrying ? 'Retrying…' : 'Retry ideation'}
+            </Button>
+          )}
         </header>
 
         <Tabs defaultValue="feed" className="space-y-6">
