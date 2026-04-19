@@ -451,6 +451,7 @@ export type Database = {
           based_on_post_id: string | null
           body: string | null
           caption: string | null
+          caption_with_hashtag: string | null
           created_at: string
           cta: string | null
           duration_seconds: number | null
@@ -459,8 +460,12 @@ export type Database = {
           hook: string | null
           id: string
           idea_number: number
+          platform_style_notes: string | null
           rating: number | null
           run_id: string
+          script_full: string | null
+          status: string
+          target_platform: string | null
           title: string
           visual_direction: string | null
           why_it_works: string | null
@@ -469,6 +474,7 @@ export type Database = {
           based_on_post_id?: string | null
           body?: string | null
           caption?: string | null
+          caption_with_hashtag?: string | null
           created_at?: string
           cta?: string | null
           duration_seconds?: number | null
@@ -477,8 +483,12 @@ export type Database = {
           hook?: string | null
           id?: string
           idea_number: number
+          platform_style_notes?: string | null
           rating?: number | null
           run_id: string
+          script_full?: string | null
+          status?: string
+          target_platform?: string | null
           title: string
           visual_direction?: string | null
           why_it_works?: string | null
@@ -487,6 +497,7 @@ export type Database = {
           based_on_post_id?: string | null
           body?: string | null
           caption?: string | null
+          caption_with_hashtag?: string | null
           created_at?: string
           cta?: string | null
           duration_seconds?: number | null
@@ -495,8 +506,12 @@ export type Database = {
           hook?: string | null
           id?: string
           idea_number?: number
+          platform_style_notes?: string | null
           rating?: number | null
           run_id?: string
+          script_full?: string | null
+          status?: string
+          target_platform?: string | null
           title?: string
           visual_direction?: string | null
           why_it_works?: string | null
@@ -522,41 +537,83 @@ export type Database = {
         Row: {
           client_id: string
           competitor_urls: string[]
+          content_styles: string[]
           created_at: string
+          discovered_at: string | null
+          do_not_use: string[]
           id: string
           label: string
           language: string
+          location: string | null
+          niche_description: string | null
           org_id: string
+          own_handle: string | null
+          platforms_to_scrape: string[]
+          posting_cadence: string | null
+          producer_type: string | null
+          tone_of_voice: string | null
+          top_competitors: Json
+          top_global_benchmarks: Json
           tracked_handles: Json
           tracked_hashtags: string[]
           tracked_keywords: string[]
           updated_at: string
+          video_length_preference: string | null
+          website: string | null
         }
         Insert: {
           client_id: string
           competitor_urls?: string[]
+          content_styles?: string[]
           created_at?: string
+          discovered_at?: string | null
+          do_not_use?: string[]
           id?: string
           label: string
           language?: string
+          location?: string | null
+          niche_description?: string | null
           org_id: string
+          own_handle?: string | null
+          platforms_to_scrape?: string[]
+          posting_cadence?: string | null
+          producer_type?: string | null
+          tone_of_voice?: string | null
+          top_competitors?: Json
+          top_global_benchmarks?: Json
           tracked_handles?: Json
           tracked_hashtags?: string[]
           tracked_keywords?: string[]
           updated_at?: string
+          video_length_preference?: string | null
+          website?: string | null
         }
         Update: {
           client_id?: string
           competitor_urls?: string[]
+          content_styles?: string[]
           created_at?: string
+          discovered_at?: string | null
+          do_not_use?: string[]
           id?: string
           label?: string
           language?: string
+          location?: string | null
+          niche_description?: string | null
           org_id?: string
+          own_handle?: string | null
+          platforms_to_scrape?: string[]
+          posting_cadence?: string | null
+          producer_type?: string | null
+          tone_of_voice?: string | null
+          top_competitors?: Json
+          top_global_benchmarks?: Json
           tracked_handles?: Json
           tracked_hashtags?: string[]
           tracked_keywords?: string[]
           updated_at?: string
+          video_length_preference?: string | null
+          website?: string | null
         }
         Relationships: [
           {
@@ -1883,6 +1940,8 @@ export type Database = {
         | "rendering"
         | "completed"
         | "failed"
+        | "discovering"
+        | "completed_empty"
       job_status: "pending" | "running" | "success" | "failed" | "partial"
       platform_type:
         | "google_ads"
@@ -2045,6 +2104,8 @@ export const Constants = {
         "rendering",
         "completed",
         "failed",
+        "discovering",
+        "completed_empty",
       ],
       job_status: ["pending", "running", "success", "failed", "partial"],
       platform_type: [
