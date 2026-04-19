@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import usePageMeta from '@/hooks/usePageMeta';
 
-const RunDetailPage = forwardRef<HTMLDivElement>((_props, _ref) => {
+const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -153,8 +153,6 @@ const RunDetailPage = forwardRef<HTMLDivElement>((_props, _ref) => {
       </div>
     </AppLayout>
   );
-});
-
-RunDetailPage.displayName = 'RunDetailPage';
+};
 
 export default RunDetailPage;

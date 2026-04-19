@@ -1,0 +1,1 @@
+ALTER TABLE public.content_lab_posts ALTER COLUMN engagement_rate TYPE NUMERIC(8,4);
