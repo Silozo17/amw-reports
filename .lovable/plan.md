@@ -1,46 +1,100 @@
 
 
-## Goal
-Re-run ideate (and analyse) on the existing successful scrape data from run `e28d9af5-63b0-4a33-906c-90bdc57b9e18` without spending another Apify call.
+## Scope
+You asked to try again with the existing key and without rotating anything. I’ll keep the current key untouched and fix the retry path so we can resume ideation from the already-scraped run data.
 
-## Why this is safe
-That run already has 73 posts in `content_lab_posts` (15 own + 40 competitor + 18 benchmark). Scrape succeeded — only ideate failed (Claude 402 out of credits). Now that Claude is topped up, we just need to resume from the ideate step.
+## What I found
+There are two real problems in the current implementation:
 
-## Approach
+1. `content-lab-ideate` hides the real Anthropic failure.
+   - On any non-2xx response it logs the body and just returns `null`.
+   - The caller then collapses that into the vague error: `Ideation produced no ideas`.
+   - So we currently cannot tell if the issue is credits, model access, auth, workspace scoping, or something else.
 
-Add a small "Retry ideate" path that skips scrape entirely and reuses existing posts:
+2. The pipeline cannot safely “resume”.
+   - `content-lab-pipeline` always deletes `content_lab_posts` and `content_lab_ideas` at the start.
+   - So reusing an existing `run_id` through the pipeline would wipe the successful scrape data and force another scrape.
+   - That is exactly what we want to avoid.
 
-1. **Reset the failed run's status** — flip `status` from `failed` back to `analysing`, clear `error_message`, keep `started_at` + posts intact.
-2. **Call `content-lab-analyse`** for that `run_id` (best-effort, may already have summaries — it's idempotent).
-3. **Call `content-lab-ideate`** for that `run_id` — this is the one that will now succeed with topped-up credits.
-4. **Mark `completed`** on success.
+## Plan
 
-Two ways to expose this — pick one:
+### 1. Make ideate failures fully observable
+Update `supabase/functions/content-lab-ideate/index.ts` so it returns structured upstream errors instead of `null`.
 
-### Option A — One-off: I trigger it directly via curl (no UI)
-I call `content-lab-ideate` directly with the existing `run_id` using the edge function tool, then update the run row. Zero code changes. Fastest path to verify Claude works.
+I’ll add:
+- explicit handling for Anthropic `400`, `401`, `402`, `403`, `429`, `500`
+- response body passthrough into the returned error
+- logging of upstream request metadata like status and request id
+- a non-sensitive runtime fingerprint log to verify the deployed function is reading the expected secret without exposing the secret itself
 
-### Option B — Add a "Retry" button on failed runs (small UI change)
-On `RunDetailPage`, when `status === 'failed'` and posts exist, show a "Retry ideation" button that calls a new tiny edge function `content-lab-resume` (or reuses `content-lab-pipeline` with a `resume_from: 'ideate'` flag). Doesn't charge a usage credit (already paid for the scrape).
+This gives us a definitive answer on the next retry instead of another generic failure.
 
-**I recommend Option A right now** — it's the fastest verification that the Claude top-up worked. If it succeeds, we can then add Option B as a permanent affordance for future failed runs (saves money every time ideate hiccups).
+### 2. Add a real “resume ideation” path
+Create a dedicated backend path that reuses existing posts and does not call scrape.
 
-## Files touched (Option A)
-- None. Pure tool calls:
-  1. Update `content_lab_runs` row → `status='analysing'`, `error_message=null`.
-  2. `curl` `content-lab-ideate` with `{ run_id: 'e28d9af5...' }`.
-  3. Verify ideas appear in `content_lab_ideas`.
-  4. Mark run `completed`.
+Best approach:
+- add a small function or extend `content-lab-pipeline` with `resume_from: "ideate"`
+- when resuming:
+  - do not delete `content_lab_posts`
+  - optionally clear only previous ideas for that run
+  - do not increment monthly usage
+  - set run status back to `analysing` / `ideating`
+  - call `content-lab-analyse` best-effort
+  - call `content-lab-ideate`
+  - mark run `completed` on success or `failed` with the exact upstream error on failure
 
-## Files touched (Option B — if you want it after A works)
-- `supabase/functions/content-lab-pipeline/index.ts` — accept `resume_from: 'ideate'` to skip scrape + usage charge.
-- `src/pages/content-lab/RunDetailPage.tsx` — "Retry ideation" button on failed runs that have posts.
-- `src/hooks/useContentLab.ts` — expose a `retryIdeate(runId)` mutation.
+This avoids another Apify spend and makes retries deterministic.
 
-## Risks
-- If Claude still 402s, top-up didn't propagate yet — wait a few minutes and retry.
-- If ideate produces 0 ideas (different error), we'll see the actual prompt/response failure cleanly in logs because scrape isn't masking it any more.
+### 3. Stop using migrations for one-off run status changes
+The last two migrations were operational data updates for a single run. That is not the right long-term pattern.
 
-## Recommendation
-Approve **Option A** — I'll trigger the resume directly, confirm Claude is working, and report back. Once verified, say the word and I'll add Option B as a permanent retry button.
+Instead, the new resume path should update:
+- `content_lab_runs.status`
+- `error_message`
+- `completed_at`
+
+from backend logic at runtime. This keeps migrations schema-only and prevents more one-off SQL patches for retries.
+
+### 4. Add a retry button in the UI
+Update `src/pages/content-lab/RunDetailPage.tsx` to show a retry action when:
+- run status is `failed`
+- posts already exist for the run
+
+Button behavior:
+- call the new resume path
+- show a toast that retry started without a new scrape
+- refresh run / ideas / posts queries
+- keep the user on the run detail page so they can watch status change
+
+This gives you a permanent, safe recovery flow for future ideation failures too.
+
+### 5. Validate on the existing failed run
+After implementation, I’ll test against run:
+`e28d9af5-63b0-4a33-906c-90bdc57b9e18`
+
+Validation checklist:
+- confirm `content_lab_posts` count stays unchanged
+- confirm no scrape function is called
+- confirm usage is not incremented
+- confirm exact Anthropic response is surfaced if it still fails
+- if Anthropic succeeds, confirm ideas are inserted and run becomes `completed`
+
+## Files to change
+- `supabase/functions/content-lab-ideate/index.ts`
+- `supabase/functions/content-lab-pipeline/index.ts` or new `supabase/functions/content-lab-resume/index.ts`
+- `src/pages/content-lab/RunDetailPage.tsx`
+- `src/hooks/useContentLab.ts` if needed for a retry mutation/helper
+
+## Technical details
+- Current blocker is not “scraping”; scrape already worked.
+- Current blocker is poor failure handling plus lack of a resume path.
+- The safest fix is not to retry the whole pipeline, because current pipeline startup clears posts.
+- The resume path must be idempotent and must never charge usage or trigger scrape.
+- Error reporting from Anthropic should be preserved all the way to `content_lab_runs.error_message` and step logs.
+
+## Expected result
+After this change, clicking retry on a failed run will:
+- reuse the 73 existing posts
+- skip Apify entirely
+- either complete ideation successfully or show the exact Anthropic error instead of a misleading generic message
 
