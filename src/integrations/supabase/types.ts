@@ -782,6 +782,56 @@ export type Database = {
           },
         ]
       }
+      content_lab_step_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          message: string | null
+          payload: Json
+          run_id: string
+          started_at: string
+          status: Database["public"]["Enums"]["content_lab_step_status"]
+          step: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          payload?: Json
+          run_id: string
+          started_at?: string
+          status: Database["public"]["Enums"]["content_lab_step_status"]
+          step: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          payload?: Json
+          run_id?: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["content_lab_step_status"]
+          step?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_step_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_lab_trends: {
         Row: {
           created_at: string
@@ -1942,6 +1992,7 @@ export type Database = {
         | "failed"
         | "discovering"
         | "completed_empty"
+      content_lab_step_status: "started" | "ok" | "failed"
       job_status: "pending" | "running" | "success" | "failed" | "partial"
       platform_type:
         | "google_ads"
@@ -2107,6 +2158,7 @@ export const Constants = {
         "discovering",
         "completed_empty",
       ],
+      content_lab_step_status: ["started", "ok", "failed"],
       job_status: ["pending", "running", "success", "failed", "partial"],
       platform_type: [
         "google_ads",

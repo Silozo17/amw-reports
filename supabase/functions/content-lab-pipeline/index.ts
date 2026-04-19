@@ -8,6 +8,7 @@
 // - Analyse step is best-effort (non-fatal); ideate is required
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { logStepStart } from "../_shared/contentLabStepLog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,6 +92,8 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
     await updateStatus("failed", { error_message: msg, completed_at: new Date().toISOString() });
   };
 
+  const pipelineLog = await logStepStart({ runId, step: "pipeline", message: "Pipeline started" });
+
   try {
     // Clear any previous posts/ideas for idempotency
     await admin.from("content_lab_posts").delete().eq("run_id", runId);
@@ -98,38 +101,79 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
 
     // 1. SCRAPE
     await updateStatus("scraping", { started_at: new Date().toISOString() });
+    const scrapeStep = await logStepStart({ runId, step: "scrape", message: "Calling content-lab-scrape" });
     const scrapeRes = await callFn("content-lab-scrape", { run_id: runId });
-    if (!scrapeRes.ok) return fail(`Scrape failed: ${scrapeRes.error ?? "unknown"}`);
+    if (!scrapeRes.ok) {
+      await scrapeStep.finish({ status: "failed", errorMessage: scrapeRes.error ?? "unknown" });
+      await pipelineLog.finish({ status: "failed", errorMessage: `Scrape failed: ${scrapeRes.error ?? "unknown"}` });
+      return fail(`Scrape failed: ${scrapeRes.error ?? "unknown"}`);
+    }
 
-    // Verify we actually got posts before continuing — otherwise ideate has nothing to work with.
+    // Verify we actually got posts before continuing
     const { count: postCount } = await admin
       .from("content_lab_posts")
       .select("id", { count: "exact", head: true })
       .eq("run_id", runId);
 
+    await scrapeStep.finish({
+      status: "ok",
+      message: `Scraped ${postCount ?? 0} posts`,
+      payload: { post_count: postCount ?? 0 },
+    });
+
     if (!postCount || postCount === 0) {
+      await pipelineLog.finish({ status: "failed", errorMessage: "No posts scraped" });
       return fail(
         "No posts could be fetched. Check that the tracked Instagram handles are public and spelled correctly, then try again.",
       );
     }
     console.log(`Pipeline ${runId}: scraped ${postCount} posts`);
 
-    // 2. ANALYSE (best-effort — ideate can still run on raw posts)
+    // 2. ANALYSE (best-effort)
     await updateStatus("analysing");
+    const analyseStep = await logStepStart({ runId, step: "analyse", message: "Calling content-lab-analyse" });
     const analyseRes = await callFn("content-lab-analyse", { run_id: runId });
     if (!analyseRes.ok) {
       console.error(`Analyse step failed (non-fatal) for ${runId}:`, analyseRes.error);
+      await analyseStep.finish({
+        status: "failed",
+        message: "Non-fatal — pipeline continued",
+        errorMessage: analyseRes.error ?? "unknown",
+      });
+    } else {
+      await analyseStep.finish({ status: "ok", message: "Analyse complete" });
     }
 
     // 3. IDEATE (required)
     await updateStatus("ideating");
+    const ideateStep = await logStepStart({ runId, step: "ideate", message: "Calling content-lab-ideate" });
     const ideateRes = await callFn("content-lab-ideate", { run_id: runId });
-    if (!ideateRes.ok) return fail(`Ideate failed: ${ideateRes.error ?? "unknown"}`);
+    if (!ideateRes.ok) {
+      await ideateStep.finish({ status: "failed", errorMessage: ideateRes.error ?? "unknown" });
+      await pipelineLog.finish({ status: "failed", errorMessage: `Ideate failed: ${ideateRes.error ?? "unknown"}` });
+      return fail(`Ideate failed: ${ideateRes.error ?? "unknown"}`);
+    }
 
-    // PDF rendering removed — content is consumed in-app via RunDetailPage.
+    const { count: ideaCount } = await admin
+      .from("content_lab_ideas")
+      .select("id", { count: "exact", head: true })
+      .eq("run_id", runId);
+    await ideateStep.finish({
+      status: "ok",
+      message: `Generated ${ideaCount ?? 0} ideas`,
+      payload: { idea_count: ideaCount ?? 0 },
+    });
+
     await updateStatus("completed", { completed_at: new Date().toISOString() });
+    await pipelineLog.finish({
+      status: "ok",
+      message: "Pipeline completed",
+      payload: { post_count: postCount ?? 0, idea_count: ideaCount ?? 0 },
+    });
   } catch (e) {
-    await fail(e instanceof Error ? e.message : "Unknown error");
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    await pipelineLog.finish({ status: "failed", errorMessage: msg });
+    await fail(msg);
   }
 }
 

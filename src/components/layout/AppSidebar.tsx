@@ -53,6 +53,7 @@ const ADMIN_SUB_ITEMS = [
   { to: '/admin/organisations', label: 'Organisations', icon: Building2 },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/activity', label: 'Activity Log', icon: Activity },
+  { to: '/admin/content-lab', label: 'Content Lab', icon: Sparkles },
   { to: '/debug', label: 'Debug', icon: Bug },
   { to: '/logs', label: 'Logs', icon: ScrollText },
 ];

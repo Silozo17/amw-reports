@@ -12,6 +12,7 @@ import {
   platformStyleNote,
   type NicheContext,
 } from "../_shared/contentLabPrompts.ts";
+import { logStepStart } from "../_shared/contentLabStepLog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,8 +81,16 @@ Deno.serve(async (req) => {
         .filter((p) => p.platform === platform)
         .slice(0, TOP_POSTS_PER_PLATFORM);
 
+      const platformLog = await logStepStart({
+        runId: run_id,
+        step: "ideate",
+        message: `Ideate ${platform} (${count} ideas, ${platformPosts.length} source posts)`,
+        payload: { platform, target_count: count, source_post_count: platformPosts.length },
+      });
+
       if (platformPosts.length === 0) {
         console.warn(`No posts for platform ${platform}, skipping ideation for it.`);
+        await platformLog.finish({ status: "failed", errorMessage: "No source posts for platform" });
         continue;
       }
 
@@ -95,6 +104,7 @@ Deno.serve(async (req) => {
 
       if (!generated || generated.length === 0) {
         console.error(`Ideation failed for ${platform}`);
+        await platformLog.finish({ status: "failed", errorMessage: "Claude returned no ideas" });
         continue;
       }
 
@@ -102,6 +112,11 @@ Deno.serve(async (req) => {
         ideaCounter += 1;
         allRows.push(toRow(run_id, ideaCounter, platform, idea, platformPosts));
       }
+      await platformLog.finish({
+        status: "ok",
+        message: `Generated ${generated.length} ideas for ${platform}`,
+        payload: { platform, generated_count: generated.length },
+      });
     }
 
     if (allRows.length === 0) {
