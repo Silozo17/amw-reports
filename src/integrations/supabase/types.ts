@@ -398,6 +398,380 @@ export type Database = {
           },
         ]
       }
+      content_lab_hooks: {
+        Row: {
+          created_at: string
+          engagement_score: number | null
+          hook_text: string
+          id: string
+          mechanism: string | null
+          run_id: string
+          source_post_id: string | null
+          why_it_works: string | null
+        }
+        Insert: {
+          created_at?: string
+          engagement_score?: number | null
+          hook_text: string
+          id?: string
+          mechanism?: string | null
+          run_id: string
+          source_post_id?: string | null
+          why_it_works?: string | null
+        }
+        Update: {
+          created_at?: string
+          engagement_score?: number | null
+          hook_text?: string
+          id?: string
+          mechanism?: string | null
+          run_id?: string
+          source_post_id?: string | null
+          why_it_works?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_hooks_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_hooks_source_post_id_fkey"
+            columns: ["source_post_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_ideas: {
+        Row: {
+          based_on_post_id: string | null
+          body: string | null
+          caption: string | null
+          created_at: string
+          cta: string | null
+          duration_seconds: number | null
+          filming_checklist: string[]
+          hashtags: string[]
+          hook: string | null
+          id: string
+          idea_number: number
+          rating: number | null
+          run_id: string
+          title: string
+          visual_direction: string | null
+          why_it_works: string | null
+        }
+        Insert: {
+          based_on_post_id?: string | null
+          body?: string | null
+          caption?: string | null
+          created_at?: string
+          cta?: string | null
+          duration_seconds?: number | null
+          filming_checklist?: string[]
+          hashtags?: string[]
+          hook?: string | null
+          id?: string
+          idea_number: number
+          rating?: number | null
+          run_id: string
+          title: string
+          visual_direction?: string | null
+          why_it_works?: string | null
+        }
+        Update: {
+          based_on_post_id?: string | null
+          body?: string | null
+          caption?: string | null
+          created_at?: string
+          cta?: string | null
+          duration_seconds?: number | null
+          filming_checklist?: string[]
+          hashtags?: string[]
+          hook?: string | null
+          id?: string
+          idea_number?: number
+          rating?: number | null
+          run_id?: string
+          title?: string
+          visual_direction?: string | null
+          why_it_works?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_ideas_based_on_post_id_fkey"
+            columns: ["based_on_post_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_ideas_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_niches: {
+        Row: {
+          client_id: string
+          competitor_urls: string[]
+          created_at: string
+          id: string
+          label: string
+          language: string
+          org_id: string
+          tracked_handles: Json
+          tracked_hashtags: string[]
+          tracked_keywords: string[]
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          competitor_urls?: string[]
+          created_at?: string
+          id?: string
+          label: string
+          language?: string
+          org_id: string
+          tracked_handles?: Json
+          tracked_hashtags?: string[]
+          tracked_keywords?: string[]
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          competitor_urls?: string[]
+          created_at?: string
+          id?: string
+          label?: string
+          language?: string
+          org_id?: string
+          tracked_handles?: Json
+          tracked_hashtags?: string[]
+          tracked_keywords?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_niches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_niches_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_posts: {
+        Row: {
+          ai_summary: string | null
+          author_handle: string
+          bucket: string | null
+          caption: string | null
+          comments: number
+          created_at: string
+          engagement_rate: number
+          hook_text: string | null
+          hook_type: string | null
+          id: string
+          likes: number
+          platform: Database["public"]["Enums"]["content_lab_platform"]
+          post_type: string | null
+          post_url: string | null
+          posted_at: string | null
+          run_id: string
+          shares: number
+          source: Database["public"]["Enums"]["content_lab_post_source"]
+          thumbnail_url: string | null
+          views: number
+        }
+        Insert: {
+          ai_summary?: string | null
+          author_handle: string
+          bucket?: string | null
+          caption?: string | null
+          comments?: number
+          created_at?: string
+          engagement_rate?: number
+          hook_text?: string | null
+          hook_type?: string | null
+          id?: string
+          likes?: number
+          platform: Database["public"]["Enums"]["content_lab_platform"]
+          post_type?: string | null
+          post_url?: string | null
+          posted_at?: string | null
+          run_id: string
+          shares?: number
+          source: Database["public"]["Enums"]["content_lab_post_source"]
+          thumbnail_url?: string | null
+          views?: number
+        }
+        Update: {
+          ai_summary?: string | null
+          author_handle?: string
+          bucket?: string | null
+          caption?: string | null
+          comments?: number
+          created_at?: string
+          engagement_rate?: number
+          hook_text?: string | null
+          hook_type?: string | null
+          id?: string
+          likes?: number
+          platform?: Database["public"]["Enums"]["content_lab_platform"]
+          post_type?: string | null
+          post_url?: string | null
+          posted_at?: string | null
+          run_id?: string
+          shares?: number
+          source?: Database["public"]["Enums"]["content_lab_post_source"]
+          thumbnail_url?: string | null
+          views?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_posts_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_runs: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          cost_pence: number
+          created_at: string
+          error_message: string | null
+          id: string
+          niche_id: string
+          org_id: string
+          pdf_storage_path: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["content_lab_run_status"]
+          summary: Json
+          triggered_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          cost_pence?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          niche_id: string
+          org_id: string
+          pdf_storage_path?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["content_lab_run_status"]
+          summary?: Json
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          cost_pence?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          niche_id?: string
+          org_id?: string
+          pdf_storage_path?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["content_lab_run_status"]
+          summary?: Json
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_runs_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_niches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_trends: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          label: string
+          momentum: string | null
+          recommendation: string | null
+          run_id: string
+          supporting_post_ids: string[]
+          verification_source: string | null
+          verification_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          label: string
+          momentum?: string | null
+          recommendation?: string | null
+          run_id: string
+          supporting_post_ids?: string[]
+          verification_source?: string | null
+          verification_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+          momentum?: string | null
+          recommendation?: string | null
+          run_id?: string
+          supporting_post_ids?: string[]
+          verification_source?: string | null
+          verification_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_trends_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_domains: {
         Row: {
           created_at: string
@@ -711,6 +1085,7 @@ export type Database = {
         Row: {
           additional_clients: number
           additional_connections: number
+          content_lab_tier: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
@@ -727,6 +1102,7 @@ export type Database = {
         Insert: {
           additional_clients?: number
           additional_connections?: number
+          content_lab_tier?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
@@ -743,6 +1119,7 @@ export type Database = {
         Update: {
           additional_clients?: number
           additional_connections?: number
+          content_lab_tier?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
@@ -1496,6 +1873,16 @@ export type Database = {
     }
     Enums: {
       app_role: "owner" | "manager"
+      content_lab_platform: "instagram" | "tiktok" | "facebook"
+      content_lab_post_source: "oauth" | "apify"
+      content_lab_run_status:
+        | "pending"
+        | "scraping"
+        | "analysing"
+        | "ideating"
+        | "rendering"
+        | "completed"
+        | "failed"
       job_status: "pending" | "running" | "success" | "failed" | "partial"
       platform_type:
         | "google_ads"
@@ -1648,6 +2035,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["owner", "manager"],
+      content_lab_platform: ["instagram", "tiktok", "facebook"],
+      content_lab_post_source: ["oauth", "apify"],
+      content_lab_run_status: [
+        "pending",
+        "scraping",
+        "analysing",
+        "ideating",
+        "rendering",
+        "completed",
+        "failed",
+      ],
       job_status: ["pending", "running", "success", "failed", "partial"],
       platform_type: [
         "google_ads",
