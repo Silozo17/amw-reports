@@ -1,17 +1,20 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [downloading, setDownloading] = useState(false);
 
   usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' });
 
@@ -72,17 +75,23 @@ const RunDetailPage = () => {
               {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
             </h1>
           </div>
-          {run?.pdf_storage_path && (
-            <Button variant="outline">
-              <FileText className="mr-2 h-4 w-4" /> Download PDF
+          {run?.pdf_storage_path ? (
+            <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading}>
+              {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Download PDF
             </Button>
-          )}
+          ) : run?.status === 'rendering' ? (
+            <Button variant="outline" disabled>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> PDF generating…
+            </Button>
+          ) : null}
         </header>
 
         <Tabs defaultValue="feed" className="space-y-6">
           <TabsList>
             <TabsTrigger value="feed">Viral Feed ({posts.length})</TabsTrigger>
             <TabsTrigger value="ideas">12 Ideas ({ideas.length})</TabsTrigger>
+            <TabsTrigger value="export">Export</TabsTrigger>
           </TabsList>
 
           <TabsContent value="feed" className="space-y-3">
