@@ -43,6 +43,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clients', label: 'Clients', icon: Users },
   { to: '/reports', label: 'Reports', icon: FileText },
+  { to: '/content-lab', label: 'Content Lab', icon: Sparkles },
   { to: '/connections', label: 'Connections', icon: Plug },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
