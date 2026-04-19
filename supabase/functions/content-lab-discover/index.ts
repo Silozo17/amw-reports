@@ -4,6 +4,7 @@
 // (Gemini) for the structured output via tool calling.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { logStepStart } from "../_shared/contentLabStepLog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,48 +70,79 @@ Deno.serve(async (req) => {
       return json({ error: "own_handle and website are required" }, 400);
     }
 
-    // 1. Scrape website
-    const siteSummary = await scrapeSite(input.website);
-    console.log("Site scraped:", siteSummary.length, "chars");
-
-    // 2. Call Gemini for structured discovery
-    const discovery = await runDiscovery({
-      own_handle: input.own_handle,
-      website: input.website,
-      location: input.location ?? null,
-      language: input.language ?? "en",
-      site_summary: siteSummary,
-    });
-
-    // 3. Persist to niche if niche_id provided, else just return
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-
-    if (input.niche_id) {
-      const { error: uErr } = await admin
-        .from("content_lab_niches")
-        .update({
-          own_handle: input.own_handle,
-          website: input.website,
-          location: input.location ?? null,
-          label: discovery.niche_label,
-          niche_description: discovery.niche_description,
-          top_competitors: discovery.top_competitors,
-          top_global_benchmarks: discovery.top_global_benchmarks,
-          tracked_hashtags: discovery.suggested_hashtags,
-          tracked_keywords: discovery.suggested_keywords,
-          tone_of_voice: discovery.default_creative_prefs.tone_of_voice,
-          content_styles: discovery.default_creative_prefs.content_styles,
-          producer_type: discovery.default_creative_prefs.producer_type,
-          video_length_preference: discovery.default_creative_prefs.video_length_preference,
-          posting_cadence: discovery.default_creative_prefs.posting_cadence,
-          do_not_use: discovery.default_creative_prefs.do_not_use,
-          discovered_at: new Date().toISOString(),
+    // Step log only when tied to a niche/run context (niche_id provided).
+    // Standalone discovery (no niche_id) is from the form before save and not part of a run.
+    const stepLog = input.niche_id
+      ? await logStepStart({
+          runId: input.niche_id, // logs are keyed on run_id; we reuse niche_id for pre-run discoveries
+          step: "discover",
+          message: `Discovering for @${input.own_handle}`,
+          payload: { own_handle: input.own_handle, website: input.website, location: input.location ?? null },
         })
-        .eq("id", input.niche_id);
-      if (uErr) return json({ error: uErr.message }, 500);
-    }
+      : null;
 
-    return json({ ok: true, discovery });
+    try {
+      // 1. Scrape website
+      const siteSummary = await scrapeSite(input.website);
+      console.log("Site scraped:", siteSummary.length, "chars");
+
+      // 2. Call Gemini for structured discovery
+      const discovery = await runDiscovery({
+        own_handle: input.own_handle,
+        website: input.website,
+        location: input.location ?? null,
+        language: input.language ?? "en",
+        site_summary: siteSummary,
+      });
+
+      // 3. Persist to niche if niche_id provided, else just return
+      const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+      if (input.niche_id) {
+        const { error: uErr } = await admin
+          .from("content_lab_niches")
+          .update({
+            own_handle: input.own_handle,
+            website: input.website,
+            location: input.location ?? null,
+            label: discovery.niche_label,
+            niche_description: discovery.niche_description,
+            top_competitors: discovery.top_competitors,
+            top_global_benchmarks: discovery.top_global_benchmarks,
+            tracked_hashtags: discovery.suggested_hashtags,
+            tracked_keywords: discovery.suggested_keywords,
+            tone_of_voice: discovery.default_creative_prefs.tone_of_voice,
+            content_styles: discovery.default_creative_prefs.content_styles,
+            producer_type: discovery.default_creative_prefs.producer_type,
+            video_length_preference: discovery.default_creative_prefs.video_length_preference,
+            posting_cadence: discovery.default_creative_prefs.posting_cadence,
+            do_not_use: discovery.default_creative_prefs.do_not_use,
+            discovered_at: new Date().toISOString(),
+          })
+          .eq("id", input.niche_id);
+        if (uErr) {
+          await stepLog?.finish({ status: "failed", errorMessage: uErr.message });
+          return json({ error: uErr.message }, 500);
+        }
+      }
+
+      await stepLog?.finish({
+        status: "ok",
+        message: `Discovered: ${discovery.niche_label}`,
+        payload: {
+          niche_label: discovery.niche_label,
+          competitor_count: discovery.top_competitors.length,
+          benchmark_count: discovery.top_global_benchmarks.length,
+          hashtag_count: discovery.suggested_hashtags.length,
+        },
+      });
+
+      return json({ ok: true, discovery });
+    } catch (innerErr) {
+      const msg = innerErr instanceof Error ? innerErr.message : "Unknown error";
+      await stepLog?.finish({ status: "failed", errorMessage: msg });
+      throw innerErr;
+    }
   } catch (e) {
     console.error("content-lab-discover error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
