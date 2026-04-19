@@ -21,7 +21,7 @@ export interface ContentLabRun {
   client_id: string;
   org_id: string;
   niche_id: string;
-  status: 'pending' | 'scraping' | 'analysing' | 'ideating' | 'rendering' | 'completed' | 'failed';
+  status: 'pending' | 'scraping' | 'analysing' | 'ideating' | 'completed' | 'failed';
   started_at: string | null;
   completed_at: string | null;
   pdf_storage_path: string | null;

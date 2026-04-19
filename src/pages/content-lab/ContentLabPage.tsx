@@ -16,7 +16,6 @@ const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: type
   scraping: { label: 'Scraping', icon: Loader2, tone: 'bg-primary/10 text-primary' },
   analysing: { label: 'Analysing', icon: Loader2, tone: 'bg-primary/10 text-primary' },
   ideating: { label: 'Ideating', icon: Loader2, tone: 'bg-primary/10 text-primary' },
-  rendering: { label: 'Rendering', icon: Loader2, tone: 'bg-primary/10 text-primary' },
   completed: { label: 'Completed', icon: CheckCircle2, tone: 'bg-emerald-500/10 text-emerald-500' },
   failed: { label: 'Failed', icon: AlertCircle, tone: 'bg-destructive/10 text-destructive' },
 };
@@ -172,7 +171,7 @@ const ContentLabPage = () => {
 const RunStatusBadge = ({ status }: { status: ContentLabRun['status'] }) => {
   const cfg = STATUS_CONFIG[status];
   const Icon = cfg.icon;
-  const spinning = ['scraping', 'analysing', 'ideating', 'rendering'].includes(status);
+  const spinning = ['scraping', 'analysing', 'ideating'].includes(status);
   return (
     <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${cfg.tone}`}>
       <Icon className={`h-3 w-3 ${spinning ? 'animate-spin' : ''}`} />

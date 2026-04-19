@@ -69,6 +69,9 @@ Deno.serve(async (req) => {
       return json({ error: "own_handle and website are required" }, 400);
     }
 
+    // Note: discover is invoked from the niche form (pre-run), so it's not
+    // attached to a content_lab_runs row. Step-logging happens at pipeline level.
+
     // 1. Scrape website
     const siteSummary = await scrapeSite(input.website);
     console.log("Site scraped:", siteSummary.length, "chars");
