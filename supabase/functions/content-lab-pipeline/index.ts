@@ -1,6 +1,11 @@
 // content-lab-pipeline: orchestrator. Creates a run (or accepts run_id), then chains
 // scrape -> analyse -> ideate, updating run status throughout. Each step is a separate
 // edge function call to avoid the 60s wall-clock cap on a single function.
+//
+// v2 changes:
+// - Removed PDF rendering step (in-app feed only)
+// - Empty-scrape handling: marks run as failed with a friendly message instead of crashing
+// - Analyse step is best-effort (non-fatal); ideate is required
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -87,28 +92,41 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
   };
 
   try {
-    await updateStatus("scraping", { started_at: new Date().toISOString() });
-
     // Clear any previous posts/ideas for idempotency
     await admin.from("content_lab_posts").delete().eq("run_id", runId);
     await admin.from("content_lab_ideas").delete().eq("run_id", runId);
 
+    // 1. SCRAPE
+    await updateStatus("scraping", { started_at: new Date().toISOString() });
     const scrapeRes = await callFn("content-lab-scrape", { run_id: runId });
     if (!scrapeRes.ok) return fail(`Scrape failed: ${scrapeRes.error ?? "unknown"}`);
 
+    // Verify we actually got posts before continuing — otherwise ideate has nothing to work with.
+    const { count: postCount } = await admin
+      .from("content_lab_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("run_id", runId);
+
+    if (!postCount || postCount === 0) {
+      return fail(
+        "No posts could be fetched. Check that the tracked Instagram handles are public and spelled correctly, then try again.",
+      );
+    }
+    console.log(`Pipeline ${runId}: scraped ${postCount} posts`);
+
+    // 2. ANALYSE (best-effort — ideate can still run on raw posts)
     await updateStatus("analysing");
     const analyseRes = await callFn("content-lab-analyse", { run_id: runId });
-    if (!analyseRes.ok) return fail(`Analyse failed: ${analyseRes.error ?? "unknown"}`);
+    if (!analyseRes.ok) {
+      console.error(`Analyse step failed (non-fatal) for ${runId}:`, analyseRes.error);
+    }
 
+    // 3. IDEATE (required)
     await updateStatus("ideating");
     const ideateRes = await callFn("content-lab-ideate", { run_id: runId });
     if (!ideateRes.ok) return fail(`Ideate failed: ${ideateRes.error ?? "unknown"}`);
 
-    await updateStatus("rendering");
-    const renderRes = await callFn("content-lab-render-pdf", { run_id: runId });
-    // PDF failure should not fail the run — content is still usable in-app
-    if (!renderRes.ok) console.error("PDF render failed (non-fatal):", renderRes.error);
-
+    // PDF rendering removed — content is consumed in-app via RunDetailPage.
     await updateStatus("completed", { completed_at: new Date().toISOString() });
   } catch (e) {
     await fail(e instanceof Error ? e.message : "Unknown error");
