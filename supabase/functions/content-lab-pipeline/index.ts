@@ -104,6 +104,11 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
     const ideateRes = await callFn("content-lab-ideate", { run_id: runId });
     if (!ideateRes.ok) return fail(`Ideate failed: ${ideateRes.error ?? "unknown"}`);
 
+    await updateStatus("rendering");
+    const renderRes = await callFn("content-lab-render-pdf", { run_id: runId });
+    // PDF failure should not fail the run — content is still usable in-app
+    if (!renderRes.ok) console.error("PDF render failed (non-fatal):", renderRes.error);
+
     await updateStatus("completed", { completed_at: new Date().toISOString() });
   } catch (e) {
     await fail(e instanceof Error ? e.message : "Unknown error");

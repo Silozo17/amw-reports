@@ -1,17 +1,20 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [downloading, setDownloading] = useState(false);
 
   usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' });
 
@@ -58,6 +61,22 @@ const RunDetailPage = () => {
     },
   });
 
+  const handleDownloadPdf = async () => {
+    if (!run?.pdf_storage_path) return;
+    setDownloading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('content-lab-reports')
+        .createSignedUrl(run.pdf_storage_path, 60);
+      if (error || !data) throw error ?? new Error('No URL');
+      window.open(data.signedUrl, '_blank');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not generate download link');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
@@ -72,17 +91,23 @@ const RunDetailPage = () => {
               {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
             </h1>
           </div>
-          {run?.pdf_storage_path && (
-            <Button variant="outline">
-              <FileText className="mr-2 h-4 w-4" /> Download PDF
+          {run?.pdf_storage_path ? (
+            <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading}>
+              {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Download PDF
             </Button>
-          )}
+          ) : run?.status === 'rendering' ? (
+            <Button variant="outline" disabled>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> PDF generating…
+            </Button>
+          ) : null}
         </header>
 
         <Tabs defaultValue="feed" className="space-y-6">
           <TabsList>
             <TabsTrigger value="feed">Viral Feed ({posts.length})</TabsTrigger>
             <TabsTrigger value="ideas">12 Ideas ({ideas.length})</TabsTrigger>
+            <TabsTrigger value="export">Export</TabsTrigger>
           </TabsList>
 
           <TabsContent value="feed" className="space-y-3">
@@ -154,6 +179,31 @@ const RunDetailPage = () => {
                 </Card>
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="export">
+            <Card className="space-y-4 p-8">
+              <h2 className="font-display text-xl">Export this report</h2>
+              {run?.pdf_storage_path ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Your branded PDF is ready. The link is private and expires after 60 seconds.
+                  </p>
+                  <Button onClick={handleDownloadPdf} disabled={downloading}>
+                    {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                    Download PDF
+                  </Button>
+                </>
+              ) : run?.status === 'rendering' ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Generating your PDF…
+                </p>
+              ) : run?.status === 'completed' ? (
+                <p className="text-sm text-muted-foreground">PDF was not generated for this run.</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">PDF will be available once the run completes.</p>
+              )}
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
