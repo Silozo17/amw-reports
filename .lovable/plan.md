@@ -1,121 +1,52 @@
 
 
-## AMW Content Lab — Build Plan
+Phase 1 is functionally complete (DB, niche form, scrape, analyse, ideate, dashboard, run detail with Viral Feed + 12 Ideas). The plan said: **pause for review after Phase 1, then proceed to Phase 2 once you've tested an end-to-end run.**
 
-A new module added inside the existing AMW Reports app at `/content-lab/*`. Scoped per existing client, gated by an add-on subscription.
+Two sensible "next" paths. Recommending the first.
 
-### What gets built (full feature set, phased)
+## Recommended next: finish Phase 1 properly before expanding
 
-**Phase 1 — Foundation & MVP (Instagram only, manual trigger)**
-1. DB schema + RLS
-2. Niche setup screen
-3. Run pipeline end-to-end for Instagram via existing OAuth + Apify for tracked competitor handles
-4. Run Detail screen: Viral Feed + 12 Ideas tabs
-5. Branded PDF export (reuses existing `generate-report` patterns + jsPDF)
-6. Internal-only (no paywall yet)
+Two small gaps remain in Phase 1 before moving to Phase 2:
 
-**Phase 2 — Expand platforms & full report**
-- Add TikTok and Facebook competitor scraping
-- Add remaining tabs: Trend Radar, Hook Library, Best Openers, Export
-- Add Ahrefs + Google Trends verification for trends
-- Voice/brand tone prompt baked into ideation
+1. **PDF export** (`content-lab-render-pdf` + Export tab) — listed as Phase 1 step 6 in the approved build order, not yet built.
+2. **End-to-end smoke test** — create a niche on the current client, click Run Now, watch it complete, sanity-check posts/ideas/PDF.
 
-**Phase 3 — Billing & automation**
-- Three new Stripe products (£49 Lite / £149 Pro / £299 Agency) as add-ons to existing plans
-- `content_lab_tier` column on `org_subscriptions`, gated routes
-- pg_cron monthly auto-run by tier cadence
-- Email delivery via existing Resend pipeline
+This closes Phase 1 cleanly so we can pause for your review with a complete shippable slice.
 
-**Phase 4 — Admin & polish**
-- Admin run table at `/content-lab/admin` (platform admins): cost, status, retry, mark-as-reviewed
-- Cost cap per run, health-check on Apify actors
+### What I'd build (one task)
 
-### Architecture decisions (locked from your answers)
+**`content-lab-render-pdf` edge function**
+- Inputs: `run_id`
+- Loads run + niche + posts (top 12 by engagement) + ideas (all 12)
+- Generates branded A4 landscape PDF via jsPDF using the org's colors/fonts (same pattern as existing `generate-report`)
+- Sections: Cover (niche label, date, client logo) → Viral Feed top 12 (thumbnail, handle, caption, metrics, AI summary) → 12 Ideas (number, title, hook, body, CTA, hashtags, filming checklist) → Footer
+- Uploads to `content-lab-reports` bucket at `{org_id}/{run_id}.pdf`
+- Updates `content_lab_runs.pdf_storage_path`
 
-| Layer | Choice |
-|---|---|
-| Routes | `/content-lab/*` inside existing app, gated by `content_lab_tier` |
-| Scraping | Hybrid — existing OAuth connections for client's own IG/FB/TikTok; Apify for competitor handles only |
-| AI — strategy/ideation | Claude (new `ANTHROPIC_API_KEY` secret) for trend synthesis + 12 ideas + hook analysis |
-| AI — per-post summaries | Lovable AI gateway (`google/gemini-2.5-flash-lite`) — cheap, no key needed |
-| Verification | Existing Ahrefs (needs `AHREFS_TOKEN`) + Google Trends (free) |
-| PDF | Same jsPDF approach as existing reports, branded via existing `organisations` colors/fonts |
-| Storage | Two new buckets: `content-lab-thumbs`, `content-lab-reports` |
-| Scheduling | pg_cron → enqueue into existing `sync_jobs`-style queue (new `content_lab_runs` table follows same pattern) |
-| Email | Existing `send-branded-email` |
+**Pipeline wiring**
+- Add a `rendering` step to `content-lab-pipeline` that invokes `content-lab-render-pdf` after `ideate` succeeds, before marking run `completed`
 
-### New database tables (all with RLS keyed to existing `org_id`)
+**Run Detail UI**
+- Add an **Export** tab with a "Download PDF" button (signed URL from the private bucket)
+- Show a "PDF generating…" state while `status='rendering'`
 
-```
-content_lab_niches      (id, client_id, org_id, label, tracked_handles jsonb,
-                         tracked_hashtags text[], tracked_keywords text[],
-                         competitor_urls text[], language)
-content_lab_runs        (id, client_id, org_id, niche_id, status, started_at,
-                         completed_at, pdf_storage_path, summary jsonb, cost_pence)
-content_lab_posts       (id, run_id, platform, source enum(oauth, apify), author_handle,
-                         post_url, post_type, caption, thumbnail_url, likes, comments,
-                         shares, views, engagement_rate, posted_at, bucket,
-                         ai_summary, hook_text, hook_type)
-content_lab_trends      (id, run_id, label, description, momentum, verification_source,
-                         verification_url, recommendation, supporting_post_ids uuid[])
-content_lab_ideas       (id, run_id, idea_number, title, based_on_post_id, caption,
-                         hook, body, cta, duration_seconds, visual_direction,
-                         why_it_works, hashtags text[], filming_checklist text[])
-content_lab_hooks       (id, run_id, hook_text, source_post_id, mechanism, why_it_works,
-                         engagement_score)
-```
-Add `content_lab_tier` (text: null/lite/pro/agency) to `org_subscriptions`.
+### What I'm NOT doing in this step
+- No new platforms (TikTok/Facebook = Phase 2)
+- No Trend Radar / Hook Library / Best Openers tabs (Phase 2)
+- No Ahrefs/Google Trends verification (Phase 2)
+- No billing/Stripe (Phase 3)
+- No cron auto-runs (Phase 3)
+- No admin run table (Phase 4)
 
-### New edge functions
+### Risks
+- **jsPDF size**: a run with 12 thumbnail images can produce a 3-5 MB PDF. Will fetch thumbnails server-side and downscale to 800px wide before embedding to keep it under 2 MB.
+- **Edge function 60s limit**: Render should finish in 10-20s for 12 posts. If it ever creeps up we can split image fetch into a parallel batch — flagging now, not pre-optimising.
 
-- `content-lab-scrape` — pulls posts: existing OAuth for own accounts, Apify for competitors
-- `content-lab-analyse` — Lovable AI for per-post summaries, Claude for trend detection
-- `content-lab-ideate` — Claude single structured tool-call returning 12 ideas
-- `content-lab-render-pdf` — jsPDF, branded, uploads to `content-lab-reports`
-- `content-lab-pipeline` — orchestrator chaining the above, status updates, error recovery
-- `content-lab-cron` — daily pg_cron entry that enqueues runs by tier cadence
+## Alternative paths if you'd rather skip ahead
 
-### New screens
+- **Skip PDF, jump to Phase 2 tabs** (Trend Radar, Hook Library, Best Openers) — faster visual progress but ships an incomplete Phase 1.
+- **Skip PDF, jump to Phase 3 billing** — gates the feature behind a paywall now. Risky without an end-to-end test first.
+- **Just run the smoke test** — no new code, just create a niche and click Run Now together so we confirm the pipeline actually works before building the PDF on top.
 
-1. `/content-lab` — Dashboard: latest run, "Run new report" CTA, niche cards, upgrade banner
-2. `/content-lab/niche/new` and `/content-lab/niche/[id]` — Niche setup form
-3. `/content-lab/run/[id]` — 6-tab report view (Viral Feed, Trend Radar, 12 Ideas, Hook Library, Best Openers, Export)
-4. `/content-lab/billing` — Three-tier add-on pricing, current plan, manage via Stripe portal
-5. `/content-lab/admin` — Platform admin only: all runs, cost, retry
-
-Sidebar: add a single "Content Lab" entry under existing nav, hidden when org has no `content_lab_tier`.
-
-### Secrets needed (will request when we hit each phase)
-
-- `ANTHROPIC_API_KEY` (Phase 1)
-- `APIFY_TOKEN` (Phase 1)
-- `AHREFS_TOKEN` (Phase 2)
-- Stripe price IDs for the 3 add-on products (Phase 3) — created via tools, no manual key
-
-### What I'm NOT building
-
-- Replacement for any existing functionality
-- Changes to existing report generation, sync, or dashboards
-- Notion/Google Calendar exports (deferred to "later")
-- White-label PDF logo swap (Phase 4 polish)
-
-### Risks flagged
-
-1. **Apify TOS / cost runaway** — hard cost cap per run, weekly health check, fallback provider in env config
-2. **Claude API key billing** — you absorb this directly; budget ~£1.20 per Pro run
-3. **60s edge function limit** — pipeline split into 5 functions chained via the orchestrator (same pattern as existing sync)
-4. **Idea quality drift** — 1–5 star rating UI on each idea so the team can flag weak outputs and we iterate the prompt
-
-### Build order — what I'll ship first
-
-Phase 1 only, in this order:
-1. Migration: tables + RLS + bucket creation
-2. `/content-lab` dashboard + `/content-lab/niche/new` with mock data
-3. `content-lab-scrape` (OAuth path first, Apify second) wired against one real client
-4. `content-lab-analyse` + `content-lab-ideate` wired
-5. `/content-lab/run/[id]` with Viral Feed + 12 Ideas tabs against real data
-6. `content-lab-render-pdf` + Export tab
-7. Pause for your review before Phase 2
-
-Approve this and I'll start with Phase 1, step 1 (the migration). I'll request `ANTHROPIC_API_KEY` and `APIFY_TOKEN` right after the migration is applied, before wiring the scraper.
+If you don't tell me otherwise I'll proceed with the recommended path: build `content-lab-render-pdf` + Export tab, then ask you to do the smoke test.
 
