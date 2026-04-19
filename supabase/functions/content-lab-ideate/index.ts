@@ -108,9 +108,11 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Fallback evidence post: highest-engagement post for this platform.
+      const fallbackPostId = platformPosts[0]?.id ?? null;
       for (const idea of generated.slice(0, count)) {
         ideaCounter += 1;
-        allRows.push(toRow(run_id, ideaCounter, platform, idea, platformPosts));
+        allRows.push(toRow(run_id, ideaCounter, platform, idea, platformPosts, fallbackPostId));
       }
       await platformLog.finish({
         status: "ok",
@@ -199,6 +201,7 @@ function toRow(
   platform: string,
   idea: GeneratedIdea,
   posts: PostRow[],
+  fallbackPostId: string | null,
 ): IdeaRow {
   return {
     run_id: runId,
@@ -206,7 +209,7 @@ function toRow(
     target_platform: platform,
     platform_style_notes: idea.platform_style_notes ?? null,
     title: idea.title,
-    based_on_post_id: matchPost(posts, idea.based_on_handle),
+    based_on_post_id: matchPost(posts, idea.based_on_handle) ?? fallbackPostId,
     caption: idea.caption ?? null,
     caption_with_hashtag: idea.caption_with_hashtag ?? null,
     hook: idea.hook,
