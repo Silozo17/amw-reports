@@ -879,6 +879,36 @@ export type Database = {
           },
         ]
       }
+      content_lab_usage: {
+        Row: {
+          created_at: string
+          id: string
+          month: number
+          org_id: string
+          runs_count: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: number
+          org_id: string
+          runs_count?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: number
+          org_id?: string
+          runs_count?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       custom_domains: {
         Row: {
           created_at: string
@@ -1953,6 +1983,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_content_lab_usage: {
+        Args: { _org_id: string }
+        Returns: number
       }
       is_client_user: {
         Args: { _client_id: string; _user_id: string }
