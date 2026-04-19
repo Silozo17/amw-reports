@@ -18,6 +18,10 @@ const RunDetailPage = () => {
   const { data: run } = useQuery({
     queryKey: ['content-lab-run', id],
     enabled: !!id,
+    refetchInterval: (query) => {
+      const status = (query.state.data as { status?: string } | undefined)?.status;
+      return status && ['completed', 'failed'].includes(status) ? false : 4000;
+    },
     queryFn: async () => {
       const { data, error } = await supabase.from('content_lab_runs').select('*').eq('id', id!).single();
       if (error) throw error;
