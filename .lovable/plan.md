@@ -1,61 +1,121 @@
 
-The sync is still showing because there are stale `sync_jobs` rows (status `pending` or `processing`) for client `c2b194b6-3b2c-4f5a-9f00-95e13ca28027`. The progress bar shows whenever any such row exists. The user wants a **clean restart**.
 
-## Plan (3 SQL ops + 1 function ping, no code changes)
+## AMW Content Lab — Build Plan
 
-All run via the insert tool (data ops, not migrations). All scoped to this one client.
+A new module added inside the existing AMW Reports app at `/content-lab/*`. Scoped per existing client, gated by an add-on subscription.
 
-### Step 1 — Inspect (read-only) what's actually in the queue
-```sql
-SELECT id, platform, status, started_at, current_month, current_year,
-       progress_completed, progress_total, error_message, created_at
-FROM sync_jobs
-WHERE client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'
-  AND status IN ('pending','processing')
-ORDER BY created_at;
+### What gets built (full feature set, phased)
+
+**Phase 1 — Foundation & MVP (Instagram only, manual trigger)**
+1. DB schema + RLS
+2. Niche setup screen
+3. Run pipeline end-to-end for Instagram via existing OAuth + Apify for tracked competitor handles
+4. Run Detail screen: Viral Feed + 12 Ideas tabs
+5. Branded PDF export (reuses existing `generate-report` patterns + jsPDF)
+6. Internal-only (no paywall yet)
+
+**Phase 2 — Expand platforms & full report**
+- Add TikTok and Facebook competitor scraping
+- Add remaining tabs: Trend Radar, Hook Library, Best Openers, Export
+- Add Ahrefs + Google Trends verification for trends
+- Voice/brand tone prompt baked into ideation
+
+**Phase 3 — Billing & automation**
+- Three new Stripe products (£49 Lite / £149 Pro / £299 Agency) as add-ons to existing plans
+- `content_lab_tier` column on `org_subscriptions`, gated routes
+- pg_cron monthly auto-run by tier cadence
+- Email delivery via existing Resend pipeline
+
+**Phase 4 — Admin & polish**
+- Admin run table at `/content-lab/admin` (platform admins): cost, status, retry, mark-as-reviewed
+- Cost cap per run, health-check on Apify actors
+
+### Architecture decisions (locked from your answers)
+
+| Layer | Choice |
+|---|---|
+| Routes | `/content-lab/*` inside existing app, gated by `content_lab_tier` |
+| Scraping | Hybrid — existing OAuth connections for client's own IG/FB/TikTok; Apify for competitor handles only |
+| AI — strategy/ideation | Claude (new `ANTHROPIC_API_KEY` secret) for trend synthesis + 12 ideas + hook analysis |
+| AI — per-post summaries | Lovable AI gateway (`google/gemini-2.5-flash-lite`) — cheap, no key needed |
+| Verification | Existing Ahrefs (needs `AHREFS_TOKEN`) + Google Trends (free) |
+| PDF | Same jsPDF approach as existing reports, branded via existing `organisations` colors/fonts |
+| Storage | Two new buckets: `content-lab-thumbs`, `content-lab-reports` |
+| Scheduling | pg_cron → enqueue into existing `sync_jobs`-style queue (new `content_lab_runs` table follows same pattern) |
+| Email | Existing `send-branded-email` |
+
+### New database tables (all with RLS keyed to existing `org_id`)
+
 ```
-This confirms what's stuck before we touch anything.
-
-### Step 2 — Mark all stuck rows for this client as failed
-```sql
-UPDATE sync_jobs
-SET status = 'failed',
-    completed_at = now(),
-    error_message = 'Manual clean restart by user'
-WHERE client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'
-  AND status IN ('pending','processing');
+content_lab_niches      (id, client_id, org_id, label, tracked_handles jsonb,
+                         tracked_hashtags text[], tracked_keywords text[],
+                         competitor_urls text[], language)
+content_lab_runs        (id, client_id, org_id, niche_id, status, started_at,
+                         completed_at, pdf_storage_path, summary jsonb, cost_pence)
+content_lab_posts       (id, run_id, platform, source enum(oauth, apify), author_handle,
+                         post_url, post_type, caption, thumbnail_url, likes, comments,
+                         shares, views, engagement_rate, posted_at, bucket,
+                         ai_summary, hook_text, hook_type)
+content_lab_trends      (id, run_id, label, description, momentum, verification_source,
+                         verification_url, recommendation, supporting_post_ids uuid[])
+content_lab_ideas       (id, run_id, idea_number, title, based_on_post_id, caption,
+                         hook, body, cta, duration_seconds, visual_direction,
+                         why_it_works, hashtags text[], filming_checklist text[])
+content_lab_hooks       (id, run_id, hook_text, source_post_id, mechanism, why_it_works,
+                         engagement_score)
 ```
-This immediately clears the "Sync in progress" bar (the realtime subscription on `sync_jobs` will refresh `useSyncJobs`).
+Add `content_lab_tier` (text: null/lite/pro/agency) to `org_subscriptions`.
 
-### Step 3 — Enqueue a fresh sync for every fully-connected platform
-Plan slug determines history depth (Agency=24, else 12). Reusing the same logic the UI uses, server-side:
-```sql
-INSERT INTO sync_jobs (connection_id, client_id, org_id, platform, months, priority)
-SELECT pc.id,
-       pc.client_id,
-       c.org_id,
-       pc.platform,
-       CASE WHEN sp.slug = 'agency' THEN 24 ELSE 12 END,
-       1
-FROM platform_connections pc
-JOIN clients c ON c.id = pc.client_id
-LEFT JOIN org_subscriptions os ON os.org_id = c.org_id AND os.status = 'active'
-LEFT JOIN subscription_plans sp ON sp.id = os.plan_id
-WHERE pc.client_id = 'c2b194b6-3b2c-4f5a-9f00-95e13ca28027'
-  AND pc.is_connected = true
-  AND pc.account_id IS NOT NULL;
-```
+### New edge functions
 
-### Step 4 — Kick the queue processor
-Call `process-sync-queue` once via `supabase--curl_edge_functions` (POST). The function will claim the new pending jobs and start running them. Realtime will then update the progress bar with real progress.
+- `content-lab-scrape` — pulls posts: existing OAuth for own accounts, Apify for competitors
+- `content-lab-analyse` — Lovable AI for per-post summaries, Claude for trend detection
+- `content-lab-ideate` — Claude single structured tool-call returning 12 ideas
+- `content-lab-render-pdf` — jsPDF, branded, uploads to `content-lab-reports`
+- `content-lab-pipeline` — orchestrator chaining the above, status updates, error recovery
+- `content-lab-cron` — daily pg_cron entry that enqueues runs by tier cadence
 
-### Step 5 — Verify
-- Re-run the SELECT from Step 1 → expect rows with `status='processing'` and progressing `progress_completed`.
-- Tail `process-sync-queue` logs to confirm it started.
+### New screens
 
-## Out of scope
-- No code changes. The recently-deployed parallel queue (20 jobs / batches of 5 / atomic claim with re-fetch) stays as-is.
-- Not enabling a watchdog cron in this turn (separate decision the user previously deferred).
+1. `/content-lab` — Dashboard: latest run, "Run new report" CTA, niche cards, upgrade banner
+2. `/content-lab/niche/new` and `/content-lab/niche/[id]` — Niche setup form
+3. `/content-lab/run/[id]` — 6-tab report view (Viral Feed, Trend Radar, 12 Ideas, Hook Library, Best Openers, Export)
+4. `/content-lab/billing` — Three-tier add-on pricing, current plan, manage via Stripe portal
+5. `/content-lab/admin` — Platform admin only: all runs, cost, retry
 
-## Risk
-- **Low.** Failing the existing rows is non-destructive (no snapshots are deleted; previously-synced months remain). The new jobs will skip already-synced months for backfill priority logic — but since these are priority 1 (treated as fresh sync, not backfill), they will re-sync the latest month plus walk the history. If you'd rather *only* requeue the previously-stuck Facebook job rather than all 13+ platforms, say so before approval and I'll narrow Step 3.
+Sidebar: add a single "Content Lab" entry under existing nav, hidden when org has no `content_lab_tier`.
+
+### Secrets needed (will request when we hit each phase)
+
+- `ANTHROPIC_API_KEY` (Phase 1)
+- `APIFY_TOKEN` (Phase 1)
+- `AHREFS_TOKEN` (Phase 2)
+- Stripe price IDs for the 3 add-on products (Phase 3) — created via tools, no manual key
+
+### What I'm NOT building
+
+- Replacement for any existing functionality
+- Changes to existing report generation, sync, or dashboards
+- Notion/Google Calendar exports (deferred to "later")
+- White-label PDF logo swap (Phase 4 polish)
+
+### Risks flagged
+
+1. **Apify TOS / cost runaway** — hard cost cap per run, weekly health check, fallback provider in env config
+2. **Claude API key billing** — you absorb this directly; budget ~£1.20 per Pro run
+3. **60s edge function limit** — pipeline split into 5 functions chained via the orchestrator (same pattern as existing sync)
+4. **Idea quality drift** — 1–5 star rating UI on each idea so the team can flag weak outputs and we iterate the prompt
+
+### Build order — what I'll ship first
+
+Phase 1 only, in this order:
+1. Migration: tables + RLS + bucket creation
+2. `/content-lab` dashboard + `/content-lab/niche/new` with mock data
+3. `content-lab-scrape` (OAuth path first, Apify second) wired against one real client
+4. `content-lab-analyse` + `content-lab-ideate` wired
+5. `/content-lab/run/[id]` with Viral Feed + 12 Ideas tabs against real data
+6. `content-lab-render-pdf` + Export tab
+7. Pause for your review before Phase 2
+
+Approve this and I'll start with Phase 1, step 1 (the migration). I'll request `ANTHROPIC_API_KEY` and `APIFY_TOKEN` right after the migration is applied, before wiring the scraper.
+
