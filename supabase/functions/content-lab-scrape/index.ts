@@ -1,7 +1,10 @@
 // content-lab-scrape: pulls posts for a run.
-// - For tracked handles with platform=instagram and a matching client OAuth connection -> Instagram Graph API
-// - For all other tracked handles + competitor URLs -> Apify (instagram-scraper actor)
-// Writes rows to content_lab_posts. Idempotent: caller (pipeline) clears posts for the run first.
+// Sources, in priority order:
+//   1. Own handle via Instagram Graph API (if OAuth-connected)
+//   2. Top competitors (from niche.top_competitors[].handle) via Apify
+//   3. Top global benchmarks (from niche.top_global_benchmarks[].handle) via Apify
+//   4. Legacy tracked_handles + competitor_urls (back-compat)
+// Per-platform isolation: a failure in one source does not abort the rest.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { decryptToken } from "../_shared/tokenCrypto.ts";
@@ -15,13 +18,16 @@ const corsHeaders = {
 };
 
 const APIFY_ACTOR = "apify~instagram-scraper";
-const MAX_POSTS_PER_HANDLE = 30;
-const MAX_TOTAL_POSTS = 200;
+const MAX_POSTS_PER_HANDLE = 20;
+const MAX_TOTAL_POSTS = 300;
 
+interface DiscoveredEntity { handle: string; reason?: string }
 interface TrackedHandle { platform: string; handle: string }
+
 interface ScrapedPost {
   platform: "instagram" | "tiktok" | "facebook";
   source: "oauth" | "apify";
+  bucket: "own" | "competitor" | "benchmark" | "legacy";
   author_handle: string;
   post_url: string | null;
   post_type: string | null;
@@ -40,80 +46,119 @@ Deno.serve(async (req) => {
 
   try {
     const { run_id } = await req.json();
-    if (!run_id) {
-      return json({ error: "run_id is required" }, 400);
-    }
+    if (!run_id) return json({ error: "run_id is required" }, 400);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Load run + niche
     const { data: run, error: runErr } = await supabase
       .from("content_lab_runs").select("*, niche:niche_id(*)").eq("id", run_id).single();
     if (runErr || !run) return json({ error: "Run not found" }, 404);
 
     const niche = (run as { niche: {
+      own_handle: string | null;
+      top_competitors: DiscoveredEntity[];
+      top_global_benchmarks: DiscoveredEntity[];
       tracked_handles: TrackedHandle[];
       competitor_urls: string[];
-      tracked_hashtags: string[];
       client_id: string;
+      platforms_to_scrape: string[];
     } }).niche;
 
-    const handles = (niche.tracked_handles ?? []) as TrackedHandle[];
-    const competitorUrls = niche.competitor_urls ?? [];
-
-    // Split handles: instagram with OAuth vs everything else (Apify)
-    const igHandles = handles.filter((h) => h.platform === "instagram");
-    const apifyHandles = handles.filter((h) => h.platform !== "instagram");
-
     const collected: ScrapedPost[] = [];
+    const errors: string[] = [];
 
-    // ---------- OAuth path: Instagram via existing platform_connections ----------
-    const { data: igConn } = await supabase
-      .from("platform_connections")
-      .select("id, access_token, account_id, account_name, is_connected")
-      .eq("client_id", niche.client_id)
-      .eq("platform", "instagram")
-      .eq("is_connected", true)
-      .maybeSingle();
+    // ---------- 1. Own handle via OAuth ----------
+    if (niche.own_handle) {
+      try {
+        const { data: igConn } = await supabase
+          .from("platform_connections")
+          .select("id, access_token, account_id, account_name, is_connected")
+          .eq("client_id", niche.client_id)
+          .eq("platform", "instagram")
+          .eq("is_connected", true)
+          .maybeSingle();
 
-    const apifyTargets: string[] = competitorUrls.slice();
+        const ownHandle = niche.own_handle.toLowerCase().replace(/^@/, "");
+        const connHandle = igConn?.account_name?.toLowerCase().replace(/^@/, "");
 
-    if (igConn?.access_token && igHandles.length > 0) {
-      const token = await decryptToken(igConn.access_token);
-      // We can only fetch our own connected IG account via Graph API.
-      // For other handles, fall back to Apify.
-      const ownAccount = igConn.account_name?.toLowerCase().replace(/^@/, "");
-      for (const h of igHandles) {
-        const handle = h.handle.toLowerCase().replace(/^@/, "");
-        if (ownAccount && handle === ownAccount) {
-          const posts = await fetchOwnInstagramPosts(igConn.account_id!, token, handle);
+        if (igConn?.access_token && igConn.account_id && connHandle === ownHandle) {
+          const token = await decryptToken(igConn.access_token);
+          const posts = await fetchOwnInstagramPosts(igConn.account_id, token, ownHandle);
+          posts.forEach((p) => { p.bucket = "own"; });
           collected.push(...posts);
+          console.log(`Own (OAuth): ${posts.length} posts for @${ownHandle}`);
         } else {
-          apifyTargets.push(`https://www.instagram.com/${handle}/`);
+          // Fallback to Apify for own handle
+          const posts = await scrapeApifyHandles([ownHandle]);
+          posts.forEach((p) => { p.bucket = "own"; });
+          collected.push(...posts);
+          console.log(`Own (Apify): ${posts.length} posts for @${ownHandle}`);
         }
-      }
-    } else {
-      for (const h of igHandles) {
-        apifyTargets.push(`https://www.instagram.com/${h.handle.replace(/^@/, "")}/`);
+      } catch (e) {
+        const msg = `Own handle scrape failed: ${e instanceof Error ? e.message : e}`;
+        console.error(msg);
+        errors.push(msg);
       }
     }
 
-    for (const h of apifyHandles) {
-      // Best-effort URLs for non-IG platforms (kept for Phase 2; Apify actor below ignores non-IG)
-      apifyTargets.push(`https://www.${h.platform}.com/${h.handle.replace(/^@/, "")}/`);
+    // ---------- 2. Top competitors ----------
+    const competitorHandles = (niche.top_competitors ?? [])
+      .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
+      .filter((h): h is string => !!h);
+    if (competitorHandles.length > 0) {
+      try {
+        const posts = await scrapeApifyHandles(competitorHandles);
+        posts.forEach((p) => { p.bucket = "competitor"; });
+        collected.push(...posts);
+        console.log(`Competitors: ${posts.length} posts from ${competitorHandles.length} handles`);
+      } catch (e) {
+        const msg = `Competitor scrape failed: ${e instanceof Error ? e.message : e}`;
+        console.error(msg);
+        errors.push(msg);
+      }
     }
 
-    // ---------- Apify path: Instagram scraper ----------
-    if (apifyTargets.length > 0) {
-      const apifyToken = Deno.env.get("APIFY_TOKEN");
-      if (!apifyToken) {
-        console.error("APIFY_TOKEN not configured; skipping Apify scrape");
-      } else {
-        const apifyPosts = await runApifyInstagram(apifyToken, apifyTargets);
-        collected.push(...apifyPosts);
+    // ---------- 3. Global benchmarks ----------
+    const benchmarkHandles = (niche.top_global_benchmarks ?? [])
+      .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
+      .filter((h): h is string => !!h);
+    if (benchmarkHandles.length > 0) {
+      try {
+        const posts = await scrapeApifyHandles(benchmarkHandles);
+        posts.forEach((p) => { p.bucket = "benchmark"; });
+        collected.push(...posts);
+        console.log(`Benchmarks: ${posts.length} posts from ${benchmarkHandles.length} handles`);
+      } catch (e) {
+        const msg = `Benchmark scrape failed: ${e instanceof Error ? e.message : e}`;
+        console.error(msg);
+        errors.push(msg);
+      }
+    }
+
+    // ---------- 4. Legacy back-compat (tracked_handles + competitor_urls) ----------
+    const legacyHandles = (niche.tracked_handles ?? [])
+      .filter((h) => h.platform === "instagram")
+      .map((h) => h.handle.toLowerCase().replace(/^@/, ""));
+    const legacyUrls = niche.competitor_urls ?? [];
+    if (legacyHandles.length > 0 || legacyUrls.length > 0) {
+      try {
+        const allTargets = [
+          ...legacyHandles.map((h) => `https://www.instagram.com/${h}/`),
+          ...legacyUrls.filter((u) => u.includes("instagram.com")),
+        ];
+        if (allTargets.length > 0) {
+          const posts = await runApifyInstagramByUrls(allTargets);
+          posts.forEach((p) => { p.bucket = "legacy"; });
+          collected.push(...posts);
+          console.log(`Legacy: ${posts.length} posts`);
+        }
+      } catch (e) {
+        const msg = `Legacy scrape failed: ${e instanceof Error ? e.message : e}`;
+        console.error(msg);
+        errors.push(msg);
       }
     }
 
@@ -126,11 +171,11 @@ Deno.serve(async (req) => {
       return true;
     }).slice(0, MAX_TOTAL_POSTS);
 
-    // Compute engagement_rate (likes+comments)/max(views,1) — lightweight; analyse fn can refine
     const rows = deduped.map((p) => ({
       run_id,
       platform: p.platform,
       source: p.source,
+      bucket: p.bucket,
       author_handle: p.author_handle,
       post_url: p.post_url,
       post_type: p.post_type,
@@ -154,7 +199,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, post_count: rows.length });
+    return json({
+      ok: true,
+      post_count: rows.length,
+      buckets: {
+        own: rows.filter((r) => r.bucket === "own").length,
+        competitor: rows.filter((r) => r.bucket === "competitor").length,
+        benchmark: rows.filter((r) => r.bucket === "benchmark").length,
+        legacy: rows.filter((r) => r.bucket === "legacy").length,
+      },
+      errors: errors.length > 0 ? errors : undefined,
+    });
   } catch (e) {
     console.error("content-lab-scrape error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
@@ -189,6 +244,7 @@ async function fetchOwnInstagramPosts(
     }) => ({
       platform: "instagram" as const,
       source: "oauth" as const,
+      bucket: "own" as const,
       author_handle: handle,
       post_url: m.permalink ?? null,
       post_type: m.media_type?.toLowerCase() ?? null,
@@ -206,8 +262,18 @@ async function fetchOwnInstagramPosts(
   }
 }
 
-async function runApifyInstagram(token: string, urls: string[]): Promise<ScrapedPost[]> {
-  // Filter to instagram URLs (the actor only handles IG)
+async function scrapeApifyHandles(handles: string[]): Promise<ScrapedPost[]> {
+  const urls = handles.map((h) => `https://www.instagram.com/${h.replace(/^@/, "")}/`);
+  return runApifyInstagramByUrls(urls);
+}
+
+async function runApifyInstagramByUrls(urls: string[]): Promise<ScrapedPost[]> {
+  const apifyToken = Deno.env.get("APIFY_TOKEN");
+  if (!apifyToken) {
+    console.error("APIFY_TOKEN not configured; skipping Apify scrape");
+    return [];
+  }
+
   const igUrls = urls.filter((u) => u.includes("instagram.com"));
   if (igUrls.length === 0) return [];
 
@@ -218,7 +284,7 @@ async function runApifyInstagram(token: string, urls: string[]): Promise<Scraped
     addParentData: false,
   };
 
-  const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${token}&timeout=50`;
+  const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=50`;
 
   try {
     const res = await fetch(runUrl, {
@@ -240,6 +306,7 @@ async function runApifyInstagram(token: string, urls: string[]): Promise<Scraped
     }) => ({
       platform: "instagram" as const,
       source: "apify" as const,
+      bucket: "competitor" as const, // overwritten by caller
       author_handle: (it.ownerUsername ?? "unknown").toLowerCase(),
       post_url: it.url ?? null,
       post_type: it.type?.toLowerCase() ?? null,
