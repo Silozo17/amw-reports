@@ -145,7 +145,7 @@ const NicheFormPage = () => {
         },
       });
       if (error) throw error;
-      const result = data?.result;
+      const result = data?.discovery ?? data?.result;
       if (!result) throw new Error('No result from discovery');
 
       setLabel(result.niche_label ?? label);
