@@ -126,7 +126,7 @@ export function useAdminContentLabStepLogs(filters: { runId?: string; status?: s
         .order('created_at', { ascending: false })
         .limit(LOGS_LIMIT);
       if (filters.runId) q = q.eq('run_id', filters.runId);
-      if (filters.status) q = q.eq('status', filters.status);
+      if (filters.status) q = q.eq('status', filters.status as 'started' | 'ok' | 'failed');
       if (filters.step) q = q.eq('step', filters.step);
       const { data, error } = await q;
       if (error) throw error;
