@@ -1,64 +1,50 @@
 
 
-User wants observability for Content Lab inside the Platform Admin area. Let me check what admin debug surfaces already exist so I match the pattern.
+User wants me to drive the preview: open /content-lab, create a test niche, confirm save + appearance. This is a browser interaction task — they explicitly asked me to test in the preview, so browser tools are appropriate.
 
-Existing patterns I know from context:
-- `src/pages/admin/AdminActivityLog.tsx` — platform-wide sync/report log viewer
-- `src/pages/DebugConsole.tsx` — admin-only JSON inspection at `/debug`
-- `src/components/layout/AppSidebar.tsx` — admin collapsible nav
-- Tables: `content_lab_runs`, `content_lab_posts`, `content_lab_ideas`, `content_lab_niches`
-- Edge functions: `content-lab-pipeline`, `content-lab-discover`, `content-lab-scrape`, `content-lab-analyse`, `content-lab-ideate`
+But wait — I'm in plan mode (read-only). Browser tools aren't listed in my allowed tools here. I need to present a plan, get approval, then in default mode execute it.
 
-Confirming scope before building. The pipeline writes status + `error_message` to `content_lab_runs`, but per-step logs only live in edge function logs. To make this debuggable end-to-end we need both: (a) a UI surface in admin, and (b) richer step-level persistence.
+Also worth noting: in the recent build (Step 4), `NicheFormPage` was rewritten to a discovery-driven flow — the form now starts with Instagram handle + website + location, then runs "Discover niche & competitors" via the `content-lab-discover` edge function to auto-populate competitors/benchmarks/keywords/hashtags. There's no longer a simple form where you manually type handles/hashtags/keywords as the user described.
 
-## Plan — Content Lab admin debug & logs
+So I need to flag this mismatch before testing. Two options:
+1. Use the new discovery flow (recommended — it's the current shipped UX)
+2. The user may be remembering the old form
 
-### What you'll get
-A new admin page **`/admin/content-lab`** with three tabs:
+I'll plan for the discovery flow but call this out.
 
-1. **Runs** — every run across all orgs. Columns: org, client, niche, status, started, duration, post count, idea count, cost, error. Click a row to expand into a detail drawer showing:
-   - Niche config snapshot (handles, competitors, benchmarks, preferences)
-   - Per-step timeline (discover → scrape → analyse → ideate) with status, duration, error
-   - Scraped posts grouped by bucket (own / competitor / benchmark) with counts per handle
-   - Generated ideas grouped by platform
-   - Raw JSON viewer (collapsed) for the full run row
+Plan:
 
-2. **Step Logs** — chronological feed of per-step events from a new `content_lab_step_logs` table. Filter by run, status, step. Each row: timestamp, run, step name, status, duration ms, message, payload JSON.
+## Test plan — create a niche end-to-end in /content-lab
 
-3. **Niches** — every niche across all orgs with discovery status, last run, total runs, total cost.
+### Heads-up before I start
+The niche form was rebuilt in Step 4 to a **discovery-driven flow**: you enter Instagram handle + website + location, click "Discover", and Claude auto-fills competitors, benchmarks, keywords and hashtags. There's no longer a manual form for typing handles/hashtags/keywords directly — the user-typed list is gone.
 
-### Data layer
-New table `content_lab_step_logs`:
-- `id`, `run_id`, `step` (discover|scrape|analyse|ideate), `status` (started|ok|failed), `started_at`, `completed_at`, `duration_ms`, `message`, `payload jsonb`, `error_message`
-- RLS: platform admins read all; org members read their own runs' logs
+If you want me to test the new discovery flow, here's what I'll do. If you wanted the old manual form back, tell me and I'll stop.
 
-Each edge function (`content-lab-pipeline`, `-scrape`, `-analyse`, `-ideate`, `-discover`) gets a small `logStep()` helper that writes start/end rows. Existing `console.log` JSON lines stay (for raw edge function logs).
+### Steps I'll run in the preview
+1. `navigate_to_sandbox` → `/content-lab`
+2. Pick the active client and click **"New niche"** (or equivalent CTA)
+3. Fill the discover form with test data:
+   - Instagram handle: `@nike`
+   - Website: `https://nike.com`
+   - Location: `Global`
+4. Click **"Discover niche & competitors"** — wait for the edge function to populate competitors/benchmarks/keywords/hashtags
+5. Review the auto-filled fields, leave defaults for tone/styles/platforms
+6. Click **Save**
+7. Navigate back to `/content-lab`
+8. Confirm the new niche row appears in the list with the right label/handle
+9. Screenshot the dashboard showing the saved niche
 
-### UI layer
-- `src/pages/admin/AdminContentLab.tsx` — page shell + tabs
-- `src/components/admin/contentLab/RunsTable.tsx` — runs list
-- `src/components/admin/contentLab/RunDetailDrawer.tsx` — expand panel with timeline + posts + ideas
-- `src/components/admin/contentLab/StepLogsTable.tsx` — step log feed
-- `src/components/admin/contentLab/NichesTable.tsx` — niches overview
-- `src/hooks/useAdminContentLab.ts` — TanStack Query hooks (runs, logs, niches, run detail)
+### What I'll report back
+- Pass/fail at each step
+- Whether the discover function returned competitors + benchmarks
+- Whether the niche persisted and shows in the list
+- Any console errors or failed network calls
+- A final screenshot
 
-### Sidebar
-Add "Content Lab" entry under the existing admin collapsible in `AppSidebar.tsx`, pointing to `/admin/content-lab`. Route registered in `App.tsx` behind the platform-admin guard.
+### What I won't do
+- Trigger a full pipeline run (that costs Apify + Claude credits — ask separately if you want it)
+- Edit any existing niches
 
-### Realtime (lightweight)
-Subscribe to `content_lab_runs` and `content_lab_step_logs` on the admin page so a running pipeline updates live without refresh.
-
-### Out of scope (ask if you want them)
-- Re-run / cancel buttons (read-only console for now)
-- Cost graphs / spend charts
-- Exporting logs to CSV
-
-### Build order
-1. Migration: `content_lab_step_logs` + RLS
-2. Add `logStep()` calls to the 5 edge functions
-3. Hooks + page + 4 components
-4. Sidebar link + route
-5. Pause for you to test
-
-Approve and I'll start with the migration.
+Approve and I'll switch to default mode and run it.
 
