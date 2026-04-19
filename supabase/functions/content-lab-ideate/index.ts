@@ -111,22 +111,29 @@ Deno.serve(async (req) => {
         posts: platformPosts,
       });
 
-      if (!generated || generated.length === 0) {
-        console.error(`Ideation failed for ${platform}`);
+      if (!generated.ok) {
+        console.error(`Ideation failed for ${platform}: ${generated.error}`);
+        await platformLog.finish({ status: "failed", errorMessage: generated.error });
+        // Bubble upstream errors (credits, auth, rate limits) up to the pipeline so the
+        // UI shows the actual root cause instead of a misleading "no ideas" message.
+        return json({ error: `Anthropic (${platform}): ${generated.error}` }, 502);
+      }
+      if (generated.ideas.length === 0) {
+        console.error(`Ideation returned 0 ideas for ${platform}`);
         await platformLog.finish({ status: "failed", errorMessage: "Claude returned no ideas" });
         continue;
       }
 
       // Fallback evidence post: highest-engagement post for this platform.
       const fallbackPostId = platformPosts[0]?.id ?? null;
-      for (const idea of generated.slice(0, count)) {
+      for (const idea of generated.ideas.slice(0, count)) {
         ideaCounter += 1;
         allRows.push(toRow(run_id, ideaCounter, platform, idea, platformPosts, fallbackPostId));
       }
       await platformLog.finish({
         status: "ok",
-        message: `Generated ${generated.length} ideas for ${platform}`,
-        payload: { platform, generated_count: generated.length },
+        message: `Generated ${generated.ideas.length} ideas for ${platform}`,
+        payload: { platform, generated_count: generated.ideas.length },
       });
     }
 
@@ -248,7 +255,11 @@ interface IdeatePlatformArgs {
   posts: PostRow[];
 }
 
-async function generateIdeasForPlatform(args: IdeatePlatformArgs): Promise<GeneratedIdea[] | null> {
+type IdeateResult =
+  | { ok: true; ideas: GeneratedIdea[] }
+  | { ok: false; error: string };
+
+async function generateIdeasForPlatform(args: IdeatePlatformArgs): Promise<IdeateResult> {
   const { apiKey, niche, platform, count, posts } = args;
 
   const systemPrompt = `${buildSystemPrompt(niche)}
@@ -325,16 +336,34 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
       }),
     });
 
+    const requestId = res.headers.get("request-id") ?? res.headers.get("x-request-id") ?? "n/a";
+
     if (!res.ok) {
-      console.error("Claude error:", res.status, await res.text());
-      return null;
+      const text = await res.text();
+      console.error(JSON.stringify({
+        fn: "content-lab-ideate",
+        anthropic_error: true,
+        status: res.status,
+        request_id: requestId,
+        body: text.slice(0, 1000),
+      }));
+      // Try to surface Anthropic's structured error message if present.
+      let detail = text.slice(0, 500);
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed?.error?.message) detail = parsed.error.message;
+      } catch { /* keep raw text */ }
+      return { ok: false, error: `${res.status} ${detail} (req:${requestId})` };
     }
+
     const data = await res.json();
     const toolUse = (data.content ?? []).find((c: { type: string }) => c.type === "tool_use");
-    if (!toolUse?.input?.ideas) return null;
-    return toolUse.input.ideas as GeneratedIdea[];
+    if (!toolUse?.input?.ideas) {
+      return { ok: false, error: "Claude response had no tool_use ideas" };
+    }
+    return { ok: true, ideas: toolUse.input.ideas as GeneratedIdea[] };
   } catch (e) {
     console.error(`generateIdeasForPlatform(${platform}) failed:`, e);
-    return null;
+    return { ok: false, error: e instanceof Error ? e.message : "fetch failed" };
   }
 }
