@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useContentLabNiches, useContentLabRuns, ContentLabRun } from '@/hooks/useContentLab';
-import { usePageMeta } from '@/hooks/usePageMeta';
+import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: typeof Clock; tone: string }> = {
   pending: { label: 'Pending', icon: Clock, tone: 'bg-muted text-muted-foreground' },
