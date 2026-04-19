@@ -199,6 +199,12 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
     }
     console.log(`Pipeline ${runId}: scraped ${postCount} posts`);
 
+    // Charge usage only once we know the scrape produced data.
+    if (orgId) {
+      const { error: usageErr } = await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
+      if (usageErr) console.error("Usage increment failed:", usageErr);
+    }
+
     // 2. ANALYSE (best-effort)
     await updateStatus("analysing");
     const analyseStep = await logStepStart({ runId, step: "analyse", message: "Calling content-lab-analyse" });
