@@ -19,9 +19,14 @@ const corsHeaders = {
 };
 
 const APIFY_ACTOR = "apify~instagram-scraper";
-const MAX_POSTS_OWN = 20;
-const MAX_POSTS_OTHER = 10;
-const MAX_TOTAL_POSTS = 300;
+// Cost caps — keep low to bound Apify spend per run.
+// Realistic worst case = 15 + (5*8) + (3*6) = 73 items.
+const MAX_POSTS_OWN = 15;
+const MAX_POSTS_COMPETITOR = 8;
+const MAX_POSTS_BENCHMARK = 6;
+const MAX_COMPETITOR_HANDLES = 5;
+const MAX_BENCHMARK_HANDLES = 3;
+const MAX_TOTAL_POSTS = 80;
 const APIFY_CHUNK_SIZE = 5;
 const APIFY_TIMEOUT_SEC = 90;
 
@@ -69,16 +74,18 @@ Deno.serve(async (req) => {
 
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
-      .filter((h): h is string => !!h);
+      .filter((h): h is string => !!h)
+      .slice(0, MAX_COMPETITOR_HANDLES);
     const benchmarkHandles = (niche.top_global_benchmarks ?? [])
       .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
-      .filter((h): h is string => !!h);
+      .filter((h): h is string => !!h)
+      .slice(0, MAX_BENCHMARK_HANDLES);
 
     // Run all three buckets in parallel; each handles its own errors.
     const [ownResult, compResult, benchResult] = await Promise.allSettled([
       scrapeOwn(supabase, niche),
-      scrapeBucket(competitorHandles, "competitor"),
-      scrapeBucket(benchmarkHandles, "benchmark"),
+      scrapeBucket(competitorHandles, "competitor", MAX_POSTS_COMPETITOR),
+      scrapeBucket(benchmarkHandles, "benchmark", MAX_POSTS_BENCHMARK),
     ]);
 
     const collected: ScrapedPost[] = [];
@@ -235,6 +242,7 @@ async function scrapeOwn(
 async function scrapeBucket(
   handles: string[],
   bucket: "competitor" | "benchmark",
+  postsPerHandle: number,
 ): Promise<BucketResult> {
   if (handles.length === 0) return { posts: [], errors: [] };
   const errors: string[] = [];
@@ -248,7 +256,7 @@ async function scrapeBucket(
 
   // Run chunks in parallel within the bucket too.
   const settled = await Promise.allSettled(
-    chunks.map((c) => runApifyForHandles(c, MAX_POSTS_OTHER)),
+    chunks.map((c) => runApifyForHandles(c, postsPerHandle)),
   );
   settled.forEach((r, idx) => {
     if (r.status === "fulfilled") {
