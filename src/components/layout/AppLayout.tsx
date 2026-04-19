@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, forwardRef } from 'react';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -11,7 +11,7 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-const AppLayout = ({ children }: AppLayoutProps) => {
+const AppLayout = forwardRef<HTMLDivElement, AppLayoutProps>(({ children }, _ref) => {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { org } = useOrg();
@@ -62,6 +62,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </div>
     </div>
   );
-};
+});
+
+AppLayout.displayName = 'AppLayout';
 
 export default AppLayout;
