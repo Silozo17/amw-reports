@@ -61,6 +61,22 @@ const RunDetailPage = () => {
     },
   });
 
+  const handleDownloadPdf = async () => {
+    if (!run?.pdf_storage_path) return;
+    setDownloading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('content-lab-reports')
+        .createSignedUrl(run.pdf_storage_path, 60);
+      if (error || !data) throw error ?? new Error('No URL');
+      window.open(data.signedUrl, '_blank');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not generate download link');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
