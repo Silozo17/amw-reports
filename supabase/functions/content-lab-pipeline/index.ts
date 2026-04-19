@@ -20,6 +20,36 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Per-org monthly run ceilings (precursor to full credit system).
+const RUN_LIMITS_BY_TIER: Record<string, number> = {
+  creator: 10,
+  studio: 25,
+  agency: 60,
+};
+const DEFAULT_RUN_LIMIT = 10;
+
+async function getMonthlyLimit(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
+  const { data } = await admin
+    .from("org_subscriptions")
+    .select("content_lab_tier")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  const tier = (data as { content_lab_tier?: string | null } | null)?.content_lab_tier?.toLowerCase();
+  return (tier && RUN_LIMITS_BY_TIER[tier]) ?? DEFAULT_RUN_LIMIT;
+}
+
+async function getCurrentUsage(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
+  const now = new Date();
+  const { data } = await admin
+    .from("content_lab_usage")
+    .select("runs_count")
+    .eq("org_id", orgId)
+    .eq("year", now.getUTCFullYear())
+    .eq("month", now.getUTCMonth() + 1)
+    .maybeSingle();
+  return (data as { runs_count?: number } | null)?.runs_count ?? 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "content-lab-pipeline", method: req.method }));
@@ -40,6 +70,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     let runId = existingRunId;
+    let orgIdForUsage: string | null = null;
 
     // Create run from niche if not provided
     if (!runId) {
@@ -48,22 +79,39 @@ Deno.serve(async (req) => {
         .from("content_lab_niches").select("id, client_id, org_id").eq("id", niche_id).single();
       if (nErr || !niche) return json({ error: "Niche not found" }, 404);
 
+      // Pre-flight monthly usage cap
+      const limit = await getMonthlyLimit(admin, (niche as { org_id: string }).org_id);
+      const used = await getCurrentUsage(admin, (niche as { org_id: string }).org_id);
+      if (used >= limit) {
+        return json({
+          error: `Monthly run limit reached (${used}/${limit}). Resets on the 1st.`,
+          limit_reached: true,
+          runs_used: used,
+          runs_limit: limit,
+        }, 429);
+      }
+
       const { data: created, error: cErr } = await admin
         .from("content_lab_runs")
         .insert({
           niche_id: niche.id,
-          client_id: niche.client_id,
-          org_id: niche.org_id,
+          client_id: (niche as { client_id: string }).client_id,
+          org_id: (niche as { org_id: string }).org_id,
           status: "pending",
           triggered_by: user.id,
         })
         .select("id").single();
       if (cErr || !created) return json({ error: cErr?.message ?? "Could not create run" }, 500);
       runId = created.id;
+      orgIdForUsage = (niche as { org_id: string }).org_id;
+    } else {
+      const { data: existing } = await admin
+        .from("content_lab_runs").select("org_id").eq("id", runId).single();
+      orgIdForUsage = (existing as { org_id?: string } | null)?.org_id ?? null;
     }
 
     // Kick off async pipeline. Respond immediately so the UI doesn't block.
-    runPipeline(admin, runId!).catch((e) => {
+    runPipeline(admin, runId!, orgIdForUsage).catch((e) => {
       console.error("Pipeline crashed:", e);
     });
 
@@ -80,7 +128,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function runPipeline(admin: ReturnType<typeof createClient>, runId: string) {
+async function runPipeline(admin: ReturnType<typeof createClient>, runId: string, orgId: string | null) {
   const updateStatus = async (status: string, extra: Record<string, unknown> = {}) => {
     await admin.from("content_lab_runs").update({
       status, updated_at: new Date().toISOString(), ...extra,
