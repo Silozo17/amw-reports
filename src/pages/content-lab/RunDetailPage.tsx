@@ -9,6 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import usePageMeta from '@/hooks/usePageMeta';
+import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
+import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
+import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
+
+const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
+  const p = (platform ?? 'instagram').toLowerCase();
+  if (p === 'tiktok') return <IdeaPreviewTikTok hook={hook} caption={caption} />;
+  if (p === 'facebook') return <IdeaPreviewFacebook hook={hook} caption={caption} />;
+  return <IdeaPreviewInstagram hook={hook} caption={caption} />;
+};
 
 const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -119,32 +129,42 @@ const RunDetailPage = () => {
               <Card className="p-10 text-center text-sm text-muted-foreground">Ideas will appear here once the run completes.</Card>
             ) : (
               ideas.map((idea) => (
-                <Card key={idea.id} className="space-y-3 p-6">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea {idea.idea_number}</p>
-                      <h3 className="mt-1 font-display text-xl">{idea.title}</h3>
-                    </div>
-                    {idea.duration_seconds && (
-                      <Badge variant="outline">{idea.duration_seconds}s</Badge>
+                <Card key={idea.id} className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
+                  <div>
+                    {renderPreview(idea.target_platform, idea.hook ?? idea.title, idea.caption)}
+                    {idea.target_platform && (
+                      <p className="mt-2 text-center text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {idea.target_platform}
+                      </p>
                     )}
                   </div>
-                  {idea.hook && <p className="text-sm"><span className="font-semibold">Hook: </span>{idea.hook}</p>}
-                  {idea.body && <p className="text-sm text-muted-foreground">{idea.body}</p>}
-                  {idea.cta && <p className="text-sm"><span className="font-semibold">CTA: </span>{idea.cta}</p>}
-                  {idea.why_it_works && (
-                    <div className="rounded-md bg-primary/5 p-3 text-sm">
-                      <span className="font-semibold text-primary">Why it works: </span>
-                      {idea.why_it_works}
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea {idea.idea_number}</p>
+                        <h3 className="mt-1 font-display text-xl">{idea.title}</h3>
+                      </div>
+                      {idea.duration_seconds && (
+                        <Badge variant="outline">{idea.duration_seconds}s</Badge>
+                      )}
                     </div>
-                  )}
-                  {idea.hashtags && idea.hashtags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {idea.hashtags.map((h: string) => (
-                        <Badge key={h} variant="secondary" className="text-[10px]">#{h}</Badge>
-                      ))}
-                    </div>
-                  )}
+                    {idea.hook && <p className="text-sm"><span className="font-semibold">Hook: </span>{idea.hook}</p>}
+                    {idea.body && <p className="text-sm text-muted-foreground">{idea.body}</p>}
+                    {idea.cta && <p className="text-sm"><span className="font-semibold">CTA: </span>{idea.cta}</p>}
+                    {idea.why_it_works && (
+                      <div className="rounded-md bg-primary/5 p-3 text-sm">
+                        <span className="font-semibold text-primary">Why it works: </span>
+                        {idea.why_it_works}
+                      </div>
+                    )}
+                    {idea.hashtags && idea.hashtags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {idea.hashtags.map((h: string) => (
+                          <Badge key={h} variant="secondary" className="text-[10px]">#{h}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </Card>
               ))
             )}
