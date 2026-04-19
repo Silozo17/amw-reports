@@ -199,15 +199,38 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Persist per-bucket counts + any non-fatal errors back to the run summary
+    // so they surface in the admin Run Detail drawer.
+    const buckets = {
+      own: rows.filter((r) => r.bucket === "own").length,
+      competitor: rows.filter((r) => r.bucket === "competitor").length,
+      benchmark: rows.filter((r) => r.bucket === "benchmark").length,
+      legacy: rows.filter((r) => r.bucket === "legacy").length,
+    };
+
+    const { data: existing } = await supabase
+      .from("content_lab_runs")
+      .select("summary")
+      .eq("id", run_id)
+      .single();
+    const existingSummary = (existing?.summary ?? {}) as Record<string, unknown>;
+
+    await supabase
+      .from("content_lab_runs")
+      .update({
+        summary: {
+          ...existingSummary,
+          scrape_buckets: buckets,
+          scrape_errors: errors.length > 0 ? errors : null,
+          scrape_post_count: rows.length,
+        },
+      })
+      .eq("id", run_id);
+
     return json({
       ok: true,
       post_count: rows.length,
-      buckets: {
-        own: rows.filter((r) => r.bucket === "own").length,
-        competitor: rows.filter((r) => r.bucket === "competitor").length,
-        benchmark: rows.filter((r) => r.bucket === "benchmark").length,
-        legacy: rows.filter((r) => r.bucket === "legacy").length,
-      },
+      buckets,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (e) {
