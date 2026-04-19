@@ -35,14 +35,25 @@ const ContentLabPage = () => {
   const queryClient = useQueryClient();
   const { data: niches = [], isLoading: nichesLoading } = useContentLabNiches();
   const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
+  const { data: usage } = useContentLabUsage();
   const [runningNiche, setRunningNiche] = useState<string | null>(null);
+  const [pendingRunNicheId, setPendingRunNicheId] = useState<string | null>(null);
 
   usePageMeta({ title: 'Content Lab', description: 'Discover what is working in your niche and generate ready-to-film content ideas.' });
 
   const latestRun = runs[0];
+  const usageReached = usage ? usage.runsThisMonth >= usage.runsLimit : false;
 
-  const handleRunNow = async (nicheId: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const RECENT_RUN_WINDOW_MS = 24 * 60 * 60 * 1000;
+  const findRecentSuccessfulRun = (nicheId: string) =>
+    runs.find(
+      (r) =>
+        r.niche_id === nicheId &&
+        r.status === 'completed' &&
+        Date.now() - new Date(r.created_at).getTime() < RECENT_RUN_WINDOW_MS,
+    );
+
+  const startRun = async (nicheId: string) => {
     setRunningNiche(nicheId);
     try {
       const { data, error } = await supabase.functions.invoke('content-lab-pipeline', {
@@ -50,7 +61,10 @@ const ContentLabPage = () => {
       });
       if (error) throw error;
       toast.success('Run started — refresh in ~1 min for results');
-      await queryClient.invalidateQueries({ queryKey: ['content-lab-runs'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['content-lab-runs'] }),
+        queryClient.invalidateQueries({ queryKey: ['content-lab-usage'] }),
+      ]);
       if (data?.run_id) navigate(`/content-lab/run/${data.run_id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not start run');
@@ -58,6 +72,24 @@ const ContentLabPage = () => {
       setRunningNiche(null);
     }
   };
+
+  const handleRunNow = (nicheId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (usageReached) {
+      toast.error(`Monthly run limit reached (${usage?.runsThisMonth}/${usage?.runsLimit}). Resets on the 1st.`);
+      return;
+    }
+    if (findRecentSuccessfulRun(nicheId)) {
+      setPendingRunNicheId(nicheId);
+      return;
+    }
+    void startRun(nicheId);
+  };
+
+  const recentRunForDialog = pendingRunNicheId ? findRecentSuccessfulRun(pendingRunNicheId) : null;
+  const hoursAgo = recentRunForDialog
+    ? Math.max(1, Math.round((Date.now() - new Date(recentRunForDialog.created_at).getTime()) / (60 * 60 * 1000)))
+    : 0;
 
   return (
     <AppLayout>
@@ -73,10 +105,44 @@ const ContentLabPage = () => {
               Pull the highest-performing posts from your niche, decode why they work, and turn them into 12 ready-to-film content ideas every month.
             </p>
           </div>
-          <Button size="lg" onClick={() => navigate('/content-lab/niche/new')} className="shrink-0">
-            <Plus className="mr-2 h-4 w-4" /> New Niche
-          </Button>
+          <div className="flex items-center gap-3 shrink-0">
+            {usage && (
+              <Badge
+                variant={usageReached ? 'destructive' : usage.runsThisMonth >= usage.runsLimit * 0.8 ? 'secondary' : 'outline'}
+                className="font-body text-xs"
+              >
+                {usage.runsThisMonth} / {usage.runsLimit} runs this month
+              </Badge>
+            )}
+            <Button size="lg" onClick={() => navigate('/content-lab/niche/new')}>
+              <Plus className="mr-2 h-4 w-4" /> New Niche
+            </Button>
+          </div>
         </header>
+
+        <AlertDialog open={!!pendingRunNicheId} onOpenChange={(open) => !open && setPendingRunNicheId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Re-run this niche?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You ran this niche {hoursAgo} hour{hoursAgo === 1 ? '' : 's'} ago. Re-running counts as another scrape against your monthly limit.
+                {usage && ` You've used ${usage.runsThisMonth} of ${usage.runsLimit} runs this month.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  const id = pendingRunNicheId;
+                  setPendingRunNicheId(null);
+                  if (id) void startRun(id);
+                }}
+              >
+                Run again
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {latestRun && (
           <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-6">
