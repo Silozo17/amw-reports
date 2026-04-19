@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play } from 'lucide-react';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 import { useContentLabNiches, useContentLabRuns, ContentLabRun } from '@/hooks/useContentLab';
 import usePageMeta from '@/hooks/usePageMeta';
 
@@ -19,12 +23,32 @@ const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: type
 
 const ContentLabPage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: niches = [], isLoading: nichesLoading } = useContentLabNiches();
   const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
+  const [runningNiche, setRunningNiche] = useState<string | null>(null);
 
   usePageMeta({ title: 'Content Lab', description: 'Discover what is working in your niche and generate ready-to-film content ideas.' });
 
   const latestRun = runs[0];
+
+  const handleRunNow = async (nicheId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setRunningNiche(nicheId);
+    try {
+      const { data, error } = await supabase.functions.invoke('content-lab-pipeline', {
+        body: { niche_id: nicheId },
+      });
+      if (error) throw error;
+      toast.success('Run started — refresh in ~1 min for results');
+      await queryClient.invalidateQueries({ queryKey: ['content-lab-runs'] });
+      if (data?.run_id) navigate(`/content-lab/run/${data.run_id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not start run');
+    } finally {
+      setRunningNiche(null);
+    }
+  };
 
   return (
     <AppLayout>
@@ -92,6 +116,19 @@ const ContentLabPage = () => {
                       </Badge>
                     ))}
                   </div>
+                  <Button
+                    size="sm"
+                    className="mt-4 w-full"
+                    onClick={(e) => handleRunNow(niche.id, e)}
+                    disabled={runningNiche === niche.id}
+                  >
+                    {runningNiche === niche.id ? (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-3.5 w-3.5" />
+                    )}
+                    Run report now
+                  </Button>
                 </Card>
               ))}
             </div>
