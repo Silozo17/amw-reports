@@ -12,6 +12,7 @@ import {
   platformStyleNote,
   type NicheContext,
 } from "../_shared/contentLabPrompts.ts";
+import { logStepStart } from "../_shared/contentLabStepLog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
