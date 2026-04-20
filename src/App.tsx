@@ -59,6 +59,7 @@ const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
 const OnboardWizardPage = lazy(() => import("./pages/content-lab/OnboardWizardPage"));
 const ContentPipelinePage = lazy(() => import("./pages/content-lab/ContentPipelinePage"));
 const IdeasLibraryPage = lazy(() => import("./pages/content-lab/IdeasLibraryPage"));
+const SwipeFilePage = lazy(() => import("./pages/content-lab/SwipeFilePage"));
 
 const queryClient = new QueryClient();
 
