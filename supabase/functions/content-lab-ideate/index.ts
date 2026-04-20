@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "content-lab-ideate", method: req.method }));
 
   try {
-    const { run_id } = await req.json();
+    const { run_id, platform: singlePlatform } = await req.json();
     if (!run_id) return json({ error: "run_id is required" }, 400);
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
@@ -66,7 +66,6 @@ Deno.serve(async (req) => {
     }
 
     const ownHandle = (niche.own_handle ?? "").toLowerCase().replace(/^@/, "");
-    // Use bucket (role: own/competitor/benchmark) NOT source (data origin: oauth/apify).
     const benchmarkPosts = (posts as PostRow[]).filter((p) => p.bucket === "benchmark" || p.bucket === "competitor");
     const ownPosts = (posts as PostRow[]).filter((p) => p.bucket === "own");
 
@@ -74,21 +73,31 @@ Deno.serve(async (req) => {
     const benchmarkP50Views = median(benchmarkPosts.slice(0, TOP_BENCHMARK_POSTS).map((p) => p.views ?? 0));
     const ownIsCompetitive = ownAvgViews > 0 && ownAvgViews >= benchmarkP50Views;
 
-    console.log(JSON.stringify({
-      fn: "content-lab-ideate",
-      gating: { own_avg_views: ownAvgViews, benchmark_p50_views: benchmarkP50Views, own_is_competitive: ownIsCompetitive },
-    }));
+    const allPlatforms: string[] = (niche.platforms_to_scrape ?? ["instagram"]) as string[];
+    const distribution = distributeIdeas(allPlatforms);
 
-    const platforms: string[] = (niche.platforms_to_scrape ?? ["instagram"]) as string[];
-    const distribution = distributeIdeas(platforms);
+    // Single-platform mode: only ideate the requested platform; preserve other platforms' ideas.
+    // Multi-platform mode (legacy): clear all and ideate every platform sequentially.
+    const platformsToProcess = singlePlatform ? [singlePlatform] : allPlatforms;
+    if (singlePlatform) {
+      await supabase.from("content_lab_ideas").delete().eq("run_id", run_id).eq("target_platform", singlePlatform);
+    } else {
+      await supabase.from("content_lab_ideas").delete().eq("run_id", run_id);
+    }
 
-    await supabase.from("content_lab_ideas").delete().eq("run_id", run_id);
+    // Get current max idea_number so single-platform calls don't collide
+    const { data: existingIdeas } = await supabase
+      .from("content_lab_ideas")
+      .select("idea_number")
+      .eq("run_id", run_id)
+      .order("idea_number", { ascending: false })
+      .limit(1);
+    let ideaCounter = (existingIdeas?.[0]?.idea_number ?? 0) as number;
 
     const allRows: IdeaRow[] = [];
-    let ideaCounter = 0;
     const rejectionLog: string[] = [];
 
-    for (const platform of platforms) {
+    for (const platform of platformsToProcess) {
       const count = distribution[platform];
       if (!count) continue;
 
@@ -195,7 +204,7 @@ Deno.serve(async (req) => {
     const { error: insertErr } = await supabase.from("content_lab_ideas").insert(allRows);
     if (insertErr) return json({ error: insertErr.message }, 500);
 
-    return json({ ok: true, idea_count: allRows.length, platforms: distribution, own_is_competitive: ownIsCompetitive });
+    return json({ ok: true, idea_count: allRows.length, platforms: platformsToProcess, own_is_competitive: ownIsCompetitive });
   } catch (e) {
     console.error("content-lab-ideate error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
