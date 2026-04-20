@@ -40,11 +40,12 @@ const ContentLabPage = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: niches = [], isLoading: nichesLoading } = useContentLabNiches();
-  const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
+  const { data: groupedRuns = [], isLoading: runsLoading } = useGroupedRuns();
   const { data: usage } = useContentLabUsage();
   const [runningNiche, setRunningNiche] = useState<string | null>(null);
   const [pendingNicheId, setPendingNicheId] = useState<string | null>(null);
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
+  const [guideDismissed, setGuideDismissed] = useState(() => localStorage.getItem('cl-guide-dismissed') === '1');
 
   usePageMeta({ title: 'Content Lab', description: 'Discover what is working in your niche and generate ready-to-film content ideas.' });
 
@@ -62,10 +63,16 @@ const ContentLabPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
-  const latestRun = runs[0];
+  const allRuns = groupedRuns.flatMap((g) => g.runs);
+  const latestRun = allRuns[0];
   const monthlyExhausted = usage ? usage.runsThisMonth >= usage.runsLimit : false;
   const noCredits = (usage?.creditBalance ?? 0) <= 0;
   const blocked = monthlyExhausted && noCredits;
+
+  const dismissGuide = () => {
+    localStorage.setItem('cl-guide-dismissed', '1');
+    setGuideDismissed(true);
+  };
 
   const startRun = async (nicheId: string) => {
     setRunningNiche(nicheId);
