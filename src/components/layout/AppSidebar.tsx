@@ -2,8 +2,6 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
-  FileText,
-  Plug,
   Settings,
   ScrollText,
   Bug,
@@ -18,10 +16,13 @@ import {
   Building2,
   Activity,
   Sparkles,
+  KanbanSquare,
+  Lightbulb,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
 import { useInvites } from '@/hooks/useInvites';
+import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';

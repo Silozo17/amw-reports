@@ -134,8 +134,11 @@ const RunDetailPage = () => {
     },
   });
 
-  const ownPosts = posts.filter((p) => (p.source as string) === 'own');
-  const viralPosts = posts.filter((p) => (p.source as string) === 'benchmark' || (p.source as string) === 'competitor');
+  const ownPosts = posts.filter((p) => (p as { bucket?: string }).bucket === 'own');
+  const viralPosts = posts.filter((p) => {
+    const b = (p as { bucket?: string }).bucket;
+    return b === 'benchmark' || b === 'competitor';
+  });
   const ownAvgViews = ownPosts.length > 0
     ? Math.round(ownPosts.reduce((s, p) => s + (p.views ?? 0), 0) / ownPosts.length)
     : 0;
