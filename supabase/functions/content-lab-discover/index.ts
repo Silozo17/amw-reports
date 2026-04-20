@@ -151,6 +151,50 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+const POOL_FRESH_DAYS = 14;
+
+async function queuePoolRefreshIfStale(args: {
+  admin: ReturnType<typeof createClient>;
+  niche_tag: string;
+  hashtags: string[];
+  keywords: string[];
+  org_id: string | null;
+}): Promise<void> {
+  // Skip if any verified pool entry exists for this niche_tag refreshed in the last POOL_FRESH_DAYS.
+  const cutoff = new Date(Date.now() - POOL_FRESH_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data: fresh } = await args.admin
+    .from("content_lab_benchmark_pool")
+    .select("id")
+    .eq("niche_tag", args.niche_tag)
+    .eq("status", "verified")
+    .gte("verified_at", cutoff)
+    .limit(1);
+  if (fresh && fresh.length > 0) {
+    console.log(`Pool already fresh for ${args.niche_tag}, skipping refresh queue`);
+    return;
+  }
+
+  // Fire-and-forget. We don't await the response so discover stays fast.
+  fetch(`${SUPABASE_URL}/functions/v1/content-lab-pool-refresh`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      niche_tag: args.niche_tag,
+      hashtags: args.hashtags,
+      keywords: args.keywords,
+      platforms: ["instagram"],
+      org_id: args.org_id,
+    }),
+  }).catch((e) => console.error("Pool refresh fire-and-forget failed:", e));
+}
+
 async function scrapeSite(url: string): Promise<string> {
   const target = url.startsWith("http") ? url : `https://${url}`;
   try {
