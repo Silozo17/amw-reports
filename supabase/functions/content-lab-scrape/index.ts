@@ -441,3 +441,134 @@ async function runApifyForHandles(handles: string[], resultsLimit: number): Prom
     return [];
   }
 }
+
+// ---------- TikTok via clockworks/tiktok-scraper ----------
+async function runTikTokScraper(handle: string, resultsLimit: number): Promise<ScrapedPost[]> {
+  const apifyToken = Deno.env.get("APIFY_TOKEN");
+  if (!apifyToken) return [];
+  const cleaned = handle.replace(/^@/, "");
+  const input = {
+    profiles: [cleaned],
+    resultsPerPage: resultsLimit,
+    shouldDownloadVideos: false,
+    shouldDownloadCovers: false,
+    shouldDownloadSubtitles: false,
+  };
+  const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      console.error("TikTok Apify error:", res.status, await res.text());
+      return [];
+    }
+    const items = await res.json();
+    if (!Array.isArray(items)) return [];
+    return items.map((it: {
+      authorMeta?: { name?: string };
+      webVideoUrl?: string;
+      text?: string;
+      playCount?: number;
+      diggCount?: number;
+      commentCount?: number;
+      shareCount?: number;
+      createTimeISO?: string;
+      videoMeta?: { duration?: number; coverUrl?: string };
+      musicMeta?: { musicName?: string; musicAuthor?: string };
+      hashtags?: Array<{ name?: string } | string>;
+    }) => ({
+      platform: "tiktok" as const,
+      source: "apify" as const,
+      bucket: "competitor" as const,
+      author_handle: (it.authorMeta?.name ?? cleaned).toLowerCase(),
+      post_url: it.webVideoUrl ?? null,
+      post_type: "video",
+      caption: it.text ?? null,
+      thumbnail_url: it.videoMeta?.coverUrl ?? null,
+      likes: it.diggCount ?? 0,
+      comments: it.commentCount ?? 0,
+      shares: it.shareCount ?? 0,
+      views: it.playCount ?? 0,
+      posted_at: it.createTimeISO ?? null,
+      transcript: null,
+      video_duration_seconds: it.videoMeta?.duration ? Math.round(it.videoMeta.duration) : null,
+      hashtags: Array.isArray(it.hashtags)
+        ? it.hashtags
+            .map((h) => (typeof h === "string" ? h : h?.name))
+            .filter((h): h is string => !!h)
+        : [],
+      mentions: [],
+      music_title: it.musicMeta?.musicName ?? null,
+      music_artist: it.musicMeta?.musicAuthor ?? null,
+      tagged_users: [],
+    }));
+  } catch (e) {
+    console.error("TikTok fetch failed:", e);
+    return [];
+  }
+}
+
+// ---------- Facebook via apify/facebook-pages-scraper ----------
+async function runFacebookScraper(handle: string, resultsLimit: number): Promise<ScrapedPost[]> {
+  const apifyToken = Deno.env.get("APIFY_TOKEN");
+  if (!apifyToken) return [];
+  const cleaned = handle.replace(/^@/, "");
+  const input = {
+    startUrls: [{ url: `https://www.facebook.com/${cleaned}/` }],
+    resultsLimit,
+  };
+  const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      console.error("Facebook Apify error:", res.status, await res.text());
+      return [];
+    }
+    const items = await res.json();
+    if (!Array.isArray(items)) return [];
+    return items.map((it: {
+      pageName?: string;
+      url?: string;
+      text?: string;
+      topImage?: string;
+      thumbnail?: string;
+      likesCount?: number;
+      commentsCount?: number;
+      sharesCount?: number;
+      videoViewCount?: number;
+      time?: string;
+      isVideo?: boolean;
+    }) => ({
+      platform: "facebook" as const,
+      source: "apify" as const,
+      bucket: "competitor" as const,
+      author_handle: (it.pageName ?? cleaned).toLowerCase(),
+      post_url: it.url ?? null,
+      post_type: it.isVideo ? "video" : "post",
+      caption: it.text ?? null,
+      thumbnail_url: it.topImage ?? it.thumbnail ?? null,
+      likes: it.likesCount ?? 0,
+      comments: it.commentsCount ?? 0,
+      shares: it.sharesCount ?? 0,
+      views: it.videoViewCount ?? 0,
+      posted_at: it.time ?? null,
+      transcript: null,
+      video_duration_seconds: null,
+      hashtags: [],
+      mentions: [],
+      music_title: null,
+      music_artist: null,
+      tagged_users: [],
+    }));
+  } catch (e) {
+    console.error("Facebook fetch failed:", e);
+    return [];
+  }
+}
