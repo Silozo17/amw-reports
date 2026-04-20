@@ -90,8 +90,23 @@ const LandingPage = () => {
     if (signupPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
     if (signupPassword.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     if (!companyName.trim()) { toast.error('Company name is required'); return; }
+    if (turnstileSiteKey && !signupTurnstileToken) {
+      toast.error('Please complete the bot check'); return;
+    }
 
     setIsLoading(true);
+    // Server-side Turnstile verification — rejects if widget bypassed.
+    const verify = await supabase.functions.invoke('verify-turnstile', {
+      body: { token: signupTurnstileToken },
+    });
+    const verifyData = verify.data as { ok?: boolean } | null;
+    if (!verifyData?.ok) {
+      toast.error('Bot check failed. Please try again.');
+      setSignupTurnstileToken('');
+      setIsLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
       email: signupEmail,
       password: signupPassword,
