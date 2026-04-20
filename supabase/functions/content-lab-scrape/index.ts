@@ -235,49 +235,79 @@ async function scrapeOwn(
   supabase: ReturnType<typeof createClient>,
   niche: { own_handle: string | null; client_id: string },
   platforms: Array<"instagram" | "tiktok" | "facebook">,
+  ownHandlesByPlatform: Partial<Record<"instagram" | "tiktok" | "facebook", string>>,
 ): Promise<BucketResult> {
-  if (!niche.own_handle) return { posts: [], errors: [] };
   const errors: string[] = [];
-  const ownHandle = niche.own_handle.toLowerCase().replace(/^@/, "");
+  const collected: ScrapedPost[] = [];
 
-  try {
-    // Instagram OAuth path (preferred, free)
-    if (platforms.includes("instagram")) {
-      const { data: igConn } = await supabase
-        .from("platform_connections")
-        .select("id, access_token, account_id, account_name, is_connected")
-        .eq("client_id", niche.client_id)
-        .eq("platform", "instagram")
-        .eq("is_connected", true)
-        .maybeSingle();
+  // Skip the bucket entirely if no own handle is set for any enabled platform.
+  const hasAny = platforms.some((p) => !!ownHandlesByPlatform[p]);
+  if (!hasAny) return { posts: [], errors: [] };
 
-      const connHandle = (igConn as { account_name?: string } | null)?.account_name?.toLowerCase().replace(/^@/, "");
+  // Instagram: prefer OAuth, then fall back to Apify if handle present.
+  if (platforms.includes("instagram")) {
+    const igHandle = ownHandlesByPlatform.instagram;
+    if (igHandle) {
+      try {
+        const { data: igConn } = await supabase
+          .from("platform_connections")
+          .select("id, access_token, account_id, account_name, is_connected")
+          .eq("client_id", niche.client_id)
+          .eq("platform", "instagram")
+          .eq("is_connected", true)
+          .maybeSingle();
 
-      if (igConn && (igConn as { access_token?: string }).access_token && (igConn as { account_id?: string }).account_id && connHandle === ownHandle) {
-        const token = await decryptToken((igConn as { access_token: string }).access_token);
-        const posts = await fetchOwnInstagramPosts((igConn as { account_id: string }).account_id, token, ownHandle);
-        posts.forEach((p) => { p.bucket = "own"; });
-        console.log(`Own (OAuth IG): ${posts.length} posts for @${ownHandle}`);
-        // Still scrape other platforms via Apify below
-        const remaining = platforms.filter((p) => p !== "instagram");
-        if (remaining.length === 0) return { posts, errors };
-        const extra = await scrapeHandlesAcrossPlatforms([ownHandle], MAX_POSTS_OWN, remaining);
-        extra.posts.forEach((p) => { p.bucket = "own"; });
-        return { posts: [...posts, ...extra.posts], errors: [...errors, ...extra.errors] };
+        const connHandle = (igConn as { account_name?: string } | null)?.account_name?.toLowerCase().replace(/^@/, "");
+
+        if (igConn && (igConn as { access_token?: string }).access_token && (igConn as { account_id?: string }).account_id && connHandle === igHandle) {
+          const token = await decryptToken((igConn as { access_token: string }).access_token);
+          const oauthPosts = await fetchOwnInstagramPosts((igConn as { account_id: string }).account_id, token, igHandle);
+          oauthPosts.forEach((p) => { p.bucket = "own"; });
+          console.log(`Own (OAuth IG): ${oauthPosts.length} posts for @${igHandle}`);
+          collected.push(...oauthPosts);
+        } else {
+          const apifyPosts = await runApifyForHandles([igHandle], MAX_POSTS_OWN);
+          apifyPosts.forEach((p) => { p.bucket = "own"; });
+          console.log(`Own (Apify IG): ${apifyPosts.length} posts for @${igHandle}`);
+          collected.push(...apifyPosts);
+        }
+      } catch (e) {
+        const msg = `Own IG scrape failed: ${e instanceof Error ? e.message : e}`;
+        console.error(msg);
+        errors.push(msg);
       }
     }
-
-    // Apify fallback for own handle across all enabled platforms
-    const result = await scrapeHandlesAcrossPlatforms([ownHandle], MAX_POSTS_OWN, platforms);
-    result.posts.forEach((p) => { p.bucket = "own"; });
-    console.log(`Own (Apify): ${result.posts.length} posts for @${ownHandle}`);
-    return { posts: result.posts, errors: [...errors, ...result.errors] };
-  } catch (e) {
-    const msg = `Own handle scrape failed: ${e instanceof Error ? e.message : e}`;
-    console.error(msg);
-    errors.push(msg);
-    return { posts: [], errors };
   }
+
+  // TikTok own
+  if (platforms.includes("tiktok") && ownHandlesByPlatform.tiktok) {
+    try {
+      const ttPosts = await runTikTokScraper(ownHandlesByPlatform.tiktok, MAX_POSTS_OWN);
+      ttPosts.forEach((p) => { p.bucket = "own"; });
+      console.log(`Own (TikTok): ${ttPosts.length} posts for @${ownHandlesByPlatform.tiktok}`);
+      collected.push(...ttPosts);
+    } catch (e) {
+      const msg = `Own TikTok scrape failed: ${e instanceof Error ? e.message : e}`;
+      console.error(msg);
+      errors.push(msg);
+    }
+  }
+
+  // Facebook own
+  if (platforms.includes("facebook") && ownHandlesByPlatform.facebook) {
+    try {
+      const fbPosts = await runFacebookScraper(ownHandlesByPlatform.facebook, MAX_POSTS_OWN);
+      fbPosts.forEach((p) => { p.bucket = "own"; });
+      console.log(`Own (Facebook): ${fbPosts.length} posts for ${ownHandlesByPlatform.facebook}`);
+      collected.push(...fbPosts);
+    } catch (e) {
+      const msg = `Own Facebook scrape failed: ${e instanceof Error ? e.message : e}`;
+      console.error(msg);
+      errors.push(msg);
+    }
+  }
+
+  return { posts: collected, errors };
 }
 
 async function scrapeBucket(
