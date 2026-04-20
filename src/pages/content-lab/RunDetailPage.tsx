@@ -331,9 +331,14 @@ const RunDetailPage = () => {
                         <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea {idea.idea_number}</p>
                         <h3 className="mt-1 font-display text-xl">{idea.title}</h3>
                       </div>
-                      {idea.duration_seconds && (
-                        <Badge variant="outline">{idea.duration_seconds}s</Badge>
-                      )}
+                      <div className="flex flex-col items-end gap-1.5">
+                        {(idea as { is_wildcard?: boolean }).is_wildcard && (
+                          <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/15">Wildcard 🚀</Badge>
+                        )}
+                        {idea.duration_seconds && (
+                          <Badge variant="outline">{idea.duration_seconds}s</Badge>
+                        )}
+                      </div>
                     </div>
                     {idea.hook && <p className="text-sm"><span className="font-semibold">Hook: </span>{idea.hook}</p>}
                     {Array.isArray(idea.hook_variants) && idea.hook_variants.length > 0 && (
