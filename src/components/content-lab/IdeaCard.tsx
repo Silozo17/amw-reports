@@ -8,7 +8,7 @@ import IdeaPreviewTikTok from './IdeaPreviewTikTok';
 import IdeaPreviewFacebook from './IdeaPreviewFacebook';
 import IdeaDetailDrawer from './IdeaDetailDrawer';
 import { useSwipeFileIds, useToggleSwipe } from '@/hooks/useSwipeFile';
-import { useIdeaCommentCount, useIdeaComments } from '@/hooks/useIdeaComments';
+import { useIdeaCommentCount } from '@/hooks/useIdeaComments';
 import IdeaCommentsDrawer from './IdeaCommentsDrawer';
 
 export interface IdeaCardData {
