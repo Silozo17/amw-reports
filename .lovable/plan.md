@@ -1,133 +1,153 @@
 
 
-## Phase 4 — Retention & Polish
+## Phase 4 — Round 4 fixes
 
-Eight workstreams. I'll group them into 4 shippable milestones to keep PRs small and reviewable.
-
----
-
-### Milestone A — Swipe File + Docx Export (the compounding asset + the deliverable)
-
-**A1. Swipe file**
-- New table `content_lab_swipe_file`: `id, org_id, client_id (nullable), user_id, idea_id, niche_id, saved_at, notes, tags text[]`. RLS: org members read/write their org's rows.
-- Heart icon on every `IdeaCard` (Pipeline board, Run Detail ideas grid, swipe-file page). Toggles save/unsave; optimistic update via TanStack Query.
-- New page `src/pages/content-lab/SwipeFilePage.tsx` (route `/content-lab/swipe-file`):
-  - Filters: niche, platform, topic cluster (derived from idea hashtags), date saved.
-  - Bulk select → "Export selected" (.docx) and "Share subset" (read-only public link, reuses A4 link infra).
-- **Pattern Insights widget** (top of swipe-file page): edge function `content-lab-swipe-insights` runs Claude Haiku on the user's saved ideas (cached for 24h), returns 1-line summary like "60% transformations, 40% myth-busting". Stored in `content_lab_swipe_file_insights`.
-
-**A2. Docx export**
-- Use the docx skill (already available — node `docx` package).
-- New edge function `content-lab-export-docx`: takes `run_id` OR `idea_ids[]`, returns signed Storage URL.
-- Per-idea page: title → angle → 5 hook variants → TikTok script → IG script → FB script → caption variants → visual direction → benchmark thumbnails (downloaded inline) + URLs.
-- Cover page uses org `logo_url`, `primary_color`, client name, month. White-label compliant.
-- Triggered from: Run Detail "Export client brief" button, Swipe File bulk action, Pipeline board "Export run".
+Three workstreams. One DB migration, several edge function & UI changes.
 
 ---
 
-### Milestone B — Agency Mode + Client Share Links
+### 1. Recency filter on scrape (no more 3-year-old posts)
 
-**B1. Agency mode (multi-niche under one org)**
-- Subscription tier `agency` already exists. Remove the 1-niche-per-tier check in `useContentLabAccess.ts` for agency tier; allow unlimited.
-- **Niche switcher** in `AppSidebar` Content Lab section: Linear-style popover listing all org niches, grouped by client. Persists last-selected niche to `localStorage` per user.
-- **Per-niche seat assignment** — new table `content_lab_niche_members (niche_id, user_id, role enum('viewer','editor'))`. Org owners assign; RLS gates write actions on niche/run/idea tables by checking membership when role differs from 'owner'.
-- Shared credit pool: no change — already org-level.
+**File:** `supabase/functions/content-lab-scrape/index.ts`
 
-**B2. Client read-only share links**
-- New table `content_lab_run_share_tokens (id, run_id, slug, is_active, view_count, last_viewed_at, client_logo_url nullable, created_by, created_at, expires_at nullable)`.
-- New public route `/share/content-lab/:slug` (no auth): renders read-only run summary — ideas, hooks, top benchmarks. No swipe-file, no regenerate, no admin.
-- Header uses client_logo_url override if set, else org branding.
-- New edge function `content-lab-share-view` records `view_count++` and `last_viewed_at` on each load.
-- "Share with client" button on Run Detail page → dialog with slug + copy + view analytics ("Viewed 4 times").
+Add a constant `RECENT_DAYS = 60` (covers current + previous month). Apply it to **competitor + benchmark** buckets (not own — own posts are limited by handle and quantity already, so filtering by date there could starve the run).
+
+Where: after each scraper returns posts, filter out anything where `posted_at` is older than `now - 60 days` OR null. Apply BEFORE the `MAX_POSTS_PER_ACCOUNT` slice so we keep the freshest 4 per account, not the 4 most-viewed-ever.
+
+Also pass `onlyPostsNewerThan: ISO date` into the Apify input where the actor supports it (Instagram + TikTok scrapers do — Facebook ignores it harmlessly), so the API call returns less junk in the first place.
+
+Risk: if a benchmark account has been quiet for 2 months we'll get zero posts from them. Mitigation: log it; the bucket-level fallback (`scrape_buckets.benchmark = 0`) already triggers the "Limited" badge users see.
 
 ---
 
-### Milestone C — Monthly Digest Email + Internal Analytics
+### 2. Restructure Content Lab navigation + add Trends page + add Hook Library page
 
-**C1. Monthly digest email**
-- New edge function `content-lab-monthly-digest` (cron 1st of month 9am UK).
-- For each active Content Lab user (has subscription, has at least 1 niche): pulls top 5 viral posts from their latest pool (highest `engagement_rate` from `content_lab_posts` where `bucket = 'benchmark'` in their niche).
-- Resend template via existing `send-branded-email` infra. Subject: "This month's top 5 viral posts in {niche.label}". CTA → run page.
-- Lapsed branch (no run in 30d): softer copy + mentions rolled-over credits.
-- **Weekly swipe-file digest** (cron Mondays 9am UK): users with ≥3 saved-but-untouched ideas get nudge email "3 ideas you saved 2 weeks ago — need scripts?". Links straight into regen flow.
+**Sidebar (`src/components/layout/AppSidebar.tsx`)**
 
-**C2. Internal analytics dashboard**
-- New page `/admin/content-lab` — admin role-guarded (reuse `is_platform_admin`).
-- Tabs: Revenue, Engagement, Churn signals, Pool quality.
-- Metrics queries (read-only views in DB):
-  - `v_content_lab_mrr_by_tier`: MRR by `org_subscriptions.content_lab_tier`.
-  - `v_content_lab_arpu`: blended subscription + credit pack ARPU per org.
-  - `v_content_lab_run_completion`: completion rate grouped by `niches.industry_slug`.
-  - `v_content_lab_pool_quality`: % runs flagged "Limited" by vertical.
-  - `v_content_lab_churn_signals`: orgs no run >21d, cancelled after one run, credit balance at cancellation.
-  - `v_content_lab_regen_rate`: avg regens per idea per run (healthy 1–2).
+Replace the current flat list with a **collapsible "Content Lab" parent** (mirrors the existing Platform Admin pattern). Sub-items, in this order:
 
----
+1. Content Pipeline — `/content-pipeline`
+2. Ideas — `/ideas`
+3. **Trends** — `/content-lab/trends` *(new)*
+4. **Hook Library** — `/content-lab/hooks` *(new)*
+5. Swipe File — `/content-lab/swipe-file`
 
-### Milestone D — Error States + Performance Polish
+The "+ New Run" entry (currently `/content-lab` → `ContentLabPage`) becomes a **primary CTA button at the top of the collapsible**, not a sub-route, so the parent IS the Content Lab section. Auto-open the collapsible when on any `/content-lab/*`, `/content-pipeline`, or `/ideas` route.
 
-**D1. Error states**
-New shared component `<ContentLabEmptyState astronaut="..." title="..." subtitle="..." cta={...} />` reused for:
-- Pool empty / building
-- Run failed (with "Retry" CTA — auto-refunds credit via `content-lab-credit-ledger` insert with `delta = +1`)
-- Payment failed (Stripe Customer Portal link via existing `customer-portal` function)
-- 404 / niche deleted
-- Network error fallback (wrap pages in section error boundaries)
+**New page: `src/pages/content-lab/TrendsLibraryPage.tsx`**
 
-Astronaut illustrations: reuse `public/mascot.svg` family — 5 variants (sad, building, broken, lost, offline). Need user to confirm if they want me to generate variants or use existing single mascot for all.
+Cross-run aggregation of `content_lab_trends`, scoped to the user's org via run join. Card grid showing label, momentum, description, recommendation, verification source link. Filters: niche, momentum (rising/steady/fading), date. Empty state uses `EmptyStateMascot`.
 
-**D2. Performance polish**
-- Skeleton loaders on Pool grid and Ideas grid (use existing `<Skeleton>` component).
-- Lazy-load benchmark thumbnails: `loading="lazy"` + `IntersectionObserver` for first-paint cards.
-- Edge function warmup: cron `content-lab-keepalive` every 5min between 8am-7pm UK, pings `discover/scrape/ideate` with `?warmup=1` (returns 200 immediately when flag present).
-- TanStack Query `staleTime: 1h` on `useContentLabVerticals` (already done) and add same to `useContentLabNiches`.
+Hook into existing `content_lab_trends` table — no schema change.
+
+**New page: `src/pages/content-lab/HookLibraryPage.tsx`**
+
+Cross-run aggregation of `content_lab_hooks` (currently only shown inside one run). Same pattern as Trends. Columns: hook text, mechanism, why-it-works, source platform, run-link. Search + niche filter.
+
+Both pages add new hooks: `useAllTrends`, `useAllHooks` in `src/hooks/useContentLab.ts`.
+
+**Routes** — add to `src/App.tsx`:
+```
+/content-lab/trends   → TrendsLibraryPage
+/content-lab/hooks    → HookLibraryPage
+```
 
 ---
 
-### Files to add/change
+### 3. Wire up the heart / comment / share icons inside the IG/TikTok/FB preview mockups
 
-**Frontend (new)**
-- `src/pages/content-lab/SwipeFilePage.tsx`
-- `src/pages/admin/AdminContentLabAnalytics.tsx`
-- `src/pages/share/ContentLabRunShare.tsx` (public route)
-- `src/components/content-lab/SwipeFileHeart.tsx`
-- `src/components/content-lab/PatternInsightsWidget.tsx`
-- `src/components/content-lab/NicheSwitcher.tsx`
-- `src/components/content-lab/ContentLabEmptyState.tsx`
-- `src/components/content-lab/ShareWithClientDialog.tsx`
-- `src/hooks/useSwipeFile.ts`, `useNicheMembers.ts`, `useContentLabAnalytics.ts`
+Currently the `<Heart>`, `<MessageCircle>`, `<Send>` icons in `IdeaPreviewInstagram.tsx` / `IdeaPreviewTikTok.tsx` / `IdeaPreviewFacebook.tsx` are **decorative SVGs**. We make them functional, and they only become functional when the preview is used inside a real idea card (not in the public share view, which stays read-only).
 
-**Frontend (edit)**
-- `src/components/content-lab/IdeaPipelineBoard.tsx` — heart icon
-- `src/pages/content-lab/RunDetailPage.tsx` — heart, "Export brief" CTA, "Share with client" CTA, skeletons
-- `src/components/layout/AppSidebar.tsx` — niche switcher slot
-- `src/App.tsx` — new routes
-- `src/hooks/useContentLabAccess.ts` — drop niche cap for agency tier
+**Approach:** add three optional props to each preview component:
+```ts
+interface Props {
+  hook: string;
+  caption?: string | null;
+  handle?: string | null;
+  // NEW — only passed in interactive contexts
+  ideaId?: string;
+  clientId?: string | null;
+  nicheId?: string | null;
+  runId?: string;
+  isSaved?: boolean;
+  onToggleSave?: () => void;
+  onOpenComments?: () => void;
+  onShare?: () => void;
+}
+```
 
-**Backend / edge functions (new)**
-- `supabase/functions/content-lab-export-docx/index.ts` (uses `docx` npm via esm.sh)
-- `supabase/functions/content-lab-swipe-insights/index.ts`
-- `supabase/functions/content-lab-monthly-digest/index.ts`
-- `supabase/functions/content-lab-weekly-swipe-digest/index.ts`
-- `supabase/functions/content-lab-share-view/index.ts`
-- `supabase/functions/content-lab-keepalive/index.ts`
+When `ideaId` is present, the icons become buttons. When absent (public share page, hover preview), they stay decorative. This keeps all 3 platform mockups rendering identically in both contexts.
 
-**Database (one migration per milestone)**
-- A: `content_lab_swipe_file`, `content_lab_swipe_file_insights`
-- B: `content_lab_niche_members`, `content_lab_run_share_tokens`
-- C: 6 read-only analytics views; 2 cron jobs (monthly digest, weekly swipe digest)
-- D: 1 cron job (keepalive)
+#### 3a. Heart → save to swipe file
+Reuse the existing `useToggleSwipe` hook. Heart fills red when saved. Toast on action. `IdeaPipelineBoard` and `RunDetailPage` already pass `client_id` / `niche_id` context — thread it through to the preview.
+
+#### 3b. Comment → idea-thread drawer
+
+**New table: `content_lab_idea_comments`**
+```
+id uuid pk
+idea_id uuid not null
+org_id uuid not null
+author_user_id uuid (nullable — null for client-portal posts)
+author_client_user_id uuid (nullable — for client portal users)
+author_label text not null   -- denormalised name for display
+body text not null
+created_at timestamptz
+```
+RLS:
+- Org members: select/insert where `user_belongs_to_org(auth.uid(), org_id)`
+- Client portal users: select/insert where `is_client_user(auth.uid(), idea→run→client_id)`
+
+**New component: `src/components/content-lab/IdeaCommentsDrawer.tsx`** (uses shadcn `Sheet`). Lists comments newest-first, shows author label + relative time, has a textarea + send. Optimistic insert via TanStack Query.
+
+**New hook:** `src/hooks/useIdeaComments.ts` — `useIdeaComments(ideaId)` + `usePostComment()`.
+
+The comment icon shows a small numeric badge when `count > 0` (cheap aggregate query).
+
+#### 3c. Send → share single idea via link
+
+Reuses the existing `content_lab_run_share_tokens` infra at the **idea level** with a thin wrapper. Two minimal options:
+
+- **Option A (simpler — chosen):** clicking Send opens a small popover with "Copy idea link" → copies `https://<host>/share/content-lab/<run-slug>?idea=<idea_id>`. The existing public share page (`ContentLabRunShare.tsx`) gets a small enhancement: if `?idea=` is present, scroll-to / highlight that one idea card. No new table needed; the existing run-level share token authorises viewing all ideas in the run anyway.
+
+  If no share token exists yet for the run, the popover offers a "Create share link" button (calls existing dialog flow).
+
+This keeps the surface area minimal and reuses everything already built in Milestone B.
+
+---
+
+### Files to add
+
+```
+src/pages/content-lab/TrendsLibraryPage.tsx
+src/pages/content-lab/HookLibraryPage.tsx
+src/components/content-lab/IdeaCommentsDrawer.tsx
+src/components/content-lab/IdeaShareLinkPopover.tsx
+src/hooks/useIdeaComments.ts
+supabase/migrations/<ts>_idea_comments.sql
+```
+
+### Files to edit
+
+```
+supabase/functions/content-lab-scrape/index.ts    — 60-day filter
+src/components/layout/AppSidebar.tsx              — collapsible Content Lab section
+src/App.tsx                                       — 2 new routes
+src/hooks/useContentLab.ts                        — useAllTrends, useAllHooks
+src/components/content-lab/IdeaPreviewInstagram.tsx
+src/components/content-lab/IdeaPreviewTikTok.tsx
+src/components/content-lab/IdeaPreviewFacebook.tsx
+src/components/content-lab/IdeaPipelineBoard.tsx  — pass ideaId/runId/etc into preview, drop the separate SwipeFileHeart (now built into preview)
+src/pages/content-lab/RunDetailPage.tsx           — same prop wiring
+src/pages/share/ContentLabRunShare.tsx            — honour ?idea= param
+```
 
 ### Risks
-- Docx generation in edge function: `docx` library is heavy (~2MB). May need to chunk benchmark thumbnail downloads to stay under 60s. Mitigation: render sequentially, cap benchmarks per idea at 3.
-- Niche switcher UX: must not break existing `?tab=contentlab` deep links into a specific client. Mitigation: switcher only changes the *active niche within the current client*, not the client itself.
-- Monthly digest at scale: pulling top 5 posts per active user × N users could time out. Mitigation: queue-based processing via `process-sync-queue` pattern, batch of 50 per cron tick.
-- Public share route bypasses auth — must hard-enforce `is_active` and never expose `org_id`/internal IDs in payload.
+- **Comment threading scope creep**: keeping it flat (no replies, no edits, no @mentions, no notifications) on purpose. Can extend later — flag it now so we don't expand mid-build.
+- **Client-portal write access**: requires the client-portal user to actually be authenticated via `client_users`. If the portal currently uses a magic link without a real `auth.uid()`, posting comments from the client side won't work. Need to verify before building 3b — I'll check `ClientPortal.tsx` once approved.
+- **60-day filter for benchmarks**: benchmarks chosen for being viral may have peaked 4 months ago. Filtering them out can drop pool quality. Mitigation: if a benchmark account returns 0 recent posts, fall back to "latest 4 regardless of date" for that one account only. I'll implement this fallback inline.
+- **Sidebar restructure**: existing users who bookmarked `/ideas` etc still work — only the visual grouping changes, no route renames.
 
 ### Open questions
-1. **Astronaut illustrations** — generate 5 SVG variants for empty states, or reuse the single existing mascot for all? I'd recommend 5 variants for warmth.
-2. **Swipe file scope** — saves attached to `org_id` (whole team can see) or `user_id` (personal)? You wrote "personal library" — confirming personal-only.
-3. **Agency niche cap** — current Agency tier limit is what? Need to confirm before removing the cap so we don't break existing checks.
-
-I'll wait for answers to those 3 before writing the migrations.
+None — proceeding once approved.
 
