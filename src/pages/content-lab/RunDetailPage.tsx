@@ -270,8 +270,22 @@ const RunDetailPage = () => {
                 </AlertDialogContent>
               </AlertDialog>
             )}
+            {ideas.length > 0 && run?.status === 'completed' && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleExportDocx} disabled={exporting}>
+                  <FileDown className={`mr-2 h-4 w-4 ${exporting ? 'animate-pulse' : ''}`} />
+                  {exporting ? 'Exporting…' : 'Export brief'}
+                </Button>
+                <Button size="sm" onClick={() => setShareOpen(true)}>
+                  <Share2 className="mr-2 h-4 w-4" />
+                  Share with client
+                </Button>
+              </>
+            )}
           </div>
         </header>
+
+        {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
 
         <Tabs defaultValue="own" className="space-y-6">
           <TabsList>
