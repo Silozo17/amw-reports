@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Plug, RefreshCw, FileText, Check, Quote, BarChart3, Palette, Mail, Globe, Users, Share2 } from 'lucide-react';
+import { ArrowRight, Plug, RefreshCw, FileText, Check, Quote, BarChart3, Palette, Mail, Globe, Users, Share2, Sparkles, Search, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WarpedGrid from '@/components/landing/WarpedGrid';
 import StarDecoration from '@/components/landing/StarDecoration';
+import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
 import { getPlatformLogo } from '@/lib/platformLogos';
 import amwLogo from '@/assets/AMW_Logo_White.png';
 import dashboardSnapshot from '@/assets/screenshots/Dashboard_Snapshot.webp';
