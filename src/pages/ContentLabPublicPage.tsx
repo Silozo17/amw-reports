@@ -469,10 +469,10 @@ const ContentLabPublicPage = () => {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button size="lg" asChild>
-              <Link to="/login?view=signup">Start Free Trial <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <a href="#pricing">See pricing — from £49/mo <ArrowRight className="ml-2 h-4 w-4" /></a>
             </Button>
             <Button size="lg" variant="outline" asChild className="border-sidebar-border text-amw-offwhite hover:bg-sidebar-accent/40">
-              <Link to="/pricing">See full pricing</Link>
+              <Link to="/pricing">AMW Reports plans</Link>
             </Button>
           </div>
         </div>
