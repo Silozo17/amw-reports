@@ -20,13 +20,15 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Per-org monthly run ceilings (precursor to full credit system).
+// Per-org monthly run ceilings. When the monthly allowance is exhausted, the org
+// can keep running by spending credits (1 credit = 1 extra run). Top-ups are
+// purchased separately.
 const RUN_LIMITS_BY_TIER: Record<string, number> = {
-  creator: 10,
-  studio: 25,
-  agency: 60,
+  creator: 1,
+  studio: 3,
+  agency: 10,
 };
-const DEFAULT_RUN_LIMIT = 10;
+const DEFAULT_RUN_LIMIT = 1;
 
 async function getMonthlyLimit(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
   const { data } = await admin
@@ -48,6 +50,15 @@ async function getCurrentUsage(admin: ReturnType<typeof createClient>, orgId: st
     .eq("month", now.getUTCMonth() + 1)
     .maybeSingle();
   return (data as { runs_count?: number } | null)?.runs_count ?? 0;
+}
+
+async function getCreditBalance(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
+  const { data } = await admin
+    .from("content_lab_credits")
+    .select("balance")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  return (data as { balance?: number } | null)?.balance ?? 0;
 }
 
 Deno.serve(async (req) => {
@@ -79,15 +90,18 @@ Deno.serve(async (req) => {
         .from("content_lab_niches").select("id, client_id, org_id").eq("id", niche_id).single();
       if (nErr || !niche) return json({ error: "Niche not found" }, 404);
 
-      // Pre-flight monthly usage cap
-      const limit = await getMonthlyLimit(admin, (niche as { org_id: string }).org_id);
-      const used = await getCurrentUsage(admin, (niche as { org_id: string }).org_id);
-      if (used >= limit) {
+      // Pre-flight monthly usage cap. If exhausted, allow if credit balance > 0.
+      const orgIdNew = (niche as { org_id: string }).org_id;
+      const limit = await getMonthlyLimit(admin, orgIdNew);
+      const used = await getCurrentUsage(admin, orgIdNew);
+      const credits = await getCreditBalance(admin, orgIdNew);
+      if (used >= limit && credits <= 0) {
         return json({
-          error: `Monthly run limit reached (${used}/${limit}). Resets on the 1st.`,
+          error: `Monthly run limit reached (${used}/${limit}). Top up credits to keep running.`,
           limit_reached: true,
           runs_used: used,
           runs_limit: limit,
+          credit_balance: credits,
         }, 429);
       }
 
@@ -200,9 +214,22 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
     console.log(`Pipeline ${runId}: scraped ${postCount} posts`);
 
     // Charge usage only once we know the scrape produced data.
+    // If the monthly allowance is exhausted, consume one credit instead.
     if (orgId) {
-      const { error: usageErr } = await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
-      if (usageErr) console.error("Usage increment failed:", usageErr);
+      const limit = await getMonthlyLimit(admin, orgId);
+      const used = await getCurrentUsage(admin, orgId);
+      if (used < limit) {
+        const { error: usageErr } = await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
+        if (usageErr) console.error("Usage increment failed:", usageErr);
+      } else {
+        const { data: ok, error: credErr } = await admin.rpc("consume_content_lab_credit", {
+          _org_id: orgId,
+          _run_id: runId,
+          _amount: 1,
+        });
+        if (credErr) console.error("Credit consume failed:", credErr);
+        else if (!ok) console.error(`Credit consume returned false for org ${orgId}`);
+      }
     }
 
     // 2. ANALYSE (best-effort)
