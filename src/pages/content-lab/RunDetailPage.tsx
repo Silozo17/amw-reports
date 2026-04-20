@@ -340,6 +340,11 @@ const RunDetailPage = () => {
         </header>
 
         {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
+        <IdeaCommentsDrawer
+          ideaId={commentsIdeaId}
+          open={!!commentsIdeaId}
+          onOpenChange={(open) => { if (!open) setCommentsIdeaId(null); }}
+        />
 
         <Tabs defaultValue="own" className="space-y-6">
           <TabsList>
