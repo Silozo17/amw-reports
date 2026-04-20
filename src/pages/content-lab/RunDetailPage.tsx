@@ -31,62 +31,8 @@ import IdeaCard from '@/components/content-lab/IdeaCard';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 
-interface PreviewArgs {
-  platform: string | null;
-  hook: string;
-  caption: string | null;
-  ideaId: string;
-  runId: string;
-  isSaved: boolean;
-  commentCount: number;
-  onToggleSave: () => void;
-  onOpenComments: () => void;
-}
+// Idea previews + interactive states are now encapsulated in <IdeaCard />.
 
-const InteractivePreview = (args: PreviewArgs) => {
-  const p = (args.platform ?? 'instagram').toLowerCase();
-  const common = {
-    hook: args.hook,
-    caption: args.caption,
-    ideaId: args.ideaId,
-    runId: args.runId,
-    isSaved: args.isSaved,
-    commentCount: args.commentCount,
-    onToggleSave: args.onToggleSave,
-    onOpenComments: args.onOpenComments,
-  };
-  if (p === 'tiktok') return <IdeaPreviewTikTok {...common} />;
-  if (p === 'facebook') return <IdeaPreviewFacebook {...common} />;
-  return <IdeaPreviewInstagram {...common} />;
-};
-
-interface IdeaPreviewWithStateProps {
-  idea: { id: string; target_platform: string | null; hook: string | null; title: string; caption: string | null };
-  runId: string;
-  clientId: string | null;
-  nicheId: string | null;
-  onOpenComments: (ideaId: string) => void;
-}
-
-const IdeaPreviewWithState = ({ idea, runId, clientId, nicheId, onOpenComments }: IdeaPreviewWithStateProps) => {
-  const { data: savedIds } = useSwipeFileIds();
-  const toggle = useToggleSwipe();
-  const { data: commentCount = 0 } = useIdeaCommentCount(idea.id);
-  const isSaved = savedIds?.has(idea.id) ?? false;
-  return (
-    <InteractivePreview
-      platform={idea.target_platform}
-      hook={idea.hook ?? idea.title}
-      caption={idea.caption}
-      ideaId={idea.id}
-      runId={runId}
-      isSaved={isSaved}
-      commentCount={commentCount}
-      onToggleSave={() => toggle.mutate({ ideaId: idea.id, clientId, nicheId, isSaved })}
-      onOpenComments={() => onOpenComments(idea.id)}
-    />
-  );
-};
 
 const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
