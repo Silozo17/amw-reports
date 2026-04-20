@@ -66,8 +66,10 @@ Deno.serve(async (req) => {
     }
 
     const ownHandle = (niche.own_handle ?? "").toLowerCase().replace(/^@/, "");
-    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.source === "benchmark" || p.source === "competitor");
-    const ownPosts = (posts as PostRow[]).filter((p) => p.source === "own");
+    // Use bucket (not source) — source is 'oauth'|'apify' (data origin), bucket is the role.
+    // Inspiration pool = benchmarks ONLY. Competitors stay visible in feed but are not used as role models.
+    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.bucket === "benchmark");
+    const ownPosts = (posts as PostRow[]).filter((p) => p.bucket === "own");
 
     const ownAvgViews = avg(ownPosts.map((p) => p.views ?? 0));
     const benchmarkP50Views = median(benchmarkPosts.slice(0, TOP_BENCHMARK_POSTS).map((p) => p.views ?? 0));
@@ -77,6 +79,9 @@ Deno.serve(async (req) => {
       fn: "content-lab-ideate",
       gating: { own_avg_views: ownAvgViews, benchmark_p50_views: benchmarkP50Views, own_is_competitive: ownIsCompetitive },
     }));
+
+    // Helper: normalise handle for fuzzy matching across platforms (Apify can swap . and _).
+    const normHandle = (h: string) => h.toLowerCase().replace(/^@/, "").replace(/[._]/g, "");
 
     const platforms: string[] = (niche.platforms_to_scrape ?? ["instagram"]) as string[];
     const distribution = distributeIdeas(platforms);
@@ -96,6 +101,11 @@ Deno.serve(async (req) => {
         .slice(0, TOP_BENCHMARK_POSTS);
 
       const platformOwn = ownPosts.filter((p) => p.platform === platform);
+
+      // Per-platform competitiveness check (overrides global verdict for this platform's loop).
+      const platformOwnAvg = avg(platformOwn.map((p) => p.views ?? 0));
+      const platformBenchP50 = median(platformBenchmarks.map((p) => p.views ?? 0));
+      const platformOwnIsCompetitive = platformOwnAvg > 0 && platformOwnAvg >= platformBenchP50;
 
       const platformLog = await logStepStart({
         runId: run_id,
@@ -117,9 +127,9 @@ Deno.serve(async (req) => {
         count,
         benchmarkPosts: platformBenchmarks,
         ownPosts: platformOwn,
-        ownIsCompetitive,
-        ownAvgViews,
-        benchmarkP50Views,
+        ownIsCompetitive: platformOwnIsCompetitive,
+        ownAvgViews: platformOwnAvg,
+        benchmarkP50Views: platformBenchP50,
       });
 
       if (!generated.ok) {
@@ -128,22 +138,23 @@ Deno.serve(async (req) => {
         return json({ error: `Anthropic (${platform}): ${generated.error}` }, 502);
       }
 
+      // Fuzzy handle set: lowercased, no @, dots/underscores stripped.
       const validHandles = new Set<string>();
-      platformBenchmarks.forEach((p) => validHandles.add(p.author_handle.toLowerCase()));
-      if (ownIsCompetitive && ownHandle) validHandles.add(ownHandle);
+      platformBenchmarks.forEach((p) => validHandles.add(normHandle(p.author_handle)));
+      if (platformOwnIsCompetitive && ownHandle) validHandles.add(normHandle(ownHandle));
 
       const fallbackPostId = platformBenchmarks[0]?.id ?? null;
       const accepted: typeof generated.ideas = [];
 
       for (const idea of generated.ideas) {
-        const handle = (idea.based_on_handle ?? "").toLowerCase().replace(/^@/, "");
-        const isOwn = ownHandle && handle === ownHandle;
+        const handle = normHandle(idea.based_on_handle ?? "");
+        const isOwn = ownHandle && handle === normHandle(ownHandle);
 
         if (!handle) {
           rejectionLog.push(`#${idea.title}: missing based_on_handle`);
           continue;
         }
-        if (isOwn && !ownIsCompetitive) {
+        if (isOwn && !platformOwnIsCompetitive) {
           rejectionLog.push(`#${idea.title}: cited own handle while own underperforms benchmarks`);
           continue;
         }
@@ -151,9 +162,14 @@ Deno.serve(async (req) => {
           rejectionLog.push(`#${idea.title}: based_on_handle '${handle}' not in scraped pool`);
           continue;
         }
-        if (idea.hook && idea.caption && idea.hook.trim().toLowerCase() === idea.caption.trim().toLowerCase()) {
-          rejectionLog.push(`#${idea.title}: hook duplicates caption`);
-          continue;
+        // Reject hook-duplicates-caption AND hook-is-prefix-of-caption.
+        if (idea.hook && idea.caption) {
+          const h = idea.hook.trim().toLowerCase();
+          const c = idea.caption.trim().toLowerCase();
+          if (h === c || c.startsWith(h)) {
+            rejectionLog.push(`#${idea.title}: hook duplicates/prefixes caption`);
+            continue;
+          }
         }
         accepted.push(idea);
         if (accepted.length >= count) break;
@@ -193,6 +209,16 @@ Deno.serve(async (req) => {
 
     const { error: insertErr } = await supabase.from("content_lab_ideas").insert(allRows);
     if (insertErr) return json({ error: insertErr.message }, 500);
+
+    // Persist rejection sample on the run summary so the UI can surface it.
+    if (rejectionLog.length > 0) {
+      const { data: existing } = await supabase
+        .from("content_lab_runs").select("summary").eq("id", run_id).single();
+      const existingSummary = (existing?.summary ?? {}) as Record<string, unknown>;
+      await supabase.from("content_lab_runs").update({
+        summary: { ...existingSummary, ideate_rejections_sample: rejectionLog.slice(-20), ideate_rejection_count: rejectionLog.length },
+      }).eq("id", run_id);
+    }
 
     return json({ ok: true, idea_count: allRows.length, platforms: distribution, own_is_competitive: ownIsCompetitive });
   } catch (e) {

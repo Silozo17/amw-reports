@@ -20,15 +20,21 @@ const corsHeaders = {
 
 const APIFY_ACTOR = "apify~instagram-scraper";
 // Cost caps — keep low to bound Apify spend per run.
-// Realistic worst case = 15 + (5*8) + (3*6) = 73 items.
+// Realistic worst case = 15 + (5*8) + (6*6) = 91 items (capped to MAX_TOTAL_POSTS).
 const MAX_POSTS_OWN = 15;
 const MAX_POSTS_COMPETITOR = 8;
 const MAX_POSTS_BENCHMARK = 6;
 const MAX_COMPETITOR_HANDLES = 5;
-const MAX_BENCHMARK_HANDLES = 3;
+// Raised from 3 → 6 so we have ~36 benchmark posts to pick top-30 from in ideate.
+const MAX_BENCHMARK_HANDLES = 6;
 const MAX_TOTAL_POSTS = 80;
 const APIFY_CHUNK_SIZE = 5;
-const APIFY_TIMEOUT_SEC = 90;
+// Lowered from 90 → 60s to keep total wall-clock under Supabase edge timeout (150s)
+// when running 3 buckets × 3 platforms in parallel.
+const APIFY_TIMEOUT_SEC = 60;
+// Engagement rate is a ratio (0-1). DB column is numeric(8,4) → max ~9999, but anything
+// >1 is a data anomaly. Clamp tightly to keep stats trustworthy.
+const MAX_ENGAGEMENT_RATE = 1;
 
 interface DiscoveredEntity { handle: string; reason?: string }
 
@@ -131,7 +137,7 @@ Deno.serve(async (req) => {
       const raw = p.views > 0
         ? (p.likes + p.comments) / p.views
         : (p.likes + p.comments) / Math.max(p.likes + p.comments + 1000, 1000);
-      const engagement_rate = Math.min(Math.max(raw, 0), 99.9999);
+      const engagement_rate = Math.min(Math.max(raw, 0), MAX_ENGAGEMENT_RATE);
       return {
         run_id,
         platform: p.platform,
