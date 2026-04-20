@@ -184,7 +184,7 @@ const HookLibraryPage = () => {
                         <Badge variant="secondary" className="text-[10px] font-semibold">#{rank}</Badge>
                       )}
                       {isTopDecile && sort === 'top' && (
-                        <Flame className="h-3.5 w-3.5 text-orange-500" aria-label="Top performing" />
+                        <Flame className="h-3.5 w-3.5 text-primary" aria-label="Top performing" />
                       )}
                     </div>
                     <Button
