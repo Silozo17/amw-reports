@@ -222,6 +222,19 @@ const LandingPage = () => {
                       type="button"
                       onClick={async () => {
                         if (!loginEmail) { toast.error('Enter your email first'); return; }
+                        if (turnstileSiteKey && !resetTurnstileToken) {
+                          toast.error('Please complete the bot check below before requesting a reset');
+                          return;
+                        }
+                        const verify = await supabase.functions.invoke('verify-turnstile', {
+                          body: { token: resetTurnstileToken },
+                        });
+                        const verifyData = verify.data as { ok?: boolean } | null;
+                        if (!verifyData?.ok) {
+                          toast.error('Bot check failed. Please try again.');
+                          setResetTurnstileToken('');
+                          return;
+                        }
                         const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
                           redirectTo: `${window.location.origin}/reset-password`,
                         });
