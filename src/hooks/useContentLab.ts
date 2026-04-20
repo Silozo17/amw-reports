@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/contexts/OrgContext';
+import { runLimitForTier } from '@/lib/contentLabPricing';
 
 export interface ContentLabNiche {
   id: string;
