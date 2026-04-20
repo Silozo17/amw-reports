@@ -328,7 +328,7 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 6000,
+        max_tokens: 16000,
         tools: [tool],
         tool_choice: { type: "tool", name: "generate_ideas" },
         system: systemPrompt,
