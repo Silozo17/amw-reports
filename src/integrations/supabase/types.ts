@@ -535,6 +535,7 @@ export type Database = {
       }
       content_lab_niches: {
         Row: {
+          brand_brief: Json
           client_id: string
           competitor_urls: string[]
           content_styles: string[]
@@ -563,6 +564,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          brand_brief?: Json
           client_id: string
           competitor_urls?: string[]
           content_styles?: string[]
@@ -591,6 +593,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          brand_brief?: Json
           client_id?: string
           competitor_urls?: string[]
           content_styles?: string[]

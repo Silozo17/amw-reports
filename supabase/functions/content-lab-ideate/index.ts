@@ -1,9 +1,7 @@
-// content-lab-ideate: generates platform-tailored content ideas using Claude.
-// - Distributes 12 ideas across selected platforms (12 / N split)
-// - One Claude call per platform with platform-specific style guide
-// - Uses master prompt (HARD_RULES + REQUIRED_RULES + brand profile)
-// - Posts are filtered to that platform + own/competitor/benchmark buckets
-// - Writes target_platform, platform_style_notes, caption_with_hashtag, script_full
+// content-lab-ideate: generates platform-tailored ideas using Claude.
+// BENCHMARK-FIRST: ideas are reverse-engineered from the top 30 benchmark posts only,
+// unless the brand's own performance matches benchmark median (then own posts are
+// also eligible inspiration). Otherwise own posts are listed as anti-examples.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
@@ -22,7 +20,8 @@ const corsHeaders = {
 };
 
 const MODEL = "claude-sonnet-4-5-20250929";
-const TOP_POSTS_PER_PLATFORM = 12;
+const TOP_BENCHMARK_POSTS = 30;
+const ANTI_EXAMPLE_OWN_POSTS = 6;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -34,15 +33,6 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return json({ error: "ANTHROPIC_API_KEY not configured" }, 500);
-    // Non-sensitive fingerprint to verify which key the deployed function is using.
-    console.log(JSON.stringify({
-      fn: "content-lab-ideate",
-      key_fingerprint: {
-        length: apiKey.length,
-        prefix: apiKey.slice(0, 10),
-        suffix: apiKey.slice(-4),
-      },
-    }));
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -65,41 +55,58 @@ Deno.serve(async (req) => {
 
     const { data: posts } = await supabase
       .from("content_lab_posts")
-      .select("id, platform, author_handle, bucket, caption, ai_summary, hook_text, hook_type, likes, comments, views, post_url")
+      .select("id, platform, author_handle, source, bucket, caption, ai_summary, hook_text, hook_type, likes, comments, views, post_url")
       .eq("run_id", run_id)
-      .order("engagement_rate", { ascending: false });
+      .order("views", { ascending: false })
+      .order("likes", { ascending: false })
+      .order("comments", { ascending: false });
 
     if (!posts || posts.length === 0) {
       return json({ error: "No posts to ideate from" }, 400);
     }
 
+    const ownHandle = (niche.own_handle ?? "").toLowerCase().replace(/^@/, "");
+    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.source === "benchmark" || p.source === "competitor");
+    const ownPosts = (posts as PostRow[]).filter((p) => p.source === "own");
+
+    const ownAvgViews = avg(ownPosts.map((p) => p.views ?? 0));
+    const benchmarkP50Views = median(benchmarkPosts.slice(0, TOP_BENCHMARK_POSTS).map((p) => p.views ?? 0));
+    const ownIsCompetitive = ownAvgViews > 0 && ownAvgViews >= benchmarkP50Views;
+
+    console.log(JSON.stringify({
+      fn: "content-lab-ideate",
+      gating: { own_avg_views: ownAvgViews, benchmark_p50_views: benchmarkP50Views, own_is_competitive: ownIsCompetitive },
+    }));
+
     const platforms: string[] = (niche.platforms_to_scrape ?? ["instagram"]) as string[];
     const distribution = distributeIdeas(platforms);
 
-    // Clear previous ideas for this run
     await supabase.from("content_lab_ideas").delete().eq("run_id", run_id);
 
     const allRows: IdeaRow[] = [];
     let ideaCounter = 0;
+    const rejectionLog: string[] = [];
 
     for (const platform of platforms) {
       const count = distribution[platform];
       if (!count) continue;
 
-      const platformPosts = (posts as PostRow[])
+      const platformBenchmarks = benchmarkPosts
         .filter((p) => p.platform === platform)
-        .slice(0, TOP_POSTS_PER_PLATFORM);
+        .slice(0, TOP_BENCHMARK_POSTS);
+
+      const platformOwn = ownPosts.filter((p) => p.platform === platform);
 
       const platformLog = await logStepStart({
         runId: run_id,
         step: "ideate",
-        message: `Ideate ${platform} (${count} ideas, ${platformPosts.length} source posts)`,
-        payload: { platform, target_count: count, source_post_count: platformPosts.length },
+        message: `Ideate ${platform} (${count} ideas, ${platformBenchmarks.length} benchmark posts)`,
+        payload: { platform, target_count: count, benchmark_post_count: platformBenchmarks.length, own_post_count: platformOwn.length, own_is_competitive: ownIsCompetitive },
       });
 
-      if (platformPosts.length === 0) {
-        console.warn(`No posts for platform ${platform}, skipping ideation for it.`);
-        await platformLog.finish({ status: "failed", errorMessage: "No source posts for platform" });
+      if (platformBenchmarks.length === 0) {
+        console.warn(`No benchmark posts for ${platform}, skipping.`);
+        await platformLog.finish({ status: "failed", errorMessage: "No benchmark posts for platform" });
         continue;
       }
 
@@ -108,43 +115,86 @@ Deno.serve(async (req) => {
         niche: niche as unknown as NicheContext,
         platform,
         count,
-        posts: platformPosts,
+        benchmarkPosts: platformBenchmarks,
+        ownPosts: platformOwn,
+        ownIsCompetitive,
+        ownAvgViews,
+        benchmarkP50Views,
       });
 
       if (!generated.ok) {
         console.error(`Ideation failed for ${platform}: ${generated.error}`);
         await platformLog.finish({ status: "failed", errorMessage: generated.error });
-        // Bubble upstream errors (credits, auth, rate limits) up to the pipeline so the
-        // UI shows the actual root cause instead of a misleading "no ideas" message.
         return json({ error: `Anthropic (${platform}): ${generated.error}` }, 502);
       }
-      if (generated.ideas.length === 0) {
-        console.error(`Ideation returned 0 ideas for ${platform}`);
-        await platformLog.finish({ status: "failed", errorMessage: "Claude returned no ideas" });
+
+      const validHandles = new Set<string>();
+      platformBenchmarks.forEach((p) => validHandles.add(p.author_handle.toLowerCase()));
+      if (ownIsCompetitive && ownHandle) validHandles.add(ownHandle);
+
+      const fallbackPostId = platformBenchmarks[0]?.id ?? null;
+      const accepted: typeof generated.ideas = [];
+
+      for (const idea of generated.ideas) {
+        const handle = (idea.based_on_handle ?? "").toLowerCase().replace(/^@/, "");
+        const isOwn = ownHandle && handle === ownHandle;
+
+        if (!handle) {
+          rejectionLog.push(`#${idea.title}: missing based_on_handle`);
+          continue;
+        }
+        if (isOwn && !ownIsCompetitive) {
+          rejectionLog.push(`#${idea.title}: cited own handle while own underperforms benchmarks`);
+          continue;
+        }
+        if (!validHandles.has(handle)) {
+          rejectionLog.push(`#${idea.title}: based_on_handle '${handle}' not in scraped pool`);
+          continue;
+        }
+        if (idea.hook && idea.caption && idea.hook.trim().toLowerCase() === idea.caption.trim().toLowerCase()) {
+          rejectionLog.push(`#${idea.title}: hook duplicates caption`);
+          continue;
+        }
+        accepted.push(idea);
+        if (accepted.length >= count) break;
+      }
+
+      if (accepted.length === 0) {
+        console.error(`All ${generated.ideas.length} ideas rejected for ${platform}`);
+        await platformLog.finish({
+          status: "failed",
+          errorMessage: `All ideas rejected by validator`,
+          payload: { rejections: rejectionLog.slice(-20) },
+        });
         continue;
       }
 
-      // Fallback evidence post: highest-engagement post for this platform.
-      const fallbackPostId = platformPosts[0]?.id ?? null;
-      for (const idea of generated.ideas.slice(0, count)) {
+      for (const idea of accepted) {
         ideaCounter += 1;
-        allRows.push(toRow(run_id, ideaCounter, platform, idea, platformPosts, fallbackPostId));
+        allRows.push(toRow(run_id, ideaCounter, platform, idea, platformBenchmarks, fallbackPostId));
       }
+
       await platformLog.finish({
         status: "ok",
-        message: `Generated ${generated.ideas.length} ideas for ${platform}`,
-        payload: { platform, generated_count: generated.ideas.length },
+        message: `Accepted ${accepted.length}/${generated.ideas.length} ideas for ${platform}`,
+        payload: {
+          platform,
+          generated_count: generated.ideas.length,
+          accepted_count: accepted.length,
+          rejection_count: generated.ideas.length - accepted.length,
+          rejections_sample: rejectionLog.slice(-10),
+        },
       });
     }
 
     if (allRows.length === 0) {
-      return json({ error: "Ideation produced no ideas" }, 500);
+      return json({ error: "Ideation produced no ideas — all rejected by validator", rejections: rejectionLog.slice(-20) }, 500);
     }
 
     const { error: insertErr } = await supabase.from("content_lab_ideas").insert(allRows);
     if (insertErr) return json({ error: insertErr.message }, 500);
 
-    return json({ ok: true, idea_count: allRows.length, platforms: distribution });
+    return json({ ok: true, idea_count: allRows.length, platforms: distribution, own_is_competitive: ownIsCompetitive });
   } catch (e) {
     console.error("content-lab-ideate error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
@@ -158,10 +208,23 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function avg(nums: number[]): number {
+  if (nums.length === 0) return 0;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+function median(nums: number[]): number {
+  if (nums.length === 0) return 0;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 interface PostRow {
   id: string;
   platform: string;
   author_handle: string;
+  source: string;
   bucket: string | null;
   caption: string | null;
   ai_summary: string | null;
@@ -252,65 +315,90 @@ interface IdeatePlatformArgs {
   niche: NicheContext;
   platform: string;
   count: number;
-  posts: PostRow[];
+  benchmarkPosts: PostRow[];
+  ownPosts: PostRow[];
+  ownIsCompetitive: boolean;
+  ownAvgViews: number;
+  benchmarkP50Views: number;
 }
 
 type IdeateResult =
   | { ok: true; ideas: GeneratedIdea[] }
   | { ok: false; error: string };
 
+function formatPostList(posts: PostRow[]): string {
+  return posts.map((p, i) => {
+    return `${i + 1}. @${p.author_handle} — ${fmt(p.views)}👁  ${fmt(p.likes)}❤  ${fmt(p.comments)}💬
+   Hook: ${p.hook_text ?? "—"}
+   Summary: ${p.ai_summary ?? p.caption?.slice(0, 200) ?? "—"}`;
+  }).join("\n\n");
+}
+
+function fmt(n: number): string {
+  if (!n) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
 async function generateIdeasForPlatform(args: IdeatePlatformArgs): Promise<IdeateResult> {
-  const { apiKey, niche, platform, count, posts } = args;
+  const { apiKey, niche, platform, count, benchmarkPosts, ownPosts, ownIsCompetitive, ownAvgViews, benchmarkP50Views } = args;
+
+  // Generate a slight buffer so the validator can reject a few without starving the run.
+  const requestCount = Math.min(count + 2, count * 2);
+
+  const inspirationPool = ownIsCompetitive
+    ? [...benchmarkPosts, ...ownPosts.slice(0, 6)]
+    : benchmarkPosts;
+
+  const antiExampleBlock = !ownIsCompetitive && ownPosts.length > 0
+    ? `\n\nBRAND'S OWN UNDERPERFORMING POSTS — DO NOT REPEAT THESE PATTERNS.\nThe brand's own avg views (${fmt(ownAvgViews)}) sit BELOW the benchmark median (${fmt(benchmarkP50Views)}). Do NOT cite the brand's own handle in based_on_handle. Treat these as anti-examples:\n\n${formatPostList(ownPosts.slice(0, ANTI_EXAMPLE_OWN_POSTS))}`
+    : ownIsCompetitive
+      ? `\n\nThe brand's own performance (${fmt(ownAvgViews)} avg views) is on par with benchmarks (${fmt(benchmarkP50Views)} median). Their best own posts are eligible inspiration too.`
+      : "";
 
   const systemPrompt = `${buildSystemPrompt(niche)}
 
 PLATFORM TARGET: ${platform.toUpperCase()}
 ${platformStyleNote(platform)}
 
-You will produce exactly ${count} ideas for this platform. Each idea must feel native to ${platform} — not a generic short-form video.`;
+You will produce exactly ${requestCount} ideas for this platform. Each idea must feel native to ${platform}.`;
 
-  const postSummary = posts.map((p, i) => {
-    const bucketTag = p.bucket ? `[${p.bucket}]` : "";
-    return `${i + 1}. ${bucketTag} @${p.author_handle} — ${p.likes}❤ ${p.comments}💬 ${p.views}👁
-   Hook: ${p.hook_text ?? "—"}
-   Summary: ${p.ai_summary ?? p.caption?.slice(0, 200) ?? "—"}`;
-  }).join("\n\n");
+  const userPrompt = `INSPIRATION POOL — top ${platform} posts in this niche, ranked by views:
 
-  const userPrompt = `Top-performing ${platform} posts in this niche:
+${formatPostList(inspirationPool)}${antiExampleBlock}
 
-${postSummary}
-
-Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas grounded in these posts.`;
+Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native ideas. Every idea MUST cite based_on_handle from the inspiration pool above.`;
 
   const tool = {
     name: "generate_ideas",
-    description: `Return ${count} ready-to-film content ideas tailored for ${platform}.`,
+    description: `Return ${requestCount} ready-to-film content ideas tailored for ${platform}.`,
     input_schema: {
       type: "object",
       properties: {
         ideas: {
           type: "array",
-          minItems: count,
-          maxItems: count,
+          minItems: requestCount,
+          maxItems: requestCount,
           items: {
             type: "object",
             properties: {
               title: { type: "string", description: "Short working title (max 80 chars)" },
-              based_on_handle: { type: "string", description: "@handle of the source post (without @)" },
+              based_on_handle: { type: "string", description: "@handle of the source benchmark post (without @) — REQUIRED, must be from the pool above" },
               hook: { type: "string", description: "Exact words spoken in first 3 seconds" },
               body: { type: "string", description: "What gets said/shown in the middle of the video" },
-              cta: { type: "string", description: "Specific, action-led CTA (no 'link in bio' alone)" },
-              caption: { type: "string", description: "Post caption (no hashtags)" },
+              cta: { type: "string", description: "Specific, action-led CTA aligned with the brand's stated goal" },
+              caption: { type: "string", description: "Post caption (no hashtags) — MUST NOT duplicate the hook" },
               caption_with_hashtag: { type: "string", description: "Caption with 1-3 hashtags appended" },
               script_full: { type: "string", description: "Full word-for-word script: hook + body + CTA" },
               duration_seconds: { type: "integer", minimum: 10, maximum: 90 },
               visual_direction: { type: "string", description: "What's on screen — angle, b-roll, text overlays" },
-              why_it_works: { type: "string", description: "Why this will resonate with this niche's audience" },
+              why_it_works: { type: "string", description: "Name the source post's metric AND the structural mechanic you're borrowing" },
               hashtags: { type: "array", items: { type: "string" }, maxItems: 3 },
               filming_checklist: { type: "array", items: { type: "string" }, maxItems: 6 },
-              platform_style_notes: { type: "string", description: `${platform}-specific format notes (aspect ratio, pacing, native feel)` },
+              platform_style_notes: { type: "string" },
             },
-            required: ["title", "hook", "body", "cta", "script_full", "duration_seconds", "why_it_works", "platform_style_notes"],
+            required: ["title", "based_on_handle", "hook", "body", "cta", "caption", "script_full", "duration_seconds", "why_it_works", "platform_style_notes"],
           },
         },
       },
@@ -347,7 +435,6 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
         request_id: requestId,
         body: text.slice(0, 1000),
       }));
-      // Try to surface Anthropic's structured error message if present.
       let detail = text.slice(0, 500);
       try {
         const parsed = JSON.parse(text);
@@ -361,13 +448,10 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
     const toolUse = contentBlocks.find((c) => c.type === "tool_use");
 
     if (!toolUse?.input?.ideas) {
-      // Capture exactly what Anthropic returned so we stop guessing.
       const stopReason = data.stop_reason ?? "unknown";
       const blockTypes = contentBlocks.map((c) => c.type).join(",") || "none";
       const textBlock = contentBlocks.find((c) => c.type === "text")?.text ?? "";
       const textPreview = textBlock ? textBlock.slice(0, 400) : "";
-      const usage = data.usage ? `in:${data.usage.input_tokens}/out:${data.usage.output_tokens}` : "n/a";
-
       console.error(JSON.stringify({
         fn: "content-lab-ideate",
         anthropic_no_tool_use: true,
@@ -375,15 +459,11 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
         request_id: requestId,
         stop_reason: stopReason,
         block_types: blockTypes,
-        usage,
         text_preview: textPreview,
-        full_response_preview: JSON.stringify(data).slice(0, 1200),
       }));
-
-      const detail = textPreview ? `text: "${textPreview}"` : "no text block";
       return {
         ok: false,
-        error: `Claude returned no tool_use (stop_reason=${stopReason}, blocks=${blockTypes}, ${detail}, req:${requestId})`,
+        error: `Claude returned no tool_use (stop_reason=${stopReason}, blocks=${blockTypes}, req:${requestId})`,
       };
     }
 
@@ -393,6 +473,7 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
       if (!idea.title) missing.push(`#${i + 1}.title`);
       if (!idea.hook) missing.push(`#${i + 1}.hook`);
       if (!idea.body) missing.push(`#${i + 1}.body`);
+      if (!idea.based_on_handle) missing.push(`#${i + 1}.based_on_handle`);
       if (!idea.why_it_works) missing.push(`#${i + 1}.why_it_works`);
     });
     if (missing.length > 0) {

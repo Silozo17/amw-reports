@@ -68,6 +68,20 @@ const NicheFormPage = () => {
   const [doNotUse, setDoNotUse] = useState<string[]>([]);
   const [doNotUseInput, setDoNotUseInput] = useState('');
 
+  // Structured brand brief
+  const [brfNiche, setBrfNiche] = useState('');
+  const [brfPositioning, setBrfPositioning] = useState('');
+  const [brfOffers, setBrfOffers] = useState<string[]>([]);
+  const [brfOfferInput, setBrfOfferInput] = useState('');
+  const [brfAudienceWho, setBrfAudienceWho] = useState('');
+  const [brfAudienceProblem, setBrfAudienceProblem] = useState('');
+  const [brfAudienceWhere, setBrfAudienceWhere] = useState('');
+  const [brfTones, setBrfTones] = useState<string[]>([]);
+  const [brfNeverDo, setBrfNeverDo] = useState<string[]>([]);
+  const [brfNeverDoInput, setBrfNeverDoInput] = useState('');
+  const [brfProducer, setBrfProducer] = useState('');
+  const [brfGoal, setBrfGoal] = useState('');
+
   const [discovering, setDiscovering] = useState(false);
   const [saving, setSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -117,6 +131,17 @@ const NicheFormPage = () => {
       setVideoLength(data.video_length_preference ?? '');
       setPostingCadence(data.posting_cadence ?? '');
       setDoNotUse(data.do_not_use ?? []);
+      const brief = ((data as { brand_brief?: Record<string, unknown> }).brand_brief ?? {}) as Record<string, unknown>;
+      setBrfNiche((brief.niche as string) ?? '');
+      setBrfPositioning((brief.positioning as string) ?? '');
+      setBrfOffers((brief.offers as string[]) ?? []);
+      setBrfAudienceWho((brief.audience_who as string) ?? '');
+      setBrfAudienceProblem((brief.audience_problem as string) ?? '');
+      setBrfAudienceWhere((brief.audience_where as string) ?? '');
+      setBrfTones((brief.tones as string[]) ?? []);
+      setBrfNeverDo((brief.never_do as string[]) ?? []);
+      setBrfProducer((brief.producer as string) ?? '');
+      setBrfGoal((brief.goal as string) ?? '');
       setHasDiscovered(!!data.discovered_at);
     })();
   }, [id, isEdit]);
@@ -142,6 +167,7 @@ const NicheFormPage = () => {
           own_handle: ownHandle.trim().replace(/^@/, ''),
           website: website.trim(),
           location: location.trim(),
+          brand_brief: buildBrief(),
         },
       });
       if (error) throw error;
@@ -186,6 +212,41 @@ const NicheFormPage = () => {
     setDoNotUseInput('');
   };
 
+  const buildBrief = () => ({
+    niche: brfNiche.trim() || undefined,
+    positioning: brfPositioning.trim() || undefined,
+    offers: brfOffers.length ? brfOffers : undefined,
+    audience_who: brfAudienceWho.trim() || undefined,
+    audience_problem: brfAudienceProblem.trim() || undefined,
+    audience_where: brfAudienceWhere.trim() || undefined,
+    tones: brfTones.length ? brfTones : undefined,
+    never_do: brfNeverDo.length ? brfNeverDo : undefined,
+    producer: brfProducer || undefined,
+    goal: brfGoal || undefined,
+  });
+
+  const toggleTone = (t: string) => {
+    setBrfTones((prev) => {
+      if (prev.includes(t)) return prev.filter((x) => x !== t);
+      if (prev.length >= 2) return [prev[1], t];
+      return [...prev, t];
+    });
+  };
+
+  const addOffer = () => {
+    const v = brfOfferInput.trim();
+    if (!v || brfOffers.length >= 3 || brfOffers.includes(v)) return;
+    setBrfOffers([...brfOffers, v]);
+    setBrfOfferInput('');
+  };
+
+  const addNeverDo = () => {
+    const v = brfNeverDoInput.trim();
+    if (!v || brfNeverDo.length >= 5 || brfNeverDo.includes(v)) return;
+    setBrfNeverDo([...brfNeverDo, v]);
+    setBrfNeverDoInput('');
+  };
+
   const handleSave = async () => {
     if (!orgId) return;
     if (!clientId) return toast.error('Pick a client');
@@ -224,6 +285,7 @@ const NicheFormPage = () => {
         video_length_preference: videoLength || null,
         posting_cadence: postingCadence || null,
         do_not_use: doNotUse,
+        brand_brief: buildBrief() as unknown as never,
         discovered_at: hasDiscovered ? new Date().toISOString() : null,
       };
 
