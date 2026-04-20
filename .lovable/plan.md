@@ -1,57 +1,50 @@
 
-User wants A2 (Benchmark Quality badge + niche-form polling) and A3 (credits top-up Stripe flow). Stripe pieces I established earlier: tables (`content_lab_credits`, `content_lab_credit_ledger`), RPC (`add_content_lab_credits`), existing `stripe-webhook` function. Need pricing decision — I suggested £5/5 credits and £20/25 credits previously but user never confirmed. I should confirm before creating Stripe products. Keep plan tight.
+User picked **A** = "£15 / 5 credits + £60 / 25 credits + £200 / 100 credits" (3 tiers).
 
-## A2 — Benchmark Quality + pool status visibility
+Need to implement A3 credits top-up. Plan was already approved earlier in principle, but pricing has now changed from my original suggestion (£5/£20) to the cost-justified £15/£60/£200 with 3 tiers. So the build is the same shape, just different numbers and 3 packs instead of 2.
 
-**1. Pool status on Niche Form (`NicheFormPage.tsx`)**
-After save, redirect to a new poll view that reads `content_lab_niches.pool_status` + counts rows in `content_lab_benchmark_pool` matching the niche's `niche_tag` and `platforms_to_scrape`. Polls every 5s until ≥5 verified handles exist or 3 min elapses. Shows "Building benchmark pool — 7/10 verified".
+## A3 — Credits top-up via Stripe (final pricing)
 
-**2. Run-button gating (`ContentLabPage.tsx`)**
-Disable "Run report now" until that niche's pool has ≥5 verified handles. Tooltip: "Pool building — X/5 verified".
+**Packs:**
+| Pack key | Credits | Price |
+|---|---|---|
+| `small` | 5 | £15 |
+| `medium` | 25 | £60 |
+| `large` | 100 | £200 |
 
-**3. Benchmark Quality badge (`RunDetailPage.tsx`)**
-Read pool size for the run's `niche_tag`. Render badge:
-- Strong (15+) — emerald
-- Good (10–14) — primary
-- Limited (5–9) — amber
-- Building (<5) — muted
+### Build steps
 
-New shared hook `useBenchmarkPoolStatus(nicheTag, platforms)` returning `{ verifiedCount, status, lastRefreshedAt }`. Used by all three surfaces.
+1. **Create 3 Stripe products + GBP one-time prices** via `stripe--create_stripe_product_and_price` (no `recurring_interval`). Capture the 3 `price_id`s.
 
-## A3 — Credits top-up via Stripe
+2. **New edge function `create-content-lab-credit-checkout`**
+   - Validates JWT, resolves user → `org_id` via `org_members`.
+   - Body: `{ pack: 'small' | 'medium' | 'large' }` (Zod-validated).
+   - Maps pack → `{ priceId, credits }` constants.
+   - Creates Stripe Checkout in `mode: 'payment'` with metadata `{ org_id, credits, type: 'content_lab_credits' }`.
+   - Success URL: `/content-lab?credits=success`. Cancel: `/content-lab?credits=cancelled`.
+   - Standard CORS + structured logging.
 
-**Pricing — needs your confirmation.** My suggestion:
-- **5 credits = £5** (£1.00/credit)
-- **25 credits = £20** (£0.80/credit, 20% bulk discount)
+3. **Extend `stripe-webhook/index.ts`**
+   - In the existing `checkout.session.completed` branch, check `session.metadata?.type === 'content_lab_credits'`.
+   - If so, idempotency check: `select 1 from content_lab_credit_ledger where stripe_payment_id = session.payment_intent`. Skip if exists.
+   - Else call `add_content_lab_credits(org_id, credits, payment_intent_id)` RPC.
+   - Skip the existing `subscription_activated` email path for credit purchases.
 
-Each credit = 1 extra Content Lab run beyond the monthly allowance. If you want different pack sizes/prices say so before I create the Stripe products.
+4. **UI on `ContentLabPage.tsx`**
+   - "Buy credits" button next to the existing usage badge.
+   - Opens a small Dialog showing 3 pack cards with price + per-credit value (highlight Medium as "Best value", Large as "Best deal").
+   - On select → `supabase.functions.invoke('create-content-lab-credit-checkout', { body: { pack } })` → `window.open(url, '_blank')`.
+   - On mount, if `?credits=success` query param: toast "Credits added", invalidate the credits/usage queries, strip the param via `navigate(pathname, { replace: true })`.
+   - On `?credits=cancelled`: toast "Checkout cancelled", strip param.
 
-**Implementation (assuming pricing approved):**
+### Files
+- **Create**: `supabase/functions/create-content-lab-credit-checkout/index.ts`
+- **Create**: `src/components/content-lab/BuyCreditsDialog.tsx`
+- **Edit**: `supabase/functions/stripe-webhook/index.ts` (add credits branch in existing checkout-completed handler)
+- **Edit**: `src/pages/content-lab/ContentLabPage.tsx` (button + query-param handler)
 
-1. Create 2 Stripe one-time products + prices (`stripe--create_stripe_product_and_price`). Store the resulting `price_id`s as constants in a new edge function.
-2. New edge function `create-content-lab-credit-checkout`:
-   - Authenticates user, resolves their `org_id`.
-   - Accepts `{ pack: 'small' | 'large' }`.
-   - Creates Stripe Checkout session in `mode: 'payment'` with metadata `{ org_id, credits, type: 'content_lab_credits' }`.
-   - Returns `{ url }`.
-3. Extend existing `stripe-webhook/index.ts` — add a branch for `checkout.session.completed` where `metadata.type === 'content_lab_credits'`. Calls `add_content_lab_credits(org_id, credits, payment_intent_id)` RPC.
-4. UI — `ContentLabPage.tsx`:
-   - "Buy credits" button next to the usage badge → opens a small dialog with the two packs.
-   - On click → invokes `create-content-lab-credit-checkout` → opens Stripe URL in new tab.
-   - On `?credits=success` query param after redirect → toast "Credits added" + invalidates `content-lab-usage` query.
-
-Success/cancel URLs: `/content-lab?credits=success` and `/content-lab?credits=cancelled`.
-
-## Build order
-1. Confirm pricing (or accept my suggestion).
-2. Create Stripe products + prices.
-3. Build A2 (pool hook + 3 UI surfaces) — independent, ships even if Stripe is delayed.
-4. Build A3 (checkout function + webhook branch + dialog).
-
-## Risks
-- **Pool can be empty for brand-new niches** even after refresh job (e.g. extremely narrow B2B niche). Building badge persists. UX needs an explicit "Pool couldn't fill — try broader hashtags" state if `pool_status='completed'` AND verified count <5. I'll include this.
-- **Webhook idempotency**: if Stripe retries, we'd double-credit. I'll check `stripe_payment_id` exists in `content_lab_credit_ledger` before adding.
-- **No frontend auth gate on credit purchase** beyond standard Supabase auth — fine since the function resolves org_id server-side.
-
-## Question before I build
-**Confirm pricing: £5/5 credits + £20/25 credits, or specify your own packs.**
+### Risks
+- **Webhook idempotency**: handled by ledger lookup on `stripe_payment_id`.
+- **Org resolution**: user could belong to multiple orgs. Use the same `.limit(1)` pattern as the rest of the webhook for consistency.
+- **Currency**: GBP everywhere. Stripe must be configured to accept GBP — assumed yes given existing subscription tiers.
+- **No code path tests credits without a real Stripe payment** — I'll add a `add_content_lab_credits` admin-only manual-grant later if you want, but not in this build.
