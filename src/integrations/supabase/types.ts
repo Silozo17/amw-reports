@@ -585,6 +585,7 @@ export type Database = {
           hook_variants: Json
           id: string
           idea_number: number
+          is_wildcard: boolean
           last_modified_via: string | null
           linked_at: string | null
           linked_post_id: string | null
@@ -618,6 +619,7 @@ export type Database = {
           hook_variants?: Json
           id?: string
           idea_number: number
+          is_wildcard?: boolean
           last_modified_via?: string | null
           linked_at?: string | null
           linked_post_id?: string | null
@@ -651,6 +653,7 @@ export type Database = {
           hook_variants?: Json
           id?: string
           idea_number?: number
+          is_wildcard?: boolean
           last_modified_via?: string | null
           linked_at?: string | null
           linked_post_id?: string | null

@@ -273,15 +273,20 @@ const ContentLabPage = () => {
                     <div className="space-y-2 pb-2">
                       {group.runs.slice(0, 5).map((run) => {
                         const niche = niches.find((n) => n.id === run.niche_id);
+                        const summary = (run.summary ?? {}) as { display_name?: string; description?: string };
+                        const created = new Date(run.created_at);
+                        const monthLabel = created.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                        const title = summary.display_name ?? `${group.clientName} · ${monthLabel}`;
+                        const subtitle = summary.description ?? `${niche?.label ?? 'Untitled niche'} · ${created.toLocaleDateString()}`;
                         return (
                           <Card
                             key={run.id}
                             className="flex cursor-pointer items-center justify-between p-3 transition-colors hover:border-primary/40"
                             onClick={() => run.status === 'completed' && navigate(`/content-lab/run/${run.id}`)}
                           >
-                            <div>
-                              <p className="font-body text-sm font-medium">{niche?.label ?? 'Unknown niche'}</p>
-                              <p className="text-xs text-muted-foreground">{new Date(run.created_at).toLocaleString()}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-body text-sm font-medium">{title}</p>
+                              <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
                             </div>
                             <RunStatusBadge status={run.status} />
                           </Card>

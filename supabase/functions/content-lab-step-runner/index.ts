@@ -347,19 +347,46 @@ async function runOneIdeatePlatformStep(
 }
 
 async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string) {
-  const { count: ideaCount } = await admin
+  const { data: ideas } = await admin
     .from("content_lab_ideas")
-    .select("id", { count: "exact", head: true })
+    .select("target_platform, is_wildcard")
     .eq("run_id", runId);
 
-  if (!ideaCount || ideaCount === 0) {
+  const ideaCount = ideas?.length ?? 0;
+  if (!ideaCount) {
     await failRun(admin, runId, "Ideation produced no ideas — see step logs for per-platform errors.");
     return;
   }
 
-  await setStatus(admin, runId, "completed", { completed_at: new Date().toISOString() });
+  // Build display_name + description for nicer UI labels.
+  const { data: runRow } = await admin
+    .from("content_lab_runs")
+    .select("created_at, summary, clients!inner(company_name)")
+    .eq("id", runId)
+    .single();
+
+  const summary = ((runRow as { summary?: Record<string, unknown> } | null)?.summary ?? {}) as Record<string, unknown>;
+  const clientName = (runRow as { clients?: { company_name?: string } } | null)?.clients?.company_name ?? "Client";
+  const created = new Date((runRow as { created_at?: string } | null)?.created_at ?? Date.now());
+  const monthLabel = created.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const platforms = [...new Set(((ideas ?? []) as Array<{ target_platform: string | null }>).map((i) => i.target_platform).filter(Boolean) as string[])];
+  const wildcardCount = ((ideas ?? []) as Array<{ is_wildcard?: boolean }>).filter((i) => i.is_wildcard).length;
+  const platformPart = platforms.length ? ` across ${platforms.join(" + ")}` : "";
+  const wildcardPart = wildcardCount > 0 ? `, ${wildcardCount} wildcard${wildcardCount === 1 ? "" : "s"}` : "";
+
+  await admin.from("content_lab_runs").update({
+    status: "completed",
+    completed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    summary: {
+      ...summary,
+      display_name: `${clientName} · ${monthLabel}`,
+      description: `${ideaCount} idea${ideaCount === 1 ? "" : "s"}${platformPart}${wildcardPart}`,
+    },
+  }).eq("id", runId);
+
   await logStepStart({ runId, step: "pipeline", message: "Pipeline completed" })
-    .then((h) => h.finish({ status: "ok", message: `Run finalised with ${ideaCount} ideas`, payload: { idea_count: ideaCount } }));
+    .then((h) => h.finish({ status: "ok", message: `Run finalised with ${ideaCount} ideas`, payload: { idea_count: ideaCount, wildcard_count: wildcardCount } }));
 
   // Fire notification (best-effort; never blocks completion).
   try {

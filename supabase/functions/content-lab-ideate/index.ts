@@ -26,6 +26,12 @@ const MODEL = "claude-sonnet-4-5-20250929";
 const TOP_BENCHMARK_POSTS = 10;
 const TOP_COMPETITOR_POSTS = 10;
 const ANTI_EXAMPLE_OWN_POSTS = 6;
+// v4: every run also produces 2 extra "wildcard" ideas designed to set new trends —
+// untested formats nobody in the niche is doing.
+const WILDCARD_COUNT = 2;
+// Performance memory: feed back the top-3 winners and bottom-3 flops from prior linked ideas
+// so each successive run gets smarter automatically.
+const PERF_HISTORY_LIMIT = 3;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -209,6 +215,33 @@ Deno.serve(async (req) => {
 
     if (allRows.length === 0) {
       return json({ error: "Ideation produced no ideas — all rejected by validator", rejections: rejectionLog.slice(-20) }, 500);
+    }
+
+    // ── Wildcard ideas: 2 untested, trend-setting ideas tagged is_wildcard.
+    // Only added on the final platform pass (or single-platform mode) to avoid duplication.
+    const isFinalPass = !singlePlatform || platformsToProcess.includes(allPlatforms[allPlatforms.length - 1]);
+    if (isFinalPass) {
+      try {
+        const wildcardPlatform = (allPlatforms[0] ?? "instagram");
+        const wildcards = await generateWildcards({
+          apiKey,
+          niche: niche as unknown as NicheContext,
+          platform: wildcardPlatform,
+          count: WILDCARD_COUNT,
+          benchmarkPosts: benchmarkPosts.slice(0, 8),
+        });
+        if (wildcards.ok) {
+          for (const w of wildcards.ideas) {
+            ideaCounter += 1;
+            const row = toRow(run_id, ideaCounter, wildcardPlatform, w, benchmarkPosts, benchmarkPosts[0]?.id ?? null);
+            row.is_wildcard = true;
+            row.based_on_post_id = null; // wildcards aren't grounded in a specific post
+            allRows.push(row);
+          }
+        }
+      } catch (e) {
+        console.warn("wildcard generation failed (non-fatal):", e);
+      }
     }
 
     const { error: insertErr } = await supabase.from("content_lab_ideas").insert(allRows);

@@ -135,11 +135,15 @@ const RunDetailPage = () => {
     },
   });
 
-  const ownPosts = posts.filter((p) => (p as { bucket?: string }).bucket === 'own');
-  const viralPosts = posts.filter((p) => {
-    const b = (p as { bucket?: string }).bucket;
-    return b === 'benchmark' || b === 'competitor';
-  });
+  // Bucket fallback: legacy rows have bucket=null. Treat any non-'own' as benchmark
+  // so the dashboard isn't empty for older scrapes.
+  const bucketOf = (p: { bucket?: string | null; source?: string }): 'own' | 'benchmark' => {
+    if (p.bucket === 'own') return 'own';
+    if (p.bucket === 'benchmark' || p.bucket === 'competitor') return 'benchmark';
+    return 'benchmark';
+  };
+  const ownPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'own');
+  const viralPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'benchmark');
   const ownAvgViews = ownPosts.length > 0
     ? Math.round(ownPosts.reduce((s, p) => s + (p.views ?? 0), 0) / ownPosts.length)
     : 0;
@@ -327,9 +331,14 @@ const RunDetailPage = () => {
                         <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea {idea.idea_number}</p>
                         <h3 className="mt-1 font-display text-xl">{idea.title}</h3>
                       </div>
-                      {idea.duration_seconds && (
-                        <Badge variant="outline">{idea.duration_seconds}s</Badge>
-                      )}
+                      <div className="flex flex-col items-end gap-1.5">
+                        {(idea as { is_wildcard?: boolean }).is_wildcard && (
+                          <Badge variant="secondary">Wildcard 🚀</Badge>
+                        )}
+                        {idea.duration_seconds && (
+                          <Badge variant="outline">{idea.duration_seconds}s</Badge>
+                        )}
+                      </div>
                     </div>
                     {idea.hook && <p className="text-sm"><span className="font-semibold">Hook: </span>{idea.hook}</p>}
                     {Array.isArray(idea.hook_variants) && idea.hook_variants.length > 0 && (
@@ -394,6 +403,7 @@ const RunDetailPage = () => {
                   target_platform: i.target_platform ?? null,
                   rating: i.rating ?? null,
                   status: i.status ?? 'not_started',
+                  is_wildcard: (i as { is_wildcard?: boolean }).is_wildcard ?? false,
                 }))}
                 onSelect={() => { /* click-to-detail can be wired later; drag is the primary action */ }}
               />
