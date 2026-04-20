@@ -12,6 +12,7 @@ const NAV_LINKS = [
 ];
 
 const SOLUTIONS_USECASES = [
+  { to: '/content-lab-feature', label: 'Content Lab (AI Content Engine)' },
   { to: '/social-media-reporting', label: 'Social Media Reporting' },
   { to: '/seo-reporting', label: 'SEO Reporting' },
   { to: '/ppc-reporting', label: 'PPC & Ads Reporting' },
