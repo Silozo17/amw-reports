@@ -42,7 +42,6 @@ const RunDetailPage = () => {
   const [rescraping, setRescraping] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [commentsIdeaId, setCommentsIdeaId] = useState<string | null>(null);
 
   const handleExportDocx = async () => {
     if (!id) return;
@@ -280,12 +279,6 @@ const RunDetailPage = () => {
         </header>
 
         {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
-        <IdeaCommentsDrawer
-          ideaId={commentsIdeaId}
-          open={!!commentsIdeaId}
-          onOpenChange={(open) => { if (!open) setCommentsIdeaId(null); }}
-        />
-
         <SectionErrorBoundary>
         <Tabs defaultValue="own" className="space-y-6">
           <TabsList>
@@ -354,85 +347,36 @@ const RunDetailPage = () => {
               <Card className="p-10 text-center text-sm text-muted-foreground">Ideas will appear here once the run completes.</Card>
             ) : (
               ideas.map((idea) => (
-                <Card key={idea.id} className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
-                  <div>
-                    <IdeaPreviewWithState
-                      idea={{
-                        id: idea.id,
-                        target_platform: idea.target_platform,
-                        hook: idea.hook,
-                        title: idea.title,
-                        caption: idea.caption,
-                      }}
-                      runId={id!}
-                      clientId={niche?.client_id ?? null}
-                      nicheId={run?.niche_id ?? null}
-                      onOpenComments={(ideaId) => setCommentsIdeaId(ideaId)}
-                    />
-                    {idea.target_platform && (
-                      <p className="mt-2 text-center text-[10px] uppercase tracking-widest text-muted-foreground">
-                        {idea.target_platform}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-widest text-muted-foreground">Idea {idea.idea_number}</p>
-                        <h3 className="mt-1 font-display text-xl">{idea.title}</h3>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        {(idea as { is_wildcard?: boolean }).is_wildcard && (
-                          <Badge variant="secondary">Wildcard 🚀</Badge>
-                        )}
-                        {idea.duration_seconds && (
-                          <Badge variant="outline">{idea.duration_seconds}s</Badge>
-                        )}
-                      </div>
-                    </div>
-                    {idea.hook && <p className="text-sm"><span className="font-semibold">Hook: </span>{idea.hook}</p>}
-                    {Array.isArray(idea.hook_variants) && idea.hook_variants.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Hook variants</p>
-                        <div className="grid gap-2 md:grid-cols-3">
-                          {(idea.hook_variants as Array<{ text: string; mechanism: string; why: string }>).map((v, vi) => (
-                            <div key={vi} className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs">
-                              <p className="font-medium leading-snug">{v.text}</p>
-                              <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">{v.mechanism}</p>
-                              {v.why && <p className="mt-1 text-muted-foreground">{v.why}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {idea.body && <p className="text-sm text-muted-foreground">{idea.body}</p>}
-                    {idea.cta && <p className="text-sm"><span className="font-semibold">CTA: </span>{idea.cta}</p>}
-                    {idea.why_it_works && (
-                      <div className="rounded-md bg-primary/5 p-3 text-sm">
-                        <span className="font-semibold text-primary">Why it works: </span>
-                        {idea.why_it_works}
-                      </div>
-                    )}
-                    {idea.hashtags && idea.hashtags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {idea.hashtags.map((h: string) => (
-                          <Badge key={h} variant="secondary" className="text-[10px]">#{h}</Badge>
-                        ))}
-                      </div>
-                    )}
-                    <div className="border-t border-border/50 pt-3">
-                      <IdeaActionButtons ideaId={idea.id} runId={id!} regenCount={(idea as { regen_count?: number }).regen_count ?? 0} />
-                    </div>
-                    <IdeaPerformanceStrip
-                      ideaId={idea.id}
-                      runId={id!}
-                      status={idea.status ?? 'not_started'}
-                      linkedPostId={(idea as { linked_post_id?: string | null }).linked_post_id ?? null}
-                      actualViews={(idea as { actual_views?: number | null }).actual_views ?? null}
-                      actualEngagementRate={(idea as { actual_engagement_rate?: number | null }).actual_engagement_rate ?? null}
-                    />
-                  </div>
-                </Card>
+                <IdeaCard
+                  key={idea.id}
+                  variant="stacked"
+                  idea={{
+                    id: idea.id,
+                    run_id: id!,
+                    client_id: niche?.client_id ?? null,
+                    niche_id: run?.niche_id ?? null,
+                    idea_number: idea.idea_number,
+                    title: idea.title,
+                    hook: idea.hook,
+                    caption: idea.caption,
+                    target_platform: idea.target_platform,
+                    rating: idea.rating,
+                    status: idea.status ?? 'not_started',
+                    duration_seconds: idea.duration_seconds,
+                    is_wildcard: (idea as { is_wildcard?: boolean }).is_wildcard ?? false,
+                    body: idea.body,
+                    cta: idea.cta,
+                    why_it_works: idea.why_it_works,
+                    hashtags: idea.hashtags,
+                    hook_variants:
+                      (idea.hook_variants as Array<{ text: string; mechanism: string; why: string }> | null) ?? null,
+                    regen_count: (idea as { regen_count?: number }).regen_count ?? 0,
+                    linked_post_id: (idea as { linked_post_id?: string | null }).linked_post_id ?? null,
+                    actual_views: (idea as { actual_views?: number | null }).actual_views ?? null,
+                    actual_engagement_rate:
+                      (idea as { actual_engagement_rate?: number | null }).actual_engagement_rate ?? null,
+                  }}
+                />
               ))
             )}
           </TabsContent>
