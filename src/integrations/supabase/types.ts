@@ -601,6 +601,42 @@ export type Database = {
           },
         ]
       }
+      content_lab_idea_comments: {
+        Row: {
+          author_client_user_id: string | null
+          author_label: string
+          author_user_id: string | null
+          body: string
+          created_at: string
+          id: string
+          idea_id: string
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_client_user_id?: string | null
+          author_label: string
+          author_user_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          idea_id: string
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_client_user_id?: string | null
+          author_label?: string
+          author_user_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          idea_id?: string
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_lab_ideas: {
         Row: {
           actual_comments: number | null
