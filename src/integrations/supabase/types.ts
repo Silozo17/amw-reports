@@ -655,14 +655,18 @@ export type Database = {
       }
       content_lab_niches: {
         Row: {
+          admired_accounts: Json
           brand_brief: Json
+          brand_voice_snapshot: Json | null
           client_id: string
+          competitor_accounts: Json
           competitor_urls: string[]
           content_styles: string[]
           created_at: string
           discovered_at: string | null
           do_not_use: string[]
           id: string
+          industry_slug: string | null
           label: string
           language: string
           location: string | null
@@ -683,17 +687,22 @@ export type Database = {
           tracked_keywords: string[]
           updated_at: string
           video_length_preference: string | null
+          voice_built_at: string | null
           website: string | null
         }
         Insert: {
+          admired_accounts?: Json
           brand_brief?: Json
+          brand_voice_snapshot?: Json | null
           client_id: string
+          competitor_accounts?: Json
           competitor_urls?: string[]
           content_styles?: string[]
           created_at?: string
           discovered_at?: string | null
           do_not_use?: string[]
           id?: string
+          industry_slug?: string | null
           label: string
           language?: string
           location?: string | null
@@ -714,17 +723,22 @@ export type Database = {
           tracked_keywords?: string[]
           updated_at?: string
           video_length_preference?: string | null
+          voice_built_at?: string | null
           website?: string | null
         }
         Update: {
+          admired_accounts?: Json
           brand_brief?: Json
+          brand_voice_snapshot?: Json | null
           client_id?: string
+          competitor_accounts?: Json
           competitor_urls?: string[]
           content_styles?: string[]
           created_at?: string
           discovered_at?: string | null
           do_not_use?: string[]
           id?: string
+          industry_slug?: string | null
           label?: string
           language?: string
           location?: string | null
@@ -745,6 +759,7 @@ export type Database = {
           tracked_keywords?: string[]
           updated_at?: string
           video_length_preference?: string | null
+          voice_built_at?: string | null
           website?: string | null
         }
         Relationships: [
@@ -754,6 +769,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_niches_industry_slug_fkey"
+            columns: ["industry_slug"]
+            isOneToOne: false
+            referencedRelation: "content_lab_verticals"
+            referencedColumns: ["slug"]
           },
           {
             foreignKeyName: "content_lab_niches_org_id_fkey"
@@ -980,6 +1002,65 @@ export type Database = {
           },
         ]
       }
+      content_lab_seed_pool: {
+        Row: {
+          avg_views_est: number | null
+          created_at: string
+          display_name: string | null
+          followers_est: number | null
+          geo: string | null
+          handle: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          platform: string
+          sub_niche: string | null
+          updated_at: string
+          verified_at: string | null
+          vertical_slug: string
+        }
+        Insert: {
+          avg_views_est?: number | null
+          created_at?: string
+          display_name?: string | null
+          followers_est?: number | null
+          geo?: string | null
+          handle: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          platform: string
+          sub_niche?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          vertical_slug: string
+        }
+        Update: {
+          avg_views_est?: number | null
+          created_at?: string
+          display_name?: string | null
+          followers_est?: number | null
+          geo?: string | null
+          handle?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          platform?: string
+          sub_niche?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          vertical_slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_seed_pool_vertical_slug_fkey"
+            columns: ["vertical_slug"]
+            isOneToOne: false
+            referencedRelation: "content_lab_verticals"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       content_lab_step_logs: {
         Row: {
           completed_at: string | null
@@ -1104,6 +1185,45 @@ export type Database = {
           runs_count?: number
           updated_at?: string
           year?: number
+        }
+        Relationships: []
+      }
+      content_lab_verticals: {
+        Row: {
+          created_at: string
+          display_name: string
+          geo_focus: string | null
+          keyword_queries: string[]
+          min_views_facebook: number
+          min_views_instagram: number
+          min_views_tiktok: number
+          notes: string | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          geo_focus?: string | null
+          keyword_queries?: string[]
+          min_views_facebook?: number
+          min_views_instagram?: number
+          min_views_tiktok?: number
+          notes?: string | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          geo_focus?: string | null
+          keyword_queries?: string[]
+          min_views_facebook?: number
+          min_views_instagram?: number
+          min_views_tiktok?: number
+          notes?: string | null
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1420,6 +1540,7 @@ export type Database = {
         Row: {
           additional_clients: number
           additional_connections: number
+          content_lab_onboarded_at: string | null
           content_lab_tier: string | null
           created_at: string
           current_period_end: string | null
@@ -1437,6 +1558,7 @@ export type Database = {
         Insert: {
           additional_clients?: number
           additional_connections?: number
+          content_lab_onboarded_at?: string | null
           content_lab_tier?: string | null
           created_at?: string
           current_period_end?: string | null
@@ -1454,6 +1576,7 @@ export type Database = {
         Update: {
           additional_clients?: number
           additional_connections?: number
+          content_lab_onboarded_at?: string | null
           content_lab_tier?: string | null
           created_at?: string
           current_period_end?: string | null
