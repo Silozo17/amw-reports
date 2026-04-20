@@ -46,8 +46,10 @@ const NicheFormPage = () => {
   const [label, setLabel] = useState('');
   const [language, setLanguage] = useState('en');
 
-  // Core 3 inputs
-  const [ownHandle, setOwnHandle] = useState('');
+  // Core inputs
+  const [ownHandle, setOwnHandle] = useState(''); // Instagram (legacy field, kept for discovery)
+  const [tiktokHandle, setTiktokHandle] = useState('');
+  const [facebookHandle, setFacebookHandle] = useState('');
   const [website, setWebsite] = useState('');
   const [location, setLocation] = useState('');
   const [platformsToScrape, setPlatformsToScrape] = useState<string[]>(['instagram']);
