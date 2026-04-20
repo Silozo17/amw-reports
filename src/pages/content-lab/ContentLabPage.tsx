@@ -270,11 +270,13 @@ interface NicheCardProps {
 
 const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
   const { data: pool } = useBenchmarkPoolStatus(niche.niche_tag, niche.platforms_to_scrape, { poll: true });
-  const verifiedCount = pool?.verifiedCount ?? 0;
-  const canRun = pool?.canRun ?? false;
-  const blocked = !!pool && !canRun;
-  const tooltipMessage = blocked
-    ? `Pool building — ${verifiedCount}/${POOL_RUN_THRESHOLD} verified accounts. Add broader hashtags or wait for verification to finish.`
+  const hasHandles =
+    niche.tracked_handles.length > 0 ||
+    niche.tracked_hashtags.length > 0 ||
+    niche.competitor_urls.length > 0;
+  const noHandles = !hasHandles;
+  const buildingMessage = pool && !pool.canRun
+    ? `Benchmarks still building (${pool.verifiedCount}/${POOL_RUN_THRESHOLD}). This run will use saved niche benchmarks.`
     : null;
 
   const runButton = (
@@ -282,7 +284,7 @@ const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
       size="sm"
       className="mt-4 w-full"
       onClick={onRun}
-      disabled={isRunning || blocked}
+      disabled={isRunning || noHandles}
     >
       {isRunning ? (
         <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
@@ -314,7 +316,7 @@ const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
           </Badge>
         ))}
       </div>
-      {blocked ? (
+      {noHandles ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="block" onClick={(e) => e.stopPropagation()}>
@@ -322,11 +324,14 @@ const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
             </span>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-[260px] text-xs">
-            {tooltipMessage}
+            Add handles, hashtags, or competitors to this niche before running.
           </TooltipContent>
         </Tooltip>
       ) : (
         runButton
+      )}
+      {buildingMessage && (
+        <p className="mt-2 text-[11px] text-muted-foreground">{buildingMessage}</p>
       )}
     </Card>
   );

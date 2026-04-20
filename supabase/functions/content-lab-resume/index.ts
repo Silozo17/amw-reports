@@ -60,10 +60,15 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    // Fire and forget so the client returns immediately
-    runResume(admin, run_id, rescrape === true).catch((e) => console.error("Resume crashed:", e));
+    // Fire as a true background task so the runtime keeps it alive
+    const bgTask = runResume(admin, run_id, rescrape === true).catch((e) => console.error("Resume crashed:", e));
+    // @ts-expect-error EdgeRuntime is provided by Supabase edge runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-expect-error see above
+      EdgeRuntime.waitUntil(bgTask);
+    }
 
-    return json({ ok: true, run_id, post_count: postCount, platforms: [...availablePlatforms], rescrape: rescrape === true });
+    return json({ ok: true, run_id, post_count: postCount, platforms: [...availablePlatforms], rescrape: rescrape === true }, 202);
   } catch (e) {
     console.error("content-lab-resume error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
@@ -128,25 +133,44 @@ async function runResume(admin: ReturnType<typeof createClient>, runId: string, 
       await analyseStep.finish({ status: "ok", message: "Analyse complete" });
     }
 
-    // IDEATE (required)
+    // IDEATE (required) — per-platform to stay under function timeout
     await updateStatus("ideating");
-    const ideateStep = await logStepStart({ runId, step: "ideate", message: "Calling content-lab-ideate (resume)" });
-    const ideateRes = await callFn("content-lab-ideate", { run_id: runId });
-    if (!ideateRes.ok) {
-      await ideateStep.finish({ status: "failed", errorMessage: ideateRes.error ?? "unknown" });
-      await pipelineLog.finish({ status: "failed", errorMessage: `Ideate failed: ${ideateRes.error ?? "unknown"}` });
-      return fail(`Ideate failed: ${ideateRes.error ?? "unknown"}`);
+
+    const { data: nicheRow } = await admin
+      .from("content_lab_runs")
+      .select("niche:niche_id(platforms_to_scrape)")
+      .eq("id", runId)
+      .single();
+    const platforms: string[] =
+      ((nicheRow as { niche: { platforms_to_scrape?: string[] } } | null)?.niche?.platforms_to_scrape) ?? ["instagram"];
+
+    let anyPlatformSucceeded = false;
+    for (const platform of platforms) {
+      const ideateStep = await logStepStart({
+        runId,
+        step: "ideate",
+        message: `Calling content-lab-ideate (resume, ${platform})`,
+        payload: { platform },
+      });
+      const ideateRes = await callFn("content-lab-ideate", { run_id: runId, platform });
+      if (!ideateRes.ok) {
+        await ideateStep.finish({ status: "failed", errorMessage: ideateRes.error ?? "unknown", payload: { platform } });
+        console.error(`Resume ideate failed for ${platform}:`, ideateRes.error);
+      } else {
+        anyPlatformSucceeded = true;
+        await ideateStep.finish({ status: "ok", message: `Ideate complete for ${platform}`, payload: { platform } });
+      }
+    }
+
+    if (!anyPlatformSucceeded) {
+      await pipelineLog.finish({ status: "failed", errorMessage: "Ideate failed for all platforms" });
+      return fail("Ideate failed for all platforms — check the run logs.");
     }
 
     const { count: ideaCount } = await admin
       .from("content_lab_ideas")
       .select("id", { count: "exact", head: true })
       .eq("run_id", runId);
-    await ideateStep.finish({
-      status: "ok",
-      message: `Generated ${ideaCount ?? 0} ideas`,
-      payload: { idea_count: ideaCount ?? 0 },
-    });
 
     await updateStatus("completed", { completed_at: new Date().toISOString() });
     await pipelineLog.finish({

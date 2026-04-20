@@ -124,12 +124,34 @@ Deno.serve(async (req) => {
       orgIdForUsage = (existing as { org_id?: string } | null)?.org_id ?? null;
     }
 
-    // Kick off async pipeline. Respond immediately so the UI doesn't block.
-    runPipeline(admin, runId!, orgIdForUsage).catch((e) => {
+    // Defensive sweep: any of this org's runs older than 30 min still in active states are stuck — mark failed.
+    if (orgIdForUsage) {
+      const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      await admin
+        .from("content_lab_runs")
+        .update({
+          status: "failed",
+          error_message: "Run timed out (>30min in active state). Auto-failed by orchestrator.",
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("org_id", orgIdForUsage)
+        .in("status", ["pending", "scraping", "analysing", "ideating"])
+        .lt("updated_at", cutoff)
+        .neq("id", runId!);
+    }
+
+    // Kick off async pipeline as a true background task so the runtime keeps it alive.
+    const bgTask = runPipeline(admin, runId!, orgIdForUsage).catch((e) => {
       console.error("Pipeline crashed:", e);
     });
+    // @ts-expect-error EdgeRuntime is provided by Supabase edge runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-expect-error see above
+      EdgeRuntime.waitUntil(bgTask);
+    }
 
-    return json({ ok: true, run_id: runId });
+    return json({ ok: true, run_id: runId }, 202);
   } catch (e) {
     console.error("content-lab-pipeline error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
@@ -247,25 +269,47 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
       await analyseStep.finish({ status: "ok", message: "Analyse complete" });
     }
 
-    // 3. IDEATE (required)
+    // 3. IDEATE (required) — per-platform to stay under function timeout
     await updateStatus("ideating");
-    const ideateStep = await logStepStart({ runId, step: "ideate", message: "Calling content-lab-ideate" });
-    const ideateRes = await callFn("content-lab-ideate", { run_id: runId });
-    if (!ideateRes.ok) {
-      await ideateStep.finish({ status: "failed", errorMessage: ideateRes.error ?? "unknown" });
-      await pipelineLog.finish({ status: "failed", errorMessage: `Ideate failed: ${ideateRes.error ?? "unknown"}` });
-      return fail(`Ideate failed: ${ideateRes.error ?? "unknown"}`);
+    const { data: nicheRow } = await admin
+      .from("content_lab_runs")
+      .select("niche:niche_id(platforms_to_scrape)")
+      .eq("id", runId)
+      .single();
+    const platforms: string[] =
+      ((nicheRow as { niche: { platforms_to_scrape?: string[] } } | null)?.niche?.platforms_to_scrape) ?? ["instagram"];
+
+    let anyPlatformSucceeded = false;
+    for (const platform of platforms) {
+      const ideateStep = await logStepStart({
+        runId,
+        step: "ideate",
+        message: `Calling content-lab-ideate (${platform})`,
+        payload: { platform },
+      });
+      const ideateRes = await callFn("content-lab-ideate", { run_id: runId, platform });
+      if (!ideateRes.ok) {
+        await ideateStep.finish({
+          status: "failed",
+          errorMessage: ideateRes.error ?? "unknown",
+          payload: { platform },
+        });
+        console.error(`Ideate failed for ${platform}:`, ideateRes.error);
+      } else {
+        anyPlatformSucceeded = true;
+        await ideateStep.finish({ status: "ok", message: `Ideate complete for ${platform}`, payload: { platform } });
+      }
+    }
+
+    if (!anyPlatformSucceeded) {
+      await pipelineLog.finish({ status: "failed", errorMessage: "Ideate failed for all platforms" });
+      return fail("Ideate failed for all platforms — check the run logs.");
     }
 
     const { count: ideaCount } = await admin
       .from("content_lab_ideas")
       .select("id", { count: "exact", head: true })
       .eq("run_id", runId);
-    await ideateStep.finish({
-      status: "ok",
-      message: `Generated ${ideaCount ?? 0} ideas`,
-      payload: { idea_count: ideaCount ?? 0 },
-    });
 
     await updateStatus("completed", { completed_at: new Date().toISOString() });
     await pipelineLog.finish({
