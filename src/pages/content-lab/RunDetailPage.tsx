@@ -288,6 +288,7 @@ const RunDetailPage = () => {
 
         {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
 
+        <SectionErrorBoundary>
         <Tabs defaultValue="own" className="space-y-6">
           <TabsList>
             <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
@@ -460,6 +461,7 @@ const RunDetailPage = () => {
             />
           </TabsContent>
         </Tabs>
+        </SectionErrorBoundary>
       </div>
     </AppLayout>
   );
