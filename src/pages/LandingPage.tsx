@@ -10,6 +10,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import LandingHero from '@/components/landing/LandingHero';
+import TurnstileWidget from '@/components/auth/TurnstileWidget';
 import usePageMeta from '@/hooks/usePageMeta';
 
 type View = 'login' | 'signup' | 'otp' | 'magic-link';
@@ -50,6 +51,19 @@ const LandingPage = () => {
   const [signupPassword, setSignupPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Cloudflare Turnstile — bot protection on signup + password reset.
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
+  const [signupTurnstileToken, setSignupTurnstileToken] = useState('');
+  const [resetTurnstileToken, setResetTurnstileToken] = useState('');
+  useEffect(() => {
+    supabase.functions.invoke('verify-turnstile', { method: 'GET' })
+      .then(({ data }) => {
+        const key = (data as { site_key?: string } | null)?.site_key;
+        if (key) setTurnstileSiteKey(key);
+      })
+      .catch(() => { /* dev mode — widget hidden, server allows */ });
+  }, []);
+
   const [otpCode, setOtpCode] = useState('');
 
   const handleGoogleSignIn = async () => {
@@ -76,8 +90,23 @@ const LandingPage = () => {
     if (signupPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
     if (signupPassword.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     if (!companyName.trim()) { toast.error('Company name is required'); return; }
+    if (turnstileSiteKey && !signupTurnstileToken) {
+      toast.error('Please complete the bot check'); return;
+    }
 
     setIsLoading(true);
+    // Server-side Turnstile verification — rejects if widget bypassed.
+    const verify = await supabase.functions.invoke('verify-turnstile', {
+      body: { token: signupTurnstileToken },
+    });
+    const verifyData = verify.data as { ok?: boolean } | null;
+    if (!verifyData?.ok) {
+      toast.error('Bot check failed. Please try again.');
+      setSignupTurnstileToken('');
+      setIsLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
       email: signupEmail,
       password: signupPassword,
@@ -193,6 +222,19 @@ const LandingPage = () => {
                       type="button"
                       onClick={async () => {
                         if (!loginEmail) { toast.error('Enter your email first'); return; }
+                        if (turnstileSiteKey && !resetTurnstileToken) {
+                          toast.error('Please complete the bot check below before requesting a reset');
+                          return;
+                        }
+                        const verify = await supabase.functions.invoke('verify-turnstile', {
+                          body: { token: resetTurnstileToken },
+                        });
+                        const verifyData = verify.data as { ok?: boolean } | null;
+                        if (!verifyData?.ok) {
+                          toast.error('Bot check failed. Please try again.');
+                          setResetTurnstileToken('');
+                          return;
+                        }
                         const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
                           redirectTo: `${window.location.origin}/reset-password`,
                         });
@@ -206,6 +248,9 @@ const LandingPage = () => {
                   </div>
                   <Input id="login-password" type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required />
                 </div>
+                {turnstileSiteKey && (
+                  <TurnstileWidget siteKey={turnstileSiteKey} onVerify={setResetTurnstileToken} onExpire={() => setResetTurnstileToken('')} />
+                )}
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Signing in...</> : <>Sign In <ArrowRight className="h-4 w-4 ml-2" /></>}
                 </Button>
@@ -265,6 +310,9 @@ const LandingPage = () => {
                   <Label htmlFor="confirm-password">Confirm Password *</Label>
                   <Input id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat password" required />
                 </div>
+                {turnstileSiteKey && (
+                  <TurnstileWidget siteKey={turnstileSiteKey} onVerify={setSignupTurnstileToken} onExpire={() => setSignupTurnstileToken('')} />
+                )}
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating account...</> : <>Create Account <ArrowRight className="h-4 w-4 ml-2" /></>}
                 </Button>
