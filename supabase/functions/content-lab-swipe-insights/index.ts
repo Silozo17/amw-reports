@@ -27,21 +27,31 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return json({ error: 'unauthorized' }, 401);
+    if (!authHeader?.startsWith('Bearer ')) return json({ error: 'unauthorized' }, 401);
+
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: userData } = await userClient.auth.getUser();
+    if (!userData.user) return json({ error: 'unauthorized' }, 401);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { global: { headers: { Authorization: authHeader } } },
+      { auth: { persistSession: false } },
     );
-
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return json({ error: 'unauthorized' }, 401);
 
     const { data: profile } = await supabase
       .from('profiles').select('org_id').eq('user_id', userData.user.id).maybeSingle();
     const orgId = profile?.org_id;
     if (!orgId) return json({ error: 'no org' }, 400);
+
+    // Verify membership explicitly (defence in depth)
+    const { data: membership } = await supabase
+      .from('org_members').select('id').eq('user_id', userData.user.id).eq('org_id', orgId).maybeSingle();
+    if (!membership) return json({ error: 'forbidden' }, 403);
 
     // Fetch saved ideas for this org
     const { data: saved, error: savedErr } = await supabase

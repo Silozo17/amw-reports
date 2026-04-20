@@ -54,6 +54,7 @@ const AdminOrgDetail = lazy(() => import("./pages/admin/AdminOrgDetail"));
 const AdminActivityLog = lazy(() => import("./pages/admin/AdminActivityLog"));
 const AdminUserList = lazy(() => import("./pages/admin/AdminUserList"));
 const AdminContentLab = lazy(() => import("./pages/admin/AdminContentLab"));
+const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const ContentLabPage = lazy(() => import("./pages/content-lab/ContentLabPage"));
 const NicheFormPage = lazy(() => import("./pages/content-lab/NicheFormPage"));
 const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
@@ -162,6 +163,7 @@ const AppRoutes = () => (
       <Route path="/admin/users" element={<AdminRoute><AdminUserList /></AdminRoute>} />
       <Route path="/admin/activity" element={<AdminRoute><AdminActivityLog /></AdminRoute>} />
       <Route path="/admin/content-lab" element={<AdminRoute><AdminContentLab /></AdminRoute>} />
+      <Route path="/admin/security" element={<AdminRoute><AdminSecurity /></AdminRoute>} />
       <Route path="/share/content-lab/:slug" element={<ContentLabRunShare />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/client-portal" element={<ClientPortalAuth />} />
