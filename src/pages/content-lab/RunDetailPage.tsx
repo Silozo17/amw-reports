@@ -361,6 +361,17 @@ const RunDetailPage = () => {
               />
             )}
           </TabsContent>
+
+          <TabsContent value="hooks" className="space-y-4">
+            <HookLibrary
+              analysedHooks={analysedHooks}
+              ideas={ideas.map((i) => ({
+                idea_number: i.idea_number,
+                hook: i.hook ?? null,
+                hook_variants: (i.hook_variants as Array<{ text: string; mechanism: string; why: string }> | null) ?? null,
+              }))}
+            />
+          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>
