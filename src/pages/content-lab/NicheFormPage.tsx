@@ -131,6 +131,17 @@ const NicheFormPage = () => {
       setVideoLength(data.video_length_preference ?? '');
       setPostingCadence(data.posting_cadence ?? '');
       setDoNotUse(data.do_not_use ?? []);
+      const brief = ((data as { brand_brief?: Record<string, unknown> }).brand_brief ?? {}) as Record<string, unknown>;
+      setBrfNiche((brief.niche as string) ?? '');
+      setBrfPositioning((brief.positioning as string) ?? '');
+      setBrfOffers((brief.offers as string[]) ?? []);
+      setBrfAudienceWho((brief.audience_who as string) ?? '');
+      setBrfAudienceProblem((brief.audience_problem as string) ?? '');
+      setBrfAudienceWhere((brief.audience_where as string) ?? '');
+      setBrfTones((brief.tones as string[]) ?? []);
+      setBrfNeverDo((brief.never_do as string[]) ?? []);
+      setBrfProducer((brief.producer as string) ?? '');
+      setBrfGoal((brief.goal as string) ?? '');
       setHasDiscovered(!!data.discovered_at);
     })();
   }, [id, isEdit]);
