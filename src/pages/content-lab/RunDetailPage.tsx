@@ -28,6 +28,8 @@ import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
+import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
+import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
