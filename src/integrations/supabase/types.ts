@@ -947,6 +947,7 @@ export type Database = {
           completed_at: string | null
           cost_pence: number
           created_at: string
+          email_on_complete: boolean
           error_message: string | null
           id: string
           niche_id: string
@@ -963,6 +964,7 @@ export type Database = {
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
+          email_on_complete?: boolean
           error_message?: string | null
           id?: string
           niche_id: string
@@ -979,6 +981,7 @@ export type Database = {
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
+          email_on_complete?: boolean
           error_message?: string | null
           id?: string
           niche_id?: string
