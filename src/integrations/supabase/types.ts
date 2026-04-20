@@ -2204,6 +2204,7 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      slugify_niche_tag: { Args: { _label: string }; Returns: string }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
