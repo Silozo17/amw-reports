@@ -37,6 +37,15 @@ Deno.serve(async (req) => {
       .from("content_lab_runs").select("id, org_id, status, niche_id").eq("id", run_id).single();
     if (!run) return json({ error: "Run not found" }, 404);
 
+    // Org-membership check: caller must belong to the run's org.
+    const { data: membership } = await admin
+      .from("org_members")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("org_id", (run as { org_id: string }).org_id)
+      .maybeSingle();
+    if (!membership) return json({ error: "Forbidden" }, 403);
+
     const { data: niche } = await admin
       .from("content_lab_niches").select("platforms_to_scrape").eq("id", run.niche_id).single();
     const targetPlatforms: string[] = (niche?.platforms_to_scrape ?? ["instagram"]) as string[];

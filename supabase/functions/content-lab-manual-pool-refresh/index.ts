@@ -10,7 +10,7 @@ const BodySchema = z.object({
   nicheId: z.string().uuid(),
 });
 
-const REFRESH_COST_CREDITS = 3;
+const REFRESH_COST_CREDITS = 1;
 const RATE_LIMIT_WINDOW_DAYS = 30;
 const RATE_LIMIT_MAX = 5;
 
@@ -79,28 +79,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Look up tier — Agency gets 1 free per calendar month
-    const { data: sub } = await admin
-      .from("org_subscriptions")
-      .select("content_lab_tier")
-      .eq("org_id", orgId)
-      .maybeSingle();
-
-    const tier = sub?.content_lab_tier?.toLowerCase() ?? null;
-
-    // Calendar-month window for free-tier check (UTC)
-    const now = new Date();
-    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-    const { count: thisMonthCount } = await admin
-      .from("content_lab_pool_refresh_jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("triggered_by_org_id", orgId)
-      .gte("created_at", monthStart);
-
-    const isAgencyFreeRefresh = tier === "agency" && (thisMonthCount ?? 0) === 0;
+    // Always charge credits — single, simple model. Spec: 1 credit per manual refresh.
     let ledgerId: string | null = null;
-
-    if (!isAgencyFreeRefresh) {
+    {
       const { data: spent, error: spendErr } = await admin.rpc("spend_content_lab_credit", {
         _org_id: orgId,
         _amount: REFRESH_COST_CREDITS,
@@ -168,16 +149,14 @@ Deno.serve(async (req) => {
       jobId: job.id,
       orgId,
       nicheTag,
-      isAgencyFreeRefresh,
-      creditsCharged: isAgencyFreeRefresh ? 0 : REFRESH_COST_CREDITS,
+      creditsCharged: REFRESH_COST_CREDITS,
     }));
 
     return new Response(
       JSON.stringify({
         ok: true,
         jobId: job.id,
-        creditsCharged: isAgencyFreeRefresh ? 0 : REFRESH_COST_CREDITS,
-        isAgencyFreeRefresh,
+        creditsCharged: REFRESH_COST_CREDITS,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

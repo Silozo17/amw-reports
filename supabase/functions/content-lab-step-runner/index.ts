@@ -16,6 +16,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { logStepStart } from "../_shared/contentLabStepLog.ts";
+import { runLimitForTier } from "../_shared/contentLabTiers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,12 +28,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const RUN_LIMITS_BY_TIER: Record<string, number> = {
-  creator: 1,
-  studio: 3,
-  agency: 10,
-};
-const DEFAULT_RUN_LIMIT = 1;
+const CHAIN_RETRY_DELAYS_MS = [250, 1000, 4000];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -89,6 +85,12 @@ async function runOneStep(
   // Terminal states — nothing to do
   if (status === "completed" || status === "failed") return;
 
+  // Heartbeat: touch updated_at so the stale-run reaper doesn't false-positive
+  // a slow LLM call as a stuck run.
+  await admin.from("content_lab_runs")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", runId);
+
   try {
     if (status === "pending" || status === "scraping") {
       await runScrapeStep(admin, runId, orgId, mode);
@@ -132,18 +134,39 @@ async function failRun(admin: ReturnType<typeof createClient>, runId: string, me
 }
 
 async function chainNext(runId: string, mode: "fresh" | "resume" | "rescrape") {
-  // Fire-and-forget; the next runner call returns 202 and continues async.
+  // Retries with exponential backoff. The stale-run reaper still acts as a
+  // final safety net if all retries fail.
+  for (let attempt = 0; attempt < CHAIN_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/content-lab-step-runner`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ run_id: runId, mode }),
+      });
+      if (res.ok) return;
+      console.error(`[step-runner] chainNext attempt ${attempt + 1} non-OK: ${res.status}`);
+    } catch (e) {
+      console.error(`[step-runner] chainNext attempt ${attempt + 1} failed for ${runId}:`, e);
+    }
+    if (attempt < CHAIN_RETRY_DELAYS_MS.length - 1) {
+      await new Promise((r) => setTimeout(r, CHAIN_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  // All attempts failed: leave a breadcrumb. Reaper will eventually fail the run.
+  console.error(`[step-runner] chainNext exhausted retries for ${runId}`);
   try {
-    await fetch(`${SUPABASE_URL}/functions/v1/content-lab-step-runner`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${SERVICE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ run_id: runId, mode }),
-    });
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    await admin.from("content_lab_runs").update({
+      error_message: "Step chain dropped (network). Auto-recovery will retry shortly.",
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+    const handle = await logStepStart({ runId, step: "chain", message: "chainNext retries exhausted" });
+    await handle.finish({ status: "failed", errorMessage: "chainNext exhausted retries" });
   } catch (e) {
-    console.error(`[step-runner] chainNext failed for ${runId}:`, e);
+    console.error(`[step-runner] chainNext breadcrumb write failed for ${runId}:`, e);
   }
 }
 
@@ -173,8 +196,8 @@ async function getMonthlyLimit(admin: ReturnType<typeof createClient>, orgId: st
     .select("content_lab_tier")
     .eq("org_id", orgId)
     .maybeSingle();
-  const tier = (data as { content_lab_tier?: string | null } | null)?.content_lab_tier?.toLowerCase();
-  return (tier && RUN_LIMITS_BY_TIER[tier]) ?? DEFAULT_RUN_LIMIT;
+  const tier = (data as { content_lab_tier?: string | null } | null)?.content_lab_tier ?? null;
+  return runLimitForTier(tier);
 }
 async function getCurrentUsage(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
   const now = new Date();

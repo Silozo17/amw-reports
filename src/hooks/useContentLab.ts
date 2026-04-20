@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/contexts/OrgContext';
+import { runLimitForTier } from '@/lib/contentLabPricing';
 
 export interface ContentLabNiche {
   id: string;
@@ -81,12 +82,6 @@ export const useContentLabRuns = (clientId?: string) => {
   });
 };
 
-const RUN_LIMITS_BY_TIER: Record<string, number> = {
-  creator: 1,
-  studio: 3,
-  agency: 10,
-};
-const DEFAULT_RUN_LIMIT = 1;
 
 export interface ContentLabUsage {
   runsThisMonth: number;
@@ -123,8 +118,8 @@ export const useContentLabUsage = () => {
       ]);
 
       const runsThisMonth = (usageRes.data as { runs_count?: number } | null)?.runs_count ?? 0;
-      const tier = (subRes.data as { content_lab_tier?: string | null } | null)?.content_lab_tier?.toLowerCase();
-      const runsLimit = (tier && RUN_LIMITS_BY_TIER[tier]) ?? DEFAULT_RUN_LIMIT;
+      const tier = (subRes.data as { content_lab_tier?: string | null } | null)?.content_lab_tier ?? null;
+      const runsLimit = runLimitForTier(tier);
       const creditBalance = (credRes.data as { balance?: number } | null)?.balance ?? 0;
       return { runsThisMonth, runsLimit, creditBalance };
     },

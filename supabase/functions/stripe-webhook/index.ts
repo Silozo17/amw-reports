@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
       console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} status=${status}`);
     }
 
-    async function syncContentLabTier(email: string, tier: string) {
+    async function syncContentLabTier(email: string, tier: string | null) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("user_id")
@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
         .update({ content_lab_tier: tier })
         .eq("org_id", membership.org_id);
 
-      console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} content_lab_tier=${tier}`);
+      console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} content_lab_tier=${tier ?? "null"}`);
     }
 
     // --- Handle events ---
@@ -133,12 +133,20 @@ Deno.serve(async (req) => {
       const prev = (event.data as Record<string, unknown>).previous_attributes as { items?: { data?: Array<{ price?: { id?: string; unit_amount?: number } }> } } | undefined;
       customerEmail = await getCustomerEmail(stripe, sub.customer as string);
 
+      const newPriceId = sub.items.data[0]?.price?.id;
+      const isContentLabSub = !!newPriceId && !!CONTENT_LAB_PRICE_TO_TIER[newPriceId];
+
       // Sync status changes
       if (customerEmail) {
         if (sub.status === "past_due") {
           await syncOrgSubscriptionStatus(customerEmail, "past_due", true, false);
         } else if (sub.status === "canceled" || sub.status === "unpaid") {
           await syncOrgSubscriptionStatus(customerEmail, "cancelled", true, false);
+          // For Content Lab subscriptions, clear the tier immediately on cancellation
+          // so the pipeline blocks new runs (gating is enforced in content-lab-pipeline).
+          if (isContentLabSub) {
+            await syncContentLabTier(customerEmail, null);
+          }
         } else if (sub.status === "active") {
           await syncOrgSubscriptionStatus(customerEmail, "active", false, true);
         }
@@ -146,8 +154,7 @@ Deno.serve(async (req) => {
 
       if (prev?.items) {
         const oldPrice = prev.items?.data?.[0]?.price?.id;
-        const newPrice = sub.items.data[0]?.price?.id;
-        if (oldPrice && newPrice && oldPrice !== newPrice) {
+        if (oldPrice && newPriceId && oldPrice !== newPriceId) {
           const oldAmount = prev.items?.data?.[0]?.price?.unit_amount ?? 0;
           const newAmount = sub.items.data[0]?.price?.unit_amount ?? 0;
           templateName = newAmount > oldAmount ? "subscription_upgraded" : "subscription_downgraded";
@@ -160,10 +167,10 @@ Deno.serve(async (req) => {
       }
 
       // Sync content_lab_tier from subscription/price metadata or known price ID
-      if (customerEmail) {
+      // (only for active subscriptions — cancelled/unpaid handled above).
+      if (customerEmail && sub.status === "active") {
         const subMetaTier = (sub.metadata?.content_lab_tier as string | undefined) ?? null;
         const priceMetaTier = (sub.items.data[0]?.price?.metadata?.content_lab_tier as string | undefined) ?? null;
-        const newPriceId = sub.items.data[0]?.price?.id;
         const tierFromPriceId = newPriceId ? CONTENT_LAB_PRICE_TO_TIER[newPriceId] : undefined;
         const newTier = subMetaTier ?? priceMetaTier ?? tierFromPriceId;
         if (newTier) {
@@ -181,8 +188,15 @@ Deno.serve(async (req) => {
       templateName = "trial_expired";
       emailData = { reason: "Subscription ended" };
 
+      const deletedPriceId = sub.items.data[0]?.price?.id;
+      const wasContentLabSub = !!deletedPriceId && !!CONTENT_LAB_PRICE_TO_TIER[deletedPriceId];
+
       if (customerEmail) {
         await syncOrgSubscriptionStatus(customerEmail, "cancelled", true, false);
+        // Hard-clear the Content Lab tier so the pipeline blocks new runs immediately.
+        if (wasContentLabSub) {
+          await syncContentLabTier(customerEmail, null);
+        }
       }
     } else if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
