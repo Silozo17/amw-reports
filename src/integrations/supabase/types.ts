@@ -568,6 +568,10 @@ export type Database = {
       }
       content_lab_ideas: {
         Row: {
+          actual_comments: number | null
+          actual_engagement_rate: number | null
+          actual_likes: number | null
+          actual_views: number | null
           based_on_post_id: string | null
           body: string | null
           caption: string | null
@@ -582,6 +586,8 @@ export type Database = {
           id: string
           idea_number: number
           last_modified_via: string | null
+          linked_at: string | null
+          linked_post_id: string | null
           platform_style_notes: string | null
           rating: number | null
           regen_count: number
@@ -595,6 +601,10 @@ export type Database = {
           why_it_works: string | null
         }
         Insert: {
+          actual_comments?: number | null
+          actual_engagement_rate?: number | null
+          actual_likes?: number | null
+          actual_views?: number | null
           based_on_post_id?: string | null
           body?: string | null
           caption?: string | null
@@ -609,6 +619,8 @@ export type Database = {
           id?: string
           idea_number: number
           last_modified_via?: string | null
+          linked_at?: string | null
+          linked_post_id?: string | null
           platform_style_notes?: string | null
           rating?: number | null
           regen_count?: number
@@ -622,6 +634,10 @@ export type Database = {
           why_it_works?: string | null
         }
         Update: {
+          actual_comments?: number | null
+          actual_engagement_rate?: number | null
+          actual_likes?: number | null
+          actual_views?: number | null
           based_on_post_id?: string | null
           body?: string | null
           caption?: string | null
@@ -636,6 +652,8 @@ export type Database = {
           id?: string
           idea_number?: number
           last_modified_via?: string | null
+          linked_at?: string | null
+          linked_post_id?: string | null
           platform_style_notes?: string | null
           rating?: number | null
           regen_count?: number
@@ -652,6 +670,13 @@ export type Database = {
           {
             foreignKeyName: "content_lab_ideas_based_on_post_id_fkey"
             columns: ["based_on_post_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_ideas_linked_post_id_fkey"
+            columns: ["linked_post_id"]
             isOneToOne: false
             referencedRelation: "content_lab_posts"
             referencedColumns: ["id"]
