@@ -20,9 +20,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
+import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
+import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
+import { useContentLabPublicDemo } from '@/hooks/useContentLabPublicDemo';
+import { AMW_DEMO_SHARE_SLUG } from '@/lib/contentLabDemo';
 
 const SAMPLE_IDEA = {
   hook: '3 things I wish I knew before launching my agency',
