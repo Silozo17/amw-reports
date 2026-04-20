@@ -143,6 +143,32 @@ function json(body: unknown, status = 200) {
 
 interface FastResult { summary: string; hook: string; hook_type: string }
 
+// deno-lint-ignore no-explicit-any
+async function upsertHooks(supabase: any, run_id: string, posts: PostRow[]) {
+  const rows = posts
+    .filter((p) => p.hook_text && p.hook_text.trim().length > 0)
+    .map((p) => ({
+      run_id,
+      hook_text: p.hook_text!.trim(),
+      mechanism: p.hook_type || null,
+      why_it_works: null,
+      source_post_id: p.id,
+    }));
+  if (rows.length === 0) return;
+  // Dedupe within the batch by lowercased hook_text
+  const seen = new Set<string>();
+  const deduped = rows.filter((r) => {
+    const k = r.hook_text.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const { error } = await supabase
+    .from("content_lab_hooks")
+    .upsert(deduped, { onConflict: "run_id,hook_text", ignoreDuplicates: true });
+  if (error) console.error("upsertHooks error:", error.message);
+}
+
 async function analyseFast(apiKey: string, caption: string): Promise<FastResult | null> {
   try {
     const res = await fetch(AI_GATEWAY, {
