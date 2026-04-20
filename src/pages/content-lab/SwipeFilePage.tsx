@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
-import { Card } from '@/components/ui/card';
+// Card import removed — page uses IdeaCard + EmptyStateMascot only.
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -165,9 +165,5 @@ const SwipeFilePage = () => {
     </AppLayout>
   );
 };
-
-const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={className}>{children}</div>
-);
 
 export default SwipeFilePage;
