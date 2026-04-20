@@ -56,6 +56,7 @@ const AdminContentLab = lazy(() => import("./pages/admin/AdminContentLab"));
 const ContentLabPage = lazy(() => import("./pages/content-lab/ContentLabPage"));
 const NicheFormPage = lazy(() => import("./pages/content-lab/NicheFormPage"));
 const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
+const OnboardWizardPage = lazy(() => import("./pages/content-lab/OnboardWizardPage"));
 
 const queryClient = new QueryClient();
 
@@ -137,6 +138,7 @@ const AppRoutes = () => (
       <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="/content-lab" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
+      <Route path="/content-lab/onboard" element={<ProtectedRoute><OnboardWizardPage /></ProtectedRoute>} />
       <Route path="/content-lab/niche/new" element={<ProtectedRoute><NicheFormPage /></ProtectedRoute>} />
       <Route path="/content-lab/niche/:id" element={<ProtectedRoute><NicheFormPage /></ProtectedRoute>} />
       <Route path="/content-lab/run/:id" element={<ProtectedRoute><RunDetailPage /></ProtectedRoute>} />
