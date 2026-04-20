@@ -85,6 +85,12 @@ async function runOneStep(
   // Terminal states — nothing to do
   if (status === "completed" || status === "failed") return;
 
+  // Heartbeat: touch updated_at so the stale-run reaper doesn't false-positive
+  // a slow LLM call as a stuck run.
+  await admin.from("content_lab_runs")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", runId);
+
   try {
     if (status === "pending" || status === "scraping") {
       await runScrapeStep(admin, runId, orgId, mode);
