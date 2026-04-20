@@ -224,6 +224,7 @@ const RunDetailPage = () => {
             <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
             <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
             <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+            <TabsTrigger value="hooks">Hook Library</TabsTrigger>
           </TabsList>
 
           <TabsContent value="own" className="space-y-4">
