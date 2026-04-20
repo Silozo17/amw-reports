@@ -374,6 +374,155 @@ const NicheFormPage = () => {
             </div>
           </div>
 
+        </Card>
+
+        {/* Structured Brand Brief — feeds every prompt downstream */}
+        <Card className="space-y-6 p-6">
+          <div>
+            <h2 className="font-medium">Brand brief</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Tighter inputs = sharper ideas. This replaces the loose "tell us about you" — every block feeds the AI directly.
+            </p>
+          </div>
+
+          {/* Brand DNA */}
+          <div className="space-y-4 rounded-md border border-border/60 p-4">
+            <h3 className="text-sm font-semibold">1. Brand DNA</h3>
+            <div className="space-y-2">
+              <Label>Niche / category</Label>
+              <Input value={brfNiche} onChange={(e) => setBrfNiche(e.target.value)} placeholder="e.g. luxury wedding photography" />
+            </div>
+            <div className="space-y-2">
+              <Label>One-line positioning</Label>
+              <Input value={brfPositioning} onChange={(e) => setBrfPositioning(e.target.value)} placeholder="What makes you different in one sentence" />
+            </div>
+            <div className="space-y-2">
+              <Label>3 specific things you sell or do</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={brfOfferInput}
+                  onChange={(e) => setBrfOfferInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addOffer())}
+                  placeholder="Add an offer (max 3)..."
+                  disabled={brfOffers.length >= 3}
+                />
+                <Button type="button" onClick={addOffer} variant="secondary" disabled={brfOffers.length >= 3}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {brfOffers.map((o) => (
+                  <Badge key={o} variant="secondary" className="gap-1.5">
+                    {o}
+                    <button onClick={() => setBrfOffers(brfOffers.filter((x) => x !== o))}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Audience */}
+          <div className="space-y-4 rounded-md border border-border/60 p-4">
+            <h3 className="text-sm font-semibold">2. Audience</h3>
+            <div className="space-y-2">
+              <Label>Who they are (1 line)</Label>
+              <Input value={brfAudienceWho} onChange={(e) => setBrfAudienceWho(e.target.value)} placeholder="e.g. couples 28-38 planning a £20k+ wedding" />
+            </div>
+            <div className="space-y-2">
+              <Label>The single problem they have</Label>
+              <Input value={brfAudienceProblem} onChange={(e) => setBrfAudienceProblem(e.target.value)} placeholder="e.g. terrified the photos won't feel like them" />
+            </div>
+            <div className="space-y-2">
+              <Label>Where they hang out online</Label>
+              <Input value={brfAudienceWhere} onChange={(e) => setBrfAudienceWhere(e.target.value)} placeholder="e.g. Instagram saves, Pinterest boards, Hitched.co.uk" />
+            </div>
+          </div>
+
+          {/* Voice & constraints */}
+          <div className="space-y-4 rounded-md border border-border/60 p-4">
+            <h3 className="text-sm font-semibold">3. Voice & constraints</h3>
+            <div className="space-y-2">
+              <Label>Tone (pick max 2)</Label>
+              <div className="flex flex-wrap gap-2">
+                {['witty', 'expert', 'warm', 'blunt', 'playful', 'premium'].map((t) => (
+                  <Badge
+                    key={t}
+                    variant={brfTones.includes(t) ? 'default' : 'outline'}
+                    className="cursor-pointer capitalize"
+                    onClick={() => toggleTone(t)}
+                  >
+                    {t}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>5 things you'll never say or do</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={brfNeverDoInput}
+                  onChange={(e) => setBrfNeverDoInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addNeverDo())}
+                  placeholder="Add a rule (max 5)..."
+                  disabled={brfNeverDo.length >= 5}
+                />
+                <Button type="button" onClick={addNeverDo} variant="secondary" disabled={brfNeverDo.length >= 5}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {brfNeverDo.map((t) => (
+                  <Badge key={t} variant="secondary" className="gap-1.5">
+                    {t}
+                    <button onClick={() => setBrfNeverDo(brfNeverDo.filter((x) => x !== t))}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Producer</Label>
+              <Select value={brfProducer} onValueChange={setBrfProducer}>
+                <SelectTrigger><SelectValue placeholder="Who films?" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="founder">Founder on a phone</SelectItem>
+                  <SelectItem value="team">Internal team</SelectItem>
+                  <SelectItem value="studio">Studio / agency</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Goal */}
+          <div className="space-y-4 rounded-md border border-border/60 p-4">
+            <h3 className="text-sm font-semibold">4. Primary goal</h3>
+            <p className="text-xs text-muted-foreground">Drives the CTA style on every idea.</p>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              {[
+                { v: 'awareness', l: 'Awareness' },
+                { v: 'leads', l: 'Leads' },
+                { v: 'sales', l: 'Sales' },
+                { v: 'community', l: 'Community' },
+              ].map((g) => (
+                <Button
+                  key={g.v}
+                  type="button"
+                  variant={brfGoal === g.v ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setBrfGoal(g.v)}
+                >
+                  {g.l}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* Discover button moved out so brief feeds it */}
+        <Card className="p-6">
           <Button onClick={handleDiscover} disabled={discovering} className="w-full" variant="secondary">
             {discovering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {hasDiscovered ? 'Re-discover' : 'Discover niche & competitors'}
