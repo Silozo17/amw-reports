@@ -60,6 +60,7 @@ const OnboardWizardPage = lazy(() => import("./pages/content-lab/OnboardWizardPa
 const ContentPipelinePage = lazy(() => import("./pages/content-lab/ContentPipelinePage"));
 const IdeasLibraryPage = lazy(() => import("./pages/content-lab/IdeasLibraryPage"));
 const SwipeFilePage = lazy(() => import("./pages/content-lab/SwipeFilePage"));
+const ContentLabRunShare = lazy(() => import("./pages/share/ContentLabRunShare"));
 
 const queryClient = new QueryClient();
 
@@ -155,6 +156,7 @@ const AppRoutes = () => (
       <Route path="/admin/users" element={<AdminRoute><AdminUserList /></AdminRoute>} />
       <Route path="/admin/activity" element={<AdminRoute><AdminActivityLog /></AdminRoute>} />
       <Route path="/admin/content-lab" element={<AdminRoute><AdminContentLab /></AdminRoute>} />
+      <Route path="/share/content-lab/:slug" element={<ContentLabRunShare />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/client-portal" element={<ClientPortalAuth />} />
       <Route path="*" element={<NotFound />} />
