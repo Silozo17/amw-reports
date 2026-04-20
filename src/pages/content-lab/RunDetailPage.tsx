@@ -305,6 +305,20 @@ const RunDetailPage = () => {
                       )}
                     </div>
                     {idea.hook && <p className="text-sm"><span className="font-semibold">Hook: </span>{idea.hook}</p>}
+                    {Array.isArray(idea.hook_variants) && idea.hook_variants.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Hook variants</p>
+                        <div className="grid gap-2 md:grid-cols-3">
+                          {(idea.hook_variants as Array<{ text: string; mechanism: string; why: string }>).map((v, vi) => (
+                            <div key={vi} className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs">
+                              <p className="font-medium leading-snug">{v.text}</p>
+                              <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">{v.mechanism}</p>
+                              {v.why && <p className="mt-1 text-muted-foreground">{v.why}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {idea.body && <p className="text-sm text-muted-foreground">{idea.body}</p>}
                     {idea.cta && <p className="text-sm"><span className="font-semibold">CTA: </span>{idea.cta}</p>}
                     {idea.why_it_works && (
