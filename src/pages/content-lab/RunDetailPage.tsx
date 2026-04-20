@@ -33,6 +33,7 @@ import IdeaActionButtons from '@/components/content-lab/IdeaActionButtons';
 import IdeaPerformanceStrip from '@/components/content-lab/IdeaPerformanceStrip';
 import ShareWithClientDialog from '@/components/content-lab/ShareWithClientDialog';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
@@ -287,6 +288,7 @@ const RunDetailPage = () => {
 
         {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
 
+        <SectionErrorBoundary>
         <Tabs defaultValue="own" className="space-y-6">
           <TabsList>
             <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
@@ -459,6 +461,7 @@ const RunDetailPage = () => {
             />
           </TabsContent>
         </Tabs>
+        </SectionErrorBoundary>
       </div>
     </AppLayout>
   );

@@ -7,6 +7,8 @@ import { KanbanSquare } from 'lucide-react';
 import { useAllIdeas } from '@/hooks/useContentLab';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
+import EmptyStateMascot from '@/components/content-lab/EmptyStateMascot';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const ALL = '__all__';
@@ -72,26 +74,29 @@ const ContentPipelinePage = () => {
         {ideasLoading ? (
           <p className="text-sm text-muted-foreground">Loading ideas…</p>
         ) : filtered.length === 0 ? (
-          <Card className="p-10 text-center text-sm text-muted-foreground">
-            No ideas yet. Generate your first run from Content Lab.
-          </Card>
-        ) : (
-          <IdeaPipelineBoard
-            runId="aggregate"
-            ideas={filtered.map((i) => ({
-              id: i.id,
-              idea_number: i.idea_number,
-              title: i.title,
-              hook: i.hook,
-              target_platform: i.target_platform,
-              rating: i.rating,
-              status: i.status,
-            }))}
-            onSelect={(idea) => {
-              const found = filtered.find((f) => f.id === idea.id);
-              if (found) navigate(`/content-lab/run/${found.run_id}`);
-            }}
+          <EmptyStateMascot
+            title="Pipeline is empty"
+            description="Generate your first run from Content Lab — ideas you create will land here so you can drag them from script to posted."
           />
+        ) : (
+          <SectionErrorBoundary>
+            <IdeaPipelineBoard
+              runId="aggregate"
+              ideas={filtered.map((i) => ({
+                id: i.id,
+                idea_number: i.idea_number,
+                title: i.title,
+                hook: i.hook,
+                target_platform: i.target_platform,
+                rating: i.rating,
+                status: i.status,
+              }))}
+              onSelect={(idea) => {
+                const found = filtered.find((f) => f.id === idea.id);
+                if (found) navigate(`/content-lab/run/${found.run_id}`);
+              }}
+            />
+          </SectionErrorBoundary>
         )}
       </div>
     </AppLayout>

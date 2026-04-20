@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Lightbulb, Search, ExternalLink } from 'lucide-react';
 import { useAllIdeas } from '@/hooks/useContentLab';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
+import EmptyStateMascot from '@/components/content-lab/EmptyStateMascot';
+import { Skeleton } from '@/components/ui/skeleton';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const ALL = '__all__';
@@ -119,9 +121,18 @@ const IdeasLibraryPage = () => {
         </Card>
 
         {ideasLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <div className="space-y-2">
+            {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+          </div>
         ) : filtered.length === 0 ? (
-          <Card className="p-10 text-center text-sm text-muted-foreground">No ideas match these filters.</Card>
+          <EmptyStateMascot
+            title={ideas.length === 0 ? 'No ideas generated yet' : 'No ideas match these filters'}
+            description={
+              ideas.length === 0
+                ? 'Run Content Lab on a niche to start filling your library.'
+                : 'Try clearing a filter or your search.'
+            }
+          />
         ) : (
           <div className="space-y-2">
             {filtered.map((i) => (

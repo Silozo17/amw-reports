@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Heart, FileText, Search, ExternalLink } from 'lucide-react';
 import { useSwipeFile, useToggleSwipe, type SwipeFileIdea } from '@/hooks/useSwipeFile';
 import PatternInsightsWidget from '@/components/content-lab/PatternInsightsWidget';
+import EmptyStateMascot from '@/components/content-lab/EmptyStateMascot';
 import usePageMeta from '@/hooks/usePageMeta';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -159,16 +160,14 @@ const SwipeFilePage = () => {
             {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-44" />)}
           </div>
         ) : filtered.length === 0 ? (
-          <Card className="p-10 text-center">
-            <p className="font-medium">
-              {entries.length === 0 ? 'No saved ideas yet' : 'No matches for these filters'}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {entries.length === 0
-                ? 'Tap the heart on any idea to save it here.'
-                : 'Try clearing a filter or your search.'}
-            </p>
-          </Card>
+          <EmptyStateMascot
+            title={entries.length === 0 ? 'No saved ideas yet' : 'No matches for these filters'}
+            description={
+              entries.length === 0
+                ? 'Tap the heart on any idea to save it here. Your team can browse, tag and export them later.'
+                : 'Try clearing a filter or your search.'
+            }
+          />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((e) => (
