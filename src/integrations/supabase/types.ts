@@ -969,6 +969,63 @@ export type Database = {
           },
         ]
       }
+      content_lab_run_share_tokens: {
+        Row: {
+          client_logo_url: string | null
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          last_viewed_at: string | null
+          org_id: string
+          run_id: string
+          slug: string
+          view_count: number
+        }
+        Insert: {
+          client_logo_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_viewed_at?: string | null
+          org_id: string
+          run_id: string
+          slug?: string
+          view_count?: number
+        }
+        Update: {
+          client_logo_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_viewed_at?: string | null
+          org_id?: string
+          run_id?: string
+          slug?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_run_share_tokens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_run_share_tokens_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_lab_runs: {
         Row: {
           client_id: string
@@ -1150,6 +1207,103 @@ export type Database = {
             columns: ["run_id"]
             isOneToOne: false
             referencedRelation: "content_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_swipe_file: {
+        Row: {
+          client_id: string | null
+          id: string
+          idea_id: string
+          niche_id: string | null
+          notes: string | null
+          org_id: string
+          saved_at: string
+          saved_by_user_id: string
+          tags: string[]
+        }
+        Insert: {
+          client_id?: string | null
+          id?: string
+          idea_id: string
+          niche_id?: string | null
+          notes?: string | null
+          org_id: string
+          saved_at?: string
+          saved_by_user_id: string
+          tags?: string[]
+        }
+        Update: {
+          client_id?: string | null
+          id?: string
+          idea_id?: string
+          niche_id?: string | null
+          notes?: string | null
+          org_id?: string
+          saved_at?: string
+          saved_by_user_id?: string
+          tags?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_swipe_file_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_swipe_file_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_swipe_file_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_niches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_swipe_file_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_swipe_insights: {
+        Row: {
+          generated_at: string
+          ideas_count: number
+          org_id: string
+          pattern_breakdown: Json
+          summary: string
+        }
+        Insert: {
+          generated_at?: string
+          ideas_count?: number
+          org_id: string
+          pattern_breakdown?: Json
+          summary: string
+        }
+        Update: {
+          generated_at?: string
+          ideas_count?: number
+          org_id?: string
+          pattern_breakdown?: Json
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_swipe_insights_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -2352,6 +2506,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_shared_run: { Args: { _slug: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2373,6 +2528,7 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      record_share_view: { Args: { _slug: string }; Returns: undefined }
       refund_content_lab_credit: {
         Args: { _ledger_id: string; _refund_reason: string }
         Returns: undefined
