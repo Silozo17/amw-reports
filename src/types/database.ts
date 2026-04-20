@@ -223,8 +223,7 @@ export type EmailTemplateType =
   | 'subscription_activated' | 'subscription_upgraded' | 'subscription_downgraded'
   | 'payment_failed' | 'trial_ending' | 'trial_expired'
   | 'monthly_digest'
-  | 'new_device_login' | 'failed_login_attempts'
-  | 'content_lab_run_complete';
+  | 'new_device_login' | 'failed_login_attempts';
 
 export const PLATFORM_LABELS: Record<PlatformType, string> = {
   google_ads: 'Google Ads',

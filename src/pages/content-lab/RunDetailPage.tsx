@@ -30,6 +30,7 @@ import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import IdeaActionButtons from '@/components/content-lab/IdeaActionButtons';
+import IdeaPerformanceStrip from '@/components/content-lab/IdeaPerformanceStrip';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
@@ -134,8 +135,11 @@ const RunDetailPage = () => {
     },
   });
 
-  const ownPosts = posts.filter((p) => (p.source as string) === 'own');
-  const viralPosts = posts.filter((p) => (p.source as string) === 'benchmark' || (p.source as string) === 'competitor');
+  const ownPosts = posts.filter((p) => (p as { bucket?: string }).bucket === 'own');
+  const viralPosts = posts.filter((p) => {
+    const b = (p as { bucket?: string }).bucket;
+    return b === 'benchmark' || b === 'competitor';
+  });
   const ownAvgViews = ownPosts.length > 0
     ? Math.round(ownPosts.reduce((s, p) => s + (p.views ?? 0), 0) / ownPosts.length)
     : 0;
@@ -358,12 +362,16 @@ const RunDetailPage = () => {
                       </div>
                     )}
                     <div className="border-t border-border/50 pt-3">
-                      <IdeaActionButtons
-                        ideaId={idea.id}
-                        runId={id!}
-                        regenCount={(idea as { regen_count?: number }).regen_count ?? 0}
-                      />
+                      <IdeaActionButtons ideaId={idea.id} runId={id!} regenCount={(idea as { regen_count?: number }).regen_count ?? 0} />
                     </div>
+                    <IdeaPerformanceStrip
+                      ideaId={idea.id}
+                      runId={id!}
+                      status={idea.status ?? 'not_started'}
+                      linkedPostId={(idea as { linked_post_id?: string | null }).linked_post_id ?? null}
+                      actualViews={(idea as { actual_views?: number | null }).actual_views ?? null}
+                      actualEngagementRate={(idea as { actual_engagement_rate?: number | null }).actual_engagement_rate ?? null}
+                    />
                   </div>
                 </Card>
               ))

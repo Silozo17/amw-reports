@@ -10,8 +10,10 @@ import {
 } from '@dnd-kit/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { GripVertical, Maximize2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -62,6 +64,7 @@ const IdeaPipelineBoard = ({ runId, ideas, onSelect }: IdeaPipelineBoardProps) =
         .eq('id', ideaId);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['content-lab-ideas', runId] });
+      queryClient.invalidateQueries({ queryKey: ['content-lab-all-ideas'] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to move idea');
     } finally {
@@ -138,28 +141,56 @@ const Column = ({
   );
 };
 
+/**
+ * Drag handle (the ⋮⋮ grip + body) is the draggable. The "open" button is a plain
+ * button outside the listener spread → no race with @dnd-kit activation distance.
+ */
 const DraggableIdeaCard = ({ idea, onSelect }: { idea: PipelineIdea; onSelect: () => void }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: idea.id });
+
   return (
     <Card
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      onClick={onSelect}
-      className={`cursor-grab space-y-2 p-3 active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
+      className={`space-y-2 p-3 transition-opacity ${isDragging ? 'opacity-50' : ''}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Idea {idea.idea_number}
-        </span>
-        {idea.target_platform && (
-          <Badge variant="secondary" className="text-[10px] capitalize">{idea.target_platform}</Badge>
-        )}
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="-ml-1 flex cursor-grab items-center gap-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+          aria-label="Drag to move"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+          <span className="text-[10px] font-semibold uppercase tracking-wider">
+            Idea {idea.idea_number}
+          </span>
+        </button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0"
+          onClick={(e) => { e.stopPropagation(); onSelect(); }}
+          aria-label="Open idea"
+        >
+          <Maximize2 className="h-3 w-3" />
+        </Button>
       </div>
-      <p className="text-sm font-medium line-clamp-3">{idea.hook ?? idea.title}</p>
-      {idea.rating != null && (
-        <p className="text-[10px] text-muted-foreground">★ {idea.rating}/10</p>
-      )}
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing"
+      >
+        <p className="text-sm font-medium line-clamp-3">{idea.hook ?? idea.title}</p>
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          {idea.target_platform && (
+            <Badge variant="secondary" className="text-[10px] capitalize">{idea.target_platform}</Badge>
+          )}
+          {idea.rating != null && (
+            <p className="text-[10px] text-muted-foreground">★ {idea.rating}/10</p>
+          )}
+        </div>
+      </div>
     </Card>
   );
 };

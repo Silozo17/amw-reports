@@ -1,85 +1,132 @@
 
+## Content Lab — full reliability + UX overhaul
 
-## Plan: Content Lab UX overhaul + 5 fixes
+### What's actually broken right now (verified from DB + code)
 
-### Issue 1 — Recent run shows no Your Content / Viral Feed (data bug)
+1. **"Stuck on ideating" is a status bug, not ideation failure.**
+   Run `875ea4f0` actually completed: 12 ideas saved (4 IG + 4 TikTok + 4 FB), every per-platform ideate logged `ok`. But the orchestrator never wrote `status='completed'` because the sequential pipeline runs ~510s in one background task (scrape 92s + analyse 41s + 3 × ideate ~125s) and Supabase background tasks die around ~400s. The work succeeds; the final status update never fires.
 
-`content_lab_posts.source` is being written as `'apify'` for every row (66/66 rows for the latest completed run). The Run Detail page filters `source === 'own'` and `source === 'benchmark' | 'competitor'` so both tabs render empty.
+2. **Scrape volume is wrong vs. spec.**
+   Currently pulls up to 15 own + 5 competitors × 8 + 3 benchmarks × 6, deduped to 80, across all enabled platforms. User wants: 8–10 own per platform; benchmarks = 4 latest from each verified account; then pick top 10 highest-engagement pieces only.
 
-**Fix**: in `content-lab-scrape/index.ts`, set `source` correctly per row based on which list the handle came from (`own` / `benchmark` / `competitor`). Backfill existing completed runs by inferring from `author_handle` vs the niche's `own_handle` / `top_global_benchmarks` / `top_competitors`.
+3. **Per-platform asymmetry.**
+   IG goes through a chunked Apify call; TikTok and FB go one handle at a time. If IG actor times out partially, IG returns less. No retry, no per-platform target floor.
 
-### Issue 2 — Pipeline cards not draggable
+4. **No notification.**
+   User isn't told runs take time and isn't emailed when ready. The page just sits on "ideating" with a spinner.
 
-`@dnd-kit` `useDraggable` spreads `attributes` + `listeners` onto a `Card` that also has `onClick={onSelect}`. The click handler intercepts the pointer-down before drag activation, and the wrapping `<Card>` (which is a styled `div`) is fine, but the real problem is that `onClick` fires on every pointerup including drag end. Also `onSelect` was wired to a no-op, so the click does nothing AND blocks drag detection because of activation distance race.
+5. **Analyse is caption-only.**
+   No transcript fetch, no hook/topic/intent extraction from video frames. Only the IG Apify return includes `videoTranscript` when present.
 
-**Fix**: split drag handle from click target. Make the card body draggable (no onClick), and add a small "open" affordance for selecting. Keep `activationConstraint.distance: 6` so a quick click doesn't start a drag.
+6. **Discovery accounts are AI-guessed**, not verified to exist or actually post in this niche. The pool refresh is the verifier but isn't blocking and is timeout-prone.
 
-### Issue 3 — Recent Runs grouped by client
+---
 
-Currently a flat list of last 20 runs. Group by client (via `runs[].client_id` → look up client name), collapsible per client, sorted by most-recent-run-per-client.
+### Plan — what we'll build
 
-### Issue 4 — Tie ideas to actual report performance
+#### 1. Fix the orchestrator (root cause of every "stuck" run)
 
-Approved approach: **auto-suggest, user confirms.**
+Replace the single sequential `runPipeline` background task with a self-chaining state machine:
 
-- Add columns to `content_lab_ideas`: `linked_post_id uuid` (nullable, references `content_lab_posts.id`), `linked_at timestamptz`, `actual_views int`, `actual_likes int`, `actual_comments int`, `actual_engagement_rate numeric`.
-- New edge function `content-lab-link-suggest` runs after every scrape: for each idea with `status in ('filming','posted')` and no `linked_post_id`, fuzzy-match against own posts in the same niche scraped in the last 30 days using: caption similarity (token Jaccard) + hook similarity + posted-after-idea-creation date filter. Return top suggestion + score.
-- New UI on idea card (in pipeline + ideas tabs): "Suggested match: [post thumbnail + caption]. Confirm / Reject / Pick another." Confirming writes `linked_post_id` and snapshots the metrics.
-- Idea card then shows a small "Performance" strip: views, likes, engagement vs the niche benchmark median already computed on the report page.
+- `content-lab-pipeline` becomes a **dispatcher** that just enqueues the next step and returns 202.
+- A new `content-lab-step-runner` edge function reads `status` from `content_lab_runs`, runs ONE step, writes the new status, then re-invokes itself for the next step.
+- Each invocation lives well under the 150s function ceiling.
+- Stale-run sweep stays in dispatcher, but threshold tightened to 10 min per step (not 30 min total).
+- Final `completed` write happens inside the runner, not the dispatcher, so it can never be lost to a dead background task.
 
-This keeps the existing reporting pipeline untouched — we read from `content_lab_posts` (which is already scraped per run) rather than wiring into `monthly_snapshots`.
+#### 2. Rewrite scraping to match the spec
 
-### Issue 5 — UI/UX overhaul + per-client Content Lab tab + sidebar restructure + entitlement gating
+In `content-lab-scrape`:
 
-**Sidebar (`AppSidebar.tsx`)** — replace `NAV_ITEMS` with:
-```
-Dashboard, Clients, Content Lab, Content Pipeline, Ideas, Settings
-```
-Reports + Connections removed from sidebar (routes preserved per your answer). Platform Admin section unchanged.
+- **Own posts**: 8 latest per enabled platform (not 15 IG-heavy).
+- **Cross-platform dedupe**: compare caption fingerprint (first 60 chars normalised) + same posted week → mark as duplicate so users who cross-post don't fill the pool.
+- **Benchmarks**: for every verified benchmark account in the pool, fetch 4 latest videos per enabled platform (not 6 from only 3 accounts).
+- **Competitors**: same — 4 latest per account per platform.
+- **Score + cull**: after collecting, score every piece by `(views × 0.6) + (engagement_rate × views × 0.4)`, then keep only the **top 10 benchmark + top 10 competitor** pieces for analysis. Everything else is stored but not analysed.
+- Per-platform retry: if a platform returns 0 posts for an account, retry once with a longer Apify timeout (120s) before giving up.
+- Hard cap retained at 80 inserted rows.
 
-**Two new pages**:
-- `/content-pipeline` — aggregated Kanban across ALL ideas the org has, grouped by client (filter dropdown), reusing `IdeaPipelineBoard` with a flat `ideas[]` query joined to runs.
-- `/ideas` — flat library view of every idea ever generated for the org, filterable by client / niche / platform / status, sortable by rating. Each row links to its run detail.
+#### 3. Real video analysis, not just caption parsing
 
-**Entitlement gating** for sidebar + per-client tab:
-- Read `org_subscriptions.content_lab_tier` (already exists). If null → user never bought the add-on → hide Content Lab + Ideas + Content Pipeline from sidebar entirely.
-- If non-null but currently `status != 'active'` → show **Content Pipeline only** (read-only). Hide Content Lab (no new runs) and Ideas (treated as a generation surface).
-- If non-null and active → show all three.
-- Hook: extend `useEntitlements` (or add `useContentLabAccess`) to expose `{ hasAccess: boolean, canGenerate: boolean }`.
+Upgrade `content-lab-analyse`:
 
-**Per-client Content Lab tab** (`ClientDetail.tsx`): add a `Content Lab` tab next to `Upsells`. Visible only when `hasAccess`. Shows: niches scoped to that client, runs scoped to that client (using existing `useContentLabNiches(clientId)` and `useContentLabRuns(clientId)`), plus a mini pipeline. Reuses existing components — no new business logic.
+- For top 10 benchmark + top 10 competitor + own posts that have `transcript` already (from Apify IG actor), feed transcript + caption + thumbnail URL to Gemini 2.5 Pro with a structured tool call returning: `hook_text`, `hook_type`, `topic`, `intent`, `format_pattern`, `script_summary`, `style_notes`.
+- For posts WITHOUT transcript (TikTok/FB Apify actors don't return one), call a transcript-fetch step using the Apify `clockworks/tiktok-scraper` `shouldDownloadSubtitles=true` mode for TikTok, and skip transcript for FB (caption + thumbnail only).
+- Frame-by-frame is not feasible in an edge function budget — instead we pass the thumbnail to Gemini Vision for visual style notes. That's the right cost/value trade today.
+- Keep the cheap model for the long tail; only top 20 get the Pro treatment.
 
-**Content Lab page (`/content-lab`) UX polish**:
-- Replace single "Latest Run" card + flat run list with: hero stats strip (runs this month, credits, next reset) + niches grid + Recent Runs grouped by client (collapsible accordions, max 5 runs visible per client by default).
-- Add empty state guidance + a "How it works" 3-step strip at the top of the page (collapsible, dismissible per user via localStorage).
-- Make niche cards show last-run status + last-run date inline.
+#### 4. Ideation alignment
+
+In `content-lab-ideate` (already per-platform):
+
+- Inspiration pool changes to: top 10 analysed benchmark + top 10 analysed competitor pieces (not 30 raw).
+- Continue per-platform invocation, kept under 130s each.
+- Hard validator stays.
+- Keep the hook variants (3 per idea).
+
+#### 5. Notification + "this will take a while" UX
+
+- Insert a confirmation dialog before launching a run: "This typically takes 20–40 minutes. We'll email you the moment your ideas are ready."
+- Add `email_run_complete` boolean to `content_lab_runs` (default true).
+- New edge function `content-lab-notify-complete` invoked at the end of the runner; uses existing branded-email infra to send a styled email with a deep link to the run.
+- In-app: keep the polling and add a passive toast when a run completes while the user is on a different page.
+
+#### 6. Discovery quality
+
+- Keep the current Gemini-driven discovery as the "draft" stage.
+- After it returns, immediately verify each suggested handle by hitting Apify's profile-info endpoint (cheap call, batch of 10): drop any handle that doesn't exist, has < 5,000 followers, or hasn't posted in 60 days. Replace dropped handles with verified ones from `content_lab_seed_pool` for the same vertical.
+- Surface verification status to the niche form so the user sees which AI suggestions survived.
+- The user's 3 manually added benchmarks bypass verification (their choice).
+
+#### 7. Pool refresh hardening
+
+- Lower default `MAX_CANDIDATES` from 25 → 15 and `MAX_SAMPLED_TARGET` 18 → 10.
+- Persist partial progress to `content_lab_pool_refresh_jobs` after every candidate so a retry resumes instead of restarting.
+- Job stays non-blocking — runs never depend on it.
+
+#### 8. Regenerate
+
+- `content-lab-regenerate-idea` already exists. Confirm wired to the FE buttons in `IdeaPipelineBoard.tsx` and `ViralPostCard.tsx`. Add a "regenerated N times" indicator and disable after 5 regenerations per idea (so users can't burn credits accidentally).
+
+#### 9. Data cleanup before deploy
+
+- Mark run `875ea4f0` as `completed` (its 12 ideas are real and valid).
+- Mark any other org's runs older than 10 min in active states as `failed`.
+
+---
 
 ### Files to change
 
-Frontend:
-- `src/components/layout/AppSidebar.tsx` — new NAV_ITEMS + entitlement gating
-- `src/App.tsx` — add `/content-pipeline` and `/ideas` routes
-- `src/pages/content-lab/ContentLabPage.tsx` — grouped runs, hero stats, polish
-- `src/pages/content-lab/ContentPipelinePage.tsx` — NEW
-- `src/pages/content-lab/IdeasLibraryPage.tsx` — NEW
-- `src/pages/clients/ClientDetail.tsx` — add Content Lab tab (gated)
-- `src/components/clients/tabs/ClientContentLabTab.tsx` — NEW
-- `src/components/content-lab/IdeaPipelineBoard.tsx` — fix drag, add link-suggestion strip
-- `src/components/content-lab/IdeaPerformanceStrip.tsx` — NEW (post-link metrics)
-- `src/hooks/useContentLab.ts` — add `useAllIdeas`, `useGroupedRuns`
-- `src/hooks/useContentLabAccess.ts` — NEW (entitlement helper)
-
 Backend:
-- `supabase/functions/content-lab-scrape/index.ts` — write correct `source` per row
-- `supabase/functions/content-lab-link-suggest/index.ts` — NEW
-- Migration: `content_lab_ideas` add `linked_post_id`, `linked_at`, `actual_views`, `actual_likes`, `actual_comments`, `actual_engagement_rate`
+- `supabase/functions/content-lab-pipeline/index.ts` — slim to dispatcher
+- `supabase/functions/content-lab-resume/index.ts` — same dispatcher pattern
+- `supabase/functions/content-lab-step-runner/index.ts` — NEW
+- `supabase/functions/content-lab-scrape/index.ts` — new caps, cross-platform dedupe, scoring, cull
+- `supabase/functions/content-lab-analyse/index.ts` — Pro model for top 20 + transcript handling + thumbnail vision
+- `supabase/functions/content-lab-ideate/index.ts` — pool reduced to top 20 analysed
+- `supabase/functions/content-lab-discover/index.ts` — post-verify handles via Apify profile-info
+- `supabase/functions/content-lab-pool-refresh/index.ts` — smaller batches, resume-safe
+- `supabase/functions/content-lab-notify-complete/index.ts` — NEW (branded email)
 
-Data fix:
-- One-off update on existing `content_lab_posts` rows where `source='apify'` to infer correct source from `author_handle` vs niche config — so the recent completed run immediately shows content.
+Frontend:
+- `src/pages/content-lab/ContentLabPage.tsx` — pre-run AlertDialog ("20–40 min, you'll be emailed")
+- `src/components/content-lab/IdeaPipelineBoard.tsx` + `ViralPostCard.tsx` — regen counter + cap
+- `src/hooks/useContentLab.ts` — refetch on run-complete realtime channel for passive toast
 
-### Risks / notes
-- Removing Reports + Connections from sidebar means power users will need to bookmark `/reports` and `/connections`. Routes still work.
-- Adding 6 columns to `content_lab_ideas` is additive, no migration risk.
-- The auto-suggest matcher will get noisy if a client posts very similar content multiple times — that's why confirmation is required.
-- Pipeline drag fix: switching off `onClick` on the card body means "open detail" needs a different control. We'll add a small chevron/ellipsis button on the card header that opens the idea (won't conflict with drag).
+Database:
+- New column `content_lab_runs.email_on_complete boolean default true`
+- New column `content_lab_ideas.regen_count` already exists — just enforce cap in FE + edge function
 
+---
+
+### Side effects / risks
+
+- **Apify spend will go UP** because we're now analysing 20 pieces with Gemini Pro and verifying discovered handles. Expect ~£0.05–0.10 per run instead of ~£0.02. Worth flagging because this is a real cost change.
+- **Run wall-clock will go DOWN** because the orchestrator can no longer die mid-flight, but total user wait stays in the 20–40 min band as advertised.
+- The cull-to-top-20 step means we no longer present every scraped post in the run detail UI — only the analysed ones get rich metadata. We'll add a "showing top 20 by engagement" label so this isn't confusing.
+- **Discovery verification** can drop AI-suggested handles. If verification yields fewer than 10 surviving accounts, we backfill from `content_lab_seed_pool`. If the seed pool is also empty for that vertical, we keep the unverified AI suggestions and tag them `unverified` so the run can still proceed.
+
+---
+
+### Open questions
+None — proceed on approval.
