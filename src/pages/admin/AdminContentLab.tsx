@@ -13,6 +13,7 @@ import RunsTable from '@/components/admin/contentLab/RunsTable';
 import RunDetailDrawer from '@/components/admin/contentLab/RunDetailDrawer';
 import StepLogsTable from '@/components/admin/contentLab/StepLogsTable';
 import NichesTable from '@/components/admin/contentLab/NichesTable';
+import ContentLabAnalyticsTab from '@/components/admin/contentLab/ContentLabAnalyticsTab';
 
 const AdminContentLab = () => {
   usePageMeta({ title: 'Content Lab — Admin — AMW Reports', description: 'Platform-wide Content Lab runs, step logs, and niches.' });
@@ -40,12 +41,16 @@ const AdminContentLab = () => {
             <CardTitle className="font-display text-lg">Observability</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="runs">
+            <Tabs defaultValue="analytics">
               <TabsList>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
                 <TabsTrigger value="runs">Runs ({runs.length})</TabsTrigger>
                 <TabsTrigger value="logs">Step Logs</TabsTrigger>
                 <TabsTrigger value="niches">Niches ({niches.length})</TabsTrigger>
               </TabsList>
+              <TabsContent value="analytics" className="mt-4">
+                <ContentLabAnalyticsTab />
+              </TabsContent>
               <TabsContent value="runs" className="mt-4">
                 <RunsTable rows={runs} isLoading={runsLoading} onSelect={setSelectedRunId} />
               </TabsContent>

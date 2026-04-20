@@ -116,6 +116,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_portal_upsells_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       client_recipients: {
@@ -202,6 +209,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_share_tokens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       client_users: {
@@ -249,6 +263,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -395,6 +416,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -558,6 +586,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "content_lab_hooks_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_regen_rate"
+            referencedColumns: ["run_id"]
+          },
+          {
             foreignKeyName: "content_lab_hooks_source_post_id_fkey"
             columns: ["source_post_id"]
             isOneToOne: false
@@ -691,6 +726,13 @@ export type Database = {
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "content_lab_ideas_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_regen_rate"
+            referencedColumns: ["run_id"]
+          },
         ]
       }
       content_lab_niches: {
@@ -823,6 +865,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_niches_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -967,6 +1016,13 @@ export type Database = {
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "content_lab_posts_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_regen_rate"
+            referencedColumns: ["run_id"]
+          },
         ]
       }
       content_lab_run_share_tokens: {
@@ -1018,11 +1074,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "content_lab_run_share_tokens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
+          {
             foreignKeyName: "content_lab_run_share_tokens_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_run_share_tokens_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_regen_rate"
+            referencedColumns: ["run_id"]
           },
         ]
       }
@@ -1099,6 +1169,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -1209,6 +1286,13 @@ export type Database = {
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "content_lab_step_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_regen_rate"
+            referencedColumns: ["run_id"]
+          },
         ]
       }
       content_lab_swipe_file: {
@@ -1274,6 +1358,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "content_lab_swipe_file_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       content_lab_swipe_insights: {
@@ -1305,6 +1396,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_swipe_insights_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -1352,6 +1450,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_trends_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_regen_rate"
+            referencedColumns: ["run_id"]
           },
         ]
       }
@@ -1463,6 +1568,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "custom_domains_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       email_logs: {
@@ -1516,6 +1628,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
           {
             foreignKeyName: "email_logs_report_id_fkey"
@@ -1693,6 +1812,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "onboarding_responses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       org_members: {
@@ -1733,6 +1859,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -1798,6 +1931,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
           {
             foreignKeyName: "org_subscriptions_plan_id_fkey"
@@ -2035,6 +2175,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       report_logs: {
@@ -2082,6 +2229,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
           {
             foreignKeyName: "report_logs_report_id_fkey"
@@ -2157,6 +2311,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "report_upsells_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       reports: {
@@ -2225,6 +2386,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -2388,6 +2556,13 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sync_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
       user_roles: {
@@ -2454,11 +2629,80 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "voice_briefings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      v_content_lab_churn_signals: {
+        Row: {
+          content_lab_tier: string | null
+          current_credit_balance: number | null
+          days_since_last_run: number | null
+          last_run_at: string | null
+          lifetime_runs: number | null
+          org_id: string | null
+          org_name: string | null
+        }
+        Relationships: []
+      }
+      v_content_lab_mrr_by_tier: {
+        Row: {
+          mrr_gbp: number | null
+          org_count: number | null
+          tier: string | null
+        }
+        Relationships: []
+      }
+      v_content_lab_pool_quality: {
+        Row: {
+          industry_slug: string | null
+          limited_count: number | null
+          limited_pct: number | null
+          niche_count: number | null
+        }
+        Relationships: []
+      }
+      v_content_lab_regen_rate: {
+        Row: {
+          avg_regens_per_idea: number | null
+          idea_count: number | null
+          org_id: string | null
+          run_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_lab_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "v_content_lab_churn_signals"
+            referencedColumns: ["org_id"]
+          },
+        ]
+      }
+      v_content_lab_run_completion: {
+        Row: {
+          completed: number | null
+          completion_rate_pct: number | null
+          failed: number | null
+          industry_slug: string | null
+          total: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_content_lab_credits: {
@@ -2488,6 +2732,7 @@ export type Database = {
           org_id: string
         }[]
       }
+      get_content_lab_analytics: { Args: never; Returns: Json }
       get_org_by_domain: { Args: { _domain: string }; Returns: string }
       get_portal_client: { Args: { _client_id: string }; Returns: Json }
       get_portal_org: { Args: { _org_id: string }; Returns: Json }
