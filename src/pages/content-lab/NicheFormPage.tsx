@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/contexts/OrgContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import usePageMeta from '@/hooks/usePageMeta';
+import DiscoveryProgress from '@/components/content-lab/DiscoveryProgress';
 
 interface CompetitorEntry {
   handle: string;
