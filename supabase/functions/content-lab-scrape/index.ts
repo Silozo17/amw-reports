@@ -405,11 +405,11 @@ async function runApifyForHandles(handles: string[], resultsLimit: number): Prom
   const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
 
   try {
-    const res = await fetch(runUrl, {
+    const res = await fetchWithRetry(runUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    });
+    }, "Apify IG");
     if (!res.ok) {
       console.error("Apify error:", res.status, await res.text());
       return [];
@@ -473,11 +473,11 @@ async function runTikTokScraper(handle: string, resultsLimit: number): Promise<S
   };
   const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    });
+    }, "Apify TikTok");
     if (!res.ok) {
       console.error("TikTok Apify error:", res.status, await res.text());
       return [];
@@ -539,11 +539,11 @@ async function runFacebookScraper(handle: string, resultsLimit: number): Promise
   };
   const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    });
+    }, "Apify FB");
     if (!res.ok) {
       console.error("Facebook Apify error:", res.status, await res.text());
       return [];
