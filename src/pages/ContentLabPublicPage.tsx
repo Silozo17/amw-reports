@@ -291,17 +291,18 @@ const ContentLabPublicPage = () => {
         </div>
       </section>
 
-      {/* 7. Pricing */}
-      <section className="py-20 lg:py-28">
+      {/* 7. Pricing — paid add-on */}
+      <section id="pricing" className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 max-w-2xl mx-auto">
-            <p className="font-accent text-lg text-primary mb-2">Pricing</p>
-            <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start free. <span className="text-gradient-purple">Scale when you’re ready.</span></h2>
+            <p className="font-accent text-lg text-primary mb-2">Pricing · Paid add-on</p>
+            <h2 className="text-3xl lg:text-5xl font-heading uppercase">Pick your plan. <span className="text-gradient-purple">No free trial.</span></h2>
+            <p className="text-amw-offwhite/60 font-body mt-4">Sold separately from AMW Reports. Cancel anytime in two clicks.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-            {TIERS.map((tier) => (
+            {CONTENT_LAB_TIER_LIST.map((tier) => (
               <div
-                key={tier.name}
+                key={tier.key}
                 className={`rounded-2xl border p-7 flex flex-col ${
                   tier.highlight ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-sidebar-border/50 bg-sidebar-accent/15'
                 }`}
@@ -310,42 +311,60 @@ const ContentLabPublicPage = () => {
                   <span className="self-start mb-3 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-[10px] uppercase tracking-wider font-body font-semibold">Most popular</span>
                 )}
                 <h3 className="text-2xl font-heading uppercase mb-1">{tier.name}</h3>
-                <p className="text-sm text-amw-offwhite/60 font-body mb-1">{tier.runs}</p>
-                <p className="text-sm font-body text-primary mb-5">{tier.price}</p>
+                <p className="text-4xl font-heading mb-1">£{tier.priceMonthly}<span className="text-base text-amw-offwhite/55 font-body"> /mo</span></p>
+                <p className="text-sm text-amw-offwhite/60 font-body mb-5">{tier.runsPerMonth} run{tier.runsPerMonth === 1 ? '' : 's'} / month</p>
                 <ul className="space-y-2 mb-6 flex-1">
-                  {tier.perks.map((p) => (
+                  {TIER_PERKS[tier.key].map((p) => (
                     <li key={p} className="flex items-start gap-2 text-sm font-body text-amw-offwhite/80">
                       <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                       <span>{p}</span>
                     </li>
                   ))}
                 </ul>
-                <Button asChild className="w-full" variant={tier.highlight ? 'default' : 'outline'}>
-                  <Link to="/login?view=signup">Start trial</Link>
+                <Button
+                  className="w-full"
+                  variant={tier.highlight ? 'default' : 'outline'}
+                  disabled={loadingTier !== null}
+                  onClick={() => handleSubscribe(tier.key)}
+                >
+                  {loadingTier === tier.key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Subscribe
                 </Button>
               </div>
             ))}
           </div>
 
           <div className="rounded-2xl border border-sidebar-border/50 bg-sidebar-accent/10 p-8">
-            <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-2">
               <div>
-                <p className="font-accent text-sm text-primary mb-1">Need more runs?</p>
-                <h3 className="text-2xl font-heading uppercase">Top up with credits — they never expire.</h3>
+                <p className="font-accent text-sm text-primary mb-1">Top up with credit packs</p>
+                <h3 className="text-2xl font-heading uppercase">1 credit = 1 regeneration · 1 remix · 1 pool refresh</h3>
               </div>
-              <Link to="/pricing" className="text-sm font-body text-primary hover:underline">See full pricing →</Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {CREDIT_PACKS.map((pack) => (
-                <div key={pack.credits} className="rounded-xl border border-sidebar-border/50 bg-amw-black/40 p-5">
-                  <div className="flex items-baseline justify-between mb-1">
-                    <p className="text-2xl font-heading">{pack.credits} credits</p>
-                    {pack.badge && <span className="text-[10px] font-body text-primary uppercase tracking-wider">{pack.badge}</span>}
+            <p className="text-sm text-amw-offwhite/55 font-body mb-6">Credits never expire. One-off purchase, no subscription.</p>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {CONTENT_LAB_CREDIT_PACK_LIST.map((pack) => {
+                const isHighlighted = pack.badge === 'Best value';
+                return (
+                  <div
+                    key={pack.key}
+                    className={`relative rounded-xl border bg-amw-black/40 p-5 ${
+                      isHighlighted ? 'border-primary/60 ring-1 ring-primary/30' : 'border-sidebar-border/50'
+                    }`}
+                  >
+                    {pack.badge && (
+                      <span className={`absolute -top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-body uppercase tracking-wider ${
+                        isHighlighted ? 'bg-primary text-primary-foreground' : 'bg-sidebar-accent text-amw-offwhite/80'
+                      }`}>
+                        {pack.badge}
+                      </span>
+                    )}
+                    <p className="text-xl font-heading text-amw-offwhite mb-1">{pack.credits} credits</p>
+                    <p className="text-2xl font-heading mb-1">£{pack.price}</p>
+                    <p className="text-xs font-body text-amw-offwhite/60">£{(pack.price / pack.credits).toFixed(2)} / credit</p>
                   </div>
-                  <p className="text-3xl font-heading text-amw-offwhite mb-1">{pack.price}</p>
-                  <p className="text-xs font-body text-amw-offwhite/60">{pack.per}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
