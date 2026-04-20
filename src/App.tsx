@@ -30,6 +30,7 @@ const ForSmbsPage = lazy(() => import("./pages/ForSmbsPage"));
 const ForCreatorsPage = lazy(() => import("./pages/ForCreatorsPage"));
 const IntegrationsPage = lazy(() => import("./pages/IntegrationsPage"));
 const HowItWorksPage = lazy(() => import("./pages/HowItWorksPage"));
+const ContentLabPublicPage = lazy(() => import("./pages/ContentLabPublicPage"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const Index = lazy(() => import("./pages/Index"));
 const ClientList = lazy(() => import("./pages/clients/ClientList"));
@@ -129,6 +130,7 @@ const AppRoutes = () => (
       <Route path="/for-creators" element={<PublicPageRoute><ForCreatorsPage /></PublicPageRoute>} />
       <Route path="/integrations" element={<PublicPageRoute><IntegrationsPage /></PublicPageRoute>} />
       <Route path="/how-it-works" element={<PublicPageRoute><HowItWorksPage /></PublicPageRoute>} />
+      <Route path="/content-lab-feature" element={<PublicPageRoute><ContentLabPublicPage /></PublicPageRoute>} />
       <Route path="/about" element={<PublicPageRoute><AboutPage /></PublicPageRoute>} />
       <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
       <Route path="/auth/threads/callback" element={<ThreadsCallback />} />

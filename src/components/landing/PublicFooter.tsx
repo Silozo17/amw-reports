@@ -27,6 +27,7 @@ const PublicFooter = () => (
           <p className="text-xs font-body font-semibold text-amw-offwhite uppercase tracking-wider">Product</p>
           <div className="flex flex-col gap-2 text-sm font-body">
             <Link to="/features" className="hover:text-primary transition-colors">Features</Link>
+            <Link to="/content-lab-feature" className="hover:text-primary transition-colors">Content Lab</Link>
             <Link to="/integrations" className="hover:text-primary transition-colors">Integrations</Link>
             <Link to="/how-it-works" className="hover:text-primary transition-colors">How It Works</Link>
             <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
