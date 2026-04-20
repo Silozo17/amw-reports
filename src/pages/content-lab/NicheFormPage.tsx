@@ -353,21 +353,6 @@ const NicheFormPage = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Your Instagram handle</Label>
-            <Input value={ownHandle} onChange={(e) => setOwnHandle(e.target.value)} placeholder="@yourbrand" />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Your website</Label>
-            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourbrand.com" />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Location</Label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="London, UK" />
-          </div>
-
-          <div className="space-y-2">
             <Label>Platforms to scrape</Label>
             <div className="flex flex-wrap gap-2">
               {PLATFORMS.map((p) => (
@@ -381,6 +366,39 @@ const NicheFormPage = () => {
                 </Badge>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground">Pick every channel you actually post on. We'll scrape your latest posts on each.</p>
+          </div>
+
+          {platformsToScrape.includes('instagram') && (
+            <div className="space-y-2">
+              <Label>Your Instagram handle</Label>
+              <Input value={ownHandle} onChange={(e) => setOwnHandle(e.target.value)} placeholder="@yourbrand" />
+            </div>
+          )}
+
+          {platformsToScrape.includes('tiktok') && (
+            <div className="space-y-2">
+              <Label>Your TikTok handle</Label>
+              <Input value={tiktokHandle} onChange={(e) => setTiktokHandle(e.target.value)} placeholder="@yourbrand" />
+            </div>
+          )}
+
+          {platformsToScrape.includes('facebook') && (
+            <div className="space-y-2">
+              <Label>Your Facebook page</Label>
+              <Input value={facebookHandle} onChange={(e) => setFacebookHandle(e.target.value)} placeholder="yourbrand or https://facebook.com/yourbrand" />
+              <p className="text-xs text-muted-foreground">Page slug or full URL — we'll normalise it.</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Your website</Label>
+            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourbrand.com" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Location</Label>
+            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="London, UK" />
           </div>
 
         </Card>
