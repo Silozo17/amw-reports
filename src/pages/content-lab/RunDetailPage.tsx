@@ -135,11 +135,15 @@ const RunDetailPage = () => {
     },
   });
 
-  const ownPosts = posts.filter((p) => (p as { bucket?: string }).bucket === 'own');
-  const viralPosts = posts.filter((p) => {
-    const b = (p as { bucket?: string }).bucket;
-    return b === 'benchmark' || b === 'competitor';
-  });
+  // Bucket fallback: legacy rows have bucket=null. Treat any non-'own' as benchmark
+  // so the dashboard isn't empty for older scrapes.
+  const bucketOf = (p: { bucket?: string | null; source?: string }): 'own' | 'benchmark' => {
+    if (p.bucket === 'own') return 'own';
+    if (p.bucket === 'benchmark' || p.bucket === 'competitor') return 'benchmark';
+    return 'benchmark';
+  };
+  const ownPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'own');
+  const viralPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'benchmark');
   const ownAvgViews = ownPosts.length > 0
     ? Math.round(ownPosts.reduce((s, p) => s + (p.views ?? 0), 0) / ownPosts.length)
     : 0;
