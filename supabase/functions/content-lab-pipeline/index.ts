@@ -124,12 +124,34 @@ Deno.serve(async (req) => {
       orgIdForUsage = (existing as { org_id?: string } | null)?.org_id ?? null;
     }
 
-    // Kick off async pipeline. Respond immediately so the UI doesn't block.
-    runPipeline(admin, runId!, orgIdForUsage).catch((e) => {
+    // Defensive sweep: any of this org's runs older than 30 min still in active states are stuck — mark failed.
+    if (orgIdForUsage) {
+      const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      await admin
+        .from("content_lab_runs")
+        .update({
+          status: "failed",
+          error_message: "Run timed out (>30min in active state). Auto-failed by orchestrator.",
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("org_id", orgIdForUsage)
+        .in("status", ["pending", "scraping", "analysing", "ideating"])
+        .lt("updated_at", cutoff)
+        .neq("id", runId!);
+    }
+
+    // Kick off async pipeline as a true background task so the runtime keeps it alive.
+    const bgTask = runPipeline(admin, runId!, orgIdForUsage).catch((e) => {
       console.error("Pipeline crashed:", e);
     });
+    // @ts-expect-error EdgeRuntime is provided by Supabase edge runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-expect-error see above
+      EdgeRuntime.waitUntil(bgTask);
+    }
 
-    return json({ ok: true, run_id: runId });
+    return json({ ok: true, run_id: runId }, 202);
   } catch (e) {
     console.error("content-lab-pipeline error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
