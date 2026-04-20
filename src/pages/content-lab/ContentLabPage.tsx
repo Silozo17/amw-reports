@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
 import { useBenchmarkPoolStatus, POOL_RUN_THRESHOLD } from '@/hooks/useBenchmarkPoolStatus';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
+import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: typeof Clock; tone: string }> = {
@@ -35,14 +36,31 @@ const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: type
 
 const ContentLabPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { data: niches = [], isLoading: nichesLoading } = useContentLabNiches();
   const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
   const { data: usage } = useContentLabUsage();
   const [runningNiche, setRunningNiche] = useState<string | null>(null);
   const [pendingRunNicheId, setPendingRunNicheId] = useState<string | null>(null);
+  const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
 
   usePageMeta({ title: 'Content Lab', description: 'Discover what is working in your niche and generate ready-to-film content ideas.' });
+
+  // Handle Stripe checkout return
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const credits = params.get('credits');
+    if (!credits) return;
+    if (credits === 'success') {
+      toast.success('Payment received — credits will appear in a moment');
+      void queryClient.invalidateQueries({ queryKey: ['content-lab-usage'] });
+    } else if (credits === 'cancelled') {
+      toast.info('Checkout cancelled');
+    }
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   const latestRun = runs[0];
   const monthlyExhausted = usage ? usage.runsThisMonth >= usage.runsLimit : false;
@@ -119,11 +137,16 @@ const ContentLabPage = () => {
                 {usage.runsThisMonth} / {usage.runsLimit} runs · {usage.creditBalance} credits
               </Badge>
             )}
+            <Button variant="outline" size="lg" onClick={() => setCreditsDialogOpen(true)}>
+              <CreditCard className="mr-2 h-4 w-4" /> Buy credits
+            </Button>
             <Button size="lg" onClick={() => navigate('/content-lab/niche/new')}>
               <Plus className="mr-2 h-4 w-4" /> New Niche
             </Button>
           </div>
         </header>
+
+        <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
 
         <AlertDialog open={!!pendingRunNicheId} onOpenChange={(open) => !open && setPendingRunNicheId(null)}>
           <AlertDialogContent>

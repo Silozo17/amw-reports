@@ -143,12 +143,48 @@ Deno.serve(async (req) => {
     } else if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
       customerEmail = session.customer_email ?? await getCustomerEmail(stripe, session.customer as string);
-      templateName = "subscription_activated";
-      emailData = { session_id: session.id };
 
-      // Restore to active and clear grace period
-      if (customerEmail) {
-        await syncOrgSubscriptionStatus(customerEmail, "active", false, true);
+      // Branch: Content Lab credit top-up
+      if (session.metadata?.type === "content_lab_credits") {
+        const orgId = session.metadata.org_id;
+        const credits = parseInt(session.metadata.credits ?? "0", 10);
+        const paymentIntentId = typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id ?? session.id;
+
+        if (orgId && credits > 0) {
+          // Idempotency check
+          const { data: existing } = await supabase
+            .from("content_lab_credit_ledger")
+            .select("id")
+            .eq("stripe_payment_id", paymentIntentId)
+            .maybeSingle();
+
+          if (existing) {
+            console.log(`[STRIPE-WEBHOOK] Credit top-up ${paymentIntentId} already processed, skipping`);
+          } else {
+            const { error: rpcErr } = await supabase.rpc("add_content_lab_credits", {
+              _org_id: orgId,
+              _amount: credits,
+              _stripe_payment_id: paymentIntentId,
+            });
+            if (rpcErr) {
+              console.error("[STRIPE-WEBHOOK] add_content_lab_credits failed:", rpcErr);
+            } else {
+              console.log(`[STRIPE-WEBHOOK] Added ${credits} credits to org ${orgId}`);
+            }
+          }
+        }
+        // No email template for credit purchases — Stripe sends its own receipt
+      } else {
+        // Subscription checkout — original behaviour
+        templateName = "subscription_activated";
+        emailData = { session_id: session.id };
+
+        // Restore to active and clear grace period
+        if (customerEmail) {
+          await syncOrgSubscriptionStatus(customerEmail, "active", false, true);
+        }
       }
     } else if (event.type === "invoice.payment_failed") {
       const invoice = event.data.object as Stripe.Invoice;
