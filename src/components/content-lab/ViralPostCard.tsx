@@ -82,8 +82,8 @@ const ViralPostCard = ({ post }: ViralPostCardProps) => {
       ? (isVideo ? 'View video' : 'View post')
       : (isVideo ? 'View reel' : 'View post');
   const proxied = proxiedSrc(post.thumbnail_url);
-  // Fallback to original URL if proxy fails
-  const thumb = imgFailed ? post.thumbnail_url : proxied;
+  // Raw IG/FB/TikTok URLs almost always 403 from the browser; if proxy fails, hide the img.
+  const thumb = imgFailed ? null : proxied;
   const initial = post.author_handle?.[0]?.toUpperCase() ?? '?';
   const showHook = isHookDistinct(post.hook_text, post.caption);
   const hashtags = (post.hashtags ?? []).slice(0, MAX_HASHTAG_CHIPS);
@@ -118,13 +118,7 @@ const ViralPostCard = ({ post }: ViralPostCardProps) => {
             loading="lazy"
             referrerPolicy="no-referrer"
             className="h-full w-full object-cover"
-            onError={(e) => {
-              if (!imgFailed) {
-                setImgFailed(true);
-              } else {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-              }
-            }}
+            onError={() => setImgFailed(true)}
           />
         )}
         {isVideo && (

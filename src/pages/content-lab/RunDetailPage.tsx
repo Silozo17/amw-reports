@@ -265,7 +265,7 @@ const RunDetailPage = () => {
               <Card className="p-10 text-center text-sm text-muted-foreground">Ideas will appear here once the run completes.</Card>
             ) : (
               ideas.map((idea) => (
-                <Card key={idea.id} className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
+                <Card key={idea.id} id={`idea-${idea.id}`} className="grid gap-6 p-6 md:grid-cols-[260px_1fr] scroll-mt-24">
                   <div>
                     {renderPreview(idea.target_platform, idea.hook ?? idea.title, idea.caption)}
                     {idea.target_platform && (
@@ -323,7 +323,12 @@ const RunDetailPage = () => {
                   rating: i.rating ?? null,
                   status: i.status ?? 'not_started',
                 }))}
-                onSelect={() => { /* click-to-detail can be wired later; drag is the primary action */ }}
+                onSelect={(idea) => {
+                  setActiveTab('ideas');
+                  setTimeout(() => {
+                    document.getElementById(`idea-${idea.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 50);
+                }}
               />
             )}
           </TabsContent>
