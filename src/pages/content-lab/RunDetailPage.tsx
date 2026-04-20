@@ -33,6 +33,7 @@ import IdeaActionButtons from '@/components/content-lab/IdeaActionButtons';
 import IdeaPerformanceStrip from '@/components/content-lab/IdeaPerformanceStrip';
 import ShareWithClientDialog from '@/components/content-lab/ShareWithClientDialog';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
