@@ -2769,6 +2769,27 @@ export type Database = {
         }[]
       }
       get_content_lab_analytics: { Args: never; Returns: Json }
+      get_global_hook_library: {
+        Args: {
+          _limit?: number
+          _mechanism?: string
+          _niche?: string
+          _platform?: string
+        }
+        Returns: {
+          author_handle: string
+          created_at: string
+          hook_text: string
+          id: string
+          mechanism: string
+          niche_label: string
+          performance_score: number
+          platform: string
+          source_engagement_rate: number
+          source_views: number
+          why_it_works: string
+        }[]
+      }
       get_org_by_domain: { Args: { _domain: string }; Returns: string }
       get_portal_client: { Args: { _client_id: string }; Returns: Json }
       get_portal_org: { Args: { _org_id: string }; Returns: Json }
