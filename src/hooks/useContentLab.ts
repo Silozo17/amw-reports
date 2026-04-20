@@ -78,15 +78,16 @@ export const useContentLabRuns = (clientId?: string) => {
 };
 
 const RUN_LIMITS_BY_TIER: Record<string, number> = {
-  creator: 10,
-  studio: 25,
-  agency: 60,
+  creator: 1,
+  studio: 3,
+  agency: 10,
 };
-const DEFAULT_RUN_LIMIT = 10;
+const DEFAULT_RUN_LIMIT = 1;
 
 export interface ContentLabUsage {
   runsThisMonth: number;
   runsLimit: number;
+  creditBalance: number;
 }
 
 export const useContentLabUsage = () => {
@@ -97,7 +98,7 @@ export const useContentLabUsage = () => {
     enabled: !!orgId,
     queryFn: async () => {
       const now = new Date();
-      const [usageRes, subRes] = await Promise.all([
+      const [usageRes, subRes, credRes] = await Promise.all([
         supabase
           .from('content_lab_usage')
           .select('runs_count')
@@ -110,12 +111,18 @@ export const useContentLabUsage = () => {
           .select('content_lab_tier')
           .eq('org_id', orgId!)
           .maybeSingle(),
+        supabase
+          .from('content_lab_credits')
+          .select('balance')
+          .eq('org_id', orgId!)
+          .maybeSingle(),
       ]);
 
       const runsThisMonth = (usageRes.data as { runs_count?: number } | null)?.runs_count ?? 0;
       const tier = (subRes.data as { content_lab_tier?: string | null } | null)?.content_lab_tier?.toLowerCase();
       const runsLimit = (tier && RUN_LIMITS_BY_TIER[tier]) ?? DEFAULT_RUN_LIMIT;
-      return { runsThisMonth, runsLimit };
+      const creditBalance = (credRes.data as { balance?: number } | null)?.balance ?? 0;
+      return { runsThisMonth, runsLimit, creditBalance };
     },
   });
 };
