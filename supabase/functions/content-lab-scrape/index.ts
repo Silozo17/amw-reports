@@ -451,8 +451,40 @@ async function scrapeBucket(
   });
 
   posts.forEach((p) => { p.bucket = bucket; });
-  console.log(`${bucket}: ${posts.length} posts from ${handles.length} handles across [${platforms.join(",")}]`);
-  return { posts, errors };
+
+  // Recency filter: keep only posts from the last RECENT_DAYS, per account.
+  // If an account returns 0 recent posts, fall back to its latest posts regardless of date.
+  const cutoff = Date.now() - RECENT_CUTOFF_MS;
+  const byAccount = new Map<string, ScrapedPost[]>();
+  posts.forEach((p) => {
+    const key = `${p.platform}|${p.author_handle}`;
+    const arr = byAccount.get(key) ?? [];
+    arr.push(p);
+    byAccount.set(key, arr);
+  });
+
+  const filtered: ScrapedPost[] = [];
+  let droppedStale = 0;
+  let fallbackAccounts = 0;
+  for (const [key, accountPosts] of byAccount.entries()) {
+    const recent = accountPosts.filter((p) => {
+      if (!p.posted_at) return false;
+      const t = new Date(p.posted_at).getTime();
+      return Number.isFinite(t) && t >= cutoff;
+    });
+    if (recent.length > 0) {
+      droppedStale += accountPosts.length - recent.length;
+      filtered.push(...recent);
+    } else {
+      // Fallback: keep this account's latest posts so we don't starve the bucket.
+      fallbackAccounts += 1;
+      console.log(`Recency fallback for ${key} — no posts in last ${RECENT_DAYS}d, keeping latest ${accountPosts.length}`);
+      filtered.push(...accountPosts);
+    }
+  }
+
+  console.log(`${bucket}: ${filtered.length} posts (dropped ${droppedStale} stale, ${fallbackAccounts} accounts used fallback) from ${handles.length} handles across [${platforms.join(",")}]`);
+  return { posts: filtered, errors };
 }
 
 // ---------- OAuth IG ----------
