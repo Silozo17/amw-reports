@@ -7,25 +7,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Credit packs — keep in sync with src/lib/contentLabPricing.ts
-const PACKS = {
-  pack_5:   { priceId: "price_1TOPogHCGP7kst5Zi9ILiaej", credits: 5 },
-  pack_15:  { priceId: "price_1TOPogHCGP7kst5ZAEMCE2gL", credits: 15 },
-  pack_25:  { priceId: "price_1TOPohHCGP7kst5Z5BCQOD3X", credits: 25 },
-  pack_50:  { priceId: "price_1TOPoiHCGP7kst5ZrDC0kdza", credits: 50 },
-  pack_100: { priceId: "price_1TOPokHCGP7kst5ZFcQyslHt", credits: 100 },
+// Subscription tier price IDs — keep in sync with src/lib/contentLabPricing.ts
+const TIERS = {
+  starter: { priceId: "price_1TOPobHCGP7kst5Z1hSGxS82" },
+  growth:  { priceId: "price_1TOPocHCGP7kst5ZnFUAQP7a" },
+  scale:   { priceId: "price_1TOPoeHCGP7kst5ZC3DKF1ma" },
 } as const;
 
-const BodySchema = z.object({
-  pack: z.enum(["pack_5", "pack_15", "pack_25", "pack_50", "pack_100"]),
-});
+const BodySchema = z.object({ tier: z.enum(["starter", "growth", "scale"]) });
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   console.log(JSON.stringify({
     ts: new Date().toISOString(),
-    fn: "create-content-lab-credit-checkout",
+    fn: "create-content-lab-subscription-checkout",
     method: req.method,
   }));
 
@@ -61,9 +57,9 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const pack = PACKS[parsed.data.pack];
+    const tier = TIERS[parsed.data.tier];
+    const tierSlug = parsed.data.tier;
 
-    // Resolve org_id (service role to bypass RLS, user already authenticated)
     const adminSupabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -83,7 +79,6 @@ Deno.serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    // Reuse existing customer if present
     const customers = await stripe.customers.list({ email: userData.user.email, limit: 1 });
     const customerId = customers.data[0]?.id;
 
@@ -91,14 +86,21 @@ Deno.serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : userData.user.email,
-      mode: "payment",
-      line_items: [{ price: pack.priceId, quantity: 1 }],
-      success_url: `${origin}/content-lab?credits=success`,
-      cancel_url: `${origin}/content-lab?credits=cancelled`,
+      mode: "subscription",
+      line_items: [{ price: tier.priceId, quantity: 1 }],
+      success_url: `${origin}/content-lab?subscription=success`,
+      cancel_url: `${origin}/content-lab-feature?subscription=cancelled`,
       metadata: {
-        type: "content_lab_credits",
+        type: "content_lab_subscription",
         org_id: membership.org_id,
-        credits: String(pack.credits),
+        content_lab_tier: tierSlug,
+      },
+      subscription_data: {
+        metadata: {
+          type: "content_lab_subscription",
+          org_id: membership.org_id,
+          content_lab_tier: tierSlug,
+        },
       },
     });
 
@@ -106,7 +108,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("create-content-lab-credit-checkout error:", e);
+    console.error("create-content-lab-subscription-checkout error:", e);
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
