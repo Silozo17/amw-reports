@@ -30,6 +30,8 @@ import ClientEditDialog from '@/components/clients/ClientEditDialog';
 import MetricConfigPanel from '@/components/clients/MetricConfigPanel';
 import ClientConnectionsTab from '@/components/clients/tabs/ClientConnectionsTab';
 import ClientSettingsTab from '@/components/clients/tabs/ClientSettingsTab';
+import ClientContentLabTab from '@/components/clients/tabs/ClientContentLabTab';
+import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { toast } from 'sonner';
 import usePageMeta from '@/hooks/usePageMeta';
 
@@ -55,6 +57,7 @@ const ClientDetail = () => {
   const { isPlatformAdmin } = usePlatformAdmin();
   const { isOwner, isManager, isClientUser } = useAuth();
   const isOrgMember = isOwner || isManager;
+  const { hasAccess: hasContentLabAccess } = useContentLabAccess();
 
   // Server-side sync queue
   const { activeJobs, isAnySyncing, enqueueSync } = useSyncJobs(id);
@@ -427,6 +430,7 @@ const ClientDetail = () => {
               <TabsTrigger value="dashboard" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5 hidden sm:inline" />Dashboard</TabsTrigger>
               <TabsTrigger value="connections">Connections</TabsTrigger>
               <TabsTrigger value="upsells">Upsells</TabsTrigger>
+              {hasContentLabAccess && <TabsTrigger value="content-lab">Content Lab</TabsTrigger>}
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
@@ -455,6 +459,12 @@ const ClientDetail = () => {
           <TabsContent value="upsells" className="mt-4">
             <UpsellTab clientId={client.id} />
           </TabsContent>
+
+          {hasContentLabAccess && (
+            <TabsContent value="content-lab" className="mt-4">
+              <ClientContentLabTab clientId={client.id} />
+            </TabsContent>
+          )}
 
           <TabsContent value="reports" className="mt-4">
             <ClientReportsTab

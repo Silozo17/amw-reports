@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play, CreditCard, Mail } from 'lucide-react';
+import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play, CreditCard, Mail, X, Search, Lightbulb, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
+import { useContentLabNiches, useContentLabUsage, useGroupedRuns, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
@@ -39,11 +40,12 @@ const ContentLabPage = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: niches = [], isLoading: nichesLoading } = useContentLabNiches();
-  const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
+  const { data: groupedRuns = [], isLoading: runsLoading } = useGroupedRuns();
   const { data: usage } = useContentLabUsage();
   const [runningNiche, setRunningNiche] = useState<string | null>(null);
   const [pendingNicheId, setPendingNicheId] = useState<string | null>(null);
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
+  const [guideDismissed, setGuideDismissed] = useState(() => localStorage.getItem('cl-guide-dismissed') === '1');
 
   usePageMeta({ title: 'Content Lab', description: 'Discover what is working in your niche and generate ready-to-film content ideas.' });
 
@@ -61,10 +63,16 @@ const ContentLabPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
-  const latestRun = runs[0];
+  const allRuns = groupedRuns.flatMap((g) => g.runs);
+  const latestRun = allRuns[0];
   const monthlyExhausted = usage ? usage.runsThisMonth >= usage.runsLimit : false;
   const noCredits = (usage?.creditBalance ?? 0) <= 0;
   const blocked = monthlyExhausted && noCredits;
+
+  const dismissGuide = () => {
+    localStorage.setItem('cl-guide-dismissed', '1');
+    setGuideDismissed(true);
+  };
 
   const startRun = async (nicheId: string) => {
     setRunningNiche(nicheId);
@@ -126,6 +134,35 @@ const ContentLabPage = () => {
             </Button>
           </div>
         </header>
+
+        {!guideDismissed && (
+          <Card className="relative border-primary/20 bg-primary/5 p-5">
+            <button
+              type="button"
+              onClick={dismissGuide}
+              className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+              aria-label="Dismiss guide"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <h3 className="font-display text-base">How Content Lab works</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              {[
+                { icon: Search, title: '1. Discover', body: 'We scrape your niche, top benchmarks and competitors.' },
+                { icon: Lightbulb, title: '2. Decode', body: 'AI analyses what is working and why — hooks, formats, trends.' },
+                { icon: Wand2, title: '3. Create', body: '12 ready-to-film ideas tailored to your brand voice.' },
+              ].map((s) => (
+                <div key={s.title} className="flex items-start gap-2 text-xs">
+                  <s.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-medium text-foreground">{s.title}</p>
+                    <p className="text-muted-foreground">{s.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
 
@@ -214,29 +251,47 @@ const ContentLabPage = () => {
           <h2 className="mb-4 font-display text-xl">Recent Runs</h2>
           {runsLoading ? (
             <p className="text-sm text-muted-foreground">Loading runs…</p>
-          ) : runs.length === 0 ? (
+          ) : groupedRuns.length === 0 ? (
             <p className="text-sm text-muted-foreground">No runs yet. Create a niche to generate your first report.</p>
           ) : (
-            <div className="space-y-2">
-              {runs.map((run) => {
-                const niche = niches.find((n) => n.id === run.niche_id);
-                return (
-                  <Card
-                    key={run.id}
-                    className="flex items-center justify-between p-4 transition-colors hover:border-primary/40 cursor-pointer"
-                    onClick={() => run.status === 'completed' && navigate(`/content-lab/run/${run.id}`)}
-                  >
-                    <div>
-                      <p className="font-body text-sm font-medium">{niche?.label ?? 'Unknown niche'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(run.created_at).toLocaleString()}
-                      </p>
+            <Accordion
+              type="multiple"
+              defaultValue={groupedRuns.slice(0, 1).map((g) => g.clientId)}
+              className="space-y-2"
+            >
+              {groupedRuns.map((group) => (
+                <AccordionItem key={group.clientId} value={group.clientId} className="rounded-lg border bg-card">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                    <div className="flex flex-1 items-center justify-between gap-3 pr-3">
+                      <span className="font-display text-sm">{group.clientName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {group.runs.length} run{group.runs.length === 1 ? '' : 's'} · last {new Date(group.latestAt).toLocaleDateString()}
+                      </span>
                     </div>
-                    <RunStatusBadge status={run.status} />
-                  </Card>
-                );
-              })}
-            </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4">
+                    <div className="space-y-2 pb-2">
+                      {group.runs.slice(0, 5).map((run) => {
+                        const niche = niches.find((n) => n.id === run.niche_id);
+                        return (
+                          <Card
+                            key={run.id}
+                            className="flex cursor-pointer items-center justify-between p-3 transition-colors hover:border-primary/40"
+                            onClick={() => run.status === 'completed' && navigate(`/content-lab/run/${run.id}`)}
+                          >
+                            <div>
+                              <p className="font-body text-sm font-medium">{niche?.label ?? 'Unknown niche'}</p>
+                              <p className="text-xs text-muted-foreground">{new Date(run.created_at).toLocaleString()}</p>
+                            </div>
+                            <RunStatusBadge status={run.status} />
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           )}
         </section>
       </div>
