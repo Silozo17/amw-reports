@@ -26,6 +26,14 @@ Deno.serve(async (req) => {
   console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "content-lab-render-pdf", method: req.method }));
 
   try {
+    // Service-role-only: this function is invoked server-to-server by step-runner.
+    // Never expose it to the browser. Compare bearer token to the service-role key.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!bearer || bearer !== SERVICE_KEY) {
+      return json({ error: "Forbidden" }, 403);
+    }
+
     const { run_id } = await req.json().catch(() => ({}));
     if (!run_id) return json({ error: "run_id required" }, 400);
 

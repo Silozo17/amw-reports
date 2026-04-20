@@ -30,20 +30,40 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return json({ error: 'Unauthorized' }, 401);
+
     const { ideaId } = await req.json();
     if (!ideaId) return json({ error: 'ideaId required' }, 400);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Validate caller (anon client + JWT — service-role ignores auth headers).
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData } = await userClient.auth.getUser();
+    if (!userData.user) return json({ error: 'Unauthorized' }, 401);
+
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: idea, error: ideaErr } = await supabase
       .from('content_lab_ideas')
-      .select('id, run_id, title, hook, caption, created_at, content_lab_runs!inner ( client_id )')
+      .select('id, run_id, title, hook, caption, created_at, content_lab_runs!inner ( client_id, org_id )')
       .eq('id', ideaId)
       .single();
     if (ideaErr || !idea) return json({ error: 'Idea not found' }, 404);
+
+    const orgId = (idea as { content_lab_runs: { org_id: string } }).content_lab_runs.org_id;
+    const { data: membership } = await supabase
+      .from('org_members')
+      .select('id')
+      .eq('user_id', userData.user.id)
+      .eq('org_id', orgId)
+      .maybeSingle();
+    if (!membership) return json({ error: 'Forbidden' }, 403);
 
     const clientId = (idea as { content_lab_runs: { client_id: string } }).content_lab_runs.client_id;
     const ideaCreated = new Date((idea as { created_at: string }).created_at);

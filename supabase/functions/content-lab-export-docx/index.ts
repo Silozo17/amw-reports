@@ -37,14 +37,20 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return json({ error: 'unauthorized' }, 401);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+    const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const { data: userData } = await supabase.auth.getUser();
+    // Validate the user with the anon key + their JWT (service-role IGNORES auth headers).
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData } = await userClient.auth.getUser();
     if (!userData.user) return json({ error: 'unauthorized' }, 401);
+    const userId = userData.user.id;
+
+    // Use a true service-role client for the privileged reads/writes.
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const body = await req.json().catch(() => ({}));
     const runId = typeof body.run_id === 'string' ? body.run_id : null;
@@ -61,21 +67,32 @@ Deno.serve(async (req) => {
     if (ideasErr) throw ideasErr;
     if (!ideas || ideas.length === 0) return json({ error: 'no ideas found' }, 404);
 
-    // Determine org + client (use first idea's run)
-    const firstRunId = (ideas[0] as IdeaFull).run_id;
-    const { data: run } = await supabase
+    // Resolve ALL run org_ids touched by these ideas — caller must belong to every org.
+    const runIds = [...new Set((ideas as IdeaFull[]).map((i) => i.run_id))];
+    const { data: runRows } = await supabase
       .from('content_lab_runs')
-      .select('org_id, client_id, completed_at')
-      .eq('id', firstRunId).maybeSingle();
-    if (!run) return json({ error: 'run missing' }, 404);
+      .select('id, org_id, client_id, completed_at')
+      .in('id', runIds);
+    if (!runRows || runRows.length === 0) return json({ error: 'run missing' }, 404);
+
+    const orgIds = [...new Set(runRows.map((r) => r.org_id as string))];
+    const { data: memberships } = await supabase
+      .from('org_members')
+      .select('org_id')
+      .eq('user_id', userId)
+      .in('org_id', orgIds);
+    const memberOrgIds = new Set((memberships ?? []).map((m) => m.org_id as string));
+    const unauthorized = orgIds.some((o) => !memberOrgIds.has(o));
+    if (unauthorized) return json({ error: 'forbidden' }, 403);
+
+    const run = runRows[0];
 
     const [{ data: org }, { data: client }] = await Promise.all([
       supabase.from('organisations').select('name, logo_url, primary_color').eq('id', run.org_id).maybeSingle(),
       supabase.from('clients').select('company_name').eq('id', run.client_id).maybeSingle(),
     ]);
 
-    // Fetch top benchmarks for the run (limited)
-    const runIds = [...new Set(ideas.map((i) => (i as IdeaFull).run_id))];
+    // (runIds was already computed above for the membership check.)
     const { data: benchmarks } = await supabase
       .from('content_lab_posts')
       .select('id, run_id, thumbnail_url, post_url, author_handle, views, engagement_rate, platform')
