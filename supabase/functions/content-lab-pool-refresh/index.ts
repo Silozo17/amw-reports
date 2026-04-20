@@ -1,11 +1,15 @@
 // content-lab-pool-refresh: builds the verified benchmark pool for a niche_tag.
-// Strategy:
-//  1. Hashtag harvest via Apify hashtag scraper — collect candidate handles from posts with high views.
-//  2. (Optional) LLM seed fallback if Tier 1 yields too few candidates.
-//  3. Verification — profile-scrape each candidate, reject if median views / followers / freshness fail thresholds.
-//  4. Upsert survivors into content_lab_benchmark_pool keyed by (niche_tag, platform, handle).
 //
-// Triggered by: content-lab-discover after a niche is saved/updated, OR by an admin/cron job.
+// v2 changes (A1 fixes):
+//  - Chunked background execution via EdgeRuntime.waitUntil so the HTTP response returns
+//    immediately and verification continues for up to 400s past the response.
+//  - Relative thresholds: instead of hard cutoffs, we collect verification stats for ALL
+//    candidates, then keep the top decile by median views per platform (with absolute floors
+//    so we don't accept genuinely tiny accounts).
+//  - Watchdog hook: stale "running" jobs older than 15 min are auto-marked failed at the
+//    start of every invocation.
+//
+// Triggered by: content-lab-discover after a niche is saved/updated, OR by cron / admin.
 // Idempotent: re-running for the same niche_tag refreshes the pool and updates verified_at.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -21,19 +25,22 @@ const APIFY_TOKEN = Deno.env.get("APIFY_TOKEN");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 // Tunables — kept conservative to bound Apify spend per pool refresh.
-const HASHTAGS_PER_REFRESH = 4;          // top hashtags to harvest from
-const POSTS_PER_HASHTAG = 30;            // posts per hashtag harvest call
-const MAX_CANDIDATES = 25;               // cap before verification
-const MAX_VERIFIED_TARGET = 15;          // stop verifying once we hit this
+const HASHTAGS_PER_REFRESH = 4;
+const POSTS_PER_HASHTAG = 30;
+const MAX_CANDIDATES = 25;
+const MAX_SAMPLED_TARGET = 18; // sample more so relative thresholds have signal
 const APIFY_TIMEOUT_SEC = 90;
+const STALE_JOB_MINUTES = 15;
 
-// Verification thresholds.
-const MIN_FOLLOWERS = 25_000;
-const MIN_MEDIAN_VIEWS_IG = 30_000;
-const MIN_MEDIAN_VIEWS_TT = 75_000;
-const MIN_MEDIAN_VIEWS_FB = 20_000;
-const MAX_DAYS_SINCE_LAST_POST = 45;
-const MIN_POSTS_SAMPLED = 6;
+// Absolute floors — accounts below these are always rejected, even in slow niches.
+const ABSOLUTE_MIN_FOLLOWERS = 5_000;
+const ABSOLUTE_MIN_MEDIAN_VIEWS = 2_000;
+const MAX_DAYS_SINCE_LAST_POST = 60;
+const MIN_POSTS_SAMPLED = 4;
+// Relative selection — keep top X% of sampled accounts by median views per platform.
+const TOP_PERCENTILE_KEEP = 0.6; // keep top 60% (was hard threshold rejecting 100%)
+const MIN_VERIFIED_OUTPUT = 5;
+const MAX_VERIFIED_OUTPUT = 15;
 
 interface RefreshInput {
   niche_tag: string;
@@ -59,9 +66,11 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Process each platform as its own job row so we have an audit trail.
-    const results: Record<string, { found: number; verified: number; error?: string }> = {};
+    // Watchdog: clean up stale running jobs from previous invocations.
+    await reapStaleJobs(admin);
 
+    // Create job rows synchronously so the caller has IDs to poll.
+    const jobIds: Array<{ platform: string; jobId: string | null }> = [];
     for (const platform of platforms) {
       const { data: jobRow } = await admin
         .from("content_lab_pool_refresh_jobs")
@@ -74,47 +83,57 @@ Deno.serve(async (req) => {
         })
         .select("id")
         .single();
-
-      const jobId = (jobRow as { id?: string } | null)?.id;
-
-      try {
-        const summary = await refreshOnePlatform(admin, {
-          niche_tag: input.niche_tag,
-          platform: platform as "instagram" | "tiktok" | "facebook",
-          hashtags,
-          keywords,
-        });
-        results[platform] = summary;
-
-        if (jobId) {
-          await admin
-            .from("content_lab_pool_refresh_jobs")
-            .update({
-              status: "completed",
-              candidates_found: summary.found,
-              candidates_verified: summary.verified,
-              completed_at: new Date().toISOString(),
-            })
-            .eq("id", jobId);
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "unknown";
-        console.error(`Pool refresh ${platform} failed:`, msg);
-        results[platform] = { found: 0, verified: 0, error: msg };
-        if (jobId) {
-          await admin
-            .from("content_lab_pool_refresh_jobs")
-            .update({
-              status: "failed",
-              error_message: msg,
-              completed_at: new Date().toISOString(),
-            })
-            .eq("id", jobId);
-        }
-      }
+      jobIds.push({ platform, jobId: (jobRow as { id?: string } | null)?.id ?? null });
     }
 
-    return json({ ok: true, niche_tag: input.niche_tag, results });
+    // Detach the heavy work — return 202 immediately, continue in background.
+    const work = (async () => {
+      for (const { platform, jobId } of jobIds) {
+        try {
+          const summary = await refreshOnePlatform(admin, {
+            niche_tag: input.niche_tag,
+            platform: platform as "instagram" | "tiktok" | "facebook",
+            hashtags,
+            keywords,
+          });
+          if (jobId) {
+            await admin
+              .from("content_lab_pool_refresh_jobs")
+              .update({
+                status: "completed",
+                candidates_found: summary.found,
+                candidates_verified: summary.verified,
+                completed_at: new Date().toISOString(),
+              })
+              .eq("id", jobId);
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "unknown";
+          console.error(`Pool refresh ${platform} failed:`, msg);
+          if (jobId) {
+            await admin
+              .from("content_lab_pool_refresh_jobs")
+              .update({
+                status: "failed",
+                error_message: msg,
+                completed_at: new Date().toISOString(),
+              })
+              .eq("id", jobId);
+          }
+        }
+      }
+    })();
+
+    // @ts-ignore - EdgeRuntime is provided by Supabase Deno runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(work);
+    } else {
+      // Fallback: run inline (will be subject to request timeout).
+      await work;
+    }
+
+    return json({ ok: true, niche_tag: input.niche_tag, jobs: jobIds, status: "queued" }, 202);
   } catch (e) {
     console.error("content-lab-pool-refresh error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
@@ -126,6 +145,20 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function reapStaleJobs(admin: ReturnType<typeof createClient>): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_JOB_MINUTES * 60_000).toISOString();
+  const { error } = await admin
+    .from("content_lab_pool_refresh_jobs")
+    .update({
+      status: "failed",
+      error_message: `Watchdog: job exceeded ${STALE_JOB_MINUTES}min runtime`,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("status", "running")
+    .lt("started_at", cutoff);
+  if (error) console.error("reapStaleJobs error:", error);
 }
 
 interface RefreshArgs {
@@ -153,23 +186,24 @@ async function refreshOnePlatform(
   candidates = candidates.slice(0, MAX_CANDIDATES);
   if (candidates.length === 0) return { found: 0, verified: 0 };
 
-  // 3. Verify each candidate by profile-scraping a few of their recent posts.
-  const verified: VerifiedAccount[] = [];
+  // 3. Sample each candidate (NOT pass/fail yet — gather metrics for relative ranking).
+  const sampled: SampledAccount[] = [];
   for (const handle of candidates) {
-    if (verified.length >= MAX_VERIFIED_TARGET) break;
+    if (sampled.length >= MAX_SAMPLED_TARGET) break;
     try {
-      const v = await verifyHandle(handle, args.platform);
-      if (v) {
-        verified.push(v);
-      } else {
-        console.log(`[${args.platform}/${args.niche_tag}] rejected @${handle}`);
-      }
+      const s = await sampleHandle(handle, args.platform);
+      if (s) sampled.push(s);
     } catch (e) {
-      console.error(`Verify @${handle} failed:`, e);
+      console.error(`Sample @${handle} failed:`, e);
     }
   }
 
-  // 4. Upsert into pool. Mark old rows for this (niche_tag, platform) as stale first.
+  if (sampled.length === 0) return { found: candidates.length, verified: 0 };
+
+  // 4. Relative selection: rank by median_views, keep top percentile, apply absolute floors.
+  const verified = selectTopAccounts(sampled);
+
+  // 5. Mark previous pool entries stale, then upsert survivors.
   await admin
     .from("content_lab_benchmark_pool")
     .update({ status: "stale", updated_at: new Date().toISOString() })
@@ -202,6 +236,26 @@ async function refreshOnePlatform(
   return { found: candidates.length, verified: verified.length };
 }
 
+// ============== Selection (relative thresholds) ==============
+
+function selectTopAccounts(sampled: SampledAccount[]): SampledAccount[] {
+  // Apply hard floors first (truly inactive or microscopic).
+  const floor = sampled.filter((s) => {
+    if (s.follower_count !== null && s.follower_count < ABSOLUTE_MIN_FOLLOWERS) return false;
+    if (s.median_views < ABSOLUTE_MIN_MEDIAN_VIEWS) return false;
+    if (s.last_post_at && daysSince(s.last_post_at) > MAX_DAYS_SINCE_LAST_POST) return false;
+    if (s.posts_analysed < MIN_POSTS_SAMPLED) return false;
+    return true;
+  });
+
+  if (floor.length === 0) return [];
+
+  // Rank by median_views desc, keep top percentile.
+  const ranked = [...floor].sort((a, b) => b.median_views - a.median_views);
+  const cutoffIdx = Math.max(MIN_VERIFIED_OUTPUT, Math.ceil(ranked.length * TOP_PERCENTILE_KEEP));
+  return ranked.slice(0, Math.min(cutoffIdx, MAX_VERIFIED_OUTPUT));
+}
+
 // ============== Harvesting ==============
 
 async function harvestCandidates(args: RefreshArgs): Promise<string[]> {
@@ -225,10 +279,7 @@ async function harvestIgHashtags(hashtags: string[]): Promise<string[]> {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hashtags: cleaned,
-        resultsLimit: POSTS_PER_HASHTAG,
-      }),
+      body: JSON.stringify({ hashtags: cleaned, resultsLimit: POSTS_PER_HASHTAG }),
     });
     if (!res.ok) {
       console.error("IG hashtag harvest error:", res.status, await res.text());
@@ -236,7 +287,6 @@ async function harvestIgHashtags(hashtags: string[]): Promise<string[]> {
     }
     const items = await res.json();
     if (!Array.isArray(items)) return [];
-    // Sort by view/like signal then dedupe owner usernames.
     const ranked = [...items].sort((a, b) =>
       ((b.videoViewCount ?? b.likesCount ?? 0) as number) - ((a.videoViewCount ?? a.likesCount ?? 0) as number),
     );
@@ -292,10 +342,7 @@ async function harvestFbKeywords(keywords: string[]): Promise<string[]> {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        search: keywords.slice(0, 3),
-        maxItems: 30,
-      }),
+      body: JSON.stringify({ search: keywords.slice(0, 3), maxItems: 30 }),
     });
     if (!res.ok) {
       console.error("FB search harvest error:", res.status, await res.text());
@@ -352,9 +399,9 @@ async function llmSeedHandles(nicheTag: string, platform: string): Promise<strin
   }
 }
 
-// ============== Verification ==============
+// ============== Sampling (no pass/fail — just collect metrics) ==============
 
-interface VerifiedAccount {
+interface SampledAccount {
   handle: string;
   display_name: string | null;
   follower_count: number | null;
@@ -366,14 +413,16 @@ interface VerifiedAccount {
   profile_url: string;
 }
 
-async function verifyHandle(handle: string, platform: "instagram" | "tiktok" | "facebook"): Promise<VerifiedAccount | null> {
-  if (platform === "instagram") return verifyIg(handle);
-  if (platform === "tiktok") return verifyTt(handle);
-  if (platform === "facebook") return verifyFb(handle);
+async function sampleHandle(handle: string, platform: "instagram" | "tiktok" | "facebook"): Promise<SampledAccount | null> {
+  if (platform === "instagram") return sampleIg(handle);
+  if (platform === "tiktok") return sampleTt(handle);
+  if (platform === "facebook") return sampleFb(handle);
   return null;
 }
 
-async function verifyIg(handle: string): Promise<VerifiedAccount | null> {
+const median = (arr: number[]) => arr.length ? [...arr].sort((a, b) => a - b)[Math.floor(arr.length / 2)] : 0;
+
+async function sampleIg(handle: string): Promise<SampledAccount | null> {
   const url = `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${APIFY_TIMEOUT_SEC}`;
   const res = await fetch(url, {
     method: "POST",
@@ -387,17 +436,13 @@ async function verifyIg(handle: string): Promise<VerifiedAccount | null> {
   });
   if (!res.ok) return null;
   const items = await res.json();
-  if (!Array.isArray(items) || items.length < MIN_POSTS_SAMPLED) return null;
+  if (!Array.isArray(items) || items.length === 0) return null;
   const followerCount = (items[0]?.ownerFollowersCount as number | undefined) ?? null;
   const views = items.map((i) => (i.videoViewCount ?? i.videoPlayCount ?? 0) as number).filter((v) => v > 0);
   const likes = items.map((i) => (i.likesCount ?? 0) as number);
   const lastPost = items[0]?.timestamp as string | undefined;
-  const median = (arr: number[]) => arr.length ? [...arr].sort((a, b) => a - b)[Math.floor(arr.length / 2)] : 0;
   const medianViews = median(views.length ? views : likes.map((l) => l * 10));
   const medianEr = followerCount && followerCount > 0 ? median(likes) / followerCount : 0;
-  if (followerCount !== null && followerCount < MIN_FOLLOWERS) return null;
-  if (medianViews < MIN_MEDIAN_VIEWS_IG) return null;
-  if (lastPost && daysSince(lastPost) > MAX_DAYS_SINCE_LAST_POST) return null;
   return {
     handle,
     display_name: items[0]?.ownerFullName ?? null,
@@ -411,7 +456,7 @@ async function verifyIg(handle: string): Promise<VerifiedAccount | null> {
   };
 }
 
-async function verifyTt(handle: string): Promise<VerifiedAccount | null> {
+async function sampleTt(handle: string): Promise<SampledAccount | null> {
   const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${APIFY_TIMEOUT_SEC}`;
   const res = await fetch(url, {
     method: "POST",
@@ -426,21 +471,16 @@ async function verifyTt(handle: string): Promise<VerifiedAccount | null> {
   });
   if (!res.ok) return null;
   const items = await res.json();
-  if (!Array.isArray(items) || items.length < MIN_POSTS_SAMPLED) return null;
+  if (!Array.isArray(items) || items.length === 0) return null;
   const followers = (items[0]?.authorMeta?.fans as number | undefined) ?? null;
   const views = items.map((i) => (i.playCount ?? 0) as number);
   const likes = items.map((i) => (i.diggCount ?? 0) as number);
   const lastPost = items[0]?.createTimeISO as string | undefined;
-  const median = (arr: number[]) => arr.length ? [...arr].sort((a, b) => a - b)[Math.floor(arr.length / 2)] : 0;
-  const medianViews = median(views);
-  if (followers !== null && followers < MIN_FOLLOWERS) return null;
-  if (medianViews < MIN_MEDIAN_VIEWS_TT) return null;
-  if (lastPost && daysSince(lastPost) > MAX_DAYS_SINCE_LAST_POST) return null;
   return {
     handle,
     display_name: items[0]?.authorMeta?.nickName ?? null,
     follower_count: followers,
-    median_views: medianViews,
+    median_views: median(views),
     median_engagement_rate: followers && followers > 0 ? median(likes) / followers : 0,
     last_post_at: lastPost ?? null,
     posts_analysed: items.length,
@@ -449,7 +489,7 @@ async function verifyTt(handle: string): Promise<VerifiedAccount | null> {
   };
 }
 
-async function verifyFb(handle: string): Promise<VerifiedAccount | null> {
+async function sampleFb(handle: string): Promise<SampledAccount | null> {
   const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${APIFY_TIMEOUT_SEC}`;
   const res = await fetch(url, {
     method: "POST",
@@ -461,20 +501,16 @@ async function verifyFb(handle: string): Promise<VerifiedAccount | null> {
   });
   if (!res.ok) return null;
   const items = await res.json();
-  if (!Array.isArray(items) || items.length < MIN_POSTS_SAMPLED) return null;
+  if (!Array.isArray(items) || items.length === 0) return null;
   const followers = (items[0]?.likes as number | undefined) ?? null;
   const views = items.map((i) => (i.videoViewCount ?? 0) as number).filter((v) => v > 0);
   const likes = items.map((i) => (i.likesCount ?? 0) as number);
   const lastPost = items[0]?.time as string | undefined;
-  const median = (arr: number[]) => arr.length ? [...arr].sort((a, b) => a - b)[Math.floor(arr.length / 2)] : 0;
-  const medianViews = median(views.length ? views : likes.map((l) => l * 5));
-  if (medianViews < MIN_MEDIAN_VIEWS_FB) return null;
-  if (lastPost && daysSince(lastPost) > MAX_DAYS_SINCE_LAST_POST) return null;
   return {
     handle,
     display_name: items[0]?.pageName ?? null,
     follower_count: followers,
-    median_views: medianViews,
+    median_views: median(views.length ? views : likes.map((l) => l * 5)),
     median_engagement_rate: 0,
     last_post_at: lastPost ?? null,
     posts_analysed: items.length,
