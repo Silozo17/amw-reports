@@ -391,3 +391,103 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
   }
   return JSON.parse(toolCall.function.arguments) as DiscoveryResult;
 }
+
+// ============== Apify handle verification (post-discovery) ==============
+
+interface BenchmarkSuggestion {
+  handle: string;
+  platform: string;
+  reason: string;
+  est_avg_views?: string;
+}
+
+/**
+ * Verify AI-suggested Instagram handles via Apify profile scraper. Drops handles
+ * that don't exist, are too small, or look inactive. Backfills from
+ * content_lab_seed_pool when too few survive. Non-IG handles pass through unchanged.
+ */
+async function verifyBenchmarkHandles(
+  suggestions: BenchmarkSuggestion[],
+  admin: ReturnType<typeof createClient>,
+  nicheTag: string,
+): Promise<BenchmarkSuggestion[]> {
+  if (!APIFY_TOKEN || suggestions.length === 0) return suggestions;
+
+  const igCandidates = suggestions.filter((s) => s.platform === "instagram");
+  const passThrough = suggestions.filter((s) => s.platform !== "instagram");
+
+  if (igCandidates.length === 0) return suggestions;
+
+  const handles = igCandidates.map((s) => s.handle.replace(/^@/, "").toLowerCase());
+  const verified = new Set<string>();
+
+  // Batch verify in chunks for speed.
+  for (let i = 0; i < handles.length; i += VERIFY_BATCH_SIZE) {
+    const batch = handles.slice(i, i + VERIFY_BATCH_SIZE);
+    try {
+      const res = await fetch(
+        `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=45`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usernames: batch }),
+        },
+      );
+      if (!res.ok) {
+        console.warn("Verify batch failed:", res.status);
+        continue;
+      }
+      const items = await res.json() as Array<{
+        username?: string;
+        followersCount?: number;
+        latestPosts?: Array<{ timestamp?: string }>;
+      }>;
+      for (const it of items ?? []) {
+        if (!it.username) continue;
+        const followers = it.followersCount ?? 0;
+        if (followers < MIN_VERIFIED_FOLLOWERS) continue;
+        const lastPostIso = it.latestPosts?.[0]?.timestamp;
+        if (lastPostIso) {
+          const days = (Date.now() - new Date(lastPostIso).getTime()) / 86_400_000;
+          if (days > MAX_DAYS_SINCE_LAST_POST) continue;
+        }
+        verified.add(it.username.toLowerCase());
+      }
+    } catch (e) {
+      console.warn("Verify batch error:", e);
+    }
+  }
+
+  const survivors = igCandidates.filter((s) => verified.has(s.handle.replace(/^@/, "").toLowerCase()));
+  console.log(`Verified ${survivors.length}/${igCandidates.length} AI-suggested IG benchmarks`);
+
+  // Backfill from seed pool if we lost too many.
+  const TARGET = igCandidates.length;
+  if (survivors.length < TARGET) {
+    const need = TARGET - survivors.length;
+    const haveHandles = new Set(survivors.map((s) => s.handle.toLowerCase()));
+    const { data: seeds } = await admin
+      .from("content_lab_seed_pool")
+      .select("handle, display_name, followers_est")
+      .eq("vertical_slug", nicheTag)
+      .eq("platform", "instagram")
+      .eq("is_active", true)
+      .order("followers_est", { ascending: false })
+      .limit(need * 2);
+
+    type SeedRow = { handle: string; display_name?: string | null; followers_est?: number | null };
+    for (const row of (seeds as SeedRow[] | null) ?? []) {
+      if (survivors.length >= TARGET) break;
+      if (haveHandles.has(row.handle.toLowerCase())) continue;
+      survivors.push({
+        handle: row.handle,
+        platform: "instagram",
+        reason: `Verified seed pool benchmark${row.followers_est ? ` (~${(row.followers_est / 1000).toFixed(0)}k followers)` : ""}`,
+      });
+      haveHandles.add(row.handle.toLowerCase());
+    }
+  }
+
+  return [...survivors, ...passThrough];
+}
+
