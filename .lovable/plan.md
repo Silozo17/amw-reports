@@ -1,61 +1,86 @@
 
 
 ## Scope
-Make the Viral Feed cards look like real Instagram posts: working thumbnails, full stat row (views, likes, comments, shares), and a "View reel" button that opens the original post. No backend re-scrape — work with the data we already have.
+Re-architect the Content Lab pipeline so ideas are world-class: benchmark-led, never derivative of underperforming own content, with sharper prompts, a tightened discovery flow, and a re-ordered Run Detail UI.
 
 ## What I found
-1. `content_lab_posts` already stores: `thumbnail_url`, `post_url`, `likes`, `comments`, `shares`, `views`, `post_type`, `posted_at`.
-2. Thumbnails are blank because Instagram CDN URLs (from Apify `displayUrl` and IG Graph `thumbnail_url`) are signed + short-lived AND blocked by Instagram's referrer policy when loaded from another domain. So `<img src={p.thumbnail_url}>` 404s or returns blank.
-3. `shares` is always `0` for Instagram (Graph API and Apify do not expose share counts for organic posts). `views` is only present for videos/reels.
-4. The card layout in `RunDetailPage.tsx` only shows likes + comments and has no link out to the original post.
+1. `content-lab-discover` currently asks AI to generate competitor handles loosely — no hard ranking by performance, no "top 10 benchmarks" concept, output mixed into `top_competitors` and `top_global_benchmarks` arrays.
+2. `content-lab-ideate` already references competitor posts but does **not** filter to top performers, does **not** compare own performance vs benchmarks, and currently uses competitor + own posts equally as inspiration — which is exactly the problem you flagged.
+3. Run Detail tabs today: **Viral Feed | 12 Ideas** (no "Your latest content" tab; "12 Ideas" label is wrong).
+4. Viral Feed sort today: `engagement_rate DESC` — not views/likes/comments as you want.
+5. NicheForm discovery step is a single text box for "tell us about you" — too loose for the quality bar you want.
+6. The system persona in `_shared/contentLabPrompts.ts` is "senior short-form strategist" — solid but not the "Head of Creative Direction" framing you want.
 
 ## Plan
 
-### 1. Fix thumbnails (proxy through an edge function)
-- Add a tiny new edge function `content-lab-image-proxy` (verify_jwt = false) that:
-  - Accepts `?url=<encoded instagram cdn url>`.
-  - Validates the URL host is on an allowlist (`*.cdninstagram.com`, `*.fbcdn.net`, `scontent*.cdninstagram.com`, `*.tiktokcdn.com` for later).
-  - Fetches server-side (no browser referrer issue) and streams the bytes back with `Content-Type` from upstream + `Cache-Control: public, max-age=86400`.
-  - Returns a 1×1 transparent PNG on failure so the card never shows a broken icon.
-- In the frontend, render thumbnails via this proxy:
-  ```
-  /functions/v1/content-lab-image-proxy?url=<encoded>
-  ```
-- Add `<img loading="lazy" onError={hide}>` so any remaining failures collapse cleanly.
+### 1) Top-10 benchmark-led ideation (the core change)
+**`content-lab-discover`**
+- Tighten the prompt to return exactly **10 benchmark accounts** (the global best in this niche, ranked by typical reel views — not engagement rate, not vibes), plus up to 5 local/contextual competitors as a separate list.
+- Output schema: `{ top_10_benchmarks: [{handle, why_top, est_avg_views}], local_competitors: [{handle, why_relevant}] }`.
+- Persist `top_10_benchmarks` to `content_lab_niches.top_global_benchmarks` (already exists).
 
-### 2. Real-looking post card
-Update the Viral Feed card in `src/pages/content-lab/RunDetailPage.tsx` (extracted into a new `src/components/content-lab/ViralPostCard.tsx` to keep file size sensible):
-- Header row: small circular avatar placeholder + `@handle` + platform badge.
-- Square (1:1) image area using the proxied thumbnail; fallback gradient if missing.
-- Action row beneath the image with icons (heart, comment, paper plane / share, bookmark) — visual only, like a real IG card.
-- Stats line: `{likes} likes · {comments} comments` and, when `views > 0`, a leading `{views} views` line above (matches how Reels display).
-- Caption: 2-line clamp.
-- Footer:
-  - **"View reel"** button (primary, small) when `post_type` is `video`/`reel`/`clip` AND `post_url` exists → opens `post_url` in a new tab.
-  - **"View post"** button otherwise, same behaviour.
-  - Posted-at relative time (e.g. "3d ago") on the right.
+**`content-lab-scrape`**
+- Continue scraping all sources (own + benchmarks + competitors).
+- Tag each post `source = 'benchmark' | 'competitor' | 'own'` (already supported).
 
-### 3. Honest handling of missing metrics
-- If `views === 0` → hide the views line (don't show a misleading "0 views").
-- If `shares === 0` → hide the shares chip (Instagram organic doesn't expose it, showing 0 looks broken).
-- Keep the "Hook" highlight box as it is — it's useful.
+**`content-lab-ideate` — the rules you asked for, hard-enforced:**
+- Pull the **top 30 benchmark posts** sorted by `views DESC, likes DESC, comments DESC` from `source = 'benchmark'` — this is the inspiration pool.
+- Pull own posts and compute `own_avg_views`.
+- Compute `benchmark_p50_views` (median of top 30).
+- Apply this rule in the prompt and in code:
+  - Default: ideas reference **only benchmark posts** via `based_on_handle`.
+  - Exception: if `own_avg_views >= benchmark_p50_views`, then own posts are eligible inspiration too. Otherwise, **own posts are explicitly listed as "what NOT to repeat"** in the prompt context.
+- Hard validation in the response handler: any idea with `based_on_handle` matching `niche.own_handle` AND own_avg_views < benchmark_p50_views → rejected and regenerated.
 
-### 4. No DB or scrape changes
-- We already have everything we need in `content_lab_posts`. No migration. No new Apify calls. No extra cost.
+### 2) Sharper persona + tighter prompts (`_shared/contentLabPrompts.ts`)
+- New system persona: **"Head of Creative Direction at a top-tier social agency, 12+ years scaling brands on Instagram/TikTok/Facebook to 8-figure accounts. You've reverse-engineered the playbooks of the top creators in every vertical (Alex Hormozi, MrBeast's content team, Gary Vee's agency, Marie Forleo, Mark Rober, Casey Neistat). You only ship ideas that would pass a senior creative review at Wieden+Kennedy or Ogilvy. {{current_year}} best practice only — no 2019 advice."**
+- Add a new `BENCHMARK_FIRST_RULES` block to enforce:
+  - "Every idea must be reverse-engineered from a specific top-10 benchmark post. Cite it via `based_on_handle` + a 1-line breakdown of the *mechanic* (not just the topic) you're borrowing."
+  - "Never copy the topic verbatim. Borrow the *structural pattern* (hook mechanism, pacing, reveal) and apply it to the brand's niche."
+  - "If the producer can't film it in one working day with a phone, reject."
+- Strengthen HARD_RULES: ban the additional cliché generation patterns ("You need to hear this", "Wait until the end", "Nobody talks about this") — these are now 2024/25 fatigued.
+
+### 3) UI: tabs + sort (`RunDetailPage.tsx`)
+- New tab order: **Your Latest Content | Viral Feed | Ideas** (drop the "12" — count varies, label is misleading).
+- "Your Latest Content" tab: filter `content_lab_posts.source = 'own'`, sorted by `posted_at DESC`, with the same `ViralPostCard` and a small header showing `own_avg_views vs benchmark_p50_views` so the user immediately sees where they stand.
+- "Viral Feed" tab: filter `source IN ('benchmark', 'competitor')`, sorted **`views DESC, likes DESC, comments DESC`** — exactly as you asked.
+- "Ideas" tab: rename, no count in label.
+
+### 4) Tighter discovery form (`NicheFormPage.tsx`)
+Replace the loose "tell us about you" with a structured 4-block form (single page, no extra steps):
+- **Brand DNA**: niche/category (free text, with autosuggest from common verticals), one-line positioning, 3 specific things you sell/do.
+- **Audience**: who they are (1 line), the single problem they have, where they hang out online.
+- **Voice & constraints**: tone (chips: witty, expert, warm, blunt, playful, premium — pick max 2), 5 things you'll never say/do, the producer (founder / team / studio).
+- **Goal**: pick one — awareness, leads, sales, community. Drives the CTA style downstream.
+
+This becomes the structured context fed into every prompt, replacing the freeform paragraph.
+
+### 5) Validation + observability
+- After ideate, run a validator that rejects any idea where:
+  - `based_on_handle` is null or doesn't match a known scraped handle in this run, OR
+  - `based_on_handle = own_handle` while own underperforms, OR
+  - `hook` matches `caption` of the source post (lazy paraphrase).
+- Log rejection reasons in `content_lab_step_logs` so we can see WHY ideas were filtered.
 
 ## Files to touch
-- `supabase/functions/content-lab-image-proxy/index.ts` (new)
-- `supabase/config.toml` (register new function with `verify_jwt = false`)
-- `src/components/content-lab/ViralPostCard.tsx` (new)
-- `src/pages/content-lab/RunDetailPage.tsx` (replace the inline card markup with `<ViralPostCard />`)
+- `supabase/functions/_shared/contentLabPrompts.ts` — new persona, BENCHMARK_FIRST_RULES, expanded HARD_RULES
+- `supabase/functions/content-lab-discover/index.ts` — top-10 benchmarks schema + prompt tightening
+- `supabase/functions/content-lab-ideate/index.ts` — top-30 benchmark inspiration pool, own-vs-benchmark gating, response validator
+- `src/pages/content-lab/RunDetailPage.tsx` — new tab order, new "Your Latest Content" tab, viral feed sort by views/likes/comments
+- `src/pages/content-lab/NicheFormPage.tsx` — restructured discovery form (Brand DNA / Audience / Voice / Goal)
+- `src/hooks/useContentLab.ts` — surface new niche fields if needed
+
+No DB migration required — existing columns cover this (`top_global_benchmarks`, `source`, etc.).
 
 ## Risks / trade-offs
-- The image proxy is the only way to reliably show Instagram CDN images in the browser. It is a small egress cost (cached 24h per URL).
-- "Shares" will not appear for Instagram even after this fix — the platform doesn't expose it. I'll flag this in the UI by simply omitting the field, not by faking a number.
-- "Views" will only show on video/reel posts.
+- The new gating rule means users with weak own performance will get **zero ideas inspired by their own work** — that's intentional and correct, but I'll surface a one-line banner explaining it on the Ideas tab.
+- The structured discovery form is a behaviour change for existing niches; old niches keep their freeform `niche_description` and we'll fall back to it when the new structured fields are empty.
+- Benchmark scraping cost is unchanged — same Apify call, just a stricter list.
 
 ## Expected result
-- Cards look like real Instagram posts: avatar + handle, square image, action icons, likes/comments/views line, caption, hook highlight, and a clear "View reel" / "View post" button that opens the original.
-- Thumbnails actually render.
-- No misleading zero values.
+- Ideas are reverse-engineered from the proven top-10 in your niche, with a cited source post for every one.
+- Your own underperforming posts are explicitly used as anti-examples, not inspiration.
+- The Run Detail page leads with **Your Latest Content** so you see your baseline first, then the **Viral Feed** sorted by raw views, then the **Ideas**.
+- Discovery captures the brand brief in 4 tight blocks instead of one paragraph.
+- Persona + rules upgrade pushes idea quality toward agency-grade output.
 
