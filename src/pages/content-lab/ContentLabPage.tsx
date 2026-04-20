@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play, CreditCard, Mail } from 'lucide-react';
+import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play, CreditCard, Mail, X, Search, Lightbulb, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
+import { useContentLabNiches, useContentLabUsage, useGroupedRuns, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
