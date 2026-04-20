@@ -77,7 +77,12 @@ Deno.serve(async (req) => {
       top_competitors: DiscoveredEntity[];
       top_global_benchmarks: DiscoveredEntity[];
       client_id: string;
+      platforms_to_scrape: string[] | null;
     } }).niche;
+
+    const enabledPlatforms = (niche.platforms_to_scrape && niche.platforms_to_scrape.length > 0
+      ? niche.platforms_to_scrape
+      : ['instagram']) as Array<'instagram' | 'tiktok' | 'facebook'>;
 
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
@@ -89,10 +94,11 @@ Deno.serve(async (req) => {
       .slice(0, MAX_BENCHMARK_HANDLES);
 
     // Run all three buckets in parallel; each handles its own errors.
+    // Each bucket fans out across all enabled platforms internally.
     const [ownResult, compResult, benchResult] = await Promise.allSettled([
-      scrapeOwn(supabase, niche),
-      scrapeBucket(competitorHandles, "competitor", MAX_POSTS_COMPETITOR),
-      scrapeBucket(benchmarkHandles, "benchmark", MAX_POSTS_BENCHMARK),
+      scrapeOwn(supabase, niche, enabledPlatforms),
+      scrapeBucket(competitorHandles, "competitor", MAX_POSTS_COMPETITOR, enabledPlatforms),
+      scrapeBucket(benchmarkHandles, "benchmark", MAX_POSTS_BENCHMARK, enabledPlatforms),
     ]);
 
     const collected: ScrapedPost[] = [];
