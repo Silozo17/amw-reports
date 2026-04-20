@@ -263,9 +263,10 @@ const NicheFormPage = () => {
 
     setSaving(true);
     try {
-      const tracked_handles = ownHandle.trim()
-        ? [{ platform: 'instagram', handle: ownHandle.trim().replace(/^@/, '') }]
-        : [];
+      const tracked_handles: Array<{ platform: string; handle: string }> = [];
+      if (ownHandle.trim()) tracked_handles.push({ platform: 'instagram', handle: ownHandle.trim().replace(/^@/, '') });
+      if (tiktokHandle.trim()) tracked_handles.push({ platform: 'tiktok', handle: tiktokHandle.trim().replace(/^@/, '') });
+      if (facebookHandle.trim()) tracked_handles.push({ platform: 'facebook', handle: normaliseFacebookHandle(facebookHandle.trim()) });
 
       const competitor_urls = topCompetitors
         .map((c) => (c.handle ? `https://instagram.com/${c.handle.replace(/^@/, '')}` : ''))
