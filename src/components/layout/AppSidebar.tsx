@@ -19,6 +19,9 @@ import {
   KanbanSquare,
   Lightbulb,
   Heart,
+  TrendingUp,
+  Anchor,
+  Plus,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
@@ -46,13 +49,11 @@ const BASE_NAV_ITEMS = [
   { to: '/clients', label: 'Clients', icon: Users },
 ];
 
-const CONTENT_LAB_GENERATE_ITEMS = [
-  { to: '/content-lab', label: 'Content Lab', icon: Sparkles },
-];
-
-const CONTENT_LAB_PIPELINE_ITEMS = [
+const CONTENT_LAB_SUB_ITEMS = [
   { to: '/content-pipeline', label: 'Content Pipeline', icon: KanbanSquare },
   { to: '/ideas', label: 'Ideas', icon: Lightbulb },
+  { to: '/content-lab/trends', label: 'Trends', icon: TrendingUp },
+  { to: '/content-lab/hooks', label: 'Hook Library', icon: Anchor },
   { to: '/content-lab/swipe-file', label: 'Swipe File', icon: Heart },
 ];
 
