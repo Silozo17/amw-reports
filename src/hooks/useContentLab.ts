@@ -82,7 +82,6 @@ export const useContentLabRuns = (clientId?: string) => {
   });
 };
 
-import { runLimitForTier } from '@/lib/contentLabPricing';
 
 export interface ContentLabUsage {
   runsThisMonth: number;
