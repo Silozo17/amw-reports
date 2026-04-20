@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
 
     const niche = (run as { niche: {
       own_handle: string | null;
+      niche_tag: string | null;
       tracked_handles: Array<{ platform: string; handle: string }> | null;
       top_competitors: DiscoveredEntity[];
       top_global_benchmarks: DiscoveredEntity[];
@@ -99,10 +100,14 @@ Deno.serve(async (req) => {
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
       .filter((h): h is string => !!h)
       .slice(0, MAX_COMPETITOR_HANDLES);
-    const benchmarkHandles = (niche.top_global_benchmarks ?? [])
-      .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
-      .filter((h): h is string => !!h)
-      .slice(0, MAX_BENCHMARK_HANDLES);
+
+    // Benchmarks: prefer the verified shared pool. Fall back to LLM list only if pool is empty.
+    const benchmarkHandles = await loadBenchmarkHandles({
+      supabase,
+      niche_tag: niche.niche_tag,
+      enabledPlatforms,
+      llmFallback: niche.top_global_benchmarks ?? [],
+    });
 
     // Run all three buckets in parallel; each handles its own errors.
     // Each bucket fans out across all enabled platforms internally.
