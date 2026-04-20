@@ -95,6 +95,30 @@ Deno.serve(async (req) => {
       console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} status=${status}`);
     }
 
+    async function syncContentLabTier(email: string, tier: string) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("email", email)
+        .maybeSingle();
+      if (!profile?.user_id) return;
+
+      const { data: membership } = await supabase
+        .from("org_members")
+        .select("org_id")
+        .eq("user_id", profile.user_id)
+        .limit(1)
+        .maybeSingle();
+      if (!membership?.org_id) return;
+
+      await supabase
+        .from("org_subscriptions")
+        .update({ content_lab_tier: tier })
+        .eq("org_id", membership.org_id);
+
+      console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} content_lab_tier=${tier}`);
+    }
+
     // --- Handle events ---
     if (event.type === "customer.subscription.updated") {
       const sub = event.data.object as Stripe.Subscription;
