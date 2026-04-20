@@ -254,10 +254,13 @@ const ContentLabPage = () => {
           ) : groupedRuns.length === 0 ? (
             <p className="text-sm text-muted-foreground">No runs yet. Create a niche to generate your first report.</p>
           ) : (
-            <Accordion type="multiple" defaultValue={groupedRuns.slice(0, 1).map((g) => g.clientId)} className="space-y-2">
-              {groupedRuns.flatMap((group) => group.runs.slice(0, 0)).length}
+            <Accordion
+              type="multiple"
+              defaultValue={groupedRuns.slice(0, 1).map((g) => g.clientId)}
+              className="space-y-2"
+            >
               {groupedRuns.map((group) => (
-                <AccordionItem key={group.clientId} value={group.clientId} className="rounded-lg border bg-card mb-2">
+                <AccordionItem key={group.clientId} value={group.clientId} className="rounded-lg border bg-card">
                   <AccordionTrigger className="px-4 py-3 hover:no-underline">
                     <div className="flex flex-1 items-center justify-between gap-3 pr-3">
                       <span className="font-display text-sm">{group.clientName}</span>
@@ -269,24 +272,26 @@ const ContentLabPage = () => {
                   <AccordionContent className="px-4">
                     <div className="space-y-2 pb-2">
                       {group.runs.slice(0, 5).map((run) => {
-                const niche = niches.find((n) => n.id === run.niche_id);
-                return (
-                  <Card
-                    key={run.id}
-                    className="flex items-center justify-between p-4 transition-colors hover:border-primary/40 cursor-pointer"
-                    onClick={() => run.status === 'completed' && navigate(`/content-lab/run/${run.id}`)}
-                  >
-                    <div>
-                      <p className="font-body text-sm font-medium">{niche?.label ?? 'Unknown niche'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(run.created_at).toLocaleString()}
-                      </p>
+                        const niche = niches.find((n) => n.id === run.niche_id);
+                        return (
+                          <Card
+                            key={run.id}
+                            className="flex cursor-pointer items-center justify-between p-3 transition-colors hover:border-primary/40"
+                            onClick={() => run.status === 'completed' && navigate(`/content-lab/run/${run.id}`)}
+                          >
+                            <div>
+                              <p className="font-body text-sm font-medium">{niche?.label ?? 'Unknown niche'}</p>
+                              <p className="text-xs text-muted-foreground">{new Date(run.created_at).toLocaleString()}</p>
+                            </div>
+                            <RunStatusBadge status={run.status} />
+                          </Card>
+                        );
+                      })}
                     </div>
-                    <RunStatusBadge status={run.status} />
-                  </Card>
-                );
-              })}
-            </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           )}
         </section>
       </div>
