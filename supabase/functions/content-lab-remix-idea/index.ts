@@ -171,14 +171,14 @@ Remix the script now per the instruction. JSON only.`;
       });
     } catch (innerErr) {
       console.error("[content-lab-remix-idea] failed, refunding:", innerErr);
-      try {
-        await admin.rpc("refund_content_lab_credit", {
-          _ledger_id: ledgerId,
-          _refund_reason: `idea_remix_${remixType}_refund`,
-        });
-      } catch (refundErr) {
-        console.error("[content-lab-remix-idea] REFUND FAILED:", refundErr);
-      }
+      const { refundCreditWithRetry } = await import("../_shared/contentLabCreditRefund.ts");
+      await refundCreditWithRetry({
+        admin,
+        ledgerId,
+        refundReason: `idea_remix_${remixType}_refund`,
+        runId: null,
+        caller: "content-lab-remix-idea",
+      });
       return new Response(
         JSON.stringify({ error: innerErr instanceof Error ? innerErr.message : "Remix failed", refunded: true }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }

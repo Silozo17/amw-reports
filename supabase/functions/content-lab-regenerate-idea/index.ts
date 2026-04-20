@@ -217,16 +217,17 @@ Regenerate the idea now per the shift instruction. JSON only.`;
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } catch (innerErr) {
-      // Refund on any failure after credit was spent
+      // Refund on any failure after credit was spent. Retried + audit-logged
+      // so a DB blip can't silently consume a user's credit.
       console.error("[content-lab-regenerate-idea] failed, refunding:", innerErr);
-      try {
-        await admin.rpc("refund_content_lab_credit", {
-          _ledger_id: ledgerId,
-          _refund_reason: "idea_regenerate_refund",
-        });
-      } catch (refundErr) {
-        console.error("[content-lab-regenerate-idea] REFUND FAILED:", refundErr);
-      }
+      const { refundCreditWithRetry } = await import("../_shared/contentLabCreditRefund.ts");
+      await refundCreditWithRetry({
+        admin,
+        ledgerId,
+        refundReason: "idea_regenerate_refund",
+        runId: typeof runId === "string" ? runId : null,
+        caller: "content-lab-regenerate-idea",
+      });
       return new Response(
         JSON.stringify({ error: innerErr instanceof Error ? innerErr.message : "Regeneration failed", refunded: true }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
