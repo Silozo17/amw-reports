@@ -104,12 +104,26 @@ const RunDetailPage = () => {
         .from('content_lab_posts')
         .select('*')
         .eq('run_id', id!)
-        .order('engagement_rate', { ascending: false })
-        .limit(40);
+        .order('views', { ascending: false })
+        .order('likes', { ascending: false })
+        .order('comments', { ascending: false })
+        .limit(80);
       if (error) throw error;
       return data ?? [];
     },
   });
+
+  const ownPosts = posts.filter((p) => p.source === 'own');
+  const viralPosts = posts.filter((p) => p.source === 'benchmark' || p.source === 'competitor');
+  const ownAvgViews = ownPosts.length > 0
+    ? Math.round(ownPosts.reduce((s, p) => s + (p.views ?? 0), 0) / ownPosts.length)
+    : 0;
+  const benchmarkViewsSorted = viralPosts.map((p) => p.views ?? 0).sort((a, b) => a - b);
+  const benchmarkP50 = benchmarkViewsSorted.length > 0
+    ? benchmarkViewsSorted[Math.floor(benchmarkViewsSorted.length / 2)]
+    : 0;
+  const ownIsCompetitive = ownAvgViews > 0 && ownAvgViews >= benchmarkP50;
+  const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
 
   const { data: ideas = [] } = useQuery({
     queryKey: ['content-lab-ideas', id],
@@ -176,18 +190,48 @@ const RunDetailPage = () => {
           </div>
         </header>
 
-        <Tabs defaultValue="feed" className="space-y-6">
+        <Tabs defaultValue="own" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="feed">Viral Feed ({posts.length})</TabsTrigger>
-            <TabsTrigger value="ideas">12 Ideas ({ideas.length})</TabsTrigger>
+            <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
+            <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
+            <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="own" className="space-y-4">
+            {ownPosts.length === 0 ? (
+              <Card className="p-10 text-center text-sm text-muted-foreground">
+                No own posts scraped yet for this run. Add your handle in the niche to see how your content stacks up.
+              </Card>
+            ) : (
+              <>
+                <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Your avg views:</span>{' '}
+                    <span className="font-semibold">{fmt(ownAvgViews)}</span>
+                    <span className="mx-2 text-muted-foreground">vs benchmark median</span>{' '}
+                    <span className="font-semibold">{fmt(benchmarkP50)}</span>
+                  </div>
+                  <Badge variant={ownIsCompetitive ? 'default' : 'outline'}>
+                    {ownIsCompetitive ? 'On par with benchmarks' : 'Below benchmarks — ideas reverse-engineer top accounts only'}
+                  </Badge>
+                </Card>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {[...ownPosts]
+                    .sort((a, b) => (b.posted_at ?? '').localeCompare(a.posted_at ?? ''))
+                    .map((p) => (
+                      <ViralPostCard key={p.id} post={p} />
+                    ))}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
           <TabsContent value="feed" className="space-y-3">
-            {posts.length === 0 ? (
-              <Card className="p-10 text-center text-sm text-muted-foreground">No posts yet for this run.</Card>
+            {viralPosts.length === 0 ? (
+              <Card className="p-10 text-center text-sm text-muted-foreground">No viral posts yet for this run.</Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {posts.map((p) => (
+                {viralPosts.map((p) => (
                   <ViralPostCard key={p.id} post={p} />
                 ))}
               </div>
