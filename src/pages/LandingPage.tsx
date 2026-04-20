@@ -248,6 +248,9 @@ const LandingPage = () => {
                   </div>
                   <Input id="login-password" type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required />
                 </div>
+                {turnstileSiteKey && (
+                  <TurnstileWidget siteKey={turnstileSiteKey} onVerify={setResetTurnstileToken} onExpire={() => setResetTurnstileToken('')} />
+                )}
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Signing in...</> : <>Sign In <ArrowRight className="h-4 w-4 ml-2" /></>}
                 </Button>
@@ -307,6 +310,9 @@ const LandingPage = () => {
                   <Label htmlFor="confirm-password">Confirm Password *</Label>
                   <Input id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat password" required />
                 </div>
+                {turnstileSiteKey && (
+                  <TurnstileWidget siteKey={turnstileSiteKey} onVerify={setSignupTurnstileToken} onExpire={() => setSignupTurnstileToken('')} />
+                )}
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating account...</> : <>Create Account <ArrowRight className="h-4 w-4 ml-2" /></>}
                 </Button>
