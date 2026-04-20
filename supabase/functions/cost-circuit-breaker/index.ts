@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     }
 
     // GC idempotency cache
-    await admin.rpc('cleanup_request_idempotency').catch(() => undefined);
+    try { await admin.rpc('cleanup_request_idempotency'); } catch { /* noop */ }
 
     return new Response(JSON.stringify({
       ok: true,
