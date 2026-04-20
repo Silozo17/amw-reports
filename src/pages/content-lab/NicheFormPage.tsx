@@ -35,6 +35,14 @@ const PRODUCERS = ['internal team', 'freelancer', 'agency', 'founder-on-phone'];
 const VIDEO_LENGTHS = ['15s', '30s', '60s', '90s'];
 const CADENCES = ['daily', '3x week', 'weekly'];
 
+// Accepts a handle, page slug or full FB URL. Strips protocol/host/trailing slash so the scraper gets a clean slug.
+const normaliseFacebookHandle = (raw: string): string => {
+  const trimmed = raw.trim().replace(/^@/, '');
+  const urlMatch = trimmed.match(/facebook\.com\/([^/?#]+)/i);
+  if (urlMatch?.[1]) return urlMatch[1];
+  return trimmed.replace(/\/$/, '');
+};
+
 const NicheFormPage = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
