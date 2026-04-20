@@ -71,6 +71,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Cost gates
+    const { assertPlatformNotFrozen, assertOrgWithinBudget, recordCost, estimateAnthropic, BudgetExceededError, PlatformFrozenError } = await import("../_shared/costGuard.ts");
+    try {
+      await assertPlatformNotFrozen();
+      await assertOrgWithinBudget(orgId);
+    } catch (e) {
+      if (e instanceof PlatformFrozenError) return new Response(JSON.stringify({ error: e.message }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (e instanceof BudgetExceededError) return new Response(JSON.stringify({ error: e.message, scope: e.scope }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw e;
+    }
+    await recordCost({ orgId, service: "anthropic", operation: "regenerate_idea", pence: estimateAnthropic("haiku", 2000, 1500), runId });
+
     // Spend 1 credit atomically
     const { data: ledgerId, error: spendErr } = await admin.rpc("spend_content_lab_credit", {
       _org_id: orgId,

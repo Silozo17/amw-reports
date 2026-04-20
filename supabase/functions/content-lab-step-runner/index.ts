@@ -91,6 +91,28 @@ async function runOneStep(
     .update({ updated_at: new Date().toISOString() })
     .eq("id", runId);
 
+  // Cost circuit breakers — abort run if platform is frozen or this run has spent >£2
+  try {
+    const { assertPlatformNotFrozen, assertRunWithinKillSwitch, recordCost, estimateApify, estimateAnthropic } = await import("../_shared/costGuard.ts");
+    await assertPlatformNotFrozen();
+    await assertRunWithinKillSwitch(runId);
+    // Record an estimated cost for the upcoming step (refunded conceptually if step fails, but we keep ledger append-only).
+    if (status === "pending" || status === "scraping") {
+      await recordCost({ orgId, service: "apify", operation: "scrape", pence: estimateApify("scrape"), runId });
+    } else if (status === "analysing") {
+      await recordCost({ orgId, service: "anthropic", operation: "analyse", pence: estimateAnthropic("sonnet", 8000, 3000), runId });
+    } else if (status === "ideating") {
+      await recordCost({ orgId, service: "anthropic", operation: "ideate", pence: estimateAnthropic("sonnet", 6000, 4000), runId });
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "cost guard tripped";
+    console.error(`[step-runner] ${runId} cost guard aborted: ${msg}`);
+    await admin.from("content_lab_runs").update({
+      status: "failed", error_message: msg, completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+    return;
+  }
+
   try {
     if (status === "pending" || status === "scraping") {
       await runScrapeStep(admin, runId, orgId, mode);
