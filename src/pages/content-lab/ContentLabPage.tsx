@@ -180,36 +180,13 @@ const ContentLabPage = () => {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {niches.map((niche) => (
-                <Card
+                <NicheCard
                   key={niche.id}
-                  className="cursor-pointer p-5 transition-colors hover:border-primary/40"
-                  onClick={() => navigate(`/content-lab/niche/${niche.id}`)}
-                >
-                  <h3 className="font-display text-lg">{niche.label}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {niche.tracked_handles.length} handles · {niche.tracked_hashtags.length} hashtags
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {niche.tracked_hashtags.slice(0, 4).map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-[10px]">
-                        #{tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button
-                    size="sm"
-                    className="mt-4 w-full"
-                    onClick={(e) => handleRunNow(niche.id, e)}
-                    disabled={runningNiche === niche.id}
-                  >
-                    {runningNiche === niche.id ? (
-                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Play className="mr-2 h-3.5 w-3.5" />
-                    )}
-                    Run report now
-                  </Button>
-                </Card>
+                  niche={niche}
+                  isRunning={runningNiche === niche.id}
+                  onOpen={() => navigate(`/content-lab/niche/${niche.id}`)}
+                  onRun={(e) => handleRunNow(niche.id, e)}
+                />
               ))}
             </div>
           )}
