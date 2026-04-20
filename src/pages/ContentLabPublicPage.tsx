@@ -235,6 +235,11 @@ const ContentLabPublicPage = () => {
 
       <div className="gradient-divider w-full" />
 
+      {/* 5b. See a real run — live AMW demo */}
+      <ContentLabLiveDemoSection />
+
+      <div className="gradient-divider w-full" />
+
       {/* 6. Audiences */}
       <section className="py-20 lg:py-24 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
