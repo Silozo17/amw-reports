@@ -119,6 +119,9 @@ const NicheFormPage = () => {
       setLabel(data.label);
       setLanguage(data.language);
       setOwnHandle(data.own_handle ?? '');
+      const handles = (data.tracked_handles as Array<{ platform: string; handle: string }> | null) ?? [];
+      setTiktokHandle(handles.find((h) => h.platform === 'tiktok')?.handle ?? '');
+      setFacebookHandle(handles.find((h) => h.platform === 'facebook')?.handle ?? '');
       setWebsite(data.website ?? '');
       setLocation(data.location ?? '');
       setPlatformsToScrape(data.platforms_to_scrape ?? ['instagram']);
