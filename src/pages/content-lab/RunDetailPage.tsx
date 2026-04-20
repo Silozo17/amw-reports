@@ -41,6 +41,7 @@ const RunDetailPage = () => {
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
   const [rescraping, setRescraping] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | undefined>();
 
   const handleRetry = async () => {
     if (!id) return;
@@ -196,8 +197,9 @@ const RunDetailPage = () => {
 
         {(() => {
           const defaultTab = ownPosts.length > 0 ? 'own' : viralPosts.length > 0 ? 'feed' : ideas.length > 0 ? 'ideas' : 'own';
+          const currentTab = activeTab ?? defaultTab;
           return (
-        <Tabs defaultValue={defaultTab} className="space-y-6">
+        <Tabs value={currentTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
             <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
