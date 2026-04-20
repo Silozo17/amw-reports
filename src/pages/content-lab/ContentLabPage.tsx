@@ -7,6 +7,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +19,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun } from '@/hooks/useContentLab';
+import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
+import { useBenchmarkPoolStatus, POOL_RUN_THRESHOLD } from '@/hooks/useBenchmarkPoolStatus';
+import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: typeof Clock; tone: string }> = {
