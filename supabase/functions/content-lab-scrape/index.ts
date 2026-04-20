@@ -236,6 +236,39 @@ function json(body: unknown, status = 200) {
 
 interface BucketResult { posts: ScrapedPost[]; errors: string[] }
 
+// Pull benchmark handles for this run from the shared verified pool.
+// Falls back to the LLM-suggested list saved on the niche only if the pool is empty.
+async function loadBenchmarkHandles(args: {
+  supabase: ReturnType<typeof createClient>;
+  niche_tag: string | null;
+  enabledPlatforms: Array<"instagram" | "tiktok" | "facebook">;
+  llmFallback: DiscoveredEntity[];
+}): Promise<string[]> {
+  if (args.niche_tag) {
+    const { data } = await args.supabase
+      .from("content_lab_benchmark_pool")
+      .select("handle")
+      .eq("niche_tag", args.niche_tag)
+      .eq("status", "verified")
+      .in("platform", args.enabledPlatforms)
+      .order("median_views", { ascending: false })
+      .limit(MAX_BENCHMARK_HANDLES);
+    const fromPool = ((data ?? []) as Array<{ handle: string }>)
+      .map((r) => r.handle.toLowerCase().replace(/^@/, ""));
+    if (fromPool.length > 0) {
+      console.log(`Benchmarks: ${fromPool.length} from verified pool (${args.niche_tag})`);
+      return fromPool;
+    }
+  }
+  // Fallback to whatever the LLM suggested, until the pool builds.
+  const fallback = args.llmFallback
+    .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
+    .filter((h): h is string => !!h)
+    .slice(0, MAX_BENCHMARK_HANDLES);
+  console.log(`Benchmarks: ${fallback.length} from LLM fallback (pool empty for ${args.niche_tag ?? "no tag"})`);
+  return fallback;
+}
+
 async function scrapeOwn(
   supabase: ReturnType<typeof createClient>,
   niche: { own_handle: string | null; client_id: string },
