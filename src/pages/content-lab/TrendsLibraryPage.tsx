@@ -4,15 +4,14 @@ import { TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import EmptyStateMascot from '@/components/content-lab/EmptyStateMascot';
+import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
+import ContentLabFilterBar from '@/components/content-lab/ContentLabFilterBar';
+import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
+import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/contexts/OrgContext';
 import usePageMeta from '@/hooks/usePageMeta';
@@ -42,6 +41,7 @@ const momentumIcon = (m: string | null) => {
 
 const TrendsLibraryPage = () => {
   usePageMeta({ title: 'Content Lab Trends', description: 'Cross-run trend signals across your niches.' });
+  const { hasAccess, isLoading: accessLoading } = useContentLabAccess();
   const { orgId } = useOrg();
   const [search, setSearch] = useState('');
   const [momentum, setMomentum] = useState<string>('all');
@@ -49,7 +49,7 @@ const TrendsLibraryPage = () => {
 
   const { data: trends = [], isLoading } = useQuery<TrendRow[]>({
     queryKey: ['content-lab-trends-all', orgId],
-    enabled: !!orgId,
+    enabled: !!orgId && hasAccess,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_trends')
@@ -76,33 +76,32 @@ const TrendsLibraryPage = () => {
 
   const filtered = useMemo(() => {
     return trends.filter((t) => {
-      if (search && !`${t.label} ${t.description ?? ''}`.toLowerCase().includes(search.toLowerCase())) {
-        return false;
-      }
+      if (search && !`${t.label} ${t.description ?? ''}`.toLowerCase().includes(search.toLowerCase())) return false;
       if (momentum !== 'all' && !(t.momentum ?? '').toLowerCase().includes(momentum)) return false;
       if (niche !== 'all' && t.content_lab_runs?.content_lab_niches?.label !== niche) return false;
       return true;
     });
   }, [trends, search, momentum, niche]);
 
+  if (!accessLoading && !hasAccess) {
+    return <AppLayout><ContentLabPaywall /></AppLayout>;
+  }
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
-        <header>
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Content Lab</p>
-          <h1 className="mt-2 font-display text-3xl">Trends</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Live trend signals detected across all your niches and runs.
-          </p>
-        </header>
+        <ContentLabHeader
+          eyebrow="Content Lab · Trends"
+          icon={TrendingUp}
+          title="Trends across your niches"
+          subtitle="Live trend signals detected across all your runs — with momentum and recommended action."
+        />
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search trends…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
-          />
+        <ContentLabFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          placeholder="Search trends…"
+        >
           <Select value={momentum} onValueChange={setMomentum}>
             <SelectTrigger className="w-[150px]"><SelectValue placeholder="Momentum" /></SelectTrigger>
             <SelectContent>
@@ -119,7 +118,7 @@ const TrendsLibraryPage = () => {
               {niches.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
+        </ContentLabFilterBar>
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -131,7 +130,10 @@ const TrendsLibraryPage = () => {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((t) => (
-              <Card key={t.id} className="space-y-3 p-5">
+              <Card
+                key={t.id}
+                className="space-y-3 border-border/60 bg-card/40 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-display text-base leading-tight">{t.label}</h3>
                   <Badge variant="outline" className="flex shrink-0 items-center gap-1 text-[10px] capitalize">

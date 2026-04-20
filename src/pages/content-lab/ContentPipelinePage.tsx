@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
-import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { KanbanSquare } from 'lucide-react';
 import { useAllIdeas } from '@/hooks/useContentLab';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import EmptyStateMascot from '@/components/content-lab/EmptyStateMascot';
+import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
+import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import usePageMeta from '@/hooks/usePageMeta';
 
@@ -33,43 +34,29 @@ const ContentPipelinePage = () => {
   );
 
   if (!isLoading && !hasAccess) {
-    return (
-      <AppLayout>
-        <div className="mx-auto max-w-2xl p-8">
-          <Card className="p-10 text-center">
-            <h1 className="font-display text-2xl">Content Lab not enabled</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Pipeline is part of the Content Lab add-on. Enable it to track ideas across your clients.
-            </p>
-          </Card>
-        </div>
-      </AppLayout>
-    );
+    return <AppLayout><ContentLabPaywall /></AppLayout>;
   }
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              <KanbanSquare className="h-3.5 w-3.5" /> Content Pipeline
-            </div>
-            <h1 className="mt-2 font-display text-3xl">Every idea, every client.</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Drag ideas from script to posted. Filter by client to focus.
-            </p>
-          </div>
-          <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All clients</SelectItem>
-              {clients.map(([id, name]) => (
-                <SelectItem key={id} value={id}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </header>
+        <ContentLabHeader
+          eyebrow="Content Lab · Pipeline"
+          icon={KanbanSquare}
+          title="Every idea, every client."
+          subtitle="Drag ideas from script to posted. Filter by client to focus."
+          actions={
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All clients</SelectItem>
+                {clients.map(([id, name]) => (
+                  <SelectItem key={id} value={id}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          }
+        />
 
         {ideasLoading ? (
           <p className="text-sm text-muted-foreground">Loading ideas…</p>

@@ -1,19 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Anchor } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import EmptyStateMascot from '@/components/content-lab/EmptyStateMascot';
+import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
+import ContentLabFilterBar from '@/components/content-lab/ContentLabFilterBar';
+import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
+import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/contexts/OrgContext';
 import usePageMeta from '@/hooks/usePageMeta';
@@ -34,13 +33,14 @@ interface HookRow {
 
 const HookLibraryPage = () => {
   usePageMeta({ title: 'Hook Library', description: 'All hooks discovered across your Content Lab runs.' });
+  const { hasAccess, isLoading: accessLoading } = useContentLabAccess();
   const { orgId } = useOrg();
   const [search, setSearch] = useState('');
   const [niche, setNiche] = useState<string>('all');
 
   const { data: hooks = [], isLoading } = useQuery<HookRow[]>({
     queryKey: ['content-lab-hooks-all', orgId],
-    enabled: !!orgId,
+    enabled: !!orgId && hasAccess,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_hooks')
@@ -72,24 +72,21 @@ const HookLibraryPage = () => {
     });
   }, [hooks, search, niche]);
 
+  if (!accessLoading && !hasAccess) {
+    return <AppLayout><ContentLabPaywall /></AppLayout>;
+  }
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
-        <header>
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Content Lab</p>
-          <h1 className="mt-2 font-display text-3xl">Hook Library</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Every hook discovered across all your runs — searchable and filterable.
-          </p>
-        </header>
+        <ContentLabHeader
+          eyebrow="Content Lab · Hooks"
+          icon={Anchor}
+          title="Hook Library"
+          subtitle="Every hook discovered across all your runs — searchable, filterable, ready to remix."
+        />
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Search hooks…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
-          />
+        <ContentLabFilterBar search={search} onSearchChange={setSearch} placeholder="Search hooks…">
           <Select value={niche} onValueChange={setNiche}>
             <SelectTrigger className="w-[200px]"><SelectValue placeholder="Niche" /></SelectTrigger>
             <SelectContent>
@@ -97,7 +94,7 @@ const HookLibraryPage = () => {
               {niches.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
+        </ContentLabFilterBar>
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -107,11 +104,14 @@ const HookLibraryPage = () => {
             description="Generate a Content Lab run to start building your hook library."
           />
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((h) => (
-              <Card key={h.id} className="space-y-2 p-4">
+              <Card
+                key={h.id}
+                className="space-y-2 border-border/60 bg-card/40 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              >
                 <p className="font-medium leading-snug">{h.hook_text}</p>
-                <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                   {h.mechanism && (
                     <Badge variant="outline" className="uppercase">{h.mechanism}</Badge>
                   )}
