@@ -392,7 +392,22 @@ Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native
             properties: {
               title: { type: "string", description: "Short working title (max 80 chars)" },
               based_on_handle: { type: "string", description: "@handle of the source benchmark post (without @) — REQUIRED, must be from the pool above" },
-              hook: { type: "string", description: "Exact words spoken in first 3 seconds" },
+              hook: { type: "string", description: "Exact words spoken in first 3 seconds (the primary recommended hook)" },
+              hook_variants: {
+                type: "array",
+                minItems: 3,
+                maxItems: 3,
+                description: "Three alternative opening hooks for the SAME idea, each using a different attention mechanism so the user can pick the one that fits their voice. The first variant should match `hook` above.",
+                items: {
+                  type: "object",
+                  properties: {
+                    text: { type: "string", description: "The hook line itself, max 12 words" },
+                    mechanism: { type: "string", description: "One of: curiosity_gap, negative, social_proof, contrarian, pattern_interrupt, stat_shock, question, story_open" },
+                    why: { type: "string", description: "One sentence on why this mechanism works for this idea" },
+                  },
+                  required: ["text", "mechanism", "why"],
+                },
+              },
               body: { type: "string", description: "What gets said/shown in the middle of the video" },
               cta: { type: "string", description: "Specific, action-led CTA aligned with the brand's stated goal" },
               caption: { type: "string", description: "Post caption (no hashtags) — MUST NOT duplicate the hook" },
@@ -405,7 +420,7 @@ Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native
               filming_checklist: { type: "array", items: { type: "string" }, maxItems: 6 },
               platform_style_notes: { type: "string" },
             },
-            required: ["title", "based_on_handle", "hook", "body", "cta", "caption", "script_full", "duration_seconds", "why_it_works", "platform_style_notes"],
+            required: ["title", "based_on_handle", "hook", "hook_variants", "body", "cta", "caption", "script_full", "duration_seconds", "why_it_works", "platform_style_notes"],
           },
         },
       },
