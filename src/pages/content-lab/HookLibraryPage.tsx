@@ -31,11 +31,30 @@ interface GlobalHookRow {
   created_at: string;
 }
 
-const PLATFORMS = ['instagram', 'tiktok', 'facebook', 'linkedin', 'threads', 'youtube'] as const;
-const MECHANISMS = [
-  'Curiosity gap', 'Negative', 'Social proof', 'Contrarian',
-  'Pattern interrupt', 'Stat shock', 'Question', 'Story open',
+const PLATFORMS = ['instagram', 'tiktok', 'facebook'] as const;
+const MECHANISM_OPTIONS = [
+  { slug: 'curiosity_gap', label: 'Curiosity gap' },
+  { slug: 'negative', label: 'Negative' },
+  { slug: 'social_proof', label: 'Social proof' },
+  { slug: 'contrarian', label: 'Contrarian' },
+  { slug: 'pattern_interrupt', label: 'Pattern interrupt' },
+  { slug: 'stat_shock', label: 'Stat shock' },
+  { slug: 'stat', label: 'Stat' },
+  { slug: 'question', label: 'Question' },
+  { slug: 'story_open', label: 'Story open' },
+  { slug: 'story', label: 'Story' },
+  { slug: 'promise', label: 'Promise' },
+  { slug: 'callout', label: 'Callout' },
+  { slug: 'listicle', label: 'Listicle' },
+  { slug: 'statement', label: 'Statement' },
+  { slug: 'demo', label: 'Demo' },
+  { slug: 'other', label: 'Other' },
+  { slug: 'unknown', label: 'Unknown' },
 ] as const;
+const MECHANISM_LABELS: Record<string, string> = MECHANISM_OPTIONS.reduce(
+  (acc, m) => ({ ...acc, [m.slug]: m.label }),
+  {} as Record<string, string>,
+);
 const SORTS = [
   { value: 'top', label: 'Top performing' },
   { value: 'newest', label: 'Newest' },
@@ -77,11 +96,23 @@ const HookLibraryPage = () => {
     },
   });
 
+  const { data: allNicheHooks = [] } = useQuery<Pick<GlobalHookRow, 'niche_label'>[]>({
+    queryKey: ['global-hook-library-niches'],
+    enabled: hasAccess,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_global_hook_library', {
+        _niche: null, _platform: null, _mechanism: null, _limit: FETCH_LIMIT,
+      });
+      if (error) throw error;
+      return (data ?? []) as GlobalHookRow[];
+    },
+  });
+
   const niches = useMemo(() => {
     const set = new Set<string>();
-    hooks.forEach((h) => { if (h.niche_label) set.add(h.niche_label); });
+    allNicheHooks.forEach((h) => { if (h.niche_label) set.add(h.niche_label); });
     return [...set].sort();
-  }, [hooks]);
+  }, [allNicheHooks]);
 
   const filtered = useMemo(() => {
     const out = hooks.filter((h) => {
@@ -149,7 +180,7 @@ const HookLibraryPage = () => {
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Mechanism" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All mechanisms</SelectItem>
-              {MECHANISMS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {MECHANISM_OPTIONS.map((m) => <SelectItem key={m.slug} value={m.slug}>{m.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={sort} onValueChange={setSort}>
@@ -206,7 +237,7 @@ const HookLibraryPage = () => {
                       <Badge variant="outline" className="capitalize">{h.platform}</Badge>
                     )}
                     {h.mechanism && (
-                      <Badge variant="outline" className="uppercase">{h.mechanism}</Badge>
+                      <Badge variant="outline">{MECHANISM_LABELS[h.mechanism] ?? h.mechanism}</Badge>
                     )}
                   </div>
 
