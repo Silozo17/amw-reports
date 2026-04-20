@@ -365,8 +365,8 @@ const NicheFormPage = () => {
                 <Badge
                   key={p.value}
                   variant={platformsToScrape.includes(p.value) ? 'default' : 'outline'}
-                  className={p.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-                  onClick={() => !p.disabled && togglePlatform(p.value)}
+                  className="cursor-pointer"
+                  onClick={() => togglePlatform(p.value)}
                 >
                   {p.label}
                 </Badge>
