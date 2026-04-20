@@ -77,7 +77,12 @@ Deno.serve(async (req) => {
       top_competitors: DiscoveredEntity[];
       top_global_benchmarks: DiscoveredEntity[];
       client_id: string;
+      platforms_to_scrape: string[] | null;
     } }).niche;
+
+    const enabledPlatforms = (niche.platforms_to_scrape && niche.platforms_to_scrape.length > 0
+      ? niche.platforms_to_scrape
+      : ['instagram']) as Array<'instagram' | 'tiktok' | 'facebook'>;
 
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
@@ -89,10 +94,11 @@ Deno.serve(async (req) => {
       .slice(0, MAX_BENCHMARK_HANDLES);
 
     // Run all three buckets in parallel; each handles its own errors.
+    // Each bucket fans out across all enabled platforms internally.
     const [ownResult, compResult, benchResult] = await Promise.allSettled([
-      scrapeOwn(supabase, niche),
-      scrapeBucket(competitorHandles, "competitor", MAX_POSTS_COMPETITOR),
-      scrapeBucket(benchmarkHandles, "benchmark", MAX_POSTS_BENCHMARK),
+      scrapeOwn(supabase, niche, enabledPlatforms),
+      scrapeBucket(competitorHandles, "competitor", MAX_POSTS_COMPETITOR, enabledPlatforms),
+      scrapeBucket(benchmarkHandles, "benchmark", MAX_POSTS_BENCHMARK, enabledPlatforms),
     ]);
 
     const collected: ScrapedPost[] = [];
@@ -217,34 +223,44 @@ interface BucketResult { posts: ScrapedPost[]; errors: string[] }
 async function scrapeOwn(
   supabase: ReturnType<typeof createClient>,
   niche: { own_handle: string | null; client_id: string },
+  platforms: Array<"instagram" | "tiktok" | "facebook">,
 ): Promise<BucketResult> {
   if (!niche.own_handle) return { posts: [], errors: [] };
   const errors: string[] = [];
+  const ownHandle = niche.own_handle.toLowerCase().replace(/^@/, "");
+
   try {
-    const { data: igConn } = await supabase
-      .from("platform_connections")
-      .select("id, access_token, account_id, account_name, is_connected")
-      .eq("client_id", niche.client_id)
-      .eq("platform", "instagram")
-      .eq("is_connected", true)
-      .maybeSingle();
+    // Instagram OAuth path (preferred, free)
+    if (platforms.includes("instagram")) {
+      const { data: igConn } = await supabase
+        .from("platform_connections")
+        .select("id, access_token, account_id, account_name, is_connected")
+        .eq("client_id", niche.client_id)
+        .eq("platform", "instagram")
+        .eq("is_connected", true)
+        .maybeSingle();
 
-    const ownHandle = niche.own_handle.toLowerCase().replace(/^@/, "");
-    const connHandle = (igConn as { account_name?: string } | null)?.account_name?.toLowerCase().replace(/^@/, "");
+      const connHandle = (igConn as { account_name?: string } | null)?.account_name?.toLowerCase().replace(/^@/, "");
 
-    if (igConn && (igConn as { access_token?: string }).access_token && (igConn as { account_id?: string }).account_id && connHandle === ownHandle) {
-      const token = await decryptToken((igConn as { access_token: string }).access_token);
-      const posts = await fetchOwnInstagramPosts((igConn as { account_id: string }).account_id, token, ownHandle);
-      posts.forEach((p) => { p.bucket = "own"; });
-      console.log(`Own (OAuth): ${posts.length} posts for @${ownHandle}`);
-      return { posts, errors };
+      if (igConn && (igConn as { access_token?: string }).access_token && (igConn as { account_id?: string }).account_id && connHandle === ownHandle) {
+        const token = await decryptToken((igConn as { access_token: string }).access_token);
+        const posts = await fetchOwnInstagramPosts((igConn as { account_id: string }).account_id, token, ownHandle);
+        posts.forEach((p) => { p.bucket = "own"; });
+        console.log(`Own (OAuth IG): ${posts.length} posts for @${ownHandle}`);
+        // Still scrape other platforms via Apify below
+        const remaining = platforms.filter((p) => p !== "instagram");
+        if (remaining.length === 0) return { posts, errors };
+        const extra = await scrapeHandlesAcrossPlatforms([ownHandle], MAX_POSTS_OWN, remaining);
+        extra.posts.forEach((p) => { p.bucket = "own"; });
+        return { posts: [...posts, ...extra.posts], errors: [...errors, ...extra.errors] };
+      }
     }
 
-    // Fallback to Apify for own handle (full 20)
-    const posts = await runApifyForHandles([ownHandle], MAX_POSTS_OWN);
-    posts.forEach((p) => { p.bucket = "own"; });
-    console.log(`Own (Apify): ${posts.length} posts for @${ownHandle}`);
-    return { posts, errors };
+    // Apify fallback for own handle across all enabled platforms
+    const result = await scrapeHandlesAcrossPlatforms([ownHandle], MAX_POSTS_OWN, platforms);
+    result.posts.forEach((p) => { p.bucket = "own"; });
+    console.log(`Own (Apify): ${result.posts.length} posts for @${ownHandle}`);
+    return { posts: result.posts, errors: [...errors, ...result.errors] };
   } catch (e) {
     const msg = `Own handle scrape failed: ${e instanceof Error ? e.message : e}`;
     console.error(msg);
@@ -257,32 +273,51 @@ async function scrapeBucket(
   handles: string[],
   bucket: "competitor" | "benchmark",
   postsPerHandle: number,
+  platforms: Array<"instagram" | "tiktok" | "facebook">,
 ): Promise<BucketResult> {
   if (handles.length === 0) return { posts: [], errors: [] };
+  const result = await scrapeHandlesAcrossPlatforms(handles, postsPerHandle, platforms);
+  result.posts.forEach((p) => { p.bucket = bucket; });
+  console.log(`${bucket}: ${result.posts.length} posts from ${handles.length} handles across [${platforms.join(",")}]`);
+  return result;
+}
+
+// Fan a list of handles across the enabled platforms and merge results.
+async function scrapeHandlesAcrossPlatforms(
+  handles: string[],
+  postsPerHandle: number,
+  platforms: Array<"instagram" | "tiktok" | "facebook">,
+): Promise<BucketResult> {
   const errors: string[] = [];
   const posts: ScrapedPost[] = [];
 
-  // Chunk handles to keep individual Apify calls small + fast.
-  const chunks: string[][] = [];
-  for (let i = 0; i < handles.length; i += APIFY_CHUNK_SIZE) {
-    chunks.push(handles.slice(i, i + APIFY_CHUNK_SIZE));
+  const tasks: Array<Promise<ScrapedPost[]>> = [];
+  if (platforms.includes("instagram")) {
+    // chunk for IG
+    const chunks: string[][] = [];
+    for (let i = 0; i < handles.length; i += APIFY_CHUNK_SIZE) {
+      chunks.push(handles.slice(i, i + APIFY_CHUNK_SIZE));
+    }
+    chunks.forEach((c) => tasks.push(runApifyForHandles(c, postsPerHandle)));
+  }
+  if (platforms.includes("tiktok")) {
+    handles.forEach((h) => tasks.push(runTikTokScraper(h, postsPerHandle)));
+  }
+  if (platforms.includes("facebook")) {
+    handles.forEach((h) => tasks.push(runFacebookScraper(h, postsPerHandle)));
   }
 
-  // Run chunks in parallel within the bucket too.
-  const settled = await Promise.allSettled(
-    chunks.map((c) => runApifyForHandles(c, postsPerHandle)),
-  );
+  const settled = await Promise.allSettled(tasks);
   settled.forEach((r, idx) => {
     if (r.status === "fulfilled") {
-      r.value.forEach((p) => { p.bucket = bucket; });
       posts.push(...r.value);
     } else {
-      const msg = `${bucket} chunk ${idx + 1} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
+      const msg = `scrape task ${idx + 1} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
       console.error(msg);
       errors.push(msg);
     }
   });
-  console.log(`${bucket}: ${posts.length} posts from ${handles.length} handles (${chunks.length} chunks)`);
+
   return { posts, errors };
 }
 
@@ -403,6 +438,137 @@ async function runApifyForHandles(handles: string[], resultsLimit: number): Prom
     });
   } catch (e) {
     console.error("Apify fetch failed:", e);
+    return [];
+  }
+}
+
+// ---------- TikTok via clockworks/tiktok-scraper ----------
+async function runTikTokScraper(handle: string, resultsLimit: number): Promise<ScrapedPost[]> {
+  const apifyToken = Deno.env.get("APIFY_TOKEN");
+  if (!apifyToken) return [];
+  const cleaned = handle.replace(/^@/, "");
+  const input = {
+    profiles: [cleaned],
+    resultsPerPage: resultsLimit,
+    shouldDownloadVideos: false,
+    shouldDownloadCovers: false,
+    shouldDownloadSubtitles: false,
+  };
+  const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      console.error("TikTok Apify error:", res.status, await res.text());
+      return [];
+    }
+    const items = await res.json();
+    if (!Array.isArray(items)) return [];
+    return items.map((it: {
+      authorMeta?: { name?: string };
+      webVideoUrl?: string;
+      text?: string;
+      playCount?: number;
+      diggCount?: number;
+      commentCount?: number;
+      shareCount?: number;
+      createTimeISO?: string;
+      videoMeta?: { duration?: number; coverUrl?: string };
+      musicMeta?: { musicName?: string; musicAuthor?: string };
+      hashtags?: Array<{ name?: string } | string>;
+    }) => ({
+      platform: "tiktok" as const,
+      source: "apify" as const,
+      bucket: "competitor" as const,
+      author_handle: (it.authorMeta?.name ?? cleaned).toLowerCase(),
+      post_url: it.webVideoUrl ?? null,
+      post_type: "video",
+      caption: it.text ?? null,
+      thumbnail_url: it.videoMeta?.coverUrl ?? null,
+      likes: it.diggCount ?? 0,
+      comments: it.commentCount ?? 0,
+      shares: it.shareCount ?? 0,
+      views: it.playCount ?? 0,
+      posted_at: it.createTimeISO ?? null,
+      transcript: null,
+      video_duration_seconds: it.videoMeta?.duration ? Math.round(it.videoMeta.duration) : null,
+      hashtags: Array.isArray(it.hashtags)
+        ? it.hashtags
+            .map((h) => (typeof h === "string" ? h : h?.name))
+            .filter((h): h is string => !!h)
+        : [],
+      mentions: [],
+      music_title: it.musicMeta?.musicName ?? null,
+      music_artist: it.musicMeta?.musicAuthor ?? null,
+      tagged_users: [],
+    }));
+  } catch (e) {
+    console.error("TikTok fetch failed:", e);
+    return [];
+  }
+}
+
+// ---------- Facebook via apify/facebook-pages-scraper ----------
+async function runFacebookScraper(handle: string, resultsLimit: number): Promise<ScrapedPost[]> {
+  const apifyToken = Deno.env.get("APIFY_TOKEN");
+  if (!apifyToken) return [];
+  const cleaned = handle.replace(/^@/, "");
+  const input = {
+    startUrls: [{ url: `https://www.facebook.com/${cleaned}/` }],
+    resultsLimit,
+  };
+  const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      console.error("Facebook Apify error:", res.status, await res.text());
+      return [];
+    }
+    const items = await res.json();
+    if (!Array.isArray(items)) return [];
+    return items.map((it: {
+      pageName?: string;
+      url?: string;
+      text?: string;
+      topImage?: string;
+      thumbnail?: string;
+      likesCount?: number;
+      commentsCount?: number;
+      sharesCount?: number;
+      videoViewCount?: number;
+      time?: string;
+      isVideo?: boolean;
+    }) => ({
+      platform: "facebook" as const,
+      source: "apify" as const,
+      bucket: "competitor" as const,
+      author_handle: (it.pageName ?? cleaned).toLowerCase(),
+      post_url: it.url ?? null,
+      post_type: it.isVideo ? "video" : "post",
+      caption: it.text ?? null,
+      thumbnail_url: it.topImage ?? it.thumbnail ?? null,
+      likes: it.likesCount ?? 0,
+      comments: it.commentsCount ?? 0,
+      shares: it.sharesCount ?? 0,
+      views: it.videoViewCount ?? 0,
+      posted_at: it.time ?? null,
+      transcript: null,
+      video_duration_seconds: null,
+      hashtags: [],
+      mentions: [],
+      music_title: null,
+      music_artist: null,
+      tagged_users: [],
+    }));
+  } catch (e) {
+    console.error("Facebook fetch failed:", e);
     return [];
   }
 }

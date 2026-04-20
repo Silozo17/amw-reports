@@ -25,8 +25,8 @@ interface CompetitorEntry {
 
 const PLATFORMS = [
   { value: 'instagram', label: 'Instagram' },
-  { value: 'tiktok', label: 'TikTok (Phase 2)', disabled: true },
-  { value: 'facebook', label: 'Facebook (Phase 2)', disabled: true },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'facebook', label: 'Facebook' },
 ];
 
 const CONTENT_STYLES = ['talking head', 'B-roll/creative', 'voiceover-only', 'UGC-style', 'tutorial', 'behind-the-scenes'];
@@ -365,8 +365,8 @@ const NicheFormPage = () => {
                 <Badge
                   key={p.value}
                   variant={platformsToScrape.includes(p.value) ? 'default' : 'outline'}
-                  className={p.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-                  onClick={() => !p.disabled && togglePlatform(p.value)}
+                  className="cursor-pointer"
+                  onClick={() => togglePlatform(p.value)}
                 >
                   {p.label}
                 </Badge>

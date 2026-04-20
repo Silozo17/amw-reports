@@ -13,6 +13,7 @@ const ALLOWED_HOST_SUFFIXES = [
   'fbcdn.net',
   'tiktokcdn.com',
   'tiktokcdn-us.com',
+  'tiktokv.com',
   'akamaized.net',
 ];
 

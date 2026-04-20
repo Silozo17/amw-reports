@@ -26,6 +26,7 @@ import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram'
 import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
+import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
@@ -124,6 +125,9 @@ const RunDetailPage = () => {
     : 0;
   const ownIsCompetitive = ownAvgViews > 0 && ownAvgViews >= benchmarkP50;
   const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+  const topOwnHook = ownPosts.length > 0
+    ? [...ownPosts].sort((a, b) => (b.views ?? 0) - (a.views ?? 0))[0]?.hook_text ?? null
+    : null;
 
   const { data: ideas = [] } = useQuery({
     queryKey: ['content-lab-ideas', id],
@@ -195,6 +199,7 @@ const RunDetailPage = () => {
             <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
             <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
             <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
+            <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           </TabsList>
 
           <TabsContent value="own" className="space-y-4">
@@ -210,6 +215,11 @@ const RunDetailPage = () => {
                     <span className="font-semibold">{fmt(ownAvgViews)}</span>
                     <span className="mx-2 text-muted-foreground">vs benchmark median</span>{' '}
                     <span className="font-semibold">{fmt(benchmarkP50)}</span>
+                    {topOwnHook && (
+                      <span className="ml-3 block text-xs text-muted-foreground md:inline">
+                        Top hook: <span className="italic">"{topOwnHook.slice(0, 80)}{topOwnHook.length > 80 ? '…' : ''}"</span>
+                      </span>
+                    )}
                   </div>
                   <Badge variant={ownIsCompetitive ? 'default' : 'outline'}>
                     {ownIsCompetitive ? 'On par with benchmarks' : 'Below benchmarks — ideas reverse-engineer top accounts only'}
@@ -239,6 +249,13 @@ const RunDetailPage = () => {
           </TabsContent>
 
           <TabsContent value="ideas" className="space-y-4">
+            {ideas.length > 0 && ownPosts.length > 0 && (
+              <Card className="border-primary/30 bg-primary/5 p-3 text-sm">
+                {ownIsCompetitive
+                  ? 'Your views are on par with the top-10 benchmarks, so your top-performing posts are also being used as inspiration.'
+                  : 'Your views are below the top-10 benchmark median, so ideas are reverse-engineered from top accounts only — your weak posts are used as anti-examples.'}
+              </Card>
+            )}
             {ideas.length === 0 ? (
               <Card className="p-10 text-center text-sm text-muted-foreground">Ideas will appear here once the run completes.</Card>
             ) : (
@@ -281,6 +298,28 @@ const RunDetailPage = () => {
                   </div>
                 </Card>
               ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="pipeline" className="space-y-4">
+            {ideas.length === 0 ? (
+              <Card className="p-10 text-center text-sm text-muted-foreground">
+                The pipeline will appear once ideas have been generated.
+              </Card>
+            ) : (
+              <IdeaPipelineBoard
+                runId={id!}
+                ideas={ideas.map((i) => ({
+                  id: i.id,
+                  idea_number: i.idea_number,
+                  title: i.title,
+                  hook: i.hook ?? null,
+                  target_platform: i.target_platform ?? null,
+                  rating: i.rating ?? null,
+                  status: i.status ?? 'not_started',
+                }))}
+                onSelect={() => { /* click-to-detail can be wired later; drag is the primary action */ }}
+              />
             )}
           </TabsContent>
         </Tabs>
