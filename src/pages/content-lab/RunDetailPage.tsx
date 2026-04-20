@@ -28,6 +28,8 @@ import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
+import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
+import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
@@ -97,6 +99,22 @@ const RunDetailPage = () => {
       return data;
     },
   });
+
+  const { data: niche } = useQuery({
+    queryKey: ['content-lab-niche-for-run', run?.niche_id],
+    enabled: !!run?.niche_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('content_lab_niches')
+        .select('niche_tag, platforms_to_scrape, label')
+        .eq('id', run!.niche_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: pool } = useBenchmarkPoolStatus(niche?.niche_tag, niche?.platforms_to_scrape);
 
   const { data: posts = [] } = useQuery({
     queryKey: ['content-lab-posts', id],
@@ -180,6 +198,10 @@ const RunDetailPage = () => {
             <h1 className="mt-2 font-display text-3xl">
               {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
             </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {niche?.label && <span className="text-sm text-muted-foreground">{niche.label}</span>}
+              {pool && <BenchmarkQualityBadge quality={pool.quality} verifiedCount={pool.verifiedCount} />}
+            </div>
             {run?.status === 'failed' && run?.error_message && (
               <p className="mt-2 max-w-2xl text-sm text-destructive">{run.error_message}</p>
             )}

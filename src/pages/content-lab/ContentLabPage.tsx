@@ -7,6 +7,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +19,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun } from '@/hooks/useContentLab';
+import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
+import { useBenchmarkPoolStatus, POOL_RUN_THRESHOLD } from '@/hooks/useBenchmarkPoolStatus';
+import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: typeof Clock; tone: string }> = {
@@ -177,36 +180,13 @@ const ContentLabPage = () => {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {niches.map((niche) => (
-                <Card
+                <NicheCard
                   key={niche.id}
-                  className="cursor-pointer p-5 transition-colors hover:border-primary/40"
-                  onClick={() => navigate(`/content-lab/niche/${niche.id}`)}
-                >
-                  <h3 className="font-display text-lg">{niche.label}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {niche.tracked_handles.length} handles · {niche.tracked_hashtags.length} hashtags
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {niche.tracked_hashtags.slice(0, 4).map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-[10px]">
-                        #{tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button
-                    size="sm"
-                    className="mt-4 w-full"
-                    onClick={(e) => handleRunNow(niche.id, e)}
-                    disabled={runningNiche === niche.id}
-                  >
-                    {runningNiche === niche.id ? (
-                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Play className="mr-2 h-3.5 w-3.5" />
-                    )}
-                    Run report now
-                  </Button>
-                </Card>
+                  niche={niche}
+                  isRunning={runningNiche === niche.id}
+                  onOpen={() => navigate(`/content-lab/niche/${niche.id}`)}
+                  onRun={(e) => handleRunNow(niche.id, e)}
+                />
               ))}
             </div>
           )}
@@ -255,6 +235,77 @@ const RunStatusBadge = ({ status }: { status: ContentLabRun['status'] }) => {
       <Icon className={`h-3 w-3 ${spinning ? 'animate-spin' : ''}`} />
       {cfg.label}
     </div>
+  );
+};
+
+interface NicheCardProps {
+  niche: ContentLabNiche;
+  isRunning: boolean;
+  onOpen: () => void;
+  onRun: (e: React.MouseEvent) => void;
+}
+
+const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
+  const { data: pool } = useBenchmarkPoolStatus(niche.niche_tag, niche.platforms_to_scrape, { poll: true });
+  const verifiedCount = pool?.verifiedCount ?? 0;
+  const canRun = pool?.canRun ?? false;
+  const blocked = !!pool && !canRun;
+  const tooltipMessage = blocked
+    ? `Pool building — ${verifiedCount}/${POOL_RUN_THRESHOLD} verified accounts. Add broader hashtags or wait for verification to finish.`
+    : null;
+
+  const runButton = (
+    <Button
+      size="sm"
+      className="mt-4 w-full"
+      onClick={onRun}
+      disabled={isRunning || blocked}
+    >
+      {isRunning ? (
+        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Play className="mr-2 h-3.5 w-3.5" />
+      )}
+      Run report now
+    </Button>
+  );
+
+  return (
+    <Card
+      className="cursor-pointer p-5 transition-colors hover:border-primary/40"
+      onClick={onOpen}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-display text-lg">{niche.label}</h3>
+        {pool && (
+          <BenchmarkQualityBadge quality={pool.quality} verifiedCount={pool.verifiedCount} />
+        )}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {niche.tracked_handles.length} handles · {niche.tracked_hashtags.length} hashtags
+      </p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {niche.tracked_hashtags.slice(0, 4).map((tag) => (
+          <Badge key={tag} variant="secondary" className="text-[10px]">
+            #{tag}
+          </Badge>
+        ))}
+      </div>
+      {blocked ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="block" onClick={(e) => e.stopPropagation()}>
+              {runButton}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+            {tooltipMessage}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        runButton
+      )}
+    </Card>
   );
 };
 
