@@ -66,8 +66,9 @@ Deno.serve(async (req) => {
     }
 
     const ownHandle = (niche.own_handle ?? "").toLowerCase().replace(/^@/, "");
-    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.source === "benchmark" || p.source === "competitor");
-    const ownPosts = (posts as PostRow[]).filter((p) => p.source === "own");
+    // Use bucket (role: own/competitor/benchmark) NOT source (data origin: oauth/apify).
+    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.bucket === "benchmark" || p.bucket === "competitor");
+    const ownPosts = (posts as PostRow[]).filter((p) => p.bucket === "own");
 
     const ownAvgViews = avg(ownPosts.map((p) => p.views ?? 0));
     const benchmarkP50Views = median(benchmarkPosts.slice(0, TOP_BENCHMARK_POSTS).map((p) => p.views ?? 0));
