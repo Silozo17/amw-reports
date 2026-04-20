@@ -565,6 +565,31 @@ const client_invite: TemplateBuilder = (data, b) => ({
 });
 
 // ═══════════════════════════════════════════════════════════
+// CATEGORY 8 — CONTENT LAB
+// ═══════════════════════════════════════════════════════════
+
+const content_lab_run_complete: TemplateBuilder = (data, b) => {
+  const niche = escapeHtml((data.niche_label as string) || "your niche");
+  const ideaCount = Number(data.idea_count ?? 0);
+  const reportUrl = String(data.report_url ?? "#");
+  const recipient = escapeHtml((data.recipient_name as string) || "there");
+  return {
+    subject: `Your Content Lab ideas are ready ✨`,
+    html: wrapEmail(b, [
+      heading("Your content plan is ready"),
+      para(`Hi ${recipient},`),
+      para(`We've finished generating <strong>${ideaCount} fresh content ideas</strong> for <strong>${niche}</strong>, with hooks, scripts, and platform-specific guidance.`),
+      infoBox(
+        `Each idea includes 3 hook variants, a full script, filming checklist, hashtags, and a "why it works" breakdown — reverse-engineered from the top-performing posts in your niche this month.`,
+        b,
+      ),
+      buildButton("View your ideas", reportUrl, b),
+      smallNote("Ideas remain available in your Content Lab dashboard. Generate a new plan any time."),
+    ].join("")),
+  };
+};
+
+// ═══════════════════════════════════════════════════════════
 // TEMPLATE REGISTRY
 // ═══════════════════════════════════════════════════════════
 
@@ -603,7 +628,9 @@ const TEMPLATES: Record<string, TemplateBuilder> = {
   new_device_login,
   failed_login_attempts,
   // Client Portal
-  client_invite
+  client_invite,
+  // Content Lab
+  content_lab_run_complete,
 };
 
 // ═══════════════════════════════════════════════════════════

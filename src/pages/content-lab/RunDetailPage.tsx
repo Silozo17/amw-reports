@@ -358,7 +358,11 @@ const RunDetailPage = () => {
                       </div>
                     )}
                     <div className="border-t border-border/50 pt-3">
-                      <IdeaActionButtons ideaId={idea.id} runId={id!} />
+                      <IdeaActionButtons
+                        ideaId={idea.id}
+                        runId={id!}
+                        regenCount={(idea as { regen_count?: number }).regen_count ?? 0}
+                      />
                     </div>
                   </div>
                 </Card>
