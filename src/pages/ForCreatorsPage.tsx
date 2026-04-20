@@ -168,7 +168,7 @@ const ForCreatorsPage = () => {
               <Sparkles className="h-7 w-7 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="font-accent text-sm text-primary mb-2">Never run out of ideas</p>
+              <p className="font-accent text-sm text-primary mb-2">Never run out of ideas · Separate subscription. From £49/mo.</p>
               <h2 className="text-2xl lg:text-3xl font-heading uppercase mb-3">Content Lab — your AI content partner.</h2>
               <p className="text-amw-offwhite/65 font-body mb-5">
                 Stop scrolling for inspiration. Content Lab pulls the top performing content in your niche, decodes the patterns, and delivers 12 ready-to-film ideas every month with hooks, scripts and filming checklists.

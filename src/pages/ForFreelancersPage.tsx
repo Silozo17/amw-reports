@@ -163,7 +163,7 @@ const ForFreelancersPage = () => {
               <Sparkles className="h-7 w-7 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="font-accent text-sm text-primary mb-2">Sell more than reports</p>
+              <p className="font-accent text-sm text-primary mb-2">Sell more than reports · Separate subscription. From £49/mo.</p>
               <h2 className="text-2xl lg:text-3xl font-heading uppercase mb-3">Add Content Lab to your service stack.</h2>
               <p className="text-amw-offwhite/65 font-body mb-5">
                 Charge for strategy, not screenshots. Run monthly content research for each client, hand over 12 ready-to-film ideas with hooks and scripts, and track production on a kanban board — all under your brand.

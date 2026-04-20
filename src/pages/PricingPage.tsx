@@ -198,7 +198,7 @@ const PricingPage = () => {
         </div>
       </section>
 
-      {/* Content Lab inclusion banner */}
+      {/* Content Lab — paid add-on (NOT bundled) */}
       <section className="pb-4">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 to-secondary/10 p-6 flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -206,14 +206,14 @@ const PricingPage = () => {
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="font-accent text-sm text-primary mb-1">Bundled with every plan</p>
-              <h3 className="text-lg lg:text-xl font-heading uppercase mb-1">Content Lab — AI content engine included</h3>
+              <p className="font-accent text-sm text-primary mb-1">Paid add-on · sold separately</p>
+              <h3 className="text-lg lg:text-xl font-heading uppercase mb-1">Content Lab — AI content engine</h3>
               <p className="text-sm text-amw-offwhite/65 font-body">
-                12 ready-to-film ideas a month, hook & trend libraries, pipeline kanban, swipe file. Free plan includes 1 run/month — Studio gets 3, Agency gets 10.
+                Not included with any AMW Reports plan. Subscribe separately from <strong>£49/mo</strong> for 3 monthly runs (Starter), £149/mo for 5 (Growth) or £299/mo for 20 (Scale). Top up with credit packs from £25.
               </p>
             </div>
             <Button asChild variant="outline" className="shrink-0">
-              <Link to="/content-lab-feature">Learn more <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link to="/content-lab-feature">See Content Lab pricing <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </div>
         </div>

@@ -185,10 +185,10 @@ const HowItWorksPage = () => {
                 <Sparkles className="h-7 w-7 text-primary" />
               </div>
               <div className="flex-1">
-                <p className="font-accent text-sm text-primary mb-2">Beyond reporting</p>
+                <p className="font-accent text-sm text-primary mb-2">Beyond reporting · Paid add-on</p>
                 <h2 className="text-2xl lg:text-3xl font-heading uppercase mb-3">Meet Content Lab — your AI content engine.</h2>
                 <p className="text-amw-offwhite/65 font-body mb-5">
-                  Reporting tells you what happened. Content Lab tells you what to post next. Scrapes 60 days of viral content in your niche, decodes the patterns, and ships 12 ready-to-film ideas every month.
+                  Reporting tells you what happened. Content Lab tells you what to post next. Scrapes 60 days of viral content in your niche, decodes the patterns, and ships 12 ready-to-film ideas every month. Available as a separate add-on from £49/mo.
                 </p>
                 <Button asChild>
                   <Link to="/content-lab-feature">Explore Content Lab <ArrowRight className="ml-2 h-4 w-4" /></Link>

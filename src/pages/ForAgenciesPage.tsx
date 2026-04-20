@@ -189,7 +189,7 @@ const ForAgenciesPage = () => {
               <Sparkles className="h-7 w-7 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="font-accent text-sm text-primary mb-2">Also for agencies</p>
+              <p className="font-accent text-sm text-primary mb-2">Also for agencies · Separate subscription. From £49/mo.</p>
               <h2 className="text-2xl lg:text-3xl font-heading uppercase mb-3">Sell content strategy as a service — at scale.</h2>
               <p className="text-amw-offwhite/65 font-body mb-5">
                 Content Lab plugs into every client account. Run monthly content research, share branded ideas via link, collect comments, and track production on a kanban board. Multi-tenant, white-labelled, ready to bill.
