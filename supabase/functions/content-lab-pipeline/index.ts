@@ -6,6 +6,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { runLimitForTier } from "../_shared/contentLabTiers.ts";
+import { assertPlatformNotFrozen, assertOrgWithinBudget, BudgetExceededError, PlatformFrozenError } from "../_shared/costGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,6 +86,19 @@ Deno.serve(async (req) => {
     let runId = existingRunId;
     let orgIdForUsage: string | null = null;
 
+    // Idempotency-Key replay protection (24h cache)
+    const idemKey = req.headers.get("Idempotency-Key");
+    if (idemKey) {
+      const { data: cached } = await admin
+        .from("request_idempotency").select("response_status, response_body")
+        .eq("key", idemKey).maybeSingle();
+      if (cached) {
+        return new Response(JSON.stringify(cached.response_body), {
+          status: cached.response_status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (!runId) {
       if (!niche_id) return json({ error: "niche_id or run_id is required" }, 400);
       const { data: niche, error: nErr } = await admin
@@ -92,6 +106,33 @@ Deno.serve(async (req) => {
       if (nErr || !niche) return json({ error: "Niche not found" }, 404);
 
       const orgIdNew = (niche as { org_id: string }).org_id;
+
+      // Cost gates: platform freeze + per-org daily/monthly budget
+      try {
+        await assertPlatformNotFrozen();
+        await assertOrgWithinBudget(orgIdNew);
+      } catch (e) {
+        if (e instanceof PlatformFrozenError) return json({ error: e.message, platform_frozen: true }, 503);
+        if (e instanceof BudgetExceededError) return json({ error: e.message, budget_exceeded: true, scope: e.scope }, 402);
+        throw e;
+      }
+
+      // Concurrent-run lock: one in-flight run per (org, niche)
+      const { count: activeCount } = await admin
+        .from("content_lab_runs").select("id", { count: "exact", head: true })
+        .eq("org_id", orgIdNew).eq("niche_id", niche_id)
+        .in("status", ["pending", "scraping", "analysing", "ideating"]);
+      if ((activeCount ?? 0) > 0) {
+        const { data: inProgress } = await admin
+          .from("content_lab_runs").select("id").eq("org_id", orgIdNew).eq("niche_id", niche_id)
+          .in("status", ["pending", "scraping", "analysing", "ideating"]).limit(1).maybeSingle();
+        return json({
+          error: "A run is already in progress for this niche.",
+          conflict: true,
+          in_progress_run_id: inProgress?.id,
+        }, 409);
+      }
+
       const ent = await getOrgEntitlement(admin, orgIdNew);
 
       // Hard gate: must have an active Content Lab subscription. No tier = no run.
@@ -161,7 +202,14 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ run_id: runId, mode: "fresh" }),
     }).catch((e) => console.error("step-runner kick failed:", e));
 
-    return json({ ok: true, run_id: runId }, 202);
+    const responseBody = { ok: true, run_id: runId };
+    if (idemKey) {
+      await admin.from("request_idempotency").upsert({
+        key: idemKey, org_id: orgIdForUsage, endpoint: "content-lab-pipeline",
+        response_status: 202, response_body: responseBody,
+      }, { onConflict: "key" });
+    }
+    return json(responseBody, 202);
   } catch (e) {
     console.error("content-lab-pipeline error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
