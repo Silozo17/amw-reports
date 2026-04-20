@@ -167,6 +167,7 @@ const NicheFormPage = () => {
           own_handle: ownHandle.trim().replace(/^@/, ''),
           website: website.trim(),
           location: location.trim(),
+          brand_brief: buildBrief(),
         },
       });
       if (error) throw error;
@@ -211,6 +212,41 @@ const NicheFormPage = () => {
     setDoNotUseInput('');
   };
 
+  const buildBrief = () => ({
+    niche: brfNiche.trim() || undefined,
+    positioning: brfPositioning.trim() || undefined,
+    offers: brfOffers.length ? brfOffers : undefined,
+    audience_who: brfAudienceWho.trim() || undefined,
+    audience_problem: brfAudienceProblem.trim() || undefined,
+    audience_where: brfAudienceWhere.trim() || undefined,
+    tones: brfTones.length ? brfTones : undefined,
+    never_do: brfNeverDo.length ? brfNeverDo : undefined,
+    producer: brfProducer || undefined,
+    goal: brfGoal || undefined,
+  });
+
+  const toggleTone = (t: string) => {
+    setBrfTones((prev) => {
+      if (prev.includes(t)) return prev.filter((x) => x !== t);
+      if (prev.length >= 2) return [prev[1], t];
+      return [...prev, t];
+    });
+  };
+
+  const addOffer = () => {
+    const v = brfOfferInput.trim();
+    if (!v || brfOffers.length >= 3 || brfOffers.includes(v)) return;
+    setBrfOffers([...brfOffers, v]);
+    setBrfOfferInput('');
+  };
+
+  const addNeverDo = () => {
+    const v = brfNeverDoInput.trim();
+    if (!v || brfNeverDo.length >= 5 || brfNeverDo.includes(v)) return;
+    setBrfNeverDo([...brfNeverDo, v]);
+    setBrfNeverDoInput('');
+  };
+
   const handleSave = async () => {
     if (!orgId) return;
     if (!clientId) return toast.error('Pick a client');
@@ -249,6 +285,7 @@ const NicheFormPage = () => {
         video_length_preference: videoLength || null,
         posting_cadence: postingCadence || null,
         do_not_use: doNotUse,
+        brand_brief: buildBrief() as unknown as never,
         discovered_at: hasDiscovered ? new Date().toISOString() : null,
       };
 
