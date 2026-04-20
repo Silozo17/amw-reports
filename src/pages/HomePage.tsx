@@ -239,6 +239,62 @@ const HomePage = () => {
         </div>
       </section>
 
+      {/* ── CONTENT LAB ── */}
+      <section className="relative py-20 lg:py-28 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <StarDecoration size={24} color="purple" className="absolute top-[10%] right-[6%]" />
+          <StarDecoration size={16} color="blue" className="absolute bottom-[20%] left-[4%]" animated={false} />
+          <div className="absolute -top-32 -left-32 w-[400px] h-[400px] rounded-full bg-primary/10 blur-[110px]" />
+        </div>
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <p className="font-accent text-lg text-primary mb-2">NEW · Content Lab</p>
+              <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4 leading-[1.05]">
+                Stop guessing what to post.<br />
+                <span className="text-gradient-purple">Decode what's working.</span>
+              </h2>
+              <p className="text-amw-offwhite/65 font-body mb-6 max-w-xl">
+                Content Lab is our AI content engine. It scrapes the last 60 days of viral content in your niche, decodes the winning patterns, and ships 12 ready-to-film ideas every month — with hooks, scripts and phone-mockup previews.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-7">
+                {[
+                  { icon: Search, label: 'Viral Feed', desc: 'Top posts in your niche.' },
+                  { icon: Sparkles, label: '12 Ready Ideas', desc: 'Hooks, scripts, checklists.' },
+                  { icon: Flame, label: 'Hook Library', desc: 'Ranked across the platform.' },
+                ].map(({ icon: Icon, label, desc }) => (
+                  <div key={label} className="rounded-lg border border-sidebar-border/50 bg-sidebar-accent/20 p-3">
+                    <Icon className="h-4 w-4 text-primary mb-1.5" />
+                    <p className="text-xs font-body font-semibold text-amw-offwhite">{label}</p>
+                    <p className="text-[11px] font-body text-amw-offwhite/55 leading-snug">{desc}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button asChild>
+                  <Link to="/content-lab-feature#live-demo">See it in action <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/content-lab-feature">Open Content Lab</Link>
+                </Button>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="absolute -inset-10 bg-primary/15 blur-3xl rounded-full pointer-events-none" />
+                <div className="relative">
+                  <IdeaPreviewInstagram
+                    hook="3 things I wish I knew before launching my agency"
+                    handle="amwmedia"
+                    caption="Save this before you start ↓"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── GRADIENT DIVIDER ── */}
       <div className="gradient-divider w-full" />
 
