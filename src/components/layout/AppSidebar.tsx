@@ -27,6 +27,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
 import { useInvites } from '@/hooks/useInvites';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -90,6 +92,23 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const [adminOpen, setAdminOpen] = useState(isAdminRoute);
   const isContentLabRoute = location.pathname.startsWith('/content-lab') || location.pathname === '/content-pipeline' || location.pathname === '/ideas';
   const [contentLabOpen, setContentLabOpen] = useState(isContentLabRoute);
+
+  // Subtle "run in progress" pulse on the Content Lab parent.
+  const { data: hasActiveRun = false } = useQuery({
+    queryKey: ['content-lab-active-run', orgId],
+    enabled: !!orgId && hasContentLabAccess,
+    refetchInterval: 15000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('content_lab_runs')
+        .select('id')
+        .eq('org_id', orgId!)
+        .in('status', ['scraping', 'analysing', 'ideating', 'pending'])
+        .limit(1);
+      if (error) return false;
+      return (data?.length ?? 0) > 0;
+    },
+  });
 
   const handleNavClick = () => {
     onNavigate?.();
@@ -199,8 +218,11 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
                     : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                 )}
               >
-                <Sparkles className="h-4 w-4" />
+                <Sparkles className={cn('h-4 w-4', hasActiveRun && 'animate-pulse text-primary')} />
                 <span className="flex-1 text-left">Content Lab</span>
+                {hasActiveRun && (
+                  <span className="mr-1 inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                )}
                 {contentLabOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               </button>
             </CollapsibleTrigger>
