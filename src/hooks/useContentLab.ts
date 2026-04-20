@@ -62,6 +62,34 @@ export const useContentLabNiches = (clientId?: string) => {
 
 export const useContentLabRuns = (clientId?: string) => {
   const { orgId } = useOrg();
+  const queryClient = useQueryClient();
+
+  // Realtime: notify the user when one of their runs flips to completed.
+  useEffect(() => {
+    if (!orgId) return;
+    const channel = supabase
+      .channel(`content-lab-runs-${orgId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'content_lab_runs', filter: `org_id=eq.${orgId}` },
+        (payload) => {
+          const newRow = payload.new as { id: string; status: string };
+          const oldRow = payload.old as { status?: string };
+          if (newRow.status === 'completed' && oldRow.status !== 'completed') {
+            toast.success('Your Content Lab ideas are ready!', {
+              action: { label: 'View', onClick: () => { window.location.href = `/content-lab/run/${newRow.id}`; } },
+              duration: 10_000,
+            });
+            queryClient.invalidateQueries({ queryKey: ['content-lab-runs', orgId] });
+          }
+          if (newRow.status === 'failed' && oldRow.status !== 'failed') {
+            queryClient.invalidateQueries({ queryKey: ['content-lab-runs', orgId] });
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [orgId, queryClient]);
 
   return useQuery({
     queryKey: ['content-lab-runs', orgId, clientId],
