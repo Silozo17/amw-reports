@@ -98,6 +98,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    // Slugify the niche label into a stable niche_tag used for shared benchmark pooling.
+    const nicheTag = slugify(discovery.niche_label);
+
     if (input.niche_id) {
       const { error: uErr } = await admin
         .from("content_lab_niches")
@@ -106,6 +109,7 @@ Deno.serve(async (req) => {
           website: input.website,
           location: input.location ?? null,
           label: discovery.niche_label,
+          niche_tag: nicheTag,
           niche_description: discovery.niche_description,
           top_competitors: discovery.top_competitors,
           top_global_benchmarks: discovery.top_global_benchmarks,
@@ -124,7 +128,17 @@ Deno.serve(async (req) => {
       if (uErr) return json({ error: uErr.message }, 500);
     }
 
-    return json({ ok: true, discovery });
+    // Fire pool refresh in the background — don't block the discover response.
+    // Skip if a verified pool already exists for this niche_tag (refreshed in last 14 days).
+    queuePoolRefreshIfStale({
+      admin,
+      niche_tag: nicheTag,
+      hashtags: discovery.suggested_hashtags,
+      keywords: discovery.suggested_keywords,
+      org_id: input.org_id ?? null,
+    }).catch((e) => console.error("Pool refresh queue failed:", e));
+
+    return json({ ok: true, discovery, niche_tag: nicheTag });
   } catch (e) {
     console.error("content-lab-discover error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
