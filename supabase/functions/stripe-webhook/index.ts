@@ -127,6 +127,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Sync content_lab_tier from subscription/price metadata if present
+      if (customerEmail) {
+        const subMetaTier = (sub.metadata?.content_lab_tier as string | undefined) ?? null;
+        const priceMetaTier = (sub.items.data[0]?.price?.metadata?.content_lab_tier as string | undefined) ?? null;
+        const newTier = subMetaTier ?? priceMetaTier;
+        if (newTier) {
+          await syncContentLabTier(customerEmail, newTier);
+        }
+      }
+
       if (!templateName && sub.status === "canceled") {
         templateName = "trial_expired";
         emailData = { reason: "Subscription cancelled" };
