@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
 
     const niche = (run as { niche: {
       own_handle: string | null;
+      tracked_handles: Array<{ platform: string; handle: string }> | null;
       top_competitors: DiscoveredEntity[];
       top_global_benchmarks: DiscoveredEntity[];
       client_id: string;
@@ -83,6 +84,16 @@ Deno.serve(async (req) => {
     const enabledPlatforms = (niche.platforms_to_scrape && niche.platforms_to_scrape.length > 0
       ? niche.platforms_to_scrape
       : ['instagram']) as Array<'instagram' | 'tiktok' | 'facebook'>;
+
+    // Build per-platform own handle map. Falls back to legacy own_handle for IG.
+    const ownHandlesByPlatform: Partial<Record<'instagram' | 'tiktok' | 'facebook', string>> = {};
+    (niche.tracked_handles ?? []).forEach((h) => {
+      const p = h.platform as 'instagram' | 'tiktok' | 'facebook';
+      if (p && h.handle) ownHandlesByPlatform[p] = h.handle.toLowerCase().replace(/^@/, '');
+    });
+    if (!ownHandlesByPlatform.instagram && niche.own_handle) {
+      ownHandlesByPlatform.instagram = niche.own_handle.toLowerCase().replace(/^@/, '');
+    }
 
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
@@ -96,7 +107,7 @@ Deno.serve(async (req) => {
     // Run all three buckets in parallel; each handles its own errors.
     // Each bucket fans out across all enabled platforms internally.
     const [ownResult, compResult, benchResult] = await Promise.allSettled([
-      scrapeOwn(supabase, niche, enabledPlatforms),
+      scrapeOwn(supabase, niche, enabledPlatforms, ownHandlesByPlatform),
       scrapeBucket(competitorHandles, "competitor", MAX_POSTS_COMPETITOR, enabledPlatforms),
       scrapeBucket(benchmarkHandles, "benchmark", MAX_POSTS_BENCHMARK, enabledPlatforms),
     ]);
