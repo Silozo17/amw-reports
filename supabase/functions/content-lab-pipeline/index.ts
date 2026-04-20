@@ -214,9 +214,22 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
     console.log(`Pipeline ${runId}: scraped ${postCount} posts`);
 
     // Charge usage only once we know the scrape produced data.
+    // If the monthly allowance is exhausted, consume one credit instead.
     if (orgId) {
-      const { error: usageErr } = await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
-      if (usageErr) console.error("Usage increment failed:", usageErr);
+      const limit = await getMonthlyLimit(admin, orgId);
+      const used = await getCurrentUsage(admin, orgId);
+      if (used < limit) {
+        const { error: usageErr } = await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
+        if (usageErr) console.error("Usage increment failed:", usageErr);
+      } else {
+        const { data: ok, error: credErr } = await admin.rpc("consume_content_lab_credit", {
+          _org_id: orgId,
+          _run_id: runId,
+          _amount: 1,
+        });
+        if (credErr) console.error("Credit consume failed:", credErr);
+        else if (!ok) console.error(`Credit consume returned false for org ${orgId}`);
+      }
     }
 
     // 2. ANALYSE (best-effort)
