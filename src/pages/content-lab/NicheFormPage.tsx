@@ -25,8 +25,8 @@ interface CompetitorEntry {
 
 const PLATFORMS = [
   { value: 'instagram', label: 'Instagram' },
-  { value: 'tiktok', label: 'TikTok (Phase 2)', disabled: true },
-  { value: 'facebook', label: 'Facebook (Phase 2)', disabled: true },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'facebook', label: 'Facebook' },
 ];
 
 const CONTENT_STYLES = ['talking head', 'B-roll/creative', 'voiceover-only', 'UGC-style', 'tutorial', 'behind-the-scenes'];
