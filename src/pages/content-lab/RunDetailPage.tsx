@@ -25,6 +25,9 @@ import usePageMeta from '@/hooks/usePageMeta';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
 import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
+import IdeaCommentsDrawer from '@/components/content-lab/IdeaCommentsDrawer';
+import { useSwipeFileIds, useToggleSwipe } from '@/hooks/useSwipeFile';
+import { useIdeaCommentCount } from '@/hooks/useIdeaComments';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
@@ -34,11 +37,61 @@ import IdeaPerformanceStrip from '@/components/content-lab/IdeaPerformanceStrip'
 import ShareWithClientDialog from '@/components/content-lab/ShareWithClientDialog';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 
-const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
-  const p = (platform ?? 'instagram').toLowerCase();
-  if (p === 'tiktok') return <IdeaPreviewTikTok hook={hook} caption={caption} />;
-  if (p === 'facebook') return <IdeaPreviewFacebook hook={hook} caption={caption} />;
-  return <IdeaPreviewInstagram hook={hook} caption={caption} />;
+interface PreviewArgs {
+  platform: string | null;
+  hook: string;
+  caption: string | null;
+  ideaId: string;
+  runId: string;
+  isSaved: boolean;
+  commentCount: number;
+  onToggleSave: () => void;
+  onOpenComments: () => void;
+}
+
+const InteractivePreview = (args: PreviewArgs) => {
+  const p = (args.platform ?? 'instagram').toLowerCase();
+  const common = {
+    hook: args.hook,
+    caption: args.caption,
+    ideaId: args.ideaId,
+    runId: args.runId,
+    isSaved: args.isSaved,
+    commentCount: args.commentCount,
+    onToggleSave: args.onToggleSave,
+    onOpenComments: args.onOpenComments,
+  };
+  if (p === 'tiktok') return <IdeaPreviewTikTok {...common} />;
+  if (p === 'facebook') return <IdeaPreviewFacebook {...common} />;
+  return <IdeaPreviewInstagram {...common} />;
+};
+
+interface IdeaPreviewWithStateProps {
+  idea: { id: string; target_platform: string | null; hook: string | null; title: string; caption: string | null };
+  runId: string;
+  clientId: string | null;
+  nicheId: string | null;
+  onOpenComments: (ideaId: string) => void;
+}
+
+const IdeaPreviewWithState = ({ idea, runId, clientId, nicheId, onOpenComments }: IdeaPreviewWithStateProps) => {
+  const { data: savedIds } = useSwipeFileIds();
+  const toggle = useToggleSwipe();
+  const { data: commentCount = 0 } = useIdeaCommentCount(idea.id);
+  const isSaved = savedIds?.has(idea.id) ?? false;
+  return (
+    <InteractivePreview
+      platform={idea.target_platform}
+      hook={idea.hook ?? idea.title}
+      caption={idea.caption}
+      ideaId={idea.id}
+      runId={runId}
+      isSaved={isSaved}
+      commentCount={commentCount}
+      onToggleSave={() => toggle.mutate({ ideaId: idea.id, clientId, nicheId, isSaved })}
+      onOpenComments={() => onOpenComments(idea.id)}
+    />
+  );
 };
 
 const RunDetailPage = () => {
