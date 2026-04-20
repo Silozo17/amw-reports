@@ -20,7 +20,11 @@ const corsHeaders = {
 };
 
 const MODEL = "claude-sonnet-4-5-20250929";
-const TOP_BENCHMARK_POSTS = 30;
+// v3: inspiration pool reduced to top 10 benchmark + top 10 competitor (analysed deeply
+// in content-lab-analyse). Smaller, higher-signal pool keeps each per-platform ideation
+// call well under the 150s function ceiling.
+const TOP_BENCHMARK_POSTS = 10;
+const TOP_COMPETITOR_POSTS = 10;
 const ANTI_EXAMPLE_OWN_POSTS = 6;
 
 Deno.serve(async (req) => {
@@ -66,7 +70,13 @@ Deno.serve(async (req) => {
     }
 
     const ownHandle = (niche.own_handle ?? "").toLowerCase().replace(/^@/, "");
-    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.bucket === "benchmark" || p.bucket === "competitor");
+    const benchmarkOnly = (posts as PostRow[]).filter((p) => p.bucket === "benchmark");
+    const competitorOnly = (posts as PostRow[]).filter((p) => p.bucket === "competitor");
+    // Inspiration pool = top 10 benchmark + top 10 competitor (already engagement-ordered).
+    const benchmarkPosts = [
+      ...benchmarkOnly.slice(0, TOP_BENCHMARK_POSTS),
+      ...competitorOnly.slice(0, TOP_COMPETITOR_POSTS),
+    ];
     const ownPosts = (posts as PostRow[]).filter((p) => p.bucket === "own");
 
     const ownAvgViews = avg(ownPosts.map((p) => p.views ?? 0));
@@ -103,7 +113,7 @@ Deno.serve(async (req) => {
 
       const platformBenchmarks = benchmarkPosts
         .filter((p) => p.platform === platform)
-        .slice(0, TOP_BENCHMARK_POSTS);
+        .slice(0, TOP_BENCHMARK_POSTS + TOP_COMPETITOR_POSTS);
 
       const platformOwn = ownPosts.filter((p) => p.platform === platform);
 

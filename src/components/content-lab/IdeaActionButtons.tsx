@@ -19,7 +19,10 @@ import BuyCreditsDialog from './BuyCreditsDialog';
 interface Props {
   ideaId: string;
   runId: string;
+  regenCount?: number;
 }
+
+const MAX_REGEN_PER_IDEA = 5;
 
 type Shift = 'angle' | 'cluster' | 'hook';
 type RemixType = 'shorter' | 'punchier' | 'emotional' | 'b2b' | 'platform';
@@ -46,11 +49,12 @@ const PLATFORMS: Array<{ value: 'instagram' | 'tiktok' | 'facebook' | 'youtube' 
   { value: 'linkedin', label: 'LinkedIn' },
 ];
 
-const IdeaActionButtons = ({ ideaId, runId }: Props) => {
+const IdeaActionButtons = ({ ideaId, runId, regenCount = 0 }: Props) => {
   const queryClient = useQueryClient();
   const { data: credits } = useContentLabCredits();
   const balance = credits?.balance ?? 0;
   const isExhausted = balance < 1;
+  const regenExhausted = regenCount >= MAX_REGEN_PER_IDEA;
   const [busy, setBusy] = useState<'regen' | 'remix' | null>(null);
   const [showBuy, setShowBuy] = useState(false);
 
@@ -127,9 +131,15 @@ const IdeaActionButtons = ({ ideaId, runId }: Props) => {
       <div className="flex flex-wrap items-center gap-2">
         <CreditCostBadge cost={1} />
 
+        {regenCount > 0 && (
+          <span className="text-[10px] text-muted-foreground">
+            Regenerated {regenCount}/{MAX_REGEN_PER_IDEA}
+          </span>
+        )}
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" disabled={busy !== null}>
+            <Button size="sm" variant="outline" disabled={busy !== null || regenExhausted} title={regenExhausted ? `Max ${MAX_REGEN_PER_IDEA} regenerations reached` : undefined}>
               {busy === 'regen' ? (
                 <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
               ) : (
