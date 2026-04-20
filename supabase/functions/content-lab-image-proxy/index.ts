@@ -43,6 +43,12 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Require authentication so this isn't a free open image proxy.
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return fallback();
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const target = searchParams.get('url');
