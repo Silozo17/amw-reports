@@ -95,6 +95,30 @@ Deno.serve(async (req) => {
       console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} status=${status}`);
     }
 
+    async function syncContentLabTier(email: string, tier: string) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("email", email)
+        .maybeSingle();
+      if (!profile?.user_id) return;
+
+      const { data: membership } = await supabase
+        .from("org_members")
+        .select("org_id")
+        .eq("user_id", profile.user_id)
+        .limit(1)
+        .maybeSingle();
+      if (!membership?.org_id) return;
+
+      await supabase
+        .from("org_subscriptions")
+        .update({ content_lab_tier: tier })
+        .eq("org_id", membership.org_id);
+
+      console.log(`[STRIPE-WEBHOOK] Synced org ${membership.org_id} content_lab_tier=${tier}`);
+    }
+
     // --- Handle events ---
     if (event.type === "customer.subscription.updated") {
       const sub = event.data.object as Stripe.Subscription;
@@ -127,6 +151,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Sync content_lab_tier from subscription/price metadata if present
+      if (customerEmail) {
+        const subMetaTier = (sub.metadata?.content_lab_tier as string | undefined) ?? null;
+        const priceMetaTier = (sub.items.data[0]?.price?.metadata?.content_lab_tier as string | undefined) ?? null;
+        const newTier = subMetaTier ?? priceMetaTier;
+        if (newTier) {
+          await syncContentLabTier(customerEmail, newTier);
+        }
+      }
+
       if (!templateName && sub.status === "canceled") {
         templateName = "trial_expired";
         emailData = { reason: "Subscription cancelled" };
@@ -153,15 +187,15 @@ Deno.serve(async (req) => {
           : session.payment_intent?.id ?? session.id;
 
         if (orgId && credits > 0) {
-          // Idempotency check
-          const { data: existing } = await supabase
+          // Event-level idempotency (Stripe can retry deliveries)
+          const { data: existingByEvent } = await supabase
             .from("content_lab_credit_ledger")
             .select("id")
-            .eq("stripe_payment_id", paymentIntentId)
+            .eq("stripe_event_id", event.id)
             .maybeSingle();
 
-          if (existing) {
-            console.log(`[STRIPE-WEBHOOK] Credit top-up ${paymentIntentId} already processed, skipping`);
+          if (existingByEvent) {
+            console.log(`[STRIPE-WEBHOOK] Event ${event.id} already processed, skipping`);
           } else {
             const { error: rpcErr } = await supabase.rpc("add_content_lab_credits", {
               _org_id: orgId,
@@ -171,7 +205,22 @@ Deno.serve(async (req) => {
             if (rpcErr) {
               console.error("[STRIPE-WEBHOOK] add_content_lab_credits failed:", rpcErr);
             } else {
-              console.log(`[STRIPE-WEBHOOK] Added ${credits} credits to org ${orgId}`);
+              // Tag the most recent ledger row for this org with the event id
+              const { data: latest } = await supabase
+                .from("content_lab_credit_ledger")
+                .select("id")
+                .eq("org_id", orgId)
+                .eq("reason", "top_up")
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              if (latest?.id) {
+                await supabase
+                  .from("content_lab_credit_ledger")
+                  .update({ stripe_event_id: event.id })
+                  .eq("id", latest.id);
+              }
+              console.log(`[STRIPE-WEBHOOK] Added ${credits} credits to org ${orgId} (event ${event.id})`);
             }
           }
         }
@@ -198,7 +247,9 @@ Deno.serve(async (req) => {
           : null,
       };
 
-      // Set past_due with grace period
+      // Set past_due with 7-day grace period (applies to both general & content_lab subs;
+      // 3b cron will enforce content_lab_tier downgrade after grace expires).
+      // TODO(3b): use new template `content_lab_payment_failed` when invoice is content-lab specific.
       if (customerEmail) {
         await syncOrgSubscriptionStatus(customerEmail, "past_due", true, false);
       }

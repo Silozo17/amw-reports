@@ -466,6 +466,7 @@ export type Database = {
           org_id: string
           reason: string
           run_id: string | null
+          stripe_event_id: string | null
           stripe_payment_id: string | null
         }
         Insert: {
@@ -475,6 +476,7 @@ export type Database = {
           org_id: string
           reason: string
           run_id?: string | null
+          stripe_event_id?: string | null
           stripe_payment_id?: string | null
         }
         Update: {
@@ -484,6 +486,7 @@ export type Database = {
           org_id?: string
           reason?: string
           run_id?: string | null
+          stripe_event_id?: string | null
           stripe_payment_id?: string | null
         }
         Relationships: []
@@ -578,8 +581,11 @@ export type Database = {
           hook_variants: Json
           id: string
           idea_number: number
+          last_modified_via: string | null
           platform_style_notes: string | null
           rating: number | null
+          regen_count: number
+          remix_count: number
           run_id: string
           script_full: string | null
           status: string
@@ -602,8 +608,11 @@ export type Database = {
           hook_variants?: Json
           id?: string
           idea_number: number
+          last_modified_via?: string | null
           platform_style_notes?: string | null
           rating?: number | null
+          regen_count?: number
+          remix_count?: number
           run_id: string
           script_full?: string | null
           status?: string
@@ -626,8 +635,11 @@ export type Database = {
           hook_variants?: Json
           id?: string
           idea_number?: number
+          last_modified_via?: string | null
           platform_style_notes?: string | null
           rating?: number | null
+          regen_count?: number
+          remix_count?: number
           run_id?: string
           script_full?: string | null
           status?: string
@@ -2330,7 +2342,20 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      refund_content_lab_credit: {
+        Args: { _ledger_id: string; _refund_reason: string }
+        Returns: undefined
+      }
       slugify_niche_tag: { Args: { _label: string }; Returns: string }
+      spend_content_lab_credit: {
+        Args: {
+          _amount: number
+          _org_id: string
+          _reason: string
+          _run_id?: string
+        }
+        Returns: string
+      }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
