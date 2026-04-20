@@ -1,71 +1,133 @@
 
 
-## Content Lab — round 3 fixes
+## Phase 4 — Retention & Polish
 
-### Issues to fix
+Eight workstreams. I'll group them into 4 shippable milestones to keep PRs small and reviewable.
 
-**1 & 2. "Building benchmarks · 0" + benchmark median 0**
-Two separate causes, both symptoms of the same root issue:
-- `RunDetailPage` header counts `posts.filter(p => p.bucket === 'benchmark')`, but legacy rows have `bucket = null` (only `source` is set). New scrapes set `bucket`, old ones don't.
-- Benchmark median is computed from `posts.filter(p => p.bucket === 'benchmark').map(p => p.views)` → empty array → median 0.
+---
 
-**Fix:** in `RunDetailPage`, derive bucket with a fallback chain: `p.bucket ?? (p.source === 'benchmark' || p.source === 'competitor' ? 'benchmark' : p.source === 'own' ? 'own' : null)`. Backfill `bucket` column on existing rows via one-off SQL using the same logic against the niche's `own_handle` / `top_global_benchmarks` / `top_competitors`.
+### Milestone A — Swipe File + Docx Export (the compounding asset + the deliverable)
 
-**3. Pipeline drag still broken**
-Current `IdeaPipelineBoard` uses `useDraggable` on the whole card with a separate "Open" button. The `activationConstraint` is on `useSensor(PointerSensor)` but the sensors aren't actually wired into a `DndContext` properly — and columns use `useDroppable` but the `onDragEnd` handler doesn't account for dropping on empty columns.
+**A1. Swipe file**
+- New table `content_lab_swipe_file`: `id, org_id, client_id (nullable), user_id, idea_id, niche_id, saved_at, notes, tags text[]`. RLS: org members read/write their org's rows.
+- Heart icon on every `IdeaCard` (Pipeline board, Run Detail ideas grid, swipe-file page). Toggles save/unsave; optimistic update via TanStack Query.
+- New page `src/pages/content-lab/SwipeFilePage.tsx` (route `/content-lab/swipe-file`):
+  - Filters: niche, platform, topic cluster (derived from idea hashtags), date saved.
+  - Bulk select → "Export selected" (.docx) and "Share subset" (read-only public link, reuses A4 link infra).
+- **Pattern Insights widget** (top of swipe-file page): edge function `content-lab-swipe-insights` runs Claude Haiku on the user's saved ideas (cached for 24h), returns 1-line summary like "60% transformations, 40% myth-busting". Stored in `content_lab_swipe_file_insights`.
 
-**Fix:** rewrite with `@dnd-kit/core`'s `DndContext` + sortable kit, give each column a stable droppable id (`status:not_started`, `status:scripted`, etc.), and on `onDragEnd` parse the over.id to extract target status. Add visible drag handle (grip icon) on card to make it obvious. Keep "Open" button separate.
+**A2. Docx export**
+- Use the docx skill (already available — node `docx` package).
+- New edge function `content-lab-export-docx`: takes `run_id` OR `idea_ids[]`, returns signed Storage URL.
+- Per-idea page: title → angle → 5 hook variants → TikTok script → IG script → FB script → caption variants → visual direction → benchmark thumbnails (downloaded inline) + URLs.
+- Cover page uses org `logo_url`, `primary_color`, client name, month. White-label compliant.
+- Triggered from: Run Detail "Export client brief" button, Swipe File bulk action, Pipeline board "Export run".
 
-**4. AI memory loop — performance feeds back into next ideation**
-When an idea is linked to a real post (via auto-suggest or manual), we already snapshot `actual_views`, `actual_likes`, `actual_engagement_rate`. We need to feed this into future runs:
-- New table `content_lab_idea_performance_history` (or reuse linked ideas) — already covered by the `linked_post_id` columns added last round.
-- In `content-lab-ideate`, before generating, fetch the niche's last N linked ideas + their actual performance, group by hook pattern / format / topic, and inject into the prompt as: `"These ideas worked: [hook A] (12k views, 8% ER). These flopped: [hook B] (200 views, 0.5% ER). Lean into what worked, avoid what flopped."`
-- Each successive monthly run gets smarter automatically.
+---
 
-**5. 10 benchmark-driven + 2 wildcard ideas**
-Currently `content-lab-ideate` generates N ideas all from benchmark patterns. Split the prompt:
-- Generate 10 ideas grounded in the benchmark posts + own performance history.
-- Generate 2 "wildcard" ideas explicitly tagged as `is_wildcard = true` — instruct the model to propose untested formats/angles nobody in the niche is doing yet, designed to set a new trend.
-- Add `is_wildcard boolean default false` column to `content_lab_ideas`. Show a small "Wildcard 🚀" badge in the UI on those cards.
+### Milestone B — Agency Mode + Client Share Links
 
-**6. Stay-in-tab navigation for client Content Lab tab**
-Currently `ClientContentLabTab` shows runs as cards that, on click, navigate to `/content-lab/run/:id` (the global page). User wants to stay inside `/clients/:id?tab=contentlab` and see content/viral feed/ideas/pipeline/hook library inline.
+**B1. Agency mode (multi-niche under one org)**
+- Subscription tier `agency` already exists. Remove the 1-niche-per-tier check in `useContentLabAccess.ts` for agency tier; allow unlimited.
+- **Niche switcher** in `AppSidebar` Content Lab section: Linear-style popover listing all org niches, grouped by client. Persists last-selected niche to `localStorage` per user.
+- **Per-niche seat assignment** — new table `content_lab_niche_members (niche_id, user_id, role enum('viewer','editor'))`. Org owners assign; RLS gates write actions on niche/run/idea tables by checking membership when role differs from 'owner'.
+- Shared credit pool: no change — already org-level.
 
-**Fix:** refactor `ClientContentLabTab` into an inner-tabbed view:
-```
-[Niches & Runs] [Your Content] [Viral Feed] [Ideas] [Pipeline] [Hook Library]
-```
-Each inner tab queries scoped to `clientId` only (no run navigation). When a user picks a specific run from the niches list, it sets local state `selectedRunId` and the other 5 tabs reflect that run's data. No route change.
+**B2. Client read-only share links**
+- New table `content_lab_run_share_tokens (id, run_id, slug, is_active, view_count, last_viewed_at, client_logo_url nullable, created_by, created_at, expires_at nullable)`.
+- New public route `/share/content-lab/:slug` (no auth): renders read-only run summary — ideas, hooks, top benchmarks. No swipe-file, no regenerate, no admin.
+- Header uses client_logo_url override if set, else org branding.
+- New edge function `content-lab-share-view` records `view_count++` and `last_viewed_at` on each load.
+- "Share with client" button on Run Detail page → dialog with slug + copy + view analytics ("Viewed 4 times").
 
-**7. Redesign + cleanup**
-- **Run naming:** rename run titles from "Untitled run · {date}" to `{ClientName} · {Month YYYY}` with a 1-line auto-generated description (e.g., "12 ideas across Instagram + TikTok, 3 wildcards"). Stored as `summary.display_name` + `summary.description` on existing `content_lab_runs.summary` jsonb (no schema change).
-- **Group by client** in the global Content Lab page (already partially done — extend with the new naming).
-- **"How it works" inline guide** on first visit (already exists, polish copy).
-- **Cleanup:** delete all `content_lab_runs` where `status = 'failed'` OR (`status = 'pending'` AND `created_at < now() - interval '24 hours'`) OR (no ideas + no posts). Cascade deletes step_logs.
+---
 
-### Files to change
+### Milestone C — Monthly Digest Email + Internal Analytics
 
-**Frontend**
-- `src/components/content-lab/IdeaPipelineBoard.tsx` — rewrite drag with proper DndContext + droppable columns + visible grip handle
-- `src/pages/content-lab/RunDetailPage.tsx` — bucket fallback derivation; show wildcard badge
-- `src/components/clients/tabs/ClientContentLabTab.tsx` — convert to inner-tabbed surface (no navigation away)
-- `src/pages/content-lab/ContentLabPage.tsx` — use new run naming `{client} · {month}` + description line
-- `src/components/content-lab/IdeaCard` (inline in board) — wildcard badge
+**C1. Monthly digest email**
+- New edge function `content-lab-monthly-digest` (cron 1st of month 9am UK).
+- For each active Content Lab user (has subscription, has at least 1 niche): pulls top 5 viral posts from their latest pool (highest `engagement_rate` from `content_lab_posts` where `bucket = 'benchmark'` in their niche).
+- Resend template via existing `send-branded-email` infra. Subject: "This month's top 5 viral posts in {niche.label}". CTA → run page.
+- Lapsed branch (no run in 30d): softer copy + mentions rolled-over credits.
+- **Weekly swipe-file digest** (cron Mondays 9am UK): users with ≥3 saved-but-untouched ideas get nudge email "3 ideas you saved 2 weeks ago — need scripts?". Links straight into regen flow.
 
-**Backend**
-- `supabase/functions/content-lab-ideate/index.ts` — split into 10 grounded + 2 wildcard; inject performance history from prior linked ideas
-- `supabase/functions/content-lab-pipeline/index.ts` — write `summary.display_name` + `summary.description` on completion
+**C2. Internal analytics dashboard**
+- New page `/admin/content-lab` — admin role-guarded (reuse `is_platform_admin`).
+- Tabs: Revenue, Engagement, Churn signals, Pool quality.
+- Metrics queries (read-only views in DB):
+  - `v_content_lab_mrr_by_tier`: MRR by `org_subscriptions.content_lab_tier`.
+  - `v_content_lab_arpu`: blended subscription + credit pack ARPU per org.
+  - `v_content_lab_run_completion`: completion rate grouped by `niches.industry_slug`.
+  - `v_content_lab_pool_quality`: % runs flagged "Limited" by vertical.
+  - `v_content_lab_churn_signals`: orgs no run >21d, cancelled after one run, credit balance at cancellation.
+  - `v_content_lab_regen_rate`: avg regens per idea per run (healthy 1–2).
 
-**Database (migration)**
-- Add `is_wildcard boolean default false` to `content_lab_ideas`
-- Backfill `content_lab_posts.bucket` from `source` + niche handles for legacy rows
-- Cleanup query: delete failed runs, stale pending runs, and empty runs
+---
 
-### Open questions
-None — proceeding on approval.
+### Milestone D — Error States + Performance Polish
+
+**D1. Error states**
+New shared component `<ContentLabEmptyState astronaut="..." title="..." subtitle="..." cta={...} />` reused for:
+- Pool empty / building
+- Run failed (with "Retry" CTA — auto-refunds credit via `content-lab-credit-ledger` insert with `delta = +1`)
+- Payment failed (Stripe Customer Portal link via existing `customer-portal` function)
+- 404 / niche deleted
+- Network error fallback (wrap pages in section error boundaries)
+
+Astronaut illustrations: reuse `public/mascot.svg` family — 5 variants (sad, building, broken, lost, offline). Need user to confirm if they want me to generate variants or use existing single mascot for all.
+
+**D2. Performance polish**
+- Skeleton loaders on Pool grid and Ideas grid (use existing `<Skeleton>` component).
+- Lazy-load benchmark thumbnails: `loading="lazy"` + `IntersectionObserver` for first-paint cards.
+- Edge function warmup: cron `content-lab-keepalive` every 5min between 8am-7pm UK, pings `discover/scrape/ideate` with `?warmup=1` (returns 200 immediately when flag present).
+- TanStack Query `staleTime: 1h` on `useContentLabVerticals` (already done) and add same to `useContentLabNiches`.
+
+---
+
+### Files to add/change
+
+**Frontend (new)**
+- `src/pages/content-lab/SwipeFilePage.tsx`
+- `src/pages/admin/AdminContentLabAnalytics.tsx`
+- `src/pages/share/ContentLabRunShare.tsx` (public route)
+- `src/components/content-lab/SwipeFileHeart.tsx`
+- `src/components/content-lab/PatternInsightsWidget.tsx`
+- `src/components/content-lab/NicheSwitcher.tsx`
+- `src/components/content-lab/ContentLabEmptyState.tsx`
+- `src/components/content-lab/ShareWithClientDialog.tsx`
+- `src/hooks/useSwipeFile.ts`, `useNicheMembers.ts`, `useContentLabAnalytics.ts`
+
+**Frontend (edit)**
+- `src/components/content-lab/IdeaPipelineBoard.tsx` — heart icon
+- `src/pages/content-lab/RunDetailPage.tsx` — heart, "Export brief" CTA, "Share with client" CTA, skeletons
+- `src/components/layout/AppSidebar.tsx` — niche switcher slot
+- `src/App.tsx` — new routes
+- `src/hooks/useContentLabAccess.ts` — drop niche cap for agency tier
+
+**Backend / edge functions (new)**
+- `supabase/functions/content-lab-export-docx/index.ts` (uses `docx` npm via esm.sh)
+- `supabase/functions/content-lab-swipe-insights/index.ts`
+- `supabase/functions/content-lab-monthly-digest/index.ts`
+- `supabase/functions/content-lab-weekly-swipe-digest/index.ts`
+- `supabase/functions/content-lab-share-view/index.ts`
+- `supabase/functions/content-lab-keepalive/index.ts`
+
+**Database (one migration per milestone)**
+- A: `content_lab_swipe_file`, `content_lab_swipe_file_insights`
+- B: `content_lab_niche_members`, `content_lab_run_share_tokens`
+- C: 6 read-only analytics views; 2 cron jobs (monthly digest, weekly swipe digest)
+- D: 1 cron job (keepalive)
 
 ### Risks
-- Pipeline drag rewrite touches a working-but-broken component; will keep the existing API (`onSelect`, `runId`, `ideas[]`) so callers don't change.
-- AI memory feed only kicks in once users start linking posts — first run after deploy still works the old way.
-- Wildcard ideas may feel "off-brand" — that's the point, but we'll flag them clearly so users know to expect it.
+- Docx generation in edge function: `docx` library is heavy (~2MB). May need to chunk benchmark thumbnail downloads to stay under 60s. Mitigation: render sequentially, cap benchmarks per idea at 3.
+- Niche switcher UX: must not break existing `?tab=contentlab` deep links into a specific client. Mitigation: switcher only changes the *active niche within the current client*, not the client itself.
+- Monthly digest at scale: pulling top 5 posts per active user × N users could time out. Mitigation: queue-based processing via `process-sync-queue` pattern, batch of 50 per cron tick.
+- Public share route bypasses auth — must hard-enforce `is_active` and never expose `org_id`/internal IDs in payload.
+
+### Open questions
+1. **Astronaut illustrations** — generate 5 SVG variants for empty states, or reuse the single existing mascot for all? I'd recommend 5 variants for warmth.
+2. **Swipe file scope** — saves attached to `org_id` (whole team can see) or `user_id` (personal)? You wrote "personal library" — confirming personal-only.
+3. **Agency niche cap** — current Agency tier limit is what? Need to confirm before removing the cap so we don't break existing checks.
+
+I'll wait for answers to those 3 before writing the migrations.
 
