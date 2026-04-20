@@ -31,11 +31,30 @@ interface GlobalHookRow {
   created_at: string;
 }
 
-const PLATFORMS = ['instagram', 'tiktok', 'facebook', 'linkedin', 'threads', 'youtube'] as const;
-const MECHANISMS = [
-  'Curiosity gap', 'Negative', 'Social proof', 'Contrarian',
-  'Pattern interrupt', 'Stat shock', 'Question', 'Story open',
+const PLATFORMS = ['instagram', 'tiktok', 'facebook'] as const;
+const MECHANISM_OPTIONS = [
+  { slug: 'curiosity_gap', label: 'Curiosity gap' },
+  { slug: 'negative', label: 'Negative' },
+  { slug: 'social_proof', label: 'Social proof' },
+  { slug: 'contrarian', label: 'Contrarian' },
+  { slug: 'pattern_interrupt', label: 'Pattern interrupt' },
+  { slug: 'stat_shock', label: 'Stat shock' },
+  { slug: 'stat', label: 'Stat' },
+  { slug: 'question', label: 'Question' },
+  { slug: 'story_open', label: 'Story open' },
+  { slug: 'story', label: 'Story' },
+  { slug: 'promise', label: 'Promise' },
+  { slug: 'callout', label: 'Callout' },
+  { slug: 'listicle', label: 'Listicle' },
+  { slug: 'statement', label: 'Statement' },
+  { slug: 'demo', label: 'Demo' },
+  { slug: 'other', label: 'Other' },
+  { slug: 'unknown', label: 'Unknown' },
 ] as const;
+const MECHANISM_LABELS: Record<string, string> = MECHANISM_OPTIONS.reduce(
+  (acc, m) => ({ ...acc, [m.slug]: m.label }),
+  {} as Record<string, string>,
+);
 const SORTS = [
   { value: 'top', label: 'Top performing' },
   { value: 'newest', label: 'Newest' },
