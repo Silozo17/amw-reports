@@ -224,6 +224,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// One retry on 5xx (Apify 503/504 are common). Returns the final response either way.
+async function fetchWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
+  const res = await fetch(url, init);
+  if (res.status >= 500 && res.status < 600) {
+    console.warn(`${label}: ${res.status}, retrying once after 1.5s`);
+    await new Promise((r) => setTimeout(r, 1500));
+    return fetch(url, init);
+  }
+  return res;
+}
+
 interface BucketResult { posts: ScrapedPost[]; errors: string[] }
 
 async function scrapeOwn(
