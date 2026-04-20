@@ -267,6 +267,7 @@ interface IdeaRow {
   caption: string | null;
   caption_with_hashtag: string | null;
   hook: string | null;
+  hook_variants: HookVariant[];
   body: string | null;
   cta: string | null;
   script_full: string | null;
@@ -276,6 +277,37 @@ interface IdeaRow {
   hashtags: string[];
   filming_checklist: string[];
   status: string;
+}
+
+function toRow(
+  runId: string,
+  ideaNumber: number,
+  platform: string,
+  idea: GeneratedIdea,
+  posts: PostRow[],
+  fallbackPostId: string | null,
+): IdeaRow {
+  return {
+    run_id: runId,
+    idea_number: ideaNumber,
+    target_platform: platform,
+    platform_style_notes: idea.platform_style_notes ?? null,
+    title: idea.title,
+    based_on_post_id: matchPost(posts, idea.based_on_handle) ?? fallbackPostId,
+    caption: idea.caption ?? null,
+    caption_with_hashtag: idea.caption_with_hashtag ?? null,
+    hook: idea.hook,
+    hook_variants: Array.isArray(idea.hook_variants) ? idea.hook_variants.slice(0, 3) : [],
+    body: idea.body,
+    cta: idea.cta ?? null,
+    script_full: idea.script_full ?? null,
+    duration_seconds: idea.duration_seconds ?? null,
+    visual_direction: idea.visual_direction ?? null,
+    why_it_works: idea.why_it_works,
+    hashtags: idea.hashtags ?? [],
+    filming_checklist: idea.filming_checklist ?? [],
+    status: "not_started",
+  };
 }
 
 function toRow(
