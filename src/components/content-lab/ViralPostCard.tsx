@@ -75,7 +75,12 @@ const isHookDistinct = (hook: string | null, caption: string | null): boolean =>
 const ViralPostCard = ({ post }: ViralPostCardProps) => {
   const [imgFailed, setImgFailed] = useState(false);
   const isVideo = VIDEO_TYPES.has((post.post_type ?? '').toLowerCase());
-  const ctaLabel = isVideo ? 'View reel' : 'View post';
+  const platformLower = (post.platform ?? '').toLowerCase();
+  const ctaLabel = platformLower === 'tiktok'
+    ? 'View TikTok'
+    : platformLower === 'facebook'
+      ? (isVideo ? 'View video' : 'View post')
+      : (isVideo ? 'View reel' : 'View post');
   const proxied = proxiedSrc(post.thumbnail_url);
   // Fallback to original URL if proxy fails
   const thumb = imgFailed ? post.thumbnail_url : proxied;
