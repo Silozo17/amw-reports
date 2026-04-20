@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Users, Plug } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Building2, Users, Plug, Shield } from 'lucide-react';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const AdminDashboard = () => {
@@ -35,9 +37,14 @@ const AdminDashboard = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-display">Platform Overview</h1>
-          <p className="text-muted-foreground font-body mt-1">AMW Reports platform statistics</p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-display">Platform Overview</h1>
+            <p className="text-muted-foreground font-body mt-1">AMW Reports platform statistics</p>
+          </div>
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/admin/security"><Shield className="h-4 w-4" /> Security &amp; Spend</Link>
+          </Button>
         </div>
 
         {isLoading ? (
