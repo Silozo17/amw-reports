@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   Search,
@@ -17,12 +18,14 @@ import {
   Building2,
   Check,
   Rocket,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
@@ -30,6 +33,13 @@ import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
 import { useContentLabPublicDemo } from '@/hooks/useContentLabPublicDemo';
 import { AMW_DEMO_SHARE_SLUG } from '@/lib/contentLabDemo';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  CONTENT_LAB_TIER_LIST,
+  CONTENT_LAB_CREDIT_PACK_LIST,
+  type ContentLabTierKey,
+} from '@/lib/contentLabPricing';
 
 const SAMPLE_IDEA = {
   hook: '3 things I wish I knew before launching my agency',
@@ -66,17 +76,13 @@ const AUDIENCES = [
   { icon: Building2, title: 'Agencies', body: 'Scale content production across every client. Multi-tenant, white-labelled, kanban-tracked.' },
 ];
 
-const TIERS = [
-  { name: 'Creator', runs: '1 run / month', price: 'Free', highlight: false, perks: ['1 niche', 'Hook & Trend libraries', 'Swipe file', 'Phone-mockup previews'] },
-  { name: 'Studio', runs: '3 runs / month', price: 'Most popular', highlight: true, perks: ['Up to 5 niches', 'Pipeline kanban', 'DOCX export', 'Client sharing links'] },
-  { name: 'Agency', runs: '10 runs / month', price: 'For agencies', highlight: false, perks: ['Unlimited niches', 'Full multi-client access', 'White-label sharing', 'Priority compute'] },
-];
+// Pricing comes from CONTENT_LAB_TIER_LIST / CONTENT_LAB_CREDIT_PACK_LIST in contentLabPricing.ts.
 
-const CREDIT_PACKS = [
-  { credits: 5, price: '£15', per: '£3.00 / credit' },
-  { credits: 25, price: '£60', per: '£2.40 / credit', badge: 'Best value' },
-  { credits: 100, price: '£200', per: '£2.00 / credit', badge: 'Best deal' },
-];
+const TIER_PERKS: Record<ContentLabTierKey, string[]> = {
+  starter: ['1 niche', 'Hook & Trend libraries', 'Swipe file', 'Phone-mockup previews'],
+  growth:  ['Up to 5 niches', 'Pipeline kanban', 'DOCX export', 'Client sharing links'],
+  scale:   ['Unlimited niches', 'Full multi-client access', 'White-label sharing', 'Priority compute'],
+};
 
 const TIMELINE = [
   { t: '0:00', label: 'Run starts', body: 'You hit “New run” — we queue scrape jobs across Instagram, TikTok and Facebook.' },
