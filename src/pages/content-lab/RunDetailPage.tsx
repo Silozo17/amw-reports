@@ -2,13 +2,24 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import usePageMeta from '@/hooks/usePageMeta';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
@@ -28,6 +39,7 @@ const RunDetailPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
+  const [rescraping, setRescraping] = useState(false);
 
   const handleRetry = async () => {
     if (!id) return;
@@ -45,6 +57,26 @@ const RunDetailPage = () => {
       toast.error(e instanceof Error ? e.message : 'Retry failed');
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const handleRescrape = async () => {
+    if (!id) return;
+    setRescraping(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('content-lab-resume', {
+        body: { run_id: id, rescrape: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Rescrape started — refreshing posts with transcripts, music & hashtags.');
+      queryClient.invalidateQueries({ queryKey: ['content-lab-run', id] });
+      queryClient.invalidateQueries({ queryKey: ['content-lab-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ['content-lab-ideas', id] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Rescrape failed');
+    } finally {
+      setRescraping(false);
     }
   };
 
@@ -110,12 +142,38 @@ const RunDetailPage = () => {
               <p className="mt-2 max-w-2xl text-sm text-destructive">{run.error_message}</p>
             )}
           </div>
-          {run?.status === 'failed' && posts.length > 0 && (
-            <Button onClick={handleRetry} disabled={retrying} size="sm">
-              <RefreshCw className={`mr-2 h-4 w-4 ${retrying ? 'animate-spin' : ''}`} />
-              {retrying ? 'Retrying…' : 'Retry ideation'}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {run?.status === 'failed' && posts.length > 0 && (
+              <Button onClick={handleRetry} disabled={retrying} size="sm">
+                <RefreshCw className={`mr-2 h-4 w-4 ${retrying ? 'animate-spin' : ''}`} />
+                {retrying ? 'Retrying…' : 'Retry ideation'}
+              </Button>
+            )}
+            {posts.length > 0 && ['completed', 'failed'].includes(run?.status ?? '') && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={rescraping}>
+                    <Sparkles className={`mr-2 h-4 w-4 ${rescraping ? 'animate-spin' : ''}`} />
+                    {rescraping ? 'Rescraping…' : 'Rescrape (uses credits)'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Rescrape this run?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will delete the existing posts and pull fresh data from Instagram via Apify, including
+                      transcripts, hashtags, music and tagged users. <strong>This costs Apify credits</strong> (one
+                      full scrape, ~73 posts). Ideas will also be regenerated.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRescrape}>Rescrape now</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </header>
 
         <Tabs defaultValue="feed" className="space-y-6">

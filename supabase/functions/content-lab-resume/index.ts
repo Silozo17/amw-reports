@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "content-lab-resume", method: req.method }));
 
   try {
-    const { run_id } = await req.json().catch(() => ({}));
+    const { run_id, rescrape } = await req.json().catch(() => ({}));
     if (!run_id) return json({ error: "run_id is required" }, 400);
 
     const authHeader = req.headers.get("Authorization");
@@ -61,9 +61,9 @@ Deno.serve(async (req) => {
     }
 
     // Fire and forget so the client returns immediately
-    runResume(admin, run_id).catch((e) => console.error("Resume crashed:", e));
+    runResume(admin, run_id, rescrape === true).catch((e) => console.error("Resume crashed:", e));
 
-    return json({ ok: true, run_id, post_count: postCount, platforms: [...availablePlatforms] });
+    return json({ ok: true, run_id, post_count: postCount, platforms: [...availablePlatforms], rescrape: rescrape === true });
   } catch (e) {
     console.error("content-lab-resume error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
@@ -77,7 +77,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function runResume(admin: ReturnType<typeof createClient>, runId: string) {
+async function runResume(admin: ReturnType<typeof createClient>, runId: string, rescrape: boolean) {
   const updateStatus = async (status: string, extra: Record<string, unknown> = {}) => {
     await admin.from("content_lab_runs").update({
       status, updated_at: new Date().toISOString(), ...extra,
@@ -89,11 +89,30 @@ async function runResume(admin: ReturnType<typeof createClient>, runId: string) 
     await updateStatus("failed", { error_message: msg, completed_at: new Date().toISOString() });
   };
 
-  const pipelineLog = await logStepStart({ runId, step: "pipeline", message: "Resume started (skip scrape)" });
+  const pipelineLog = await logStepStart({
+    runId,
+    step: "pipeline",
+    message: rescrape ? "Resume started (RESCRAPE)" : "Resume started (skip scrape)",
+  });
 
   try {
-    // Reset to analysing — keep posts, clear stale ideas only
+    // Always clear stale ideas
     await admin.from("content_lab_ideas").delete().eq("run_id", runId);
+
+    // Optional rescrape: wipe existing posts + re-run scrape (costs Apify credits)
+    if (rescrape) {
+      const scrapeStep = await logStepStart({ runId, step: "scrape", message: "Rescraping (user-requested)" });
+      await admin.from("content_lab_posts").delete().eq("run_id", runId);
+      await updateStatus("scraping", { error_message: null, completed_at: null });
+      const scrapeRes = await callFn("content-lab-scrape", { run_id: runId });
+      if (!scrapeRes.ok) {
+        await scrapeStep.finish({ status: "failed", errorMessage: scrapeRes.error ?? "unknown" });
+        await pipelineLog.finish({ status: "failed", errorMessage: `Rescrape failed: ${scrapeRes.error ?? "unknown"}` });
+        return fail(`Rescrape failed: ${scrapeRes.error ?? "unknown"}`);
+      }
+      await scrapeStep.finish({ status: "ok", message: "Rescrape complete" });
+    }
+
     await updateStatus("analysing", { error_message: null, completed_at: null });
 
     // ANALYSE (best-effort)

@@ -67,11 +67,19 @@ Deno.serve(async (req) => {
       },
     });
 
+    const contentType = upstream.headers.get('Content-Type') ?? 'image/jpeg';
+    console.log(JSON.stringify({
+      ts: new Date().toISOString(),
+      fn: 'content-lab-image-proxy',
+      host: parsed.hostname,
+      status: upstream.status,
+      contentType,
+    }));
+
     if (!upstream.ok || !upstream.body) {
       return fallback();
     }
 
-    const contentType = upstream.headers.get('Content-Type') ?? 'image/jpeg';
     if (!contentType.startsWith('image/')) {
       return fallback();
     }

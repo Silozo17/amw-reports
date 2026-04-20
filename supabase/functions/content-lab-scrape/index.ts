@@ -46,6 +46,13 @@ interface ScrapedPost {
   shares: number;
   views: number;
   posted_at: string | null;
+  transcript: string | null;
+  video_duration_seconds: number | null;
+  hashtags: string[];
+  mentions: string[];
+  music_title: string | null;
+  music_artist: string | null;
+  tagged_users: string[];
 }
 
 Deno.serve(async (req) => {
@@ -135,6 +142,13 @@ Deno.serve(async (req) => {
         views: p.views,
         engagement_rate,
         posted_at: p.posted_at,
+        transcript: p.transcript,
+        video_duration_seconds: p.video_duration_seconds,
+        hashtags: p.hashtags,
+        mentions: p.mentions,
+        music_title: p.music_title,
+        music_artist: p.music_artist,
+        tagged_users: p.tagged_users,
       };
     });
 
@@ -304,6 +318,13 @@ async function fetchOwnInstagramPosts(
       shares: 0,
       views: 0,
       posted_at: m.timestamp ?? null,
+      transcript: null,
+      video_duration_seconds: null,
+      hashtags: [],
+      mentions: [],
+      music_title: null,
+      music_artist: null,
+      tagged_users: [],
     }));
   } catch (e) {
     console.error("IG own fetch failed:", e);
@@ -345,24 +366,41 @@ async function runApifyForHandles(handles: string[], resultsLimit: number): Prom
     if (!Array.isArray(items)) return [];
 
     return items.map((it: {
-      ownerUsername?: string; url?: string; type?: string; caption?: string;
+      ownerUsername?: string; url?: string; type?: string; productType?: string; caption?: string;
       displayUrl?: string; likesCount?: number; commentsCount?: number;
-      videoViewCount?: number; videoPlayCount?: number; timestamp?: string;
-    }) => ({
-      platform: "instagram" as const,
-      source: "apify" as const,
-      bucket: "competitor" as const, // overwritten by caller
-      author_handle: (it.ownerUsername ?? "unknown").toLowerCase(),
-      post_url: it.url ?? null,
-      post_type: it.type?.toLowerCase() ?? null,
-      caption: it.caption ?? null,
-      thumbnail_url: it.displayUrl ?? null,
-      likes: it.likesCount ?? 0,
-      comments: it.commentsCount ?? 0,
-      shares: 0,
-      views: it.videoViewCount ?? it.videoPlayCount ?? 0,
-      posted_at: it.timestamp ?? null,
-    }));
+      videoViewCount?: number; videoPlayCount?: number; videoDuration?: number;
+      videoTranscript?: string; timestamp?: string;
+      hashtags?: string[]; mentions?: string[];
+      musicInfo?: { song_name?: string; artist_name?: string };
+      taggedUsers?: Array<{ username?: string }>;
+    }) => {
+      const rawType = (it.productType ?? it.type ?? "").toLowerCase();
+      const post_type = rawType === "clips" ? "reel" : rawType || null;
+      return {
+        platform: "instagram" as const,
+        source: "apify" as const,
+        bucket: "competitor" as const, // overwritten by caller
+        author_handle: (it.ownerUsername ?? "unknown").toLowerCase(),
+        post_url: it.url ?? null,
+        post_type,
+        caption: it.caption ?? null,
+        thumbnail_url: it.displayUrl ?? null,
+        likes: it.likesCount ?? 0,
+        comments: it.commentsCount ?? 0,
+        shares: 0,
+        views: it.videoViewCount ?? it.videoPlayCount ?? 0,
+        posted_at: it.timestamp ?? null,
+        transcript: it.videoTranscript?.trim() || null,
+        video_duration_seconds: it.videoDuration ? Math.round(it.videoDuration) : null,
+        hashtags: Array.isArray(it.hashtags) ? it.hashtags.filter((h) => typeof h === "string") : [],
+        mentions: Array.isArray(it.mentions) ? it.mentions.filter((m) => typeof m === "string") : [],
+        music_title: it.musicInfo?.song_name ?? null,
+        music_artist: it.musicInfo?.artist_name ?? null,
+        tagged_users: Array.isArray(it.taggedUsers)
+          ? it.taggedUsers.map((u) => u.username).filter((u): u is string => !!u)
+          : [],
+      };
+    });
   } catch (e) {
     console.error("Apify fetch failed:", e);
     return [];
