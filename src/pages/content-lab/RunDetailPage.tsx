@@ -102,6 +102,7 @@ const RunDetailPage = () => {
   const [rescraping, setRescraping] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [commentsIdeaId, setCommentsIdeaId] = useState<string | null>(null);
 
   const handleExportDocx = async () => {
     if (!id) return;
@@ -185,7 +186,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_niches')
-        .select('niche_tag, platforms_to_scrape, label')
+        .select('id, client_id, niche_tag, platforms_to_scrape, label')
         .eq('id', run!.niche_id)
         .single();
       if (error) throw error;
@@ -409,7 +410,19 @@ const RunDetailPage = () => {
               ideas.map((idea) => (
                 <Card key={idea.id} className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
                   <div>
-                    {renderPreview(idea.target_platform, idea.hook ?? idea.title, idea.caption)}
+                    <IdeaPreviewWithState
+                      idea={{
+                        id: idea.id,
+                        target_platform: idea.target_platform,
+                        hook: idea.hook,
+                        title: idea.title,
+                        caption: idea.caption,
+                      }}
+                      runId={id!}
+                      clientId={niche?.client_id ?? null}
+                      nicheId={run?.niche_id ?? null}
+                      onOpenComments={(ideaId) => setCommentsIdeaId(ideaId)}
+                    />
                     {idea.target_platform && (
                       <p className="mt-2 text-center text-[10px] uppercase tracking-widest text-muted-foreground">
                         {idea.target_platform}
