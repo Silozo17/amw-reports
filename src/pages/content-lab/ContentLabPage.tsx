@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play, CreditCard } from 'lucide-react';
+import { Plus, Sparkles, FileText, Clock, CheckCircle2, AlertCircle, Loader2, Play, CreditCard, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useContentLabNiches, useContentLabRuns, useContentLabUsage, ContentLabRun, ContentLabNiche } from '@/hooks/useContentLab';
-import { useBenchmarkPoolStatus, POOL_RUN_THRESHOLD } from '@/hooks/useBenchmarkPoolStatus';
+import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
 import usePageMeta from '@/hooks/usePageMeta';
@@ -42,12 +42,11 @@ const ContentLabPage = () => {
   const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
   const { data: usage } = useContentLabUsage();
   const [runningNiche, setRunningNiche] = useState<string | null>(null);
-  const [pendingRunNicheId, setPendingRunNicheId] = useState<string | null>(null);
+  const [pendingNicheId, setPendingNicheId] = useState<string | null>(null);
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
 
   usePageMeta({ title: 'Content Lab', description: 'Discover what is working in your niche and generate ready-to-film content ideas.' });
 
-  // Handle Stripe checkout return
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const credits = params.get('credits');
@@ -67,23 +66,14 @@ const ContentLabPage = () => {
   const noCredits = (usage?.creditBalance ?? 0) <= 0;
   const blocked = monthlyExhausted && noCredits;
 
-  const RECENT_RUN_WINDOW_MS = 24 * 60 * 60 * 1000;
-  const findRecentSuccessfulRun = (nicheId: string) =>
-    runs.find(
-      (r) =>
-        r.niche_id === nicheId &&
-        r.status === 'completed' &&
-        Date.now() - new Date(r.created_at).getTime() < RECENT_RUN_WINDOW_MS,
-    );
-
   const startRun = async (nicheId: string) => {
     setRunningNiche(nicheId);
     try {
       const { data, error } = await supabase.functions.invoke('content-lab-pipeline', {
-        body: { niche_id: nicheId },
+        body: { niche_id: nicheId, email_on_complete: true },
       });
       if (error) throw error;
-      toast.success('Run started — refresh in ~1 min for results');
+      toast.success("Run started — we'll email you when your ideas are ready (~20–40 min).");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['content-lab-runs'] }),
         queryClient.invalidateQueries({ queryKey: ['content-lab-usage'] }),
@@ -102,17 +92,8 @@ const ContentLabPage = () => {
       toast.error(`Monthly limit reached (${usage?.runsThisMonth}/${usage?.runsLimit}) and no credits left. Top up to keep running.`);
       return;
     }
-    if (findRecentSuccessfulRun(nicheId)) {
-      setPendingRunNicheId(nicheId);
-      return;
-    }
-    void startRun(nicheId);
+    setPendingNicheId(nicheId);
   };
-
-  const recentRunForDialog = pendingRunNicheId ? findRecentSuccessfulRun(pendingRunNicheId) : null;
-  const hoursAgo = recentRunForDialog
-    ? Math.max(1, Math.round((Date.now() - new Date(recentRunForDialog.created_at).getTime()) / (60 * 60 * 1000)))
-    : 0;
 
   return (
     <AppLayout>
@@ -148,25 +129,39 @@ const ContentLabPage = () => {
 
         <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
 
-        <AlertDialog open={!!pendingRunNicheId} onOpenChange={(open) => !open && setPendingRunNicheId(null)}>
+        <AlertDialog open={!!pendingNicheId} onOpenChange={(open) => !open && setPendingNicheId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Re-run this niche?</AlertDialogTitle>
-              <AlertDialogDescription>
-                You ran this niche {hoursAgo} hour{hoursAgo === 1 ? '' : 's'} ago. Re-running counts as another scrape against your monthly limit.
-                {usage && ` You've used ${usage.runsThisMonth} of ${usage.runsLimit} runs this month.`}
+              <AlertDialogTitle>Start your Content Lab run?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3 text-sm">
+                  <p>
+                    This typically takes <strong>20–40 minutes</strong> end to end. We'll scrape your latest posts, the top benchmark accounts and competitors,
+                    decode what's working, then generate 12 ready-to-film ideas.
+                  </p>
+                  <p className="flex items-start gap-2 rounded-md bg-primary/5 p-3 text-foreground">
+                    <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span>You'll get an email the moment your ideas are ready — feel free to close this tab.</span>
+                  </p>
+                  {usage && (
+                    <p className="text-xs text-muted-foreground">
+                      Uses 1 of {usage.runsLimit} monthly runs ({usage.runsThisMonth} used so far).
+                      {monthlyExhausted && ` Will spend 1 credit instead — ${usage.creditBalance} available.`}
+                    </p>
+                  )}
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  const id = pendingRunNicheId;
-                  setPendingRunNicheId(null);
+                  const id = pendingNicheId;
+                  setPendingNicheId(null);
                   if (id) void startRun(id);
                 }}
               >
-                Run again
+                Start run
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -276,7 +271,7 @@ const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
     niche.competitor_urls.length > 0;
   const noHandles = !hasHandles;
   const buildingMessage = pool && !pool.canRun
-    ? `Benchmarks still building (${pool.verifiedCount}/${POOL_RUN_THRESHOLD}). This run will use saved niche benchmarks.`
+    ? `Benchmarks still building. This run will use saved niche benchmarks.`
     : null;
 
   const runButton = (

@@ -1,14 +1,10 @@
-// content-lab-pipeline: orchestrator. Creates a run (or accepts run_id), then chains
-// scrape -> analyse -> ideate, updating run status throughout. Each step is a separate
-// edge function call to avoid the 60s wall-clock cap on a single function.
-//
-// v2 changes:
-// - Removed PDF rendering step (in-app feed only)
-// - Empty-scrape handling: marks run as failed with a friendly message instead of crashing
-// - Analyse step is best-effort (non-fatal); ideate is required
+// content-lab-pipeline: thin DISPATCHER. Creates a run row (or accepts run_id),
+// performs pre-flight gates, then hands the run off to content-lab-step-runner
+// which advances the state machine one step at a time. This replaces the previous
+// monolithic background task that exceeded the ~400s edge runtime ceiling and left
+// runs stuck in `ideating` even when ideation succeeded.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { logStepStart } from "../_shared/contentLabStepLog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,15 +16,13 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Per-org monthly run ceilings. When the monthly allowance is exhausted, the org
-// can keep running by spending credits (1 credit = 1 extra run). Top-ups are
-// purchased separately.
 const RUN_LIMITS_BY_TIER: Record<string, number> = {
   creator: 1,
   studio: 3,
   agency: 10,
 };
 const DEFAULT_RUN_LIMIT = 1;
+const STALE_RUN_MINUTES = 10;
 
 async function getMonthlyLimit(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
   const { data } = await admin
@@ -67,9 +61,10 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { niche_id, run_id: existingRunId } = body as { niche_id?: string; run_id?: string };
+    const { niche_id, run_id: existingRunId, email_on_complete } = body as {
+      niche_id?: string; run_id?: string; email_on_complete?: boolean;
+    };
 
-    // Verify caller — must be authenticated org member
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Unauthorized" }, 401);
     const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -80,17 +75,18 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    // Defensive sweep: any active run older than STALE_RUN_MINUTES → force-fail.
+    await reapStaleRuns(admin);
+
     let runId = existingRunId;
     let orgIdForUsage: string | null = null;
 
-    // Create run from niche if not provided
     if (!runId) {
       if (!niche_id) return json({ error: "niche_id or run_id is required" }, 400);
       const { data: niche, error: nErr } = await admin
         .from("content_lab_niches").select("id, client_id, org_id").eq("id", niche_id).single();
       if (nErr || !niche) return json({ error: "Niche not found" }, 404);
 
-      // Pre-flight monthly usage cap. If exhausted, allow if credit balance > 0.
       const orgIdNew = (niche as { org_id: string }).org_id;
       const limit = await getMonthlyLimit(admin, orgIdNew);
       const used = await getCurrentUsage(admin, orgIdNew);
@@ -110,46 +106,35 @@ Deno.serve(async (req) => {
         .insert({
           niche_id: niche.id,
           client_id: (niche as { client_id: string }).client_id,
-          org_id: (niche as { org_id: string }).org_id,
+          org_id: orgIdNew,
           status: "pending",
           triggered_by: user.id,
+          email_on_complete: email_on_complete !== false,
         })
         .select("id").single();
       if (cErr || !created) return json({ error: cErr?.message ?? "Could not create run" }, 500);
       runId = created.id;
-      orgIdForUsage = (niche as { org_id: string }).org_id;
+      orgIdForUsage = orgIdNew;
     } else {
       const { data: existing } = await admin
         .from("content_lab_runs").select("org_id").eq("id", runId).single();
       orgIdForUsage = (existing as { org_id?: string } | null)?.org_id ?? null;
+      if (typeof email_on_complete === "boolean") {
+        await admin.from("content_lab_runs")
+          .update({ email_on_complete, updated_at: new Date().toISOString() })
+          .eq("id", runId);
+      }
     }
 
-    // Defensive sweep: any of this org's runs older than 30 min still in active states are stuck — mark failed.
-    if (orgIdForUsage) {
-      const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-      await admin
-        .from("content_lab_runs")
-        .update({
-          status: "failed",
-          error_message: "Run timed out (>30min in active state). Auto-failed by orchestrator.",
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("org_id", orgIdForUsage)
-        .in("status", ["pending", "scraping", "analysing", "ideating"])
-        .lt("updated_at", cutoff)
-        .neq("id", runId!);
-    }
-
-    // Kick off async pipeline as a true background task so the runtime keeps it alive.
-    const bgTask = runPipeline(admin, runId!, orgIdForUsage).catch((e) => {
-      console.error("Pipeline crashed:", e);
-    });
-    // @ts-expect-error EdgeRuntime is provided by Supabase edge runtime
-    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
-      // @ts-expect-error see above
-      EdgeRuntime.waitUntil(bgTask);
-    }
+    // Hand off to the state-machine step runner.
+    await fetch(`${SUPABASE_URL}/functions/v1/content-lab-step-runner`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ run_id: runId, mode: "fresh" }),
+    }).catch((e) => console.error("step-runner kick failed:", e));
 
     return json({ ok: true, run_id: runId }, 202);
   } catch (e) {
@@ -164,182 +149,16 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function runPipeline(admin: ReturnType<typeof createClient>, runId: string, orgId: string | null) {
-  const updateStatus = async (status: string, extra: Record<string, unknown> = {}) => {
-    await admin.from("content_lab_runs").update({
-      status, updated_at: new Date().toISOString(), ...extra,
-    }).eq("id", runId);
-  };
-
-  const fail = async (msg: string) => {
-    console.error("Pipeline fail:", runId, msg);
-    await updateStatus("failed", { error_message: msg, completed_at: new Date().toISOString() });
-  };
-
-  const pipelineLog = await logStepStart({ runId, step: "pipeline", message: "Pipeline started" });
-
-  try {
-    // Clear any previous posts/ideas for idempotency
-    await admin.from("content_lab_posts").delete().eq("run_id", runId);
-    await admin.from("content_lab_ideas").delete().eq("run_id", runId);
-
-    // Pre-flight: ensure the niche has at least one handle to scrape
-    const { data: runRow } = await admin
-      .from("content_lab_runs")
-      .select("niche:niche_id(own_handle, top_competitors, top_global_benchmarks, tracked_handles)")
-      .eq("id", runId)
-      .single();
-    const niche = (runRow as { niche: {
-      own_handle: string | null;
-      top_competitors: Array<{ handle?: string }> | null;
-      top_global_benchmarks: Array<{ handle?: string }> | null;
-      tracked_handles: Array<{ handle?: string }> | null;
-    } } | null)?.niche;
-    const handleCount =
-      (niche?.own_handle ? 1 : 0) +
-      (niche?.top_competitors?.length ?? 0) +
-      (niche?.top_global_benchmarks?.length ?? 0) +
-      (niche?.tracked_handles?.length ?? 0);
-    if (handleCount === 0) {
-      await pipelineLog.finish({ status: "failed", errorMessage: "No handles configured" });
-      return fail("Niche has no handles to scrape — re-run discovery from the niche form.");
-    }
-
-    // 1. SCRAPE
-    await updateStatus("scraping", { started_at: new Date().toISOString() });
-    const scrapeStep = await logStepStart({ runId, step: "scrape", message: "Calling content-lab-scrape" });
-    const scrapeRes = await callFn("content-lab-scrape", { run_id: runId });
-    if (!scrapeRes.ok) {
-      await scrapeStep.finish({ status: "failed", errorMessage: scrapeRes.error ?? "unknown" });
-      await pipelineLog.finish({ status: "failed", errorMessage: `Scrape failed: ${scrapeRes.error ?? "unknown"}` });
-      return fail(`Scrape failed: ${scrapeRes.error ?? "unknown"}`);
-    }
-
-    // Verify we actually got posts before continuing
-    const { count: postCount } = await admin
-      .from("content_lab_posts")
-      .select("id", { count: "exact", head: true })
-      .eq("run_id", runId);
-
-    await scrapeStep.finish({
-      status: "ok",
-      message: `Scraped ${postCount ?? 0} posts`,
-      payload: { post_count: postCount ?? 0 },
-    });
-
-    if (!postCount || postCount === 0) {
-      await pipelineLog.finish({ status: "failed", errorMessage: "No posts scraped" });
-      return fail(
-        "No posts could be fetched. Check that the tracked Instagram handles are public and spelled correctly, then try again.",
-      );
-    }
-    console.log(`Pipeline ${runId}: scraped ${postCount} posts`);
-
-    // Charge usage only once we know the scrape produced data.
-    // If the monthly allowance is exhausted, consume one credit instead.
-    if (orgId) {
-      const limit = await getMonthlyLimit(admin, orgId);
-      const used = await getCurrentUsage(admin, orgId);
-      if (used < limit) {
-        const { error: usageErr } = await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
-        if (usageErr) console.error("Usage increment failed:", usageErr);
-      } else {
-        const { data: ok, error: credErr } = await admin.rpc("consume_content_lab_credit", {
-          _org_id: orgId,
-          _run_id: runId,
-          _amount: 1,
-        });
-        if (credErr) console.error("Credit consume failed:", credErr);
-        else if (!ok) console.error(`Credit consume returned false for org ${orgId}`);
-      }
-    }
-
-    // 2. ANALYSE (best-effort)
-    await updateStatus("analysing");
-    const analyseStep = await logStepStart({ runId, step: "analyse", message: "Calling content-lab-analyse" });
-    const analyseRes = await callFn("content-lab-analyse", { run_id: runId });
-    if (!analyseRes.ok) {
-      console.error(`Analyse step failed (non-fatal) for ${runId}:`, analyseRes.error);
-      await analyseStep.finish({
-        status: "failed",
-        message: "Non-fatal — pipeline continued",
-        errorMessage: analyseRes.error ?? "unknown",
-      });
-    } else {
-      await analyseStep.finish({ status: "ok", message: "Analyse complete" });
-    }
-
-    // 3. IDEATE (required) — per-platform to stay under function timeout
-    await updateStatus("ideating");
-    const { data: nicheRow } = await admin
-      .from("content_lab_runs")
-      .select("niche:niche_id(platforms_to_scrape)")
-      .eq("id", runId)
-      .single();
-    const platforms: string[] =
-      ((nicheRow as { niche: { platforms_to_scrape?: string[] } } | null)?.niche?.platforms_to_scrape) ?? ["instagram"];
-
-    let anyPlatformSucceeded = false;
-    for (const platform of platforms) {
-      const ideateStep = await logStepStart({
-        runId,
-        step: "ideate",
-        message: `Calling content-lab-ideate (${platform})`,
-        payload: { platform },
-      });
-      const ideateRes = await callFn("content-lab-ideate", { run_id: runId, platform });
-      if (!ideateRes.ok) {
-        await ideateStep.finish({
-          status: "failed",
-          errorMessage: ideateRes.error ?? "unknown",
-          payload: { platform },
-        });
-        console.error(`Ideate failed for ${platform}:`, ideateRes.error);
-      } else {
-        anyPlatformSucceeded = true;
-        await ideateStep.finish({ status: "ok", message: `Ideate complete for ${platform}`, payload: { platform } });
-      }
-    }
-
-    if (!anyPlatformSucceeded) {
-      await pipelineLog.finish({ status: "failed", errorMessage: "Ideate failed for all platforms" });
-      return fail("Ideate failed for all platforms — check the run logs.");
-    }
-
-    const { count: ideaCount } = await admin
-      .from("content_lab_ideas")
-      .select("id", { count: "exact", head: true })
-      .eq("run_id", runId);
-
-    await updateStatus("completed", { completed_at: new Date().toISOString() });
-    await pipelineLog.finish({
-      status: "ok",
-      message: "Pipeline completed",
-      payload: { post_count: postCount ?? 0, idea_count: ideaCount ?? 0 },
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    await pipelineLog.finish({ status: "failed", errorMessage: msg });
-    await fail(msg);
-  }
-}
-
-async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${SERVICE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      return { ok: false, error: `${res.status} ${text}` };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "fetch failed" };
-  }
+async function reapStaleRuns(admin: ReturnType<typeof createClient>) {
+  const cutoff = new Date(Date.now() - STALE_RUN_MINUTES * 60 * 1000).toISOString();
+  await admin
+    .from("content_lab_runs")
+    .update({
+      status: "failed",
+      error_message: `Run timed out (>${STALE_RUN_MINUTES}min in active state). Auto-failed by orchestrator.`,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .in("status", ["pending", "scraping", "analysing", "ideating"])
+    .lt("updated_at", cutoff);
 }
