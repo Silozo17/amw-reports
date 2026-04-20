@@ -251,11 +251,24 @@ const ContentLabPage = () => {
           <h2 className="mb-4 font-display text-xl">Recent Runs</h2>
           {runsLoading ? (
             <p className="text-sm text-muted-foreground">Loading runs…</p>
-          ) : runs.length === 0 ? (
+          ) : groupedRuns.length === 0 ? (
             <p className="text-sm text-muted-foreground">No runs yet. Create a niche to generate your first report.</p>
           ) : (
-            <div className="space-y-2">
-              {runs.map((run) => {
+            <Accordion type="multiple" defaultValue={groupedRuns.slice(0, 1).map((g) => g.clientId)} className="space-y-2">
+              {groupedRuns.flatMap((group) => group.runs.slice(0, 0)).length}
+              {groupedRuns.map((group) => (
+                <AccordionItem key={group.clientId} value={group.clientId} className="rounded-lg border bg-card mb-2">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                    <div className="flex flex-1 items-center justify-between gap-3 pr-3">
+                      <span className="font-display text-sm">{group.clientName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {group.runs.length} run{group.runs.length === 1 ? '' : 's'} · last {new Date(group.latestAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4">
+                    <div className="space-y-2 pb-2">
+                      {group.runs.slice(0, 5).map((run) => {
                 const niche = niches.find((n) => n.id === run.niche_id);
                 return (
                   <Card
