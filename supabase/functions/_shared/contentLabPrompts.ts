@@ -41,8 +41,7 @@ HARD RULES — output is rejected if any are violated:
 // Each idea must reference a real source post in this run. No exceptions.
 export const REQUIRED_RULES = `
 REQUIRED — every idea must satisfy:
-- Hook: a sentence a real person says out loud in the first 3 seconds. Conversational. Specific to the niche. Use British English spelling and idiom (organisation, colour, optimise, etc.) unless niche.language explicitly says otherwise.
-- 3 hook variants: produce three different hooks for the same idea, each using a DIFFERENT mechanism from this enum: contrarian, list, question, story, stat, demo, before-after, callout. Label each variant with its mechanism.
+- Hook: ONE sentence a real person says out loud in the first 3 seconds. Conversational. Specific to the niche. Use British English spelling and idiom (organisation, colour, optimise, etc.) unless niche.language explicitly says otherwise. Pick the strongest mechanism for this idea from: contrarian, list, question, story, stat, demo, before-after, callout. Do NOT return multiple hook variants — return one canonical hook per idea.
 - Body: grounded in something observed in the source post (a pattern, a question, a mistake, a method). Not generic advice.
 - CTA: must reference something tangible — answer a question in the comments, save for later, send to a specific friend, comment a keyword, DM a specific phrase.
 - Evidence: every idea must set based_on_handle to the @handle of a real source post from the list provided, and why_it_works must reference a real metric (engagement rate, likes, comments, views) from that post — not generic theory.

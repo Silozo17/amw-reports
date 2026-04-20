@@ -328,7 +328,7 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 6000,
+        max_tokens: 16000,
         tools: [tool],
         tool_choice: { type: "tool", name: "generate_ideas" },
         system: systemPrompt,
@@ -357,11 +357,56 @@ Use the generate_ideas tool to return exactly ${count} ${platform}-native ideas 
     }
 
     const data = await res.json();
-    const toolUse = (data.content ?? []).find((c: { type: string }) => c.type === "tool_use");
+    const contentBlocks = (data.content ?? []) as Array<{ type: string; text?: string; input?: { ideas?: GeneratedIdea[] } }>;
+    const toolUse = contentBlocks.find((c) => c.type === "tool_use");
+
     if (!toolUse?.input?.ideas) {
-      return { ok: false, error: "Claude response had no tool_use ideas" };
+      // Capture exactly what Anthropic returned so we stop guessing.
+      const stopReason = data.stop_reason ?? "unknown";
+      const blockTypes = contentBlocks.map((c) => c.type).join(",") || "none";
+      const textBlock = contentBlocks.find((c) => c.type === "text")?.text ?? "";
+      const textPreview = textBlock ? textBlock.slice(0, 400) : "";
+      const usage = data.usage ? `in:${data.usage.input_tokens}/out:${data.usage.output_tokens}` : "n/a";
+
+      console.error(JSON.stringify({
+        fn: "content-lab-ideate",
+        anthropic_no_tool_use: true,
+        platform,
+        request_id: requestId,
+        stop_reason: stopReason,
+        block_types: blockTypes,
+        usage,
+        text_preview: textPreview,
+        full_response_preview: JSON.stringify(data).slice(0, 1200),
+      }));
+
+      const detail = textPreview ? `text: "${textPreview}"` : "no text block";
+      return {
+        ok: false,
+        error: `Claude returned no tool_use (stop_reason=${stopReason}, blocks=${blockTypes}, ${detail}, req:${requestId})`,
+      };
     }
-    return { ok: true, ideas: toolUse.input.ideas as GeneratedIdea[] };
+
+    const ideas = toolUse.input.ideas;
+    const missing: string[] = [];
+    ideas.forEach((idea, i) => {
+      if (!idea.title) missing.push(`#${i + 1}.title`);
+      if (!idea.hook) missing.push(`#${i + 1}.hook`);
+      if (!idea.body) missing.push(`#${i + 1}.body`);
+      if (!idea.why_it_works) missing.push(`#${i + 1}.why_it_works`);
+    });
+    if (missing.length > 0) {
+      console.error(JSON.stringify({
+        fn: "content-lab-ideate",
+        anthropic_invalid_payload: true,
+        platform,
+        request_id: requestId,
+        missing_fields: missing.slice(0, 10),
+      }));
+      return { ok: false, error: `Claude payload missing required fields: ${missing.slice(0, 5).join(", ")} (req:${requestId})` };
+    }
+
+    return { ok: true, ideas };
   } catch (e) {
     console.error(`generateIdeasForPlatform(${platform}) failed:`, e);
     return { ok: false, error: e instanceof Error ? e.message : "fetch failed" };

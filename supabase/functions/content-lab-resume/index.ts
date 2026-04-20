@@ -34,23 +34,36 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Verify run exists and has posts
+    // Verify run exists and load niche so we can preflight platforms.
     const { data: run } = await admin
-      .from("content_lab_runs").select("id, org_id, status").eq("id", run_id).single();
+      .from("content_lab_runs").select("id, org_id, status, niche_id").eq("id", run_id).single();
     if (!run) return json({ error: "Run not found" }, 404);
 
-    const { count: postCount } = await admin
+    const { data: niche } = await admin
+      .from("content_lab_niches").select("platforms_to_scrape").eq("id", run.niche_id).single();
+    const targetPlatforms: string[] = (niche?.platforms_to_scrape ?? ["instagram"]) as string[];
+
+    // Group existing posts by platform.
+    const { data: postRows } = await admin
       .from("content_lab_posts")
-      .select("id", { count: "exact", head: true })
+      .select("platform")
       .eq("run_id", run_id);
-    if (!postCount || postCount === 0) {
+    if (!postRows || postRows.length === 0) {
       return json({ error: "Run has no posts to resume from — start a fresh run instead." }, 400);
+    }
+    const postCount = postRows.length;
+    const availablePlatforms = new Set(postRows.map((p) => p.platform));
+    const missingPlatforms = targetPlatforms.filter((p) => !availablePlatforms.has(p));
+    if (missingPlatforms.length > 0) {
+      return json({
+        error: `Cannot resume: niche targets [${targetPlatforms.join(", ")}] but run only has posts for [${[...availablePlatforms].join(", ")}]. Missing: ${missingPlatforms.join(", ")}. Edit the niche or start a fresh run.`,
+      }, 400);
     }
 
     // Fire and forget so the client returns immediately
     runResume(admin, run_id).catch((e) => console.error("Resume crashed:", e));
 
-    return json({ ok: true, run_id, post_count: postCount });
+    return json({ ok: true, run_id, post_count: postCount, platforms: [...availablePlatforms] });
   } catch (e) {
     console.error("content-lab-resume error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
