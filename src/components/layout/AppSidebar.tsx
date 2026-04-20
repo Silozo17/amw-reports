@@ -18,6 +18,7 @@ import {
   Sparkles,
   KanbanSquare,
   Lightbulb,
+  Heart,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
@@ -52,6 +53,7 @@ const CONTENT_LAB_GENERATE_ITEMS = [
 const CONTENT_LAB_PIPELINE_ITEMS = [
   { to: '/content-pipeline', label: 'Content Pipeline', icon: KanbanSquare },
   { to: '/ideas', label: 'Ideas', icon: Lightbulb },
+  { to: '/content-lab/swipe-file', label: 'Swipe File', icon: Heart },
 ];
 
 const TAIL_NAV_ITEMS = [

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import SwipeFileHeart from '@/components/content-lab/SwipeFileHeart';
 
 export type PipelineStatus = 'not_started' | 'scripted' | 'filming' | 'posted' | 'archived';
 
@@ -213,6 +214,7 @@ const DraggableIdeaCard = ({ idea, onSelect, isOverlay }: DraggableCardProps) =>
           {idea.is_wildcard && (
             <Badge variant="secondary" className="text-[9px]">Wildcard 🚀</Badge>
           )}
+          {!isOverlay && <SwipeFileHeart ideaId={idea.id} />}
           {!isOverlay && (
             <Button
               variant="ghost"
