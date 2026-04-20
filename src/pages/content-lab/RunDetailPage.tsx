@@ -100,6 +100,22 @@ const RunDetailPage = () => {
     },
   });
 
+  const { data: niche } = useQuery({
+    queryKey: ['content-lab-niche-for-run', run?.niche_id],
+    enabled: !!run?.niche_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('content_lab_niches')
+        .select('niche_tag, platforms_to_scrape, label')
+        .eq('id', run!.niche_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: pool } = useBenchmarkPoolStatus(niche?.niche_tag, niche?.platforms_to_scrape);
+
   const { data: posts = [] } = useQuery({
     queryKey: ['content-lab-posts', id],
     enabled: !!id,
