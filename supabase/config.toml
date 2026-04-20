@@ -1,1 +1,4 @@
 project_id = "kcdixfmjiifpnbtplodv"
+
+[functions.content-lab-image-proxy]
+verify_jwt = false

@@ -14,6 +14,7 @@ import usePageMeta from '@/hooks/usePageMeta';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
 import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
+import ViralPostCard from '@/components/content-lab/ViralPostCard';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
@@ -129,30 +130,7 @@ const RunDetailPage = () => {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {posts.map((p) => (
-                  <Card key={p.id} className="overflow-hidden">
-                    {p.thumbnail_url && (
-                      <div className="aspect-[4/5] bg-muted">
-                        <img src={p.thumbnail_url} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      </div>
-                    )}
-                    <div className="space-y-2 p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium">@{p.author_handle}</span>
-                        <Badge variant="secondary" className="text-[10px]">{p.platform}</Badge>
-                      </div>
-                      <p className="line-clamp-3 text-sm">{p.caption ?? '—'}</p>
-                      <div className="flex gap-3 text-xs text-muted-foreground">
-                        <span>{p.likes.toLocaleString()} likes</span>
-                        <span>{p.comments.toLocaleString()} comments</span>
-                      </div>
-                      {p.hook_text && (
-                        <div className="rounded-md bg-primary/5 p-2 text-xs">
-                          <span className="font-semibold text-primary">Hook: </span>
-                          {p.hook_text}
-                        </div>
-                      )}
-                    </div>
-                  </Card>
+                  <ViralPostCard key={p.id} post={p} />
                 ))}
               </div>
             )}
