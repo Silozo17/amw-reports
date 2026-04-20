@@ -398,6 +398,123 @@ export type Database = {
           },
         ]
       }
+      content_lab_benchmark_pool: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          follower_count: number | null
+          handle: string
+          id: string
+          last_post_at: string | null
+          median_engagement_rate: number | null
+          median_views: number | null
+          niche_tag: string
+          platform: string
+          posts_analysed: number | null
+          profile_url: string | null
+          rejection_reason: string | null
+          status: string
+          thumbnail_url: string | null
+          updated_at: string
+          verified_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          follower_count?: number | null
+          handle: string
+          id?: string
+          last_post_at?: string | null
+          median_engagement_rate?: number | null
+          median_views?: number | null
+          niche_tag: string
+          platform: string
+          posts_analysed?: number | null
+          profile_url?: string | null
+          rejection_reason?: string | null
+          status?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          verified_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          follower_count?: number | null
+          handle?: string
+          id?: string
+          last_post_at?: string | null
+          median_engagement_rate?: number | null
+          median_views?: number | null
+          niche_tag?: string
+          platform?: string
+          posts_analysed?: number | null
+          profile_url?: string | null
+          rejection_reason?: string | null
+          status?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          verified_at?: string
+        }
+        Relationships: []
+      }
+      content_lab_credit_ledger: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          org_id: string
+          reason: string
+          run_id: string | null
+          stripe_payment_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          org_id: string
+          reason: string
+          run_id?: string | null
+          stripe_payment_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          org_id?: string
+          reason?: string
+          run_id?: string | null
+          stripe_payment_id?: string | null
+        }
+        Relationships: []
+      }
+      content_lab_credits: {
+        Row: {
+          balance: number
+          created_at: string
+          lifetime_purchased: number
+          lifetime_used: number
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          lifetime_purchased?: number
+          lifetime_used?: number
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          lifetime_purchased?: number
+          lifetime_used?: number
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_lab_hooks: {
         Row: {
           created_at: string
@@ -551,9 +668,11 @@ export type Database = {
           location: string | null
           media_types: string[]
           niche_description: string | null
+          niche_tag: string | null
           org_id: string
           own_handle: string | null
           platforms_to_scrape: string[]
+          pool_status: string
           posting_cadence: string | null
           producer_type: string | null
           tone_of_voice: string | null
@@ -580,9 +699,11 @@ export type Database = {
           location?: string | null
           media_types?: string[]
           niche_description?: string | null
+          niche_tag?: string | null
           org_id: string
           own_handle?: string | null
           platforms_to_scrape?: string[]
+          pool_status?: string
           posting_cadence?: string | null
           producer_type?: string | null
           tone_of_voice?: string | null
@@ -609,9 +730,11 @@ export type Database = {
           location?: string | null
           media_types?: string[]
           niche_description?: string | null
+          niche_tag?: string | null
           org_id?: string
           own_handle?: string | null
           platforms_to_scrape?: string[]
+          pool_status?: string
           posting_cadence?: string | null
           producer_type?: string | null
           tone_of_voice?: string | null
@@ -640,6 +763,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      content_lab_pool_refresh_jobs: {
+        Row: {
+          candidates_found: number | null
+          candidates_verified: number | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          niche_tag: string
+          platform: string
+          started_at: string | null
+          status: string
+          triggered_by_org_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          candidates_found?: number | null
+          candidates_verified?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          niche_tag: string
+          platform: string
+          started_at?: string | null
+          status?: string
+          triggered_by_org_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          candidates_found?: number | null
+          candidates_verified?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          niche_tag?: string
+          platform?: string
+          started_at?: string | null
+          status?: string
+          triggered_by_org_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       content_lab_posts: {
         Row: {
@@ -1970,6 +2138,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_content_lab_credits: {
+        Args: { _amount: number; _org_id: string; _stripe_payment_id?: string }
+        Returns: number
+      }
+      consume_content_lab_credit: {
+        Args: { _amount?: number; _org_id: string; _run_id: string }
+        Returns: boolean
+      }
       create_child_platform_connection: {
         Args: {
           _account_id: string
