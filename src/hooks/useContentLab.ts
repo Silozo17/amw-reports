@@ -12,6 +12,9 @@ export interface ContentLabNiche {
   tracked_keywords: string[];
   competitor_urls: string[];
   language: string;
+  niche_tag: string | null;
+  platforms_to_scrape: string[];
+  pool_status: string;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +24,7 @@ export interface ContentLabRun {
   client_id: string;
   org_id: string;
   niche_id: string;
+  niche_tag?: string | null;
   status: 'pending' | 'scraping' | 'analysing' | 'ideating' | 'completed' | 'failed';
   started_at: string | null;
   completed_at: string | null;
