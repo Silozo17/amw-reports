@@ -78,10 +78,15 @@ Deno.serve(async (req) => {
             hook_text: result.hook,
             hook_type: result.hook_type,
           }).eq("id", p.id);
+          // Mutate locally so the hook write below picks up the new value
+          p.hook_text = result.hook;
           fastAnalysed++;
         }
       }
     }
+
+    // Write extracted hooks to the global hook library (idempotent via unique index).
+    await upsertHooks(supabase, run_id, (posts ?? []) as PostRow[]);
 
     // Deep analysis for top-N — re-fetch including the IDs flagged by scraper that
     // may not be in the engagement-rate-ordered top 40 batch above.
