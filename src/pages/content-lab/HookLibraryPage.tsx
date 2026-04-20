@@ -96,11 +96,23 @@ const HookLibraryPage = () => {
     },
   });
 
+  const { data: allNicheHooks = [] } = useQuery<Pick<GlobalHookRow, 'niche_label'>[]>({
+    queryKey: ['global-hook-library-niches'],
+    enabled: hasAccess,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_global_hook_library', {
+        _niche: null, _platform: null, _mechanism: null, _limit: FETCH_LIMIT,
+      });
+      if (error) throw error;
+      return (data ?? []) as GlobalHookRow[];
+    },
+  });
+
   const niches = useMemo(() => {
     const set = new Set<string>();
-    hooks.forEach((h) => { if (h.niche_label) set.add(h.niche_label); });
+    allNicheHooks.forEach((h) => { if (h.niche_label) set.add(h.niche_label); });
     return [...set].sort();
-  }, [hooks]);
+  }, [allNicheHooks]);
 
   const filtered = useMemo(() => {
     const out = hooks.filter((h) => {
@@ -168,7 +180,7 @@ const HookLibraryPage = () => {
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Mechanism" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All mechanisms</SelectItem>
-              {MECHANISMS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {MECHANISM_OPTIONS.map((m) => <SelectItem key={m.slug} value={m.slug}>{m.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={sort} onValueChange={setSort}>
@@ -225,7 +237,7 @@ const HookLibraryPage = () => {
                       <Badge variant="outline" className="capitalize">{h.platform}</Badge>
                     )}
                     {h.mechanism && (
-                      <Badge variant="outline" className="uppercase">{h.mechanism}</Badge>
+                      <Badge variant="outline">{MECHANISM_LABELS[h.mechanism] ?? h.mechanism}</Badge>
                     )}
                   </div>
 
