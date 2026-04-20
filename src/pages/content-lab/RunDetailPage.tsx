@@ -25,6 +25,9 @@ import usePageMeta from '@/hooks/usePageMeta';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
 import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
+import IdeaCommentsDrawer from '@/components/content-lab/IdeaCommentsDrawer';
+import { useSwipeFileIds, useToggleSwipe } from '@/hooks/useSwipeFile';
+import { useIdeaCommentCount } from '@/hooks/useIdeaComments';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
@@ -35,11 +38,61 @@ import ShareWithClientDialog from '@/components/content-lab/ShareWithClientDialo
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 
-const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
-  const p = (platform ?? 'instagram').toLowerCase();
-  if (p === 'tiktok') return <IdeaPreviewTikTok hook={hook} caption={caption} />;
-  if (p === 'facebook') return <IdeaPreviewFacebook hook={hook} caption={caption} />;
-  return <IdeaPreviewInstagram hook={hook} caption={caption} />;
+interface PreviewArgs {
+  platform: string | null;
+  hook: string;
+  caption: string | null;
+  ideaId: string;
+  runId: string;
+  isSaved: boolean;
+  commentCount: number;
+  onToggleSave: () => void;
+  onOpenComments: () => void;
+}
+
+const InteractivePreview = (args: PreviewArgs) => {
+  const p = (args.platform ?? 'instagram').toLowerCase();
+  const common = {
+    hook: args.hook,
+    caption: args.caption,
+    ideaId: args.ideaId,
+    runId: args.runId,
+    isSaved: args.isSaved,
+    commentCount: args.commentCount,
+    onToggleSave: args.onToggleSave,
+    onOpenComments: args.onOpenComments,
+  };
+  if (p === 'tiktok') return <IdeaPreviewTikTok {...common} />;
+  if (p === 'facebook') return <IdeaPreviewFacebook {...common} />;
+  return <IdeaPreviewInstagram {...common} />;
+};
+
+interface IdeaPreviewWithStateProps {
+  idea: { id: string; target_platform: string | null; hook: string | null; title: string; caption: string | null };
+  runId: string;
+  clientId: string | null;
+  nicheId: string | null;
+  onOpenComments: (ideaId: string) => void;
+}
+
+const IdeaPreviewWithState = ({ idea, runId, clientId, nicheId, onOpenComments }: IdeaPreviewWithStateProps) => {
+  const { data: savedIds } = useSwipeFileIds();
+  const toggle = useToggleSwipe();
+  const { data: commentCount = 0 } = useIdeaCommentCount(idea.id);
+  const isSaved = savedIds?.has(idea.id) ?? false;
+  return (
+    <InteractivePreview
+      platform={idea.target_platform}
+      hook={idea.hook ?? idea.title}
+      caption={idea.caption}
+      ideaId={idea.id}
+      runId={runId}
+      isSaved={isSaved}
+      commentCount={commentCount}
+      onToggleSave={() => toggle.mutate({ ideaId: idea.id, clientId, nicheId, isSaved })}
+      onOpenComments={() => onOpenComments(idea.id)}
+    />
+  );
 };
 
 const RunDetailPage = () => {
@@ -50,6 +103,7 @@ const RunDetailPage = () => {
   const [rescraping, setRescraping] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [commentsIdeaId, setCommentsIdeaId] = useState<string | null>(null);
 
   const handleExportDocx = async () => {
     if (!id) return;
@@ -133,7 +187,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_niches')
-        .select('niche_tag, platforms_to_scrape, label')
+        .select('id, client_id, niche_tag, platforms_to_scrape, label')
         .eq('id', run!.niche_id)
         .single();
       if (error) throw error;
@@ -287,6 +341,11 @@ const RunDetailPage = () => {
         </header>
 
         {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
+        <IdeaCommentsDrawer
+          ideaId={commentsIdeaId}
+          open={!!commentsIdeaId}
+          onOpenChange={(open) => { if (!open) setCommentsIdeaId(null); }}
+        />
 
         <SectionErrorBoundary>
         <Tabs defaultValue="own" className="space-y-6">
@@ -358,7 +417,19 @@ const RunDetailPage = () => {
               ideas.map((idea) => (
                 <Card key={idea.id} className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
                   <div>
-                    {renderPreview(idea.target_platform, idea.hook ?? idea.title, idea.caption)}
+                    <IdeaPreviewWithState
+                      idea={{
+                        id: idea.id,
+                        target_platform: idea.target_platform,
+                        hook: idea.hook,
+                        title: idea.title,
+                        caption: idea.caption,
+                      }}
+                      runId={id!}
+                      clientId={niche?.client_id ?? null}
+                      nicheId={run?.niche_id ?? null}
+                      onOpenComments={(ideaId) => setCommentsIdeaId(ideaId)}
+                    />
                     {idea.target_platform && (
                       <p className="mt-2 text-center text-[10px] uppercase tracking-widest text-muted-foreground">
                         {idea.target_platform}
