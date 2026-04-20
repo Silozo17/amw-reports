@@ -40,12 +40,21 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clients', label: 'Clients', icon: Users },
-  { to: '/reports', label: 'Reports', icon: FileText },
+];
+
+const CONTENT_LAB_GENERATE_ITEMS = [
   { to: '/content-lab', label: 'Content Lab', icon: Sparkles },
-  { to: '/connections', label: 'Connections', icon: Plug },
+];
+
+const CONTENT_LAB_PIPELINE_ITEMS = [
+  { to: '/content-pipeline', label: 'Content Pipeline', icon: KanbanSquare },
+  { to: '/ideas', label: 'Ideas', icon: Lightbulb },
+];
+
+const TAIL_NAV_ITEMS = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -66,6 +75,7 @@ interface AppSidebarProps {
 const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
   const { signOut, profile, role, isOwner, isPlatformAdmin } = useAuth();
   const { org, orgId, allMemberships, switchOrg } = useOrg();
+  const { hasAccess: hasContentLabAccess, canGenerate: canGenerateContentLab } = useContentLabAccess();
   
   const { pendingInvites, acceptInvite, declineInvite } = useInvites();
   const location = useLocation();
@@ -149,7 +159,12 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {[
+          ...BASE_NAV_ITEMS,
+          ...(canGenerateContentLab ? CONTENT_LAB_GENERATE_ITEMS : []),
+          ...(hasContentLabAccess ? CONTENT_LAB_PIPELINE_ITEMS : []),
+          ...TAIL_NAV_ITEMS,
+        ].map((item) => {
           const isActive = item.to === '/dashboard'
             ? location.pathname === '/dashboard'
             : location.pathname.startsWith(item.to);
