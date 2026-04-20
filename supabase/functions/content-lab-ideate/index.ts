@@ -26,6 +26,12 @@ const MODEL = "claude-sonnet-4-5-20250929";
 const TOP_BENCHMARK_POSTS = 10;
 const TOP_COMPETITOR_POSTS = 10;
 const ANTI_EXAMPLE_OWN_POSTS = 6;
+// v4: every run also produces 2 extra "wildcard" ideas designed to set new trends —
+// untested formats nobody in the niche is doing.
+const WILDCARD_COUNT = 2;
+// Performance memory: feed back the top-3 winners and bottom-3 flops from prior linked ideas
+// so each successive run gets smarter automatically.
+const PERF_HISTORY_LIMIT = 3;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
