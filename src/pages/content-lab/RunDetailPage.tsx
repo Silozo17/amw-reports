@@ -198,6 +198,10 @@ const RunDetailPage = () => {
             <h1 className="mt-2 font-display text-3xl">
               {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
             </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {niche?.label && <span className="text-sm text-muted-foreground">{niche.label}</span>}
+              {pool && <BenchmarkQualityBadge quality={pool.quality} verifiedCount={pool.verifiedCount} />}
+            </div>
             {run?.status === 'failed' && run?.error_message && (
               <p className="mt-2 max-w-2xl text-sm text-destructive">{run.error_message}</p>
             )}
