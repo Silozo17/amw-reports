@@ -9,6 +9,20 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Lock to platform admins only — this endpoint calls 4 paid Claude models.
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.49.4");
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: userData } = await userClient.auth.getUser();
+  if (!userData.user) return json({ error: "unauthorized" }, 401);
+  const { data: isAdmin } = await userClient.rpc("is_platform_admin", { _user_id: userData.user.id });
+  if (!isAdmin) return json({ error: "forbidden" }, 403);
+
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
     return json({ error: "ANTHROPIC_API_KEY not configured" }, 500);
