@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Users, Palette, Mail, Globe, BarChart3 } from 'lucide-react';
+import { ArrowRight, Users, Palette, Mail, Globe, BarChart3, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
@@ -177,6 +177,27 @@ const ForAgenciesPage = () => {
                 <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
               </details>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Content Lab cross-sell */}
+      <section className="py-16">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10 p-8 lg:p-10 flex flex-col lg:flex-row gap-6 items-start">
+            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center shrink-0">
+              <Sparkles className="h-7 w-7 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-accent text-sm text-primary mb-2">Also for agencies</p>
+              <h2 className="text-2xl lg:text-3xl font-heading uppercase mb-3">Sell content strategy as a service — at scale.</h2>
+              <p className="text-amw-offwhite/65 font-body mb-5">
+                Content Lab plugs into every client account. Run monthly content research, share branded ideas via link, collect comments, and track production on a kanban board. Multi-tenant, white-labelled, ready to bill.
+              </p>
+              <Button asChild>
+                <Link to="/content-lab-feature">Explore Content Lab <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>

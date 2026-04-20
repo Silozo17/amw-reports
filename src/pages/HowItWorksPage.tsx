@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Plug, RefreshCw, FileText, Mail, Share2 } from 'lucide-react';
+import { ArrowRight, Plug, RefreshCw, FileText, Mail, Share2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
@@ -172,6 +172,29 @@ const HowItWorksPage = () => {
                 <div className="px-4 pb-4 text-sm font-body text-amw-offwhite/60 leading-relaxed">{a}</div>
               </details>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── BEYOND REPORTING — Content Lab callout ── */}
+      <section className="py-16 lg:py-20">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10 p-8 lg:p-10">
+            <div className="flex flex-col lg:flex-row gap-8 items-start">
+              <div className="shrink-0 w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
+                <Sparkles className="h-7 w-7 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-accent text-sm text-primary mb-2">Beyond reporting</p>
+                <h2 className="text-2xl lg:text-3xl font-heading uppercase mb-3">Meet Content Lab — your AI content engine.</h2>
+                <p className="text-amw-offwhite/65 font-body mb-5">
+                  Reporting tells you what happened. Content Lab tells you what to post next. Scrapes 60 days of viral content in your niche, decodes the patterns, and ships 12 ready-to-film ideas every month.
+                </p>
+                <Button asChild>
+                  <Link to="/content-lab-feature">Explore Content Lab <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </section>

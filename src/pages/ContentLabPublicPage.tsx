@@ -20,9 +20,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
+import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
+import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
+import { useContentLabPublicDemo } from '@/hooks/useContentLabPublicDemo';
+import { AMW_DEMO_SHARE_SLUG } from '@/lib/contentLabDemo';
 
 const SAMPLE_IDEA = {
   hook: '3 things I wish I knew before launching my agency',
@@ -228,6 +235,11 @@ const ContentLabPublicPage = () => {
 
       <div className="gradient-divider w-full" />
 
+      {/* 5b. See a real run — live AMW demo */}
+      <ContentLabLiveDemoSection />
+
+      <div className="gradient-divider w-full" />
+
       {/* 6. Audiences */}
       <section className="py-20 lg:py-24 section-light">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -415,6 +427,166 @@ const ContentLabPublicPage = () => {
         </div>
       </section>
     </>
+  );
+};
+
+const PIPELINE_COLUMNS = [
+  { key: 'scripted', label: 'Scripted', tone: 'border-primary/40 bg-primary/5' },
+  { key: 'filming', label: 'Filming', tone: 'border-amw-orange/40 bg-amw-orange/5' },
+  { key: 'edit', label: 'Edit', tone: 'border-secondary/40 bg-secondary/5' },
+  { key: 'posted', label: 'Posted', tone: 'border-accent/40 bg-accent/5' },
+] as const;
+
+const renderIdeaPreview = (idea: { hook: string | null; caption: string | null; target_platform: string | null }, handle: string) => {
+  const hook = idea.hook ?? 'Decode what works in your niche.';
+  const caption = idea.caption ?? '';
+  const platform = (idea.target_platform ?? 'instagram').toLowerCase();
+  if (platform.includes('tiktok')) return <IdeaPreviewTikTok hook={hook} handle={handle} caption={caption} />;
+  if (platform.includes('facebook')) return <IdeaPreviewFacebook hook={hook} handle={handle} caption={caption} />;
+  return <IdeaPreviewInstagram hook={hook} handle={handle} caption={caption} />;
+};
+
+const ContentLabLiveDemoSection = () => {
+  const { data, isLoading } = useContentLabPublicDemo();
+
+  // Hide silently on error/empty so the rest of the page stays clean.
+  if (!isLoading && (!data || !data.ideas?.length)) return null;
+
+  const ideas = data?.ideas ?? [];
+  const topPosts = (data?.top_posts ?? []).slice(0, 8);
+  const handle = (data?.client_name ?? 'amwmedia').toLowerCase().replace(/\s+/g, '');
+  const previewIdeas = ideas.slice(0, 6);
+  const pipelineIdeas = ideas.slice(0, 8);
+  const hookIdeas = ideas.filter((i) => i.hook).slice(0, 8);
+
+  return (
+    <section id="live-demo" className="py-20 lg:py-28 section-light">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-10 max-w-2xl mx-auto">
+          <p className="font-accent text-lg text-primary mb-2">See a real run</p>
+          <h2 className="text-3xl lg:text-5xl font-heading uppercase">
+            Real data. Real ideas. <span className="text-gradient-purple">From AMW Media.</span>
+          </h2>
+          <p className="text-amw-offwhite/60 font-body mt-3">
+            Below is a live read-only sample from AMW Media's most recent Content Lab run — straight from the platform.
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-[9/16] w-full max-w-[260px] mx-auto rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          <Tabs defaultValue="ideas" className="w-full">
+            <TabsList className="mx-auto flex w-fit max-w-full overflow-x-auto bg-sidebar-accent/30 border border-sidebar-border/50 mb-8">
+              <TabsTrigger value="ideas">Ideas</TabsTrigger>
+              <TabsTrigger value="viral">Viral Feed</TabsTrigger>
+              <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+              <TabsTrigger value="hooks">Hook Library</TabsTrigger>
+            </TabsList>
+
+            {/* Ideas — phone mockups */}
+            <TabsContent value="ideas">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {previewIdeas.map((idea) => (
+                  <div key={idea.id} className="flex flex-col items-center gap-3">
+                    {renderIdeaPreview(idea, handle)}
+                    <div className="text-center max-w-[260px]">
+                      <p className="text-sm font-body font-semibold text-amw-offwhite line-clamp-2">{idea.title}</p>
+                      {idea.is_wildcard && <Badge variant="secondary" className="mt-2 text-[10px]">Wildcard 🚀</Badge>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* Viral Feed — top performing benchmark posts */}
+            <TabsContent value="viral">
+              {topPosts.length === 0 ? (
+                <p className="text-center text-amw-offwhite/60 font-body">No reference posts available.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {topPosts.map((post, i) => (
+                    <a
+                      key={`${post.author_handle}-${i}`}
+                      href={post.post_url ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block aspect-[9/16] rounded-xl overflow-hidden bg-sidebar-accent/30 border border-sidebar-border/50 relative hover:border-primary/50 transition-colors"
+                    >
+                      {post.thumbnail_url ? (
+                        <img
+                          src={post.thumbnail_url}
+                          alt={`Post by @${post.author_handle}`}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                          onError={(e) => { (e.currentTarget.style.display = 'none'); }}
+                        />
+                      ) : null}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-2.5 text-[10px] font-body text-white">
+                        <p className="font-semibold truncate">@{post.author_handle}</p>
+                        <p className="opacity-80">{post.views.toLocaleString()} views</p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Pipeline — static read-only kanban */}
+            <TabsContent value="pipeline">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {PIPELINE_COLUMNS.map((col, colIdx) => {
+                  const colItems = pipelineIdeas.filter((_, i) => i % 4 === colIdx);
+                  return (
+                    <div key={col.key} className={`rounded-xl border ${col.tone} p-4 min-h-[280px]`}>
+                      <h3 className="text-xs font-body font-semibold uppercase tracking-wider text-amw-offwhite/80 mb-3">{col.label}</h3>
+                      <div className="space-y-2">
+                        {colItems.map((idea) => (
+                          <div key={idea.id} className="rounded-lg bg-amw-black/50 border border-sidebar-border/50 p-3">
+                            <p className="text-xs font-body text-amw-offwhite line-clamp-3">{idea.title}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs font-body text-amw-offwhite/50 text-center mt-4">Read-only preview. In-app, drag cards across columns to track production.</p>
+            </TabsContent>
+
+            {/* Hook Library — pulled from idea hooks */}
+            <TabsContent value="hooks">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {hookIdeas.map((idea, i) => (
+                  <div key={idea.id} className="rounded-xl border border-sidebar-border/50 bg-amw-black/40 p-4 flex items-start gap-3">
+                    <span className="font-mono text-xs text-primary mt-0.5 shrink-0">#{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-body text-amw-offwhite leading-snug">{idea.hook}</p>
+                      <p className="text-[11px] font-body text-amw-offwhite/50 mt-1.5">From idea: {idea.title}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs font-body text-amw-offwhite/50 text-center mt-4">In-app, the Hook Library ranks every hook from every run by real engagement.</p>
+            </TabsContent>
+          </Tabs>
+        )}
+
+        <div className="mt-10 text-center">
+          <a
+            href={`/share/content-lab/${AMW_DEMO_SHARE_SLUG}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-body text-primary hover:underline"
+          >
+            Open the full AMW Media run →
+          </a>
+        </div>
+      </div>
+    </section>
   );
 };
 

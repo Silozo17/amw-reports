@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, FileText, Mail, Palette, Globe, Users, BarChart3, Share2, Clock, Layers, Shield } from 'lucide-react';
+import { ArrowRight, FileText, Mail, Palette, Globe, Users, BarChart3, Share2, Clock, Layers, Shield, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
@@ -217,6 +217,27 @@ const FeaturesPage = () => {
                 <p className="text-sm text-amw-offwhite/60 font-body">{desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Content Lab spotlight */}
+      <section className="py-20 lg:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10 p-8 lg:p-10 grid grid-cols-1 lg:grid-cols-[auto,1fr,auto] gap-6 items-center">
+            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
+              <Sparkles className="h-7 w-7 text-primary" />
+            </div>
+            <div>
+              <p className="font-accent text-sm text-primary mb-1">New · Content Lab</p>
+              <h3 className="text-xl lg:text-2xl font-heading uppercase mb-2">AI Content Engine — included for every plan</h3>
+              <p className="text-sm text-amw-offwhite/65 font-body">
+                Scrape what's working in your niche, decode the patterns, and ship 12 ready-to-film ideas every month — with hooks, scripts, filming checklists and phone-mockup previews.
+              </p>
+            </div>
+            <Button asChild>
+              <Link to="/content-lab-feature">Explore Content Lab <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
           </div>
         </div>
       </section>
