@@ -30,6 +30,7 @@ import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import IdeaActionButtons from '@/components/content-lab/IdeaActionButtons';
+import IdeaPerformanceStrip from '@/components/content-lab/IdeaPerformanceStrip';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
@@ -361,8 +362,16 @@ const RunDetailPage = () => {
                       </div>
                     )}
                     <div className="border-t border-border/50 pt-3">
-                      <IdeaActionButtons ideaId={idea.id} runId={id!} />
+                      <IdeaActionButtons ideaId={idea.id} runId={id!} regenCount={(idea as { regen_count?: number }).regen_count ?? 0} />
                     </div>
+                    <IdeaPerformanceStrip
+                      ideaId={idea.id}
+                      runId={id!}
+                      status={idea.status ?? 'not_started'}
+                      linkedPostId={(idea as { linked_post_id?: string | null }).linked_post_id ?? null}
+                      actualViews={(idea as { actual_views?: number | null }).actual_views ?? null}
+                      actualEngagementRate={(idea as { actual_engagement_rate?: number | null }).actual_engagement_rate ?? null}
+                    />
                   </div>
                 </Card>
               ))

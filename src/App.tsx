@@ -57,6 +57,8 @@ const ContentLabPage = lazy(() => import("./pages/content-lab/ContentLabPage"));
 const NicheFormPage = lazy(() => import("./pages/content-lab/NicheFormPage"));
 const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
 const OnboardWizardPage = lazy(() => import("./pages/content-lab/OnboardWizardPage"));
+const ContentPipelinePage = lazy(() => import("./pages/content-lab/ContentPipelinePage"));
+const IdeasLibraryPage = lazy(() => import("./pages/content-lab/IdeasLibraryPage"));
 
 const queryClient = new QueryClient();
 
@@ -142,6 +144,8 @@ const AppRoutes = () => (
       <Route path="/content-lab/niche/new" element={<ProtectedRoute><NicheFormPage /></ProtectedRoute>} />
       <Route path="/content-lab/niche/:id" element={<ProtectedRoute><NicheFormPage /></ProtectedRoute>} />
       <Route path="/content-lab/run/:id" element={<ProtectedRoute><RunDetailPage /></ProtectedRoute>} />
+      <Route path="/content-pipeline" element={<ProtectedRoute><ContentPipelinePage /></ProtectedRoute>} />
+      <Route path="/ideas" element={<ProtectedRoute><IdeasLibraryPage /></ProtectedRoute>} />
       <Route path="/debug" element={<AdminRoute><DebugConsole /></AdminRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/organisations" element={<AdminRoute><AdminOrgList /></AdminRoute>} />
