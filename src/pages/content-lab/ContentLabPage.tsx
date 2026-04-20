@@ -24,6 +24,7 @@ import { useContentLabNiches, useContentLabUsage, useGroupedRuns, ContentLabRun,
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
+import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_CONFIG: Record<ContentLabRun['status'], { label: string; icon: typeof Clock; tone: string }> = {
@@ -106,34 +107,30 @@ const ContentLabPage = () => {
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-8 p-6 md:p-8">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5" />
-              Content Lab
-            </div>
-            <h1 className="mt-2 font-display text-4xl">Discover. Decode. Create.</h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Pull the highest-performing posts from your niche, decode why they work, and turn them into 12 ready-to-film content ideas every month.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {usage && (
-              <Badge
-                variant={blocked ? 'destructive' : monthlyExhausted ? 'secondary' : 'outline'}
-                className="font-body text-xs"
-              >
-                {usage.runsThisMonth} / {usage.runsLimit} runs · {usage.creditBalance} credits
-              </Badge>
-            )}
-            <Button variant="outline" size="lg" onClick={() => setCreditsDialogOpen(true)}>
-              <CreditCard className="mr-2 h-4 w-4" /> Buy credits
-            </Button>
-            <Button size="lg" onClick={() => navigate('/content-lab/niche/new')}>
-              <Plus className="mr-2 h-4 w-4" /> New Niche
-            </Button>
-          </div>
-        </header>
+        <ContentLabHeader
+          eyebrow="Content Lab"
+          icon={Sparkles}
+          title="Discover. Decode. Create."
+          subtitle="Pull the highest-performing posts from your niche, decode why they work, and turn them into 12 ready-to-film content ideas every month."
+          actions={
+            <>
+              {usage && (
+                <Badge
+                  variant={blocked ? 'destructive' : monthlyExhausted ? 'secondary' : 'outline'}
+                  className="font-body text-xs"
+                >
+                  {usage.runsThisMonth} / {usage.runsLimit} runs · {usage.creditBalance} credits
+                </Badge>
+              )}
+              <Button variant="outline" size="lg" onClick={() => setCreditsDialogOpen(true)}>
+                <CreditCard className="mr-2 h-4 w-4" /> Buy credits
+              </Button>
+              <Button size="lg" onClick={() => navigate('/content-lab/niche/new')}>
+                <Plus className="mr-2 h-4 w-4" /> New Niche
+              </Button>
+            </>
+          }
+        />
 
         {!guideDismissed && (
           <Card className="relative border-primary/20 bg-primary/5 p-5">
