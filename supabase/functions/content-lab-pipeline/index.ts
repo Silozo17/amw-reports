@@ -147,22 +147,23 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
     await admin.from("content_lab_posts").delete().eq("run_id", runId);
     await admin.from("content_lab_ideas").delete().eq("run_id", runId);
 
-    // Pre-flight: ensure the niche has at least one handle to scrape.
-    // tracked_handles is deprecated (replaced by top_global_benchmarks + top_competitors).
+    // Pre-flight: ensure the niche has at least one handle to scrape
     const { data: runRow } = await admin
       .from("content_lab_runs")
-      .select("niche:niche_id(own_handle, top_competitors, top_global_benchmarks)")
+      .select("niche:niche_id(own_handle, top_competitors, top_global_benchmarks, tracked_handles)")
       .eq("id", runId)
       .single();
     const niche = (runRow as { niche: {
       own_handle: string | null;
       top_competitors: Array<{ handle?: string }> | null;
       top_global_benchmarks: Array<{ handle?: string }> | null;
+      tracked_handles: Array<{ handle?: string }> | null;
     } } | null)?.niche;
     const handleCount =
       (niche?.own_handle ? 1 : 0) +
       (niche?.top_competitors?.length ?? 0) +
-      (niche?.top_global_benchmarks?.length ?? 0);
+      (niche?.top_global_benchmarks?.length ?? 0) +
+      (niche?.tracked_handles?.length ?? 0);
     if (handleCount === 0) {
       await pipelineLog.finish({ status: "failed", errorMessage: "No handles configured" });
       return fail("Niche has no handles to scrape — re-run discovery from the niche form.");

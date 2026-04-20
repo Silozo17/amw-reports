@@ -1,75 +1,79 @@
 
 
-## Gap analysis
+The user wants to revisit the plan I previously presented. The brand brief just shipped. Now they want:
+1. Facebook + TikTok scraping
+2. Kanban pipeline for ideas
+3. Smart use of own-account performance
 
-**Immediate bug you spotted (small, fixable now):**
-The niche form only has one handle field labelled "Your Instagram handle". When users tick Facebook or TikTok, there's nowhere to enter those handles. The scraper then has nothing to fetch for those platforms, so own-account scrape silently returns empty.
+Most of (3) is already implemented in the recent rewrite (own posts tagged, gating rule in ideate, "Your Latest Content" tab exists). I should call that out so we don't redo work.
 
-**vs. v2 spec — what's still missing:**
+Let me check current state quickly and present a tight plan.
 
-| Area | Spec | Current | Gap |
-|---|---|---|---|
-| Own handles per platform | IG + TikTok + FB handles | IG only | **Missing** |
-| Zero-config discovery | Firecrawl + Apify IG + Gemini + Claude → auto-fill voice + competitors | Discover exists, but no website scrape, no IG profile pre-scrape, no brand voice profile | Partial |
-| Brand voice profile | `content_lab_brand_voice_snapshots` with vocab, banned words, example captions | Brand brief form exists, but not auto-built from scrapes | Missing |
-| Hook variants | 3 per idea, each different mechanism | 1 hook per idea | **Missing** |
-| Visual post preview | Phone-frame mockups (TikTok/IG/FB) | Card previews exist (`IdeaPreviewInstagram/TikTok/Facebook`) | ✅ Already done |
-| Trend Radar verification | Ahrefs / Google Trends | Trends generated but not verified | Missing |
-| Hook Library tab | Standalone tab grouped by mechanism | Hooks stored in DB, no tab | Missing |
-| Swipe File / favourites | Star → swipe file, drag to calendar | Not built | Missing |
-| Content Calendar (Scale) | Drag ideas onto dates | Not built | Missing |
-| Credit system | Per-idea regen costs credits | Not built | Missing |
-| Regenerate / Remix idea | 1 credit per regen, modifier prompt | Not built | Missing |
-| Trending audio (TikTok) | Lookup + suggest per idea | Not built | Missing |
-| Tier gating (Starter/Growth/Scale) | 3 tiers with niches/runs/credits limits | Not gated | Missing |
-| Discovery progress UI | Step-by-step reveal (60-90s) | Single spinner | Polish |
+## Scope
+Three things, ordered by effort:
+1. **Facebook + TikTok scraping** — extend the scraper + niche form.
+2. **Kanban pipeline** — drag-and-drop board on ideas grouped by `status`.
+3. **Smarter use of own posts** — already 80% done from the last rewrite; just polish.
 
-## What I propose to build now
+## What's already in place (no rework needed)
+- Own posts are tagged `source = 'own'` and shown on the "Your Latest Content" tab.
+- Ideate function already pulls `own_avg_views`, computes `benchmark_p50`, gates own-post inspiration accordingly, and lists weak own posts as anti-examples.
+- `content_lab_ideas.status` column already exists (default `'not_started'`).
+- `platforms_to_scrape` array already exists on `content_lab_niches`.
 
-Given "one task at a time" and your immediate observation, I'll split into **two phases**. Phase 1 ships now (hotfix + foundations). Phase 2 is a separate approval after you see Phase 1.
+## Plan
 
-### Phase 1 (this PR) — Fix the handle gap + the highest-leverage gaps
+### 1) Facebook + TikTok scraping
+**Niche form (`NicheFormPage.tsx`)**
+- Add a 3-checkbox platform picker (Instagram / Facebook / TikTok), persisted to `platforms_to_scrape`.
+- Default = Instagram only (no behaviour change for existing niches).
 
-1. **Per-platform own handles** *(fixes the bug you spotted)*
-   - Replace single "Your Instagram handle" input with 3 conditional fields shown only when that platform is ticked: IG handle, TikTok handle (`@`), Facebook page URL or handle.
-   - Persist into `content_lab_niches.tracked_handles` jsonb as `[{platform, handle}]` (column already exists, already supports it).
-   - Update `content-lab-scrape` to read all 3, route IG handle → IG actor, TikTok handle → TikTok actor, FB handle/URL → FB actor for the `own` bucket. Already handles per-platform competitor scraping; this just adds own routing.
-   - Auto-fill from `clients.social_handles` jsonb when a client is picked (already supports `instagram`, `tiktok`, `facebook` keys).
+**Scraper (`content-lab-scrape/index.ts`)**
+- Split into `scrapeInstagram` (existing), `scrapeFacebook` (new — `apify/facebook-pages-scraper`), `scrapeTikTok` (new — `clockworks/tiktok-scraper`).
+- Run enabled platforms in parallel. Field map per platform:
+  - FB: `likesCount`, `commentsCount`, `sharesCount`, `videoViewCount`, `text`, `topImage`, `url`, `time`, `pageName`.
+  - TikTok: `playCount`→views, `diggCount`→likes, `commentCount`, `shareCount`, `text`, `videoUrl`, `cover`, `createTimeISO`, `videoMeta.duration`, `musicMeta.musicName`, `musicMeta.authorName`.
+- Apply existing `media_types` filter per platform (TikTok = always video).
+- Tag rows with the right `platform` enum + `source`.
 
-2. **3 hook variants per idea** *(biggest quality lever in the spec)*
-   - Update `content-lab-ideate` prompt + JSON schema to require `hook_variants: [{text, mechanism, why}]` × 3, each a different mechanism.
-   - Add `hook_variants jsonb` column to `content_lab_ideas` (keep existing `hook` as the selected/primary).
-   - UI: idea detail shows 3 hook cards, click to set as the working hook (purely client-side, persists selection back to `hook`).
+**Image proxy (`content-lab-image-proxy`)**
+- Extend allowlist with `*.tiktokcdn.com`, `*.tiktokcdn-us.com`, `*.tiktokv.com`. `*.fbcdn.net` already present.
 
-3. **Hook Library tab** on Run Detail
-   - New tab after Ideas. Pulls from `content_lab_hooks` (already populated by analyse) + flattens `hook_variants` from ideas.
-   - Grouped by `mechanism`, copy-to-clipboard on each, source post link.
+**Card (`ViralPostCard.tsx`)**
+- Switch the "View …" link label by platform: Reel / Post / TikTok.
 
-4. **Discovery progress UX**
-   - Replace single spinner on Discover button with a 5-step reveal (Scanning website → Reading posts → Classifying niche → Finding competitors → Building voice). Pure UI, no edge function change — driven by elapsed time + step durations.
+### 2) Kanban pipeline
+- Add `@dnd-kit/core` + `@dnd-kit/sortable`.
+- New tab on Run Detail: **Pipeline** (after Ideas). 5 columns: Not started / Scripted / Filming / Posted / Archived — driven by `content_lab_ideas.status`.
+- Each card shows idea number, hook, target platform badge, rating.
+- Drag between columns → `update content_lab_ideas set status = newStatus`.
+- Click card → opens existing idea detail.
+- Mobile (<md): swap drag-and-drop for a status `Select` dropdown on each card.
 
-### Out of scope for this PR (next phase, separate approval):
-- Credit system + Stripe credit packs
-- Regenerate / Remix per-idea
-- Swipe File + Content Calendar
-- Trend verification (Ahrefs / Google Trends)
-- Trending audio lookup for TikTok
-- Tier gating UI (Starter / Growth / Scale limits)
-- Brand voice auto-extraction from website + last-30-posts (separate `content-lab-discover` rewrite)
-- White-label PDF export
+### 3) Smarter own-post usage (polish only)
+- Surface a one-line note on the Ideas tab when `own_avg_views < benchmark_p50`: *"Your views are below the top-10 benchmark median, so ideas are reverse-engineered from top accounts only."*
+- Surface the inverse note when on par: *"Your views are on par with the top-10 benchmarks, so your top-performing posts are also being used as inspiration."*
+- Add a "Top-performing own hook" line on the "Your Latest Content" tab header (computed in-page, no schema change).
 
-## Files touched (Phase 1)
+## Files to touch
+- `package.json` — add `@dnd-kit/core`, `@dnd-kit/sortable`
+- `src/pages/content-lab/NicheFormPage.tsx` — platform multi-select
+- `src/pages/content-lab/RunDetailPage.tsx` — Pipeline tab + own-post banner
+- `src/components/content-lab/ViralPostCard.tsx` — platform-aware link label
+- `src/components/content-lab/IdeaPipelineBoard.tsx` (new)
+- `supabase/functions/content-lab-scrape/index.ts` — FB + TikTok fetchers
+- `supabase/functions/content-lab-image-proxy/index.ts` — extend allowlist
 
-- `src/pages/content-lab/NicheFormPage.tsx` — per-platform handle fields, conditional on ticked platforms
-- `supabase/functions/content-lab-scrape/index.ts` — read tracked_handles per platform for `own` bucket
-- `supabase/functions/content-lab-ideate/index.ts` — request 3 hook_variants in schema + prompt
-- `supabase/migrations/<new>.sql` — `alter table content_lab_ideas add column hook_variants jsonb default '[]'::jsonb`
-- `src/pages/content-lab/RunDetailPage.tsx` — Hook Library tab + select hook variant from idea detail
-- `src/components/content-lab/HookLibrary.tsx` (new) — grouped-by-mechanism display
-- `src/components/content-lab/DiscoveryProgress.tsx` (new) — 5-step reveal
+No DB migration needed.
 
-## Risks / things to confirm
-- **Existing ideas have no `hook_variants`** — the UI will fall back to showing the single `hook` field for old runs. New runs get the 3 variants.
-- **Facebook handle vs page URL** — FB scraper needs the page URL or page slug, not an `@handle`. The field will accept either and normalise.
-- **TikTok own scrape** — `clockworks/tiktok-scraper` requires the handle without `@`, which the existing scraper already handles for competitors.
+## Risks / trade-offs
+- TikTok actor on Apify is paid per result (~$0.30/1000) — same model as IG, surfaces in existing usage counter.
+- Facebook scraper needs the page to be public; private pages return empty (we'll show the same "no posts found" message as IG).
+- Drag-and-drop on small screens degrades to a dropdown — chosen over cramped 5-column scroll.
+- Existing runs stay IG-only; only new runs benefit from FB/TikTok.
+
+## Expected result
+- Niches can target IG, FB, TikTok independently.
+- Run Detail gains a Kanban Pipeline tab where ideas move from "Not started" → "Posted".
+- Ideas tab clearly tells the user *why* their own posts are or aren't being used as inspiration.
 

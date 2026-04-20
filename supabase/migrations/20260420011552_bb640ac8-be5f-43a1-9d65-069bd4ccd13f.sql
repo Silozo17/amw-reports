@@ -1,0 +1,1 @@
+ALTER TABLE public.content_lab_ideas ADD COLUMN IF NOT EXISTS hook_variants jsonb NOT NULL DEFAULT '[]'::jsonb;

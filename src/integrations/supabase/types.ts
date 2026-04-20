@@ -458,6 +458,7 @@ export type Database = {
           filming_checklist: string[]
           hashtags: string[]
           hook: string | null
+          hook_variants: Json
           id: string
           idea_number: number
           platform_style_notes: string | null
@@ -481,6 +482,7 @@ export type Database = {
           filming_checklist?: string[]
           hashtags?: string[]
           hook?: string | null
+          hook_variants?: Json
           id?: string
           idea_number: number
           platform_style_notes?: string | null
@@ -504,6 +506,7 @@ export type Database = {
           filming_checklist?: string[]
           hashtags?: string[]
           hook?: string | null
+          hook_variants?: Json
           id?: string
           idea_number?: number
           platform_style_notes?: string | null

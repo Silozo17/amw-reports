@@ -27,6 +27,7 @@ import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
+import HookLibrary from '@/components/content-lab/HookLibrary';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
@@ -41,7 +42,6 @@ const RunDetailPage = () => {
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
   const [rescraping, setRescraping] = useState(false);
-  const [activeTab, setActiveTab] = useState<string | undefined>();
 
   const handleRetry = async () => {
     if (!id) return;
@@ -82,7 +82,7 @@ const RunDetailPage = () => {
     }
   };
 
-  usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and platform-tailored content ideas for the month.' });
+  usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' });
 
   const { data: run } = useQuery({
     queryKey: ['content-lab-run', id],
@@ -144,6 +144,29 @@ const RunDetailPage = () => {
     },
   });
 
+  const { data: analysedHooks = [] } = useQuery({
+    queryKey: ['content-lab-hooks', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('content_lab_hooks')
+        .select('hook_text, mechanism, why_it_works, source_post_id')
+        .eq('run_id', id!);
+      if (error) throw error;
+      const postMap = new Map(posts.map((p) => [p.id, p]));
+      return (data ?? []).map((h) => {
+        const sp = h.source_post_id ? postMap.get(h.source_post_id) : null;
+        return {
+          hook_text: h.hook_text,
+          mechanism: h.mechanism,
+          why_it_works: h.why_it_works,
+          source_handle: sp?.author_handle ?? null,
+          source_url: sp?.post_url ?? null,
+        };
+      });
+    },
+  });
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
@@ -195,16 +218,13 @@ const RunDetailPage = () => {
           </div>
         </header>
 
-        {(() => {
-          const defaultTab = ownPosts.length > 0 ? 'own' : viralPosts.length > 0 ? 'feed' : ideas.length > 0 ? 'ideas' : 'own';
-          const currentTab = activeTab ?? defaultTab;
-          return (
-        <Tabs value={currentTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs defaultValue="own" className="space-y-6">
           <TabsList>
             <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
             <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
             <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
             <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+            <TabsTrigger value="hooks">Hook Library</TabsTrigger>
           </TabsList>
 
           <TabsContent value="own" className="space-y-4">
@@ -265,7 +285,7 @@ const RunDetailPage = () => {
               <Card className="p-10 text-center text-sm text-muted-foreground">Ideas will appear here once the run completes.</Card>
             ) : (
               ideas.map((idea) => (
-                <Card key={idea.id} id={`idea-${idea.id}`} className="grid gap-6 p-6 md:grid-cols-[260px_1fr] scroll-mt-24">
+                <Card key={idea.id} className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
                   <div>
                     {renderPreview(idea.target_platform, idea.hook ?? idea.title, idea.caption)}
                     {idea.target_platform && (
@@ -285,6 +305,20 @@ const RunDetailPage = () => {
                       )}
                     </div>
                     {idea.hook && <p className="text-sm"><span className="font-semibold">Hook: </span>{idea.hook}</p>}
+                    {Array.isArray(idea.hook_variants) && idea.hook_variants.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Hook variants</p>
+                        <div className="grid gap-2 md:grid-cols-3">
+                          {(idea.hook_variants as Array<{ text: string; mechanism: string; why: string }>).map((v, vi) => (
+                            <div key={vi} className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs">
+                              <p className="font-medium leading-snug">{v.text}</p>
+                              <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">{v.mechanism}</p>
+                              {v.why && <p className="mt-1 text-muted-foreground">{v.why}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {idea.body && <p className="text-sm text-muted-foreground">{idea.body}</p>}
                     {idea.cta && <p className="text-sm"><span className="font-semibold">CTA: </span>{idea.cta}</p>}
                     {idea.why_it_works && (
@@ -323,18 +357,22 @@ const RunDetailPage = () => {
                   rating: i.rating ?? null,
                   status: i.status ?? 'not_started',
                 }))}
-                onSelect={(idea) => {
-                  setActiveTab('ideas');
-                  setTimeout(() => {
-                    document.getElementById(`idea-${idea.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }, 50);
-                }}
+                onSelect={() => { /* click-to-detail can be wired later; drag is the primary action */ }}
               />
             )}
           </TabsContent>
+
+          <TabsContent value="hooks" className="space-y-4">
+            <HookLibrary
+              analysedHooks={analysedHooks}
+              ideas={ideas.map((i) => ({
+                idea_number: i.idea_number,
+                hook: i.hook ?? null,
+                hook_variants: (i.hook_variants as Array<{ text: string; mechanism: string; why: string }> | null) ?? null,
+              }))}
+            />
+          </TabsContent>
         </Tabs>
-          );
-        })()}
       </div>
     </AppLayout>
   );

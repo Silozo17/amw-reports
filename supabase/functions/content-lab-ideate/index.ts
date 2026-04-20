@@ -66,9 +66,8 @@ Deno.serve(async (req) => {
     }
 
     const ownHandle = (niche.own_handle ?? "").toLowerCase().replace(/^@/, "");
-    // Use bucket (not source) — source is 'oauth'|'apify' (data origin), bucket is the role.
-    // Inspiration pool = benchmarks ONLY. Competitors stay visible in feed but are not used as role models.
-    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.bucket === "benchmark");
+    // Use bucket (role: own/competitor/benchmark) NOT source (data origin: oauth/apify).
+    const benchmarkPosts = (posts as PostRow[]).filter((p) => p.bucket === "benchmark" || p.bucket === "competitor");
     const ownPosts = (posts as PostRow[]).filter((p) => p.bucket === "own");
 
     const ownAvgViews = avg(ownPosts.map((p) => p.views ?? 0));
@@ -79,9 +78,6 @@ Deno.serve(async (req) => {
       fn: "content-lab-ideate",
       gating: { own_avg_views: ownAvgViews, benchmark_p50_views: benchmarkP50Views, own_is_competitive: ownIsCompetitive },
     }));
-
-    // Helper: normalise handle for fuzzy matching across platforms (Apify can swap . and _).
-    const normHandle = (h: string) => h.toLowerCase().replace(/^@/, "").replace(/[._]/g, "");
 
     const platforms: string[] = (niche.platforms_to_scrape ?? ["instagram"]) as string[];
     const distribution = distributeIdeas(platforms);
@@ -101,11 +97,6 @@ Deno.serve(async (req) => {
         .slice(0, TOP_BENCHMARK_POSTS);
 
       const platformOwn = ownPosts.filter((p) => p.platform === platform);
-
-      // Per-platform competitiveness check (overrides global verdict for this platform's loop).
-      const platformOwnAvg = avg(platformOwn.map((p) => p.views ?? 0));
-      const platformBenchP50 = median(platformBenchmarks.map((p) => p.views ?? 0));
-      const platformOwnIsCompetitive = platformOwnAvg > 0 && platformOwnAvg >= platformBenchP50;
 
       const platformLog = await logStepStart({
         runId: run_id,
@@ -127,9 +118,9 @@ Deno.serve(async (req) => {
         count,
         benchmarkPosts: platformBenchmarks,
         ownPosts: platformOwn,
-        ownIsCompetitive: platformOwnIsCompetitive,
-        ownAvgViews: platformOwnAvg,
-        benchmarkP50Views: platformBenchP50,
+        ownIsCompetitive,
+        ownAvgViews,
+        benchmarkP50Views,
       });
 
       if (!generated.ok) {
@@ -138,23 +129,22 @@ Deno.serve(async (req) => {
         return json({ error: `Anthropic (${platform}): ${generated.error}` }, 502);
       }
 
-      // Fuzzy handle set: lowercased, no @, dots/underscores stripped.
       const validHandles = new Set<string>();
-      platformBenchmarks.forEach((p) => validHandles.add(normHandle(p.author_handle)));
-      if (platformOwnIsCompetitive && ownHandle) validHandles.add(normHandle(ownHandle));
+      platformBenchmarks.forEach((p) => validHandles.add(p.author_handle.toLowerCase()));
+      if (ownIsCompetitive && ownHandle) validHandles.add(ownHandle);
 
       const fallbackPostId = platformBenchmarks[0]?.id ?? null;
       const accepted: typeof generated.ideas = [];
 
       for (const idea of generated.ideas) {
-        const handle = normHandle(idea.based_on_handle ?? "");
-        const isOwn = ownHandle && handle === normHandle(ownHandle);
+        const handle = (idea.based_on_handle ?? "").toLowerCase().replace(/^@/, "");
+        const isOwn = ownHandle && handle === ownHandle;
 
         if (!handle) {
           rejectionLog.push(`#${idea.title}: missing based_on_handle`);
           continue;
         }
-        if (isOwn && !platformOwnIsCompetitive) {
+        if (isOwn && !ownIsCompetitive) {
           rejectionLog.push(`#${idea.title}: cited own handle while own underperforms benchmarks`);
           continue;
         }
@@ -162,14 +152,9 @@ Deno.serve(async (req) => {
           rejectionLog.push(`#${idea.title}: based_on_handle '${handle}' not in scraped pool`);
           continue;
         }
-        // Reject hook-duplicates-caption AND hook-is-prefix-of-caption.
-        if (idea.hook && idea.caption) {
-          const h = idea.hook.trim().toLowerCase();
-          const c = idea.caption.trim().toLowerCase();
-          if (h === c || c.startsWith(h)) {
-            rejectionLog.push(`#${idea.title}: hook duplicates/prefixes caption`);
-            continue;
-          }
+        if (idea.hook && idea.caption && idea.hook.trim().toLowerCase() === idea.caption.trim().toLowerCase()) {
+          rejectionLog.push(`#${idea.title}: hook duplicates caption`);
+          continue;
         }
         accepted.push(idea);
         if (accepted.length >= count) break;
@@ -209,16 +194,6 @@ Deno.serve(async (req) => {
 
     const { error: insertErr } = await supabase.from("content_lab_ideas").insert(allRows);
     if (insertErr) return json({ error: insertErr.message }, 500);
-
-    // Persist rejection sample on the run summary so the UI can surface it.
-    if (rejectionLog.length > 0) {
-      const { data: existing } = await supabase
-        .from("content_lab_runs").select("summary").eq("id", run_id).single();
-      const existingSummary = (existing?.summary ?? {}) as Record<string, unknown>;
-      await supabase.from("content_lab_runs").update({
-        summary: { ...existingSummary, ideate_rejections_sample: rejectionLog.slice(-20), ideate_rejection_count: rejectionLog.length },
-      }).eq("id", run_id);
-    }
 
     return json({ ok: true, idea_count: allRows.length, platforms: distribution, own_is_competitive: ownIsCompetitive });
   } catch (e) {
@@ -262,10 +237,13 @@ interface PostRow {
   post_url: string | null;
 }
 
+interface HookVariant { text: string; mechanism: string; why: string }
+
 interface GeneratedIdea {
   title: string;
   based_on_handle?: string;
   hook: string;
+  hook_variants?: HookVariant[];
   body: string;
   cta?: string;
   caption?: string;
@@ -289,6 +267,7 @@ interface IdeaRow {
   caption: string | null;
   caption_with_hashtag: string | null;
   hook: string | null;
+  hook_variants: HookVariant[];
   body: string | null;
   cta: string | null;
   script_full: string | null;
@@ -318,6 +297,7 @@ function toRow(
     caption: idea.caption ?? null,
     caption_with_hashtag: idea.caption_with_hashtag ?? null,
     hook: idea.hook,
+    hook_variants: Array.isArray(idea.hook_variants) ? idea.hook_variants.slice(0, 3) : [],
     body: idea.body,
     cta: idea.cta ?? null,
     script_full: idea.script_full ?? null,
@@ -329,6 +309,7 @@ function toRow(
     status: "not_started",
   };
 }
+
 
 function matchPost(posts: PostRow[], handle?: string): string | null {
   if (!handle) return null;
@@ -411,7 +392,22 @@ Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native
             properties: {
               title: { type: "string", description: "Short working title (max 80 chars)" },
               based_on_handle: { type: "string", description: "@handle of the source benchmark post (without @) — REQUIRED, must be from the pool above" },
-              hook: { type: "string", description: "Exact words spoken in first 3 seconds" },
+              hook: { type: "string", description: "Exact words spoken in first 3 seconds (the primary recommended hook)" },
+              hook_variants: {
+                type: "array",
+                minItems: 3,
+                maxItems: 3,
+                description: "Three alternative opening hooks for the SAME idea, each using a different attention mechanism so the user can pick the one that fits their voice. The first variant should match `hook` above.",
+                items: {
+                  type: "object",
+                  properties: {
+                    text: { type: "string", description: "The hook line itself, max 12 words" },
+                    mechanism: { type: "string", description: "One of: curiosity_gap, negative, social_proof, contrarian, pattern_interrupt, stat_shock, question, story_open" },
+                    why: { type: "string", description: "One sentence on why this mechanism works for this idea" },
+                  },
+                  required: ["text", "mechanism", "why"],
+                },
+              },
               body: { type: "string", description: "What gets said/shown in the middle of the video" },
               cta: { type: "string", description: "Specific, action-led CTA aligned with the brand's stated goal" },
               caption: { type: "string", description: "Post caption (no hashtags) — MUST NOT duplicate the hook" },
@@ -424,7 +420,7 @@ Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native
               filming_checklist: { type: "array", items: { type: "string" }, maxItems: 6 },
               platform_style_notes: { type: "string" },
             },
-            required: ["title", "based_on_handle", "hook", "body", "cta", "caption", "script_full", "duration_seconds", "why_it_works", "platform_style_notes"],
+            required: ["title", "based_on_handle", "hook", "hook_variants", "body", "cta", "caption", "script_full", "duration_seconds", "why_it_works", "platform_style_notes"],
           },
         },
       },

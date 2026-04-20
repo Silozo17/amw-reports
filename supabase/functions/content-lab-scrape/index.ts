@@ -20,21 +20,15 @@ const corsHeaders = {
 
 const APIFY_ACTOR = "apify~instagram-scraper";
 // Cost caps — keep low to bound Apify spend per run.
-// Realistic worst case = 15 + (5*8) + (6*6) = 91 items (capped to MAX_TOTAL_POSTS).
+// Realistic worst case = 15 + (5*8) + (3*6) = 73 items.
 const MAX_POSTS_OWN = 15;
 const MAX_POSTS_COMPETITOR = 8;
 const MAX_POSTS_BENCHMARK = 6;
 const MAX_COMPETITOR_HANDLES = 5;
-// Raised from 3 → 6 so we have ~36 benchmark posts to pick top-30 from in ideate.
-const MAX_BENCHMARK_HANDLES = 6;
+const MAX_BENCHMARK_HANDLES = 3;
 const MAX_TOTAL_POSTS = 80;
 const APIFY_CHUNK_SIZE = 5;
-// Lowered from 90 → 60s to keep total wall-clock under Supabase edge timeout (150s)
-// when running 3 buckets × 3 platforms in parallel.
-const APIFY_TIMEOUT_SEC = 60;
-// Engagement rate is a ratio (0-1). DB column is numeric(8,4) → max ~9999, but anything
-// >1 is a data anomaly. Clamp tightly to keep stats trustworthy.
-const MAX_ENGAGEMENT_RATE = 1;
+const APIFY_TIMEOUT_SEC = 90;
 
 interface DiscoveredEntity { handle: string; reason?: string }
 
@@ -80,6 +74,7 @@ Deno.serve(async (req) => {
 
     const niche = (run as { niche: {
       own_handle: string | null;
+      tracked_handles: Array<{ platform: string; handle: string }> | null;
       top_competitors: DiscoveredEntity[];
       top_global_benchmarks: DiscoveredEntity[];
       client_id: string;
@@ -89,6 +84,16 @@ Deno.serve(async (req) => {
     const enabledPlatforms = (niche.platforms_to_scrape && niche.platforms_to_scrape.length > 0
       ? niche.platforms_to_scrape
       : ['instagram']) as Array<'instagram' | 'tiktok' | 'facebook'>;
+
+    // Build per-platform own handle map. Falls back to legacy own_handle for IG.
+    const ownHandlesByPlatform: Partial<Record<'instagram' | 'tiktok' | 'facebook', string>> = {};
+    (niche.tracked_handles ?? []).forEach((h) => {
+      const p = h.platform as 'instagram' | 'tiktok' | 'facebook';
+      if (p && h.handle) ownHandlesByPlatform[p] = h.handle.toLowerCase().replace(/^@/, '');
+    });
+    if (!ownHandlesByPlatform.instagram && niche.own_handle) {
+      ownHandlesByPlatform.instagram = niche.own_handle.toLowerCase().replace(/^@/, '');
+    }
 
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
@@ -102,7 +107,7 @@ Deno.serve(async (req) => {
     // Run all three buckets in parallel; each handles its own errors.
     // Each bucket fans out across all enabled platforms internally.
     const [ownResult, compResult, benchResult] = await Promise.allSettled([
-      scrapeOwn(supabase, niche, enabledPlatforms),
+      scrapeOwn(supabase, niche, enabledPlatforms, ownHandlesByPlatform),
       scrapeBucket(competitorHandles, "competitor", MAX_POSTS_COMPETITOR, enabledPlatforms),
       scrapeBucket(benchmarkHandles, "benchmark", MAX_POSTS_BENCHMARK, enabledPlatforms),
     ]);
@@ -137,7 +142,7 @@ Deno.serve(async (req) => {
       const raw = p.views > 0
         ? (p.likes + p.comments) / p.views
         : (p.likes + p.comments) / Math.max(p.likes + p.comments + 1000, 1000);
-      const engagement_rate = Math.min(Math.max(raw, 0), MAX_ENGAGEMENT_RATE);
+      const engagement_rate = Math.min(Math.max(raw, 0), 99.9999);
       return {
         run_id,
         platform: p.platform,
@@ -224,66 +229,85 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// One retry on 5xx (Apify 503/504 are common). Returns the final response either way.
-async function fetchWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
-  const res = await fetch(url, init);
-  if (res.status >= 500 && res.status < 600) {
-    console.warn(`${label}: ${res.status}, retrying once after 1.5s`);
-    await new Promise((r) => setTimeout(r, 1500));
-    return fetch(url, init);
-  }
-  return res;
-}
-
 interface BucketResult { posts: ScrapedPost[]; errors: string[] }
 
 async function scrapeOwn(
   supabase: ReturnType<typeof createClient>,
   niche: { own_handle: string | null; client_id: string },
   platforms: Array<"instagram" | "tiktok" | "facebook">,
+  ownHandlesByPlatform: Partial<Record<"instagram" | "tiktok" | "facebook", string>>,
 ): Promise<BucketResult> {
-  if (!niche.own_handle) return { posts: [], errors: [] };
   const errors: string[] = [];
-  const ownHandle = niche.own_handle.toLowerCase().replace(/^@/, "");
+  const collected: ScrapedPost[] = [];
 
-  try {
-    // Instagram OAuth path (preferred, free)
-    if (platforms.includes("instagram")) {
-      const { data: igConn } = await supabase
-        .from("platform_connections")
-        .select("id, access_token, account_id, account_name, is_connected")
-        .eq("client_id", niche.client_id)
-        .eq("platform", "instagram")
-        .eq("is_connected", true)
-        .maybeSingle();
+  // Skip the bucket entirely if no own handle is set for any enabled platform.
+  const hasAny = platforms.some((p) => !!ownHandlesByPlatform[p]);
+  if (!hasAny) return { posts: [], errors: [] };
 
-      const connHandle = (igConn as { account_name?: string } | null)?.account_name?.toLowerCase().replace(/^@/, "");
+  // Instagram: prefer OAuth, then fall back to Apify if handle present.
+  if (platforms.includes("instagram")) {
+    const igHandle = ownHandlesByPlatform.instagram;
+    if (igHandle) {
+      try {
+        const { data: igConn } = await supabase
+          .from("platform_connections")
+          .select("id, access_token, account_id, account_name, is_connected")
+          .eq("client_id", niche.client_id)
+          .eq("platform", "instagram")
+          .eq("is_connected", true)
+          .maybeSingle();
 
-      if (igConn && (igConn as { access_token?: string }).access_token && (igConn as { account_id?: string }).account_id && connHandle === ownHandle) {
-        const token = await decryptToken((igConn as { access_token: string }).access_token);
-        const posts = await fetchOwnInstagramPosts((igConn as { account_id: string }).account_id, token, ownHandle);
-        posts.forEach((p) => { p.bucket = "own"; });
-        console.log(`Own (OAuth IG): ${posts.length} posts for @${ownHandle}`);
-        // Still scrape other platforms via Apify below
-        const remaining = platforms.filter((p) => p !== "instagram");
-        if (remaining.length === 0) return { posts, errors };
-        const extra = await scrapeHandlesAcrossPlatforms([ownHandle], MAX_POSTS_OWN, remaining);
-        extra.posts.forEach((p) => { p.bucket = "own"; });
-        return { posts: [...posts, ...extra.posts], errors: [...errors, ...extra.errors] };
+        const connHandle = (igConn as { account_name?: string } | null)?.account_name?.toLowerCase().replace(/^@/, "");
+
+        if (igConn && (igConn as { access_token?: string }).access_token && (igConn as { account_id?: string }).account_id && connHandle === igHandle) {
+          const token = await decryptToken((igConn as { access_token: string }).access_token);
+          const oauthPosts = await fetchOwnInstagramPosts((igConn as { account_id: string }).account_id, token, igHandle);
+          oauthPosts.forEach((p) => { p.bucket = "own"; });
+          console.log(`Own (OAuth IG): ${oauthPosts.length} posts for @${igHandle}`);
+          collected.push(...oauthPosts);
+        } else {
+          const apifyPosts = await runApifyForHandles([igHandle], MAX_POSTS_OWN);
+          apifyPosts.forEach((p) => { p.bucket = "own"; });
+          console.log(`Own (Apify IG): ${apifyPosts.length} posts for @${igHandle}`);
+          collected.push(...apifyPosts);
+        }
+      } catch (e) {
+        const msg = `Own IG scrape failed: ${e instanceof Error ? e.message : e}`;
+        console.error(msg);
+        errors.push(msg);
       }
     }
-
-    // Apify fallback for own handle across all enabled platforms
-    const result = await scrapeHandlesAcrossPlatforms([ownHandle], MAX_POSTS_OWN, platforms);
-    result.posts.forEach((p) => { p.bucket = "own"; });
-    console.log(`Own (Apify): ${result.posts.length} posts for @${ownHandle}`);
-    return { posts: result.posts, errors: [...errors, ...result.errors] };
-  } catch (e) {
-    const msg = `Own handle scrape failed: ${e instanceof Error ? e.message : e}`;
-    console.error(msg);
-    errors.push(msg);
-    return { posts: [], errors };
   }
+
+  // TikTok own
+  if (platforms.includes("tiktok") && ownHandlesByPlatform.tiktok) {
+    try {
+      const ttPosts = await runTikTokScraper(ownHandlesByPlatform.tiktok, MAX_POSTS_OWN);
+      ttPosts.forEach((p) => { p.bucket = "own"; });
+      console.log(`Own (TikTok): ${ttPosts.length} posts for @${ownHandlesByPlatform.tiktok}`);
+      collected.push(...ttPosts);
+    } catch (e) {
+      const msg = `Own TikTok scrape failed: ${e instanceof Error ? e.message : e}`;
+      console.error(msg);
+      errors.push(msg);
+    }
+  }
+
+  // Facebook own
+  if (platforms.includes("facebook") && ownHandlesByPlatform.facebook) {
+    try {
+      const fbPosts = await runFacebookScraper(ownHandlesByPlatform.facebook, MAX_POSTS_OWN);
+      fbPosts.forEach((p) => { p.bucket = "own"; });
+      console.log(`Own (Facebook): ${fbPosts.length} posts for ${ownHandlesByPlatform.facebook}`);
+      collected.push(...fbPosts);
+    } catch (e) {
+      const msg = `Own Facebook scrape failed: ${e instanceof Error ? e.message : e}`;
+      console.error(msg);
+      errors.push(msg);
+    }
+  }
+
+  return { posts: collected, errors };
 }
 
 async function scrapeBucket(
@@ -405,11 +429,11 @@ async function runApifyForHandles(handles: string[], resultsLimit: number): Prom
   const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
 
   try {
-    const res = await fetchWithRetry(runUrl, {
+    const res = await fetch(runUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    }, "Apify IG");
+    });
     if (!res.ok) {
       console.error("Apify error:", res.status, await res.text());
       return [];
@@ -473,11 +497,11 @@ async function runTikTokScraper(handle: string, resultsLimit: number): Promise<S
   };
   const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
   try {
-    const res = await fetchWithRetry(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    }, "Apify TikTok");
+    });
     if (!res.ok) {
       console.error("TikTok Apify error:", res.status, await res.text());
       return [];
@@ -539,11 +563,11 @@ async function runFacebookScraper(handle: string, resultsLimit: number): Promise
   };
   const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
   try {
-    const res = await fetchWithRetry(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    }, "Apify FB");
+    });
     if (!res.ok) {
       console.error("Facebook Apify error:", res.status, await res.text());
       return [];

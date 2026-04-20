@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/contexts/OrgContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import usePageMeta from '@/hooks/usePageMeta';
+import DiscoveryProgress from '@/components/content-lab/DiscoveryProgress';
 
 interface CompetitorEntry {
   handle: string;
@@ -35,6 +36,14 @@ const PRODUCERS = ['internal team', 'freelancer', 'agency', 'founder-on-phone'];
 const VIDEO_LENGTHS = ['15s', '30s', '60s', '90s'];
 const CADENCES = ['daily', '3x week', 'weekly'];
 
+// Accepts a handle, page slug or full FB URL. Strips protocol/host/trailing slash so the scraper gets a clean slug.
+const normaliseFacebookHandle = (raw: string): string => {
+  const trimmed = raw.trim().replace(/^@/, '');
+  const urlMatch = trimmed.match(/facebook\.com\/([^/?#]+)/i);
+  if (urlMatch?.[1]) return urlMatch[1];
+  return trimmed.replace(/\/$/, '');
+};
+
 const NicheFormPage = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -46,8 +55,10 @@ const NicheFormPage = () => {
   const [label, setLabel] = useState('');
   const [language, setLanguage] = useState('en');
 
-  // Core 3 inputs
-  const [ownHandle, setOwnHandle] = useState('');
+  // Core inputs
+  const [ownHandle, setOwnHandle] = useState(''); // Instagram (legacy field, kept for discovery)
+  const [tiktokHandle, setTiktokHandle] = useState('');
+  const [facebookHandle, setFacebookHandle] = useState('');
   const [website, setWebsite] = useState('');
   const [location, setLocation] = useState('');
   const [platformsToScrape, setPlatformsToScrape] = useState<string[]>(['instagram']);
@@ -117,6 +128,9 @@ const NicheFormPage = () => {
       setLabel(data.label);
       setLanguage(data.language);
       setOwnHandle(data.own_handle ?? '');
+      const handles = (data.tracked_handles as Array<{ platform: string; handle: string }> | null) ?? [];
+      setTiktokHandle(handles.find((h) => h.platform === 'tiktok')?.handle ?? '');
+      setFacebookHandle(handles.find((h) => h.platform === 'facebook')?.handle ?? '');
       setWebsite(data.website ?? '');
       setLocation(data.location ?? '');
       setPlatformsToScrape(data.platforms_to_scrape ?? ['instagram']);
@@ -154,6 +168,9 @@ const NicheFormPage = () => {
     if (!website && client.website) setWebsite(client.website);
     const handles = client.social_handles as Record<string, string> | null;
     if (!ownHandle && handles?.instagram) setOwnHandle(handles.instagram);
+    if (!tiktokHandle && handles?.tiktok) setTiktokHandle(handles.tiktok);
+    if (!facebookHandle && handles?.facebook) setFacebookHandle(handles.facebook);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, clients, isEdit]);
 
   const handleDiscover = async () => {
@@ -255,9 +272,10 @@ const NicheFormPage = () => {
 
     setSaving(true);
     try {
-      const tracked_handles = ownHandle.trim()
-        ? [{ platform: 'instagram', handle: ownHandle.trim().replace(/^@/, '') }]
-        : [];
+      const tracked_handles: Array<{ platform: string; handle: string }> = [];
+      if (ownHandle.trim()) tracked_handles.push({ platform: 'instagram', handle: ownHandle.trim().replace(/^@/, '') });
+      if (tiktokHandle.trim()) tracked_handles.push({ platform: 'tiktok', handle: tiktokHandle.trim().replace(/^@/, '') });
+      if (facebookHandle.trim()) tracked_handles.push({ platform: 'facebook', handle: normaliseFacebookHandle(facebookHandle.trim()) });
 
       const competitor_urls = topCompetitors
         .map((c) => (c.handle ? `https://instagram.com/${c.handle.replace(/^@/, '')}` : ''))
@@ -344,21 +362,6 @@ const NicheFormPage = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Your Instagram handle</Label>
-            <Input value={ownHandle} onChange={(e) => setOwnHandle(e.target.value)} placeholder="@yourbrand" />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Your website</Label>
-            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourbrand.com" />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Location</Label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="London, UK" />
-          </div>
-
-          <div className="space-y-2">
             <Label>Platforms to scrape</Label>
             <div className="flex flex-wrap gap-2">
               {PLATFORMS.map((p) => (
@@ -372,6 +375,39 @@ const NicheFormPage = () => {
                 </Badge>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground">Pick every channel you actually post on. We'll scrape your latest posts on each.</p>
+          </div>
+
+          {platformsToScrape.includes('instagram') && (
+            <div className="space-y-2">
+              <Label>Your Instagram handle</Label>
+              <Input value={ownHandle} onChange={(e) => setOwnHandle(e.target.value)} placeholder="@yourbrand" />
+            </div>
+          )}
+
+          {platformsToScrape.includes('tiktok') && (
+            <div className="space-y-2">
+              <Label>Your TikTok handle</Label>
+              <Input value={tiktokHandle} onChange={(e) => setTiktokHandle(e.target.value)} placeholder="@yourbrand" />
+            </div>
+          )}
+
+          {platformsToScrape.includes('facebook') && (
+            <div className="space-y-2">
+              <Label>Your Facebook page</Label>
+              <Input value={facebookHandle} onChange={(e) => setFacebookHandle(e.target.value)} placeholder="yourbrand or https://facebook.com/yourbrand" />
+              <p className="text-xs text-muted-foreground">Page slug or full URL — we'll normalise it.</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Your website</Label>
+            <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yourbrand.com" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Location</Label>
+            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="London, UK" />
           </div>
 
         </Card>
@@ -522,11 +558,12 @@ const NicheFormPage = () => {
         </Card>
 
         {/* Discover button moved out so brief feeds it */}
-        <Card className="p-6">
+        <Card className="space-y-4 p-6">
           <Button onClick={handleDiscover} disabled={discovering} className="w-full" variant="secondary">
             {discovering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {hasDiscovered ? 'Re-discover' : 'Discover niche & competitors'}
           </Button>
+          <DiscoveryProgress active={discovering} />
         </Card>
 
         {/* Discovered niche review */}
