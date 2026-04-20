@@ -1,33 +1,106 @@
 
+## Scope
+Analyse the failure end-to-end, fix the real cause, add preflight checks so we do not retry blindly again, and only then attempt one safe resume on the existing run data.
 
-## What I'm hearing
-You're certain the key and account are correct, and the screenshots back that up ($20 credit on the right account). I trust you. Let's stop blaming the key and find the real cause.
+## What I found
+1. The current failure is not the API key anymore.
+   - The latest `content-lab-ideate` logs show the new key fingerprint (`...kgAA`) was loaded.
+   - `content-lab-resume` now fails with:
+     `Ideate failed: 502 {"error":"Anthropic (instagram): Claude response had no tool_use ideas"}`
+   - So the key is being read, the function is running, and the failure has moved into ideation output handling.
 
-## What I'll actually do
+2. The main bug is in `content-lab-ideate`.
+   - It calls Anthropic directly and assumes every successful response will contain `content[].type === "tool_use"`.
+   - If Anthropic returns a normal text block, a refusal, or any non-tool structured success response, the code throws the generic error `"Claude response had no tool_use ideas"`.
+   - That means the code is not capturing the real 200-response body, so it is still partially guessing.
 
-### Step 1 — Prove the key works (or doesn't) with a 1-line test
-Call Anthropic directly from an edge function with the *current* `ANTHROPIC_API_KEY` using the cheapest possible request: `claude-haiku` with a 5-token "ping". This isolates the variable completely.
+3. The prompt contract is internally inconsistent.
+   - `_shared/contentLabPrompts.ts` requires “3 hook variants” with labelled mechanisms.
+   - But `content-lab-ideate/index.ts` only accepts a single `hook: string` in the tool schema and DB row shape.
+   - This contradiction can make the model ignore the tool contract or respond in an unexpected format.
 
-Three possible outcomes:
-- **200 OK** → key is fine, problem is specific to `claude-sonnet-4-5-20250929` (model access scoping)
-- **402** → confirmed billing/workspace mismatch, then we discuss
-- **401/403** → key is invalid/revoked
+4. Setup is not fully guarded.
+   - `NicheFormPage` can persist `platforms_to_scrape`, and old/edit data can still contain TikTok/Facebook.
+   - But `content-lab-scrape` currently only gathers Instagram posts.
+   - `content-lab-resume` does not validate that the run actually has source posts for every target platform before re-ideating.
 
-### Step 2 — Based on result, fix the real cause
-- If outcome A (model access): switch ideate to `claude-3-5-sonnet-20241022` (universally available, same quality tier, no special access needed) — one-line change.
-- If outcome B: you decide whether to update the secret or move credit on Anthropic's side.
-- If outcome C: rotate.
+5. There is a separate admin UI bug, but it is not the run failure.
+   - `Badge` is a plain function component, not `forwardRef`.
+   - Radix components in `RunDetailDrawer` are trying to attach refs through it, causing the console warning.
 
-### Step 3 — Re-run resume on the existing scrape
-Once the key passes the ping, hit `content-lab-resume` for run `e28d9af5…`. Posts already exist, no Apify spend.
+## Implementation plan
 
-## Files to touch
-- `supabase/functions/content-lab-ideate/index.ts` — only if Step 1 reveals a model-access issue (swap model string).
-- No other files. No migrations. No UI changes.
+### 1) Fix the ideation contract first
+Update:
+- `supabase/functions/_shared/contentLabPrompts.ts`
+- `supabase/functions/content-lab-ideate/index.ts`
 
-## Why this is different from last time
-Last attempt assumed the key was wrong and looped. This attempt **proves** what's wrong with a cheap isolated test before changing anything. We stop guessing.
+Changes:
+- Make the prompt match the schema exactly.
+- Remove the “3 hook variants” requirement unless we also redesign the DB/UI to store them.
+- Keep one canonical `hook` per idea, since that matches the current DB and UI.
+- Tighten the tool schema so the model has one unambiguous output shape.
 
-## Risk
-Zero. The ping costs fractions of a cent and touches no production data.
+### 2) Make Anthropic response handling diagnostic instead of guessy
+Update:
+- `supabase/functions/content-lab-ideate/index.ts`
 
+Changes:
+- Log request id and a safe preview of successful 200 responses when no `tool_use` is returned.
+- Preserve the actual response type/body summary in the returned error.
+- Validate the tool payload before insert and report exactly what field is missing.
+- If Anthropic returns text instead of tool output, surface that exact text preview into step logs and `content_lab_runs.error_message`.
+
+Result:
+- Next failure, if any, will be concrete, not “no tool_use ideas”.
+
+### 3) Add preflight guards before any retry
+Update:
+- `supabase/functions/content-lab-resume/index.ts`
+- `supabase/functions/content-lab-ideate/index.ts`
+- `src/pages/content-lab/NicheFormPage.tsx`
+
+Changes:
+- Before re-ideating, verify the run still has posts and group them by platform.
+- Verify `platforms_to_scrape` is compatible with the actual available source posts.
+- If the run only has Instagram posts, ideation should either:
+  - restrict itself to Instagram, or
+  - fail early with a clear setup error before calling AI.
+- Prevent unsupported platform combinations from being saved from the niche form until scrape support exists.
+
+Result:
+- No more retries against impossible platform setups.
+
+### 4) Clean up the noisy admin warning
+Update:
+- `src/components/ui/badge.tsx`
+
+Changes:
+- Convert `Badge` to `React.forwardRef` so Radix wrappers stop throwing ref warnings in `RunDetailDrawer`.
+
+This is not the run failure, but it removes misleading noise while debugging.
+
+### 5) Verify before the next retry, then do one controlled resume
+After implementing:
+1. Confirm prompt/schema alignment.
+2. Confirm ideate logs now capture non-tool 200 responses.
+3. Confirm run platform preflight passes for the existing run.
+4. Redeploy affected functions.
+5. Trigger a single `content-lab-resume` on the existing run so it reuses the already-scraped posts and does not spend another scrape credit.
+
+## Technical details
+Files to change:
+- `supabase/functions/content-lab-ideate/index.ts`
+- `supabase/functions/_shared/contentLabPrompts.ts`
+- `supabase/functions/content-lab-resume/index.ts`
+- `src/pages/content-lab/NicheFormPage.tsx`
+- `src/components/ui/badge.tsx`
+
+No database migration is required.
+
+## Expected result
+After this fix:
+- we stop guessing
+- retry only runs when setup is valid
+- ideation either completes successfully from the existing posts or shows the exact AI response/problem
+- admin debugging no longer shows the `Badge` ref warning
