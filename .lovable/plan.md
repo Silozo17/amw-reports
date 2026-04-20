@@ -1,86 +1,79 @@
 
 
-## Scope
-Re-architect the Content Lab pipeline so ideas are world-class: benchmark-led, never derivative of underperforming own content, with sharper prompts, a tightened discovery flow, and a re-ordered Run Detail UI.
+The user wants to revisit the plan I previously presented. The brand brief just shipped. Now they want:
+1. Facebook + TikTok scraping
+2. Kanban pipeline for ideas
+3. Smart use of own-account performance
 
-## What I found
-1. `content-lab-discover` currently asks AI to generate competitor handles loosely — no hard ranking by performance, no "top 10 benchmarks" concept, output mixed into `top_competitors` and `top_global_benchmarks` arrays.
-2. `content-lab-ideate` already references competitor posts but does **not** filter to top performers, does **not** compare own performance vs benchmarks, and currently uses competitor + own posts equally as inspiration — which is exactly the problem you flagged.
-3. Run Detail tabs today: **Viral Feed | 12 Ideas** (no "Your latest content" tab; "12 Ideas" label is wrong).
-4. Viral Feed sort today: `engagement_rate DESC` — not views/likes/comments as you want.
-5. NicheForm discovery step is a single text box for "tell us about you" — too loose for the quality bar you want.
-6. The system persona in `_shared/contentLabPrompts.ts` is "senior short-form strategist" — solid but not the "Head of Creative Direction" framing you want.
+Most of (3) is already implemented in the recent rewrite (own posts tagged, gating rule in ideate, "Your Latest Content" tab exists). I should call that out so we don't redo work.
+
+Let me check current state quickly and present a tight plan.
+
+## Scope
+Three things, ordered by effort:
+1. **Facebook + TikTok scraping** — extend the scraper + niche form.
+2. **Kanban pipeline** — drag-and-drop board on ideas grouped by `status`.
+3. **Smarter use of own posts** — already 80% done from the last rewrite; just polish.
+
+## What's already in place (no rework needed)
+- Own posts are tagged `source = 'own'` and shown on the "Your Latest Content" tab.
+- Ideate function already pulls `own_avg_views`, computes `benchmark_p50`, gates own-post inspiration accordingly, and lists weak own posts as anti-examples.
+- `content_lab_ideas.status` column already exists (default `'not_started'`).
+- `platforms_to_scrape` array already exists on `content_lab_niches`.
 
 ## Plan
 
-### 1) Top-10 benchmark-led ideation (the core change)
-**`content-lab-discover`**
-- Tighten the prompt to return exactly **10 benchmark accounts** (the global best in this niche, ranked by typical reel views — not engagement rate, not vibes), plus up to 5 local/contextual competitors as a separate list.
-- Output schema: `{ top_10_benchmarks: [{handle, why_top, est_avg_views}], local_competitors: [{handle, why_relevant}] }`.
-- Persist `top_10_benchmarks` to `content_lab_niches.top_global_benchmarks` (already exists).
+### 1) Facebook + TikTok scraping
+**Niche form (`NicheFormPage.tsx`)**
+- Add a 3-checkbox platform picker (Instagram / Facebook / TikTok), persisted to `platforms_to_scrape`.
+- Default = Instagram only (no behaviour change for existing niches).
 
-**`content-lab-scrape`**
-- Continue scraping all sources (own + benchmarks + competitors).
-- Tag each post `source = 'benchmark' | 'competitor' | 'own'` (already supported).
+**Scraper (`content-lab-scrape/index.ts`)**
+- Split into `scrapeInstagram` (existing), `scrapeFacebook` (new — `apify/facebook-pages-scraper`), `scrapeTikTok` (new — `clockworks/tiktok-scraper`).
+- Run enabled platforms in parallel. Field map per platform:
+  - FB: `likesCount`, `commentsCount`, `sharesCount`, `videoViewCount`, `text`, `topImage`, `url`, `time`, `pageName`.
+  - TikTok: `playCount`→views, `diggCount`→likes, `commentCount`, `shareCount`, `text`, `videoUrl`, `cover`, `createTimeISO`, `videoMeta.duration`, `musicMeta.musicName`, `musicMeta.authorName`.
+- Apply existing `media_types` filter per platform (TikTok = always video).
+- Tag rows with the right `platform` enum + `source`.
 
-**`content-lab-ideate` — the rules you asked for, hard-enforced:**
-- Pull the **top 30 benchmark posts** sorted by `views DESC, likes DESC, comments DESC` from `source = 'benchmark'` — this is the inspiration pool.
-- Pull own posts and compute `own_avg_views`.
-- Compute `benchmark_p50_views` (median of top 30).
-- Apply this rule in the prompt and in code:
-  - Default: ideas reference **only benchmark posts** via `based_on_handle`.
-  - Exception: if `own_avg_views >= benchmark_p50_views`, then own posts are eligible inspiration too. Otherwise, **own posts are explicitly listed as "what NOT to repeat"** in the prompt context.
-- Hard validation in the response handler: any idea with `based_on_handle` matching `niche.own_handle` AND own_avg_views < benchmark_p50_views → rejected and regenerated.
+**Image proxy (`content-lab-image-proxy`)**
+- Extend allowlist with `*.tiktokcdn.com`, `*.tiktokcdn-us.com`, `*.tiktokv.com`. `*.fbcdn.net` already present.
 
-### 2) Sharper persona + tighter prompts (`_shared/contentLabPrompts.ts`)
-- New system persona: **"Head of Creative Direction at a top-tier social agency, 12+ years scaling brands on Instagram/TikTok/Facebook to 8-figure accounts. You've reverse-engineered the playbooks of the top creators in every vertical (Alex Hormozi, MrBeast's content team, Gary Vee's agency, Marie Forleo, Mark Rober, Casey Neistat). You only ship ideas that would pass a senior creative review at Wieden+Kennedy or Ogilvy. {{current_year}} best practice only — no 2019 advice."**
-- Add a new `BENCHMARK_FIRST_RULES` block to enforce:
-  - "Every idea must be reverse-engineered from a specific top-10 benchmark post. Cite it via `based_on_handle` + a 1-line breakdown of the *mechanic* (not just the topic) you're borrowing."
-  - "Never copy the topic verbatim. Borrow the *structural pattern* (hook mechanism, pacing, reveal) and apply it to the brand's niche."
-  - "If the producer can't film it in one working day with a phone, reject."
-- Strengthen HARD_RULES: ban the additional cliché generation patterns ("You need to hear this", "Wait until the end", "Nobody talks about this") — these are now 2024/25 fatigued.
+**Card (`ViralPostCard.tsx`)**
+- Switch the "View …" link label by platform: Reel / Post / TikTok.
 
-### 3) UI: tabs + sort (`RunDetailPage.tsx`)
-- New tab order: **Your Latest Content | Viral Feed | Ideas** (drop the "12" — count varies, label is misleading).
-- "Your Latest Content" tab: filter `content_lab_posts.source = 'own'`, sorted by `posted_at DESC`, with the same `ViralPostCard` and a small header showing `own_avg_views vs benchmark_p50_views` so the user immediately sees where they stand.
-- "Viral Feed" tab: filter `source IN ('benchmark', 'competitor')`, sorted **`views DESC, likes DESC, comments DESC`** — exactly as you asked.
-- "Ideas" tab: rename, no count in label.
+### 2) Kanban pipeline
+- Add `@dnd-kit/core` + `@dnd-kit/sortable`.
+- New tab on Run Detail: **Pipeline** (after Ideas). 5 columns: Not started / Scripted / Filming / Posted / Archived — driven by `content_lab_ideas.status`.
+- Each card shows idea number, hook, target platform badge, rating.
+- Drag between columns → `update content_lab_ideas set status = newStatus`.
+- Click card → opens existing idea detail.
+- Mobile (<md): swap drag-and-drop for a status `Select` dropdown on each card.
 
-### 4) Tighter discovery form (`NicheFormPage.tsx`)
-Replace the loose "tell us about you" with a structured 4-block form (single page, no extra steps):
-- **Brand DNA**: niche/category (free text, with autosuggest from common verticals), one-line positioning, 3 specific things you sell/do.
-- **Audience**: who they are (1 line), the single problem they have, where they hang out online.
-- **Voice & constraints**: tone (chips: witty, expert, warm, blunt, playful, premium — pick max 2), 5 things you'll never say/do, the producer (founder / team / studio).
-- **Goal**: pick one — awareness, leads, sales, community. Drives the CTA style downstream.
-
-This becomes the structured context fed into every prompt, replacing the freeform paragraph.
-
-### 5) Validation + observability
-- After ideate, run a validator that rejects any idea where:
-  - `based_on_handle` is null or doesn't match a known scraped handle in this run, OR
-  - `based_on_handle = own_handle` while own underperforms, OR
-  - `hook` matches `caption` of the source post (lazy paraphrase).
-- Log rejection reasons in `content_lab_step_logs` so we can see WHY ideas were filtered.
+### 3) Smarter own-post usage (polish only)
+- Surface a one-line note on the Ideas tab when `own_avg_views < benchmark_p50`: *"Your views are below the top-10 benchmark median, so ideas are reverse-engineered from top accounts only."*
+- Surface the inverse note when on par: *"Your views are on par with the top-10 benchmarks, so your top-performing posts are also being used as inspiration."*
+- Add a "Top-performing own hook" line on the "Your Latest Content" tab header (computed in-page, no schema change).
 
 ## Files to touch
-- `supabase/functions/_shared/contentLabPrompts.ts` — new persona, BENCHMARK_FIRST_RULES, expanded HARD_RULES
-- `supabase/functions/content-lab-discover/index.ts` — top-10 benchmarks schema + prompt tightening
-- `supabase/functions/content-lab-ideate/index.ts` — top-30 benchmark inspiration pool, own-vs-benchmark gating, response validator
-- `src/pages/content-lab/RunDetailPage.tsx` — new tab order, new "Your Latest Content" tab, viral feed sort by views/likes/comments
-- `src/pages/content-lab/NicheFormPage.tsx` — restructured discovery form (Brand DNA / Audience / Voice / Goal)
-- `src/hooks/useContentLab.ts` — surface new niche fields if needed
+- `package.json` — add `@dnd-kit/core`, `@dnd-kit/sortable`
+- `src/pages/content-lab/NicheFormPage.tsx` — platform multi-select
+- `src/pages/content-lab/RunDetailPage.tsx` — Pipeline tab + own-post banner
+- `src/components/content-lab/ViralPostCard.tsx` — platform-aware link label
+- `src/components/content-lab/IdeaPipelineBoard.tsx` (new)
+- `supabase/functions/content-lab-scrape/index.ts` — FB + TikTok fetchers
+- `supabase/functions/content-lab-image-proxy/index.ts` — extend allowlist
 
-No DB migration required — existing columns cover this (`top_global_benchmarks`, `source`, etc.).
+No DB migration needed.
 
 ## Risks / trade-offs
-- The new gating rule means users with weak own performance will get **zero ideas inspired by their own work** — that's intentional and correct, but I'll surface a one-line banner explaining it on the Ideas tab.
-- The structured discovery form is a behaviour change for existing niches; old niches keep their freeform `niche_description` and we'll fall back to it when the new structured fields are empty.
-- Benchmark scraping cost is unchanged — same Apify call, just a stricter list.
+- TikTok actor on Apify is paid per result (~$0.30/1000) — same model as IG, surfaces in existing usage counter.
+- Facebook scraper needs the page to be public; private pages return empty (we'll show the same "no posts found" message as IG).
+- Drag-and-drop on small screens degrades to a dropdown — chosen over cramped 5-column scroll.
+- Existing runs stay IG-only; only new runs benefit from FB/TikTok.
 
 ## Expected result
-- Ideas are reverse-engineered from the proven top-10 in your niche, with a cited source post for every one.
-- Your own underperforming posts are explicitly used as anti-examples, not inspiration.
-- The Run Detail page leads with **Your Latest Content** so you see your baseline first, then the **Viral Feed** sorted by raw views, then the **Ideas**.
-- Discovery captures the brand brief in 4 tight blocks instead of one paragraph.
-- Persona + rules upgrade pushes idea quality toward agency-grade output.
+- Niches can target IG, FB, TikTok independently.
+- Run Detail gains a Kanban Pipeline tab where ideas move from "Not started" → "Posted".
+- Ideas tab clearly tells the user *why* their own posts are or aren't being used as inspiration.
 
