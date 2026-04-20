@@ -1568,6 +1568,39 @@ export type Database = {
         }
         Relationships: []
       }
+      cost_events: {
+        Row: {
+          amount_pence: number
+          created_at: string
+          id: string
+          metadata: Json
+          operation: string
+          org_id: string
+          run_id: string | null
+          service: string
+        }
+        Insert: {
+          amount_pence: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          operation: string
+          org_id: string
+          run_id?: string | null
+          service: string
+        }
+        Update: {
+          amount_pence?: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          operation?: string
+          org_id?: string
+          run_id?: string | null
+          service?: string
+        }
+        Relationships: []
+      }
       custom_domains: {
         Row: {
           created_at: string
@@ -2157,6 +2190,33 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          id: boolean
+          spend_freeze_active: boolean
+          spend_freeze_at: string | null
+          spend_freeze_by: string | null
+          spend_freeze_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          spend_freeze_active?: boolean
+          spend_freeze_at?: string | null
+          spend_freeze_by?: string | null
+          spend_freeze_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          spend_freeze_active?: boolean
+          spend_freeze_at?: string | null
+          spend_freeze_by?: string | null
+          spend_freeze_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_type: string | null
@@ -2431,6 +2491,33 @@ export type Database = {
             referencedColumns: ["org_id"]
           },
         ]
+      }
+      request_idempotency: {
+        Row: {
+          created_at: string
+          endpoint: string
+          key: string
+          org_id: string | null
+          response_body: Json
+          response_status: number
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          key: string
+          org_id?: string | null
+          response_body: Json
+          response_status: number
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          key?: string
+          org_id?: string | null
+          response_body?: Json
+          response_status?: number
+        }
+        Relationships: []
       }
       subscription_plans: {
         Row: {
@@ -2745,6 +2832,7 @@ export type Database = {
         Args: { _amount: number; _org_id: string; _stripe_payment_id?: string }
         Returns: number
       }
+      cleanup_request_idempotency: { Args: never; Returns: undefined }
       consume_content_lab_credit: {
         Args: { _amount?: number; _org_id: string; _run_id: string }
         Returns: boolean
@@ -2830,11 +2918,17 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      org_spend_pence_since: {
+        Args: { _org_id: string; _since: string }
+        Returns: number
+      }
+      platform_spend_pence_since: { Args: { _since: string }; Returns: number }
       record_share_view: { Args: { _slug: string }; Returns: undefined }
       refund_content_lab_credit: {
         Args: { _ledger_id: string; _refund_reason: string }
         Returns: undefined
       }
+      run_spend_pence: { Args: { _run_id: string }; Returns: number }
       slugify_niche_tag: { Args: { _label: string }; Returns: string }
       spend_content_lab_credit: {
         Args: {

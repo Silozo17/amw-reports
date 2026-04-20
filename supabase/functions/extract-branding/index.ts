@@ -52,6 +52,34 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Server-side URL safety + cost gates
+    const { validateSafeUrl } = await import('../_shared/safeUrl.ts');
+    const { assertPlatformNotFrozen, recordCost, estimateFirecrawl, PlatformFrozenError } = await import('../_shared/costGuard.ts');
+    const safe = validateSafeUrl(url);
+    if (!safe.ok || !safe.url) {
+      return new Response(JSON.stringify({ error: `Invalid URL (${safe.reason})` }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    try {
+      await assertPlatformNotFrozen();
+    } catch (e) {
+      if (e instanceof PlatformFrozenError) {
+        return new Response(JSON.stringify({ error: 'Branding extraction temporarily disabled (platform spend freeze).' }), {
+          status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw e;
+    }
+
+    // Look up org for cost attribution (best-effort, non-blocking)
+    let orgIdForCost: string | null = null;
+    try {
+      const { data: prof } = await anonClient.from('profiles').select('org_id').eq('user_id', claimsData.claims.sub).maybeSingle();
+      orgIdForCost = (prof as { org_id?: string } | null)?.org_id ?? null;
+    } catch { /* ignore */ }
+
     const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
     if (!apiKey) {
       return new Response(
@@ -60,10 +88,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    let formattedUrl = url.trim();
-    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
-      formattedUrl = `https://${formattedUrl}`;
-    }
+    const formattedUrl = safe.url;
 
     console.log('Extracting branding from:', formattedUrl);
 
@@ -92,6 +117,13 @@ Deno.serve(async (req) => {
         },
       }),
     });
+
+    if (orgIdForCost) {
+      await recordCost({
+        orgId: orgIdForCost, service: 'firecrawl', operation: 'extract_branding',
+        pence: estimateFirecrawl(), metadata: { url: formattedUrl },
+      });
+    }
 
     if (!response.ok) {
       const err = await response.text();

@@ -64,6 +64,17 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const { assertPlatformNotFrozen, assertOrgWithinBudget, recordCost, estimateApify, BudgetExceededError, PlatformFrozenError } = await import("../_shared/costGuard.ts");
+    try {
+      await assertPlatformNotFrozen();
+      await assertOrgWithinBudget(orgId);
+    } catch (e) {
+      if (e instanceof PlatformFrozenError) return new Response(JSON.stringify({ error: e.message }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (e instanceof BudgetExceededError) return new Response(JSON.stringify({ error: e.message, scope: e.scope }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw e;
+    }
+    await recordCost({ orgId, service: "apify", operation: "pool_refresh", pence: estimateApify("pool_refresh") });
+
     // Rate-limit check: max 5 manual refreshes per org per rolling 30 days
     const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const { count: recentCount } = await admin
