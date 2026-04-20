@@ -1,106 +1,75 @@
 
 
-## Content Lab — Full Audit
+## Gap analysis
 
-I read every edge function, the Run Detail UI, the niche form, the Kanban, the image proxy, plus recent run logs. Here's what's broken, fragile, or worth tightening — grouped by severity.
+**Immediate bug you spotted (small, fixable now):**
+The niche form only has one handle field labelled "Your Instagram handle". When users tick Facebook or TikTok, there's nowhere to enter those handles. The scraper then has nothing to fetch for those platforms, so own-account scrape silently returns empty.
 
----
+**vs. v2 spec — what's still missing:**
 
-### 🔴 Critical bugs (live failures in your last 5 runs)
+| Area | Spec | Current | Gap |
+|---|---|---|---|
+| Own handles per platform | IG + TikTok + FB handles | IG only | **Missing** |
+| Zero-config discovery | Firecrawl + Apify IG + Gemini + Claude → auto-fill voice + competitors | Discover exists, but no website scrape, no IG profile pre-scrape, no brand voice profile | Partial |
+| Brand voice profile | `content_lab_brand_voice_snapshots` with vocab, banned words, example captions | Brand brief form exists, but not auto-built from scrapes | Missing |
+| Hook variants | 3 per idea, each different mechanism | 1 hook per idea | **Missing** |
+| Visual post preview | Phone-frame mockups (TikTok/IG/FB) | Card previews exist (`IdeaPreviewInstagram/TikTok/Facebook`) | ✅ Already done |
+| Trend Radar verification | Ahrefs / Google Trends | Trends generated but not verified | Missing |
+| Hook Library tab | Standalone tab grouped by mechanism | Hooks stored in DB, no tab | Missing |
+| Swipe File / favourites | Star → swipe file, drag to calendar | Not built | Missing |
+| Content Calendar (Scale) | Drag ideas onto dates | Not built | Missing |
+| Credit system | Per-idea regen costs credits | Not built | Missing |
+| Regenerate / Remix idea | 1 credit per regen, modifier prompt | Not built | Missing |
+| Trending audio (TikTok) | Lookup + suggest per idea | Not built | Missing |
+| Tier gating (Starter/Growth/Scale) | 3 tiers with niches/runs/credits limits | Not gated | Missing |
+| Discovery progress UI | Step-by-step reveal (60-90s) | Single spinner | Polish |
 
-**1. `numeric field overflow` on scrape insert** (run `e059e8fd…` failed on this)
-- `engagement_rate` is computed in `content-lab-scrape` with `(likes + comments) / views`. When `views` is near zero and likes are huge, it overflows the DB column. The clamp `Math.min(raw, 99.9999)` exists, but the column is likely `numeric(precision, scale)` with low precision and the engagement_rate of TikTok/own posts where `views=0` falls through the fallback formula and can still overflow.
-- **Fix**: clamp to a safe range AND check the actual column precision. Switch to `numeric(7,4)` or apply `Math.min(raw, 9.9999)` (engagement rate as ratio caps at 1.0 anyway — anything >1 is a data bug).
+## What I propose to build now
 
-**2. Scrape 504 IDLE_TIMEOUT** (run `2cdc5617…`)
-- `content-lab-pipeline` calls `content-lab-scrape` with no timeout protection. Scrape runs 3 buckets × multiple platforms in parallel via Apify `run-sync`, each up to 90s. With 3 platforms enabled, total wall-clock can exceed Supabase's 150s edge timeout.
-- **Fix options**: lower `APIFY_TIMEOUT_SEC` to 60s, fan out per-platform calls inside scrape sequentially-then-merge, or move scrape to an async Apify job poll pattern instead of `run-sync`.
+Given "one task at a time" and your immediate observation, I'll split into **two phases**. Phase 1 ships now (hotfix + foundations). Phase 2 is a separate approval after you see Phase 1.
 
-**3. Bucket vs source mismatch — silently wrong ideation pool**
-- `scrape` writes `bucket = 'own' | 'competitor' | 'benchmark'` to a **bucket** column. It writes `source = 'oauth' | 'apify'` (the data origin, not the role).
-- `ideate` filters with `p.source === 'benchmark' || p.source === 'competitor'` and `p.source === 'own'`. **Source never has those values** — so this filter returns nothing OR everything depending on enum vs text typing. The query SELECTs both `source` and `bucket`, so the fix is one-line, but right now ideation may be operating on the wrong pool.
-- **Fix**: change ideate filters to use `p.bucket` not `p.source`.
+### Phase 1 (this PR) — Fix the handle gap + the highest-leverage gaps
 
-**4. Pipeline preflight checks deprecated `tracked_handles`**
-- `content-lab-pipeline` line 153 still selects `tracked_handles` and counts it, but discovery no longer populates it (replaced by `top_global_benchmarks` + `top_competitors`). Old niches with `tracked_handles` still pass; new ones rely entirely on benchmarks/competitors which is fine — but the count check is misleading and you've shipped at least one "no posts could be fetched" run because of this gap.
-- **Fix**: remove `tracked_handles` from preflight (or migrate it).
+1. **Per-platform own handles** *(fixes the bug you spotted)*
+   - Replace single "Your Instagram handle" input with 3 conditional fields shown only when that platform is ticked: IG handle, TikTok handle (`@`), Facebook page URL or handle.
+   - Persist into `content_lab_niches.tracked_handles` jsonb as `[{platform, handle}]` (column already exists, already supports it).
+   - Update `content-lab-scrape` to read all 3, route IG handle → IG actor, TikTok handle → TikTok actor, FB handle/URL → FB actor for the `own` bucket. Already handles per-platform competitor scraping; this just adds own routing.
+   - Auto-fill from `clients.social_handles` jsonb when a client is picked (already supports `instagram`, `tiktok`, `facebook` keys).
 
----
+2. **3 hook variants per idea** *(biggest quality lever in the spec)*
+   - Update `content-lab-ideate` prompt + JSON schema to require `hook_variants: [{text, mechanism, why}]` × 3, each a different mechanism.
+   - Add `hook_variants jsonb` column to `content_lab_ideas` (keep existing `hook` as the selected/primary).
+   - UI: idea detail shows 3 hook cards, click to set as the working hook (purely client-side, persists selection back to `hook`).
 
-### 🟠 Logic issues / ideation quality
+3. **Hook Library tab** on Run Detail
+   - New tab after Ideas. Pulls from `content_lab_hooks` (already populated by analyse) + flattens `hook_variants` from ideas.
+   - Grouped by `mechanism`, copy-to-clipboard on each, source post link.
 
-**5. `competitor` posts are mixed into the benchmark inspiration pool**
-- Ideate treats `bucket IN ('benchmark','competitor')` as one pool. Per your stated direction, ideas should be reverse-engineered from the **top 10 global benchmarks**, not local competitors. Local competitors are useful context but not the role-models.
-- **Fix**: pool inspiration from `bucket='benchmark'` only; keep competitor posts visible in the Viral Feed but exclude them from ideate's `inspirationPool` (or use them as a secondary tier with lower weight).
+4. **Discovery progress UX**
+   - Replace single spinner on Discover button with a 5-step reveal (Scanning website → Reading posts → Classifying niche → Finding competitors → Building voice). Pure UI, no edge function change — driven by elapsed time + step durations.
 
-**6. Benchmark sample is too small for the "top 30 by views" claim**
-- Scraper caps benchmarks at `MAX_BENCHMARK_HANDLES=3` × `MAX_POSTS_BENCHMARK=6` = **18 posts max**. The ideate code asks for the "top 30 benchmark posts by views" but it'll never have more than 18.
-- Discovery returns 10 benchmarks but only 3 are scraped. Either raise `MAX_BENCHMARK_HANDLES` to 6–8 (cost-aware) or drop the "top 30" framing in the prompt.
+### Out of scope for this PR (next phase, separate approval):
+- Credit system + Stripe credit packs
+- Regenerate / Remix per-idea
+- Swipe File + Content Calendar
+- Trend verification (Ahrefs / Google Trends)
+- Trending audio lookup for TikTok
+- Tier gating UI (Starter / Growth / Scale limits)
+- Brand voice auto-extraction from website + last-30-posts (separate `content-lab-discover` rewrite)
+- White-label PDF export
 
-**7. Hashtag/keywords/own-handle from the niche are ignored**
-- `tracked_hashtags` and `tracked_keywords` from discovery are saved but **never used by scrape or ideate**. The pipeline only scrapes by handle. Either remove them from the form or actually feed hashtags into a hashtag-search Apify run.
+## Files touched (Phase 1)
 
-**8. Ideate is rejecting a lot — 11 failed vs 4 ok in last 7 days**
-- Validator drops ideas where `based_on_handle` doesn't match the scraped pool (case-sensitivity, `@` prefix already handled, but author_handle is sometimes truncated/changed by Apify — e.g. TikTok stores `authorMeta.name` which can differ from input handle). Then `accepted.length === 0 → continue` means a platform silently produces zero ideas.
-- **Fix**: fuzzy-match handles (lowercased, no @, allow swapping `.` and `_`), and make the validator log the rejection sample to UI not just console.
+- `src/pages/content-lab/NicheFormPage.tsx` — per-platform handle fields, conditional on ticked platforms
+- `supabase/functions/content-lab-scrape/index.ts` — read tracked_handles per platform for `own` bucket
+- `supabase/functions/content-lab-ideate/index.ts` — request 3 hook_variants in schema + prompt
+- `supabase/migrations/<new>.sql` — `alter table content_lab_ideas add column hook_variants jsonb default '[]'::jsonb`
+- `src/pages/content-lab/RunDetailPage.tsx` — Hook Library tab + select hook variant from idea detail
+- `src/components/content-lab/HookLibrary.tsx` (new) — grouped-by-mechanism display
+- `src/components/content-lab/DiscoveryProgress.tsx` (new) — 5-step reveal
 
-**9. Anti-example block can leak even when own posts are tagged `competitor` in the bucket column**
-- Same root cause as #3 — relies on `source==='own'` which never matches.
-
-**10. `ownIsCompetitive` uses single median, not platform-aware**
-- Median is computed across all benchmark posts globally, but ideate runs per-platform. A brand on par with IG benchmarks but below TikTok benchmarks gets a flat verdict.
-- **Fix**: compute `benchmarkP50Views` per platform inside the loop (the `platformBenchmarks` slice is already there).
-
----
-
-### 🟡 UX / front-end issues
-
-**11. Tabs default to "own" but most runs have 0 own posts → empty first impression**
-- `Tabs defaultValue="own"`. If `ownPosts.length === 0`, the first thing the user sees is an empty state.
-- **Fix**: default to whichever tab has data — `own` if present, else `feed`.
-
-**12. Ideas tab caption-vs-hook check is local only**
-- Card already hides hook when it's a prefix of caption (good). But the Ideas tab itself still shows `idea.hook` even when the AI returned `hook === caption` — validator catches identical strings but not "hook is first 80 chars of caption".
-- **Fix**: tighten the dedupe to a normalized prefix check, like the card already does.
-
-**13. Pipeline tab `onSelect` is a no-op**
-- `onSelect={() => { /* click-to-detail can be wired later */ }}` — clicking a card on the Kanban does nothing. Either remove the cursor change or wire it to open the existing idea detail.
-
-**14. NicheForm: `Auto-fill from client when picked` effect has a missing dep**
-- `useEffect(() => {…}, [clientId, clients, isEdit])` reads `website` and `ownHandle` but excludes them — eslint-disable wasn't added. It works but will surprise on prop change.
-
-**15. Page meta is stale**
-- `usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' })` — count is no longer 12 (it's adaptive across platforms).
-
----
-
-### 🟢 Polish / hygiene
-
-**16. `RECENT_RUN_WINDOW_MS` is hardcoded** in ContentLabPage — pull to a top-level constant and reuse.
-**17. `MAX_TOTAL_POSTS=80` query** in `RunDetailPage` matches scraper cap — keep them in a shared constant so they don't drift.
-**18. `content-lab-analyse` orders by `engagement_rate DESC`** but engagement_rate is broken/clamped per #1 — once that's fixed, ordering will be more meaningful. Also: it analyses up to 40 posts via paid LLM; consider lowering to 25 if cost matters.
-**19. No retry/backoff on Apify 5xx** — every Apify call is single-attempt. 503/504 from Apify are common; add 1 retry with 1.5s delay for non-2xx.
-**20. `ViralPostCard` falls back to raw IG URL on proxy failure** — but raw IG URLs almost always 403 from the browser. The fallback is effectively a broken image. Better to show the placeholder gradient when proxy fails.
-**21. Step logs table has no `INSERT` policy for users** (correct — it's service-role written) but the UI never surfaces them. Consider showing the last failed step's log on the run detail page when status='failed'.
-
----
-
-## Proposed fix plan (ordered by impact)
-
-1. **Fix `bucket` vs `source` filter in ideate** — single edit, restores the entire benchmark-first logic. (Critical)
-2. **Cap `engagement_rate` at 1.0 in scrape** — eliminates the numeric overflow class of failures. (Critical)
-3. **Lower scrape wall-clock**: `APIFY_TIMEOUT_SEC` 90→60s and reduce per-bucket concurrency when 3+ platforms active. (Critical)
-4. **Drop `tracked_handles` from pipeline preflight**; rely on benchmarks/competitors. (Critical)
-5. **Pool inspiration from `bucket='benchmark'` only**; competitors stay in feed. (Quality)
-6. **Raise `MAX_BENCHMARK_HANDLES` to 6** so we actually have ~36 benchmark posts to pick top-30 from. (Quality)
-7. **Per-platform `ownIsCompetitive`**. (Quality)
-8. **Fuzzy handle matching in validator** + surface rejection sample in `summary` so UI can show it. (Quality)
-9. **Default RunDetail tab to whichever has data**; fix stale page meta + 12-ideas copy. (UX)
-10. **Wire pipeline card click → idea detail dialog**. (UX)
-11. **One Apify retry on 5xx**. (Reliability)
-12. **Cleanup pass**: shared constants, page meta, image fallback to placeholder, optional analyse cap. (Polish)
-
-Steps 1–4 fix the live failures you're hitting today. Steps 5–8 materially improve idea quality. 9–12 are polish.
-
-No DB migrations needed for items 1–10. Item 2 may need one if the column precision is too tight — I'll check `content_lab_posts.engagement_rate` precision first and migrate only if needed.
+## Risks / things to confirm
+- **Existing ideas have no `hook_variants`** — the UI will fall back to showing the single `hook` field for old runs. New runs get the 3 variants.
+- **Facebook handle vs page URL** — FB scraper needs the page URL or page slug, not an `@handle`. The field will accept either and normalise.
+- **TikTok own scrape** — `clockworks/tiktok-scraper` requires the handle without `@`, which the existing scraper already handles for competitors.
 
