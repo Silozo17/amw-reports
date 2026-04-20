@@ -1,119 +1,127 @@
 
 
-## Two changes — Global Hook Library + Premium Swipe File detail
+## Public landing page: `/content-lab`
 
-### 1. Make Hook Library a global, ranked, growing library
+A full marketing funnel page on the public site explaining what Content Lab does, how it works, who it's for, what's included, and how to start. Mirrors the look and structure of existing public pages (`/how-it-works`, `/features`, `/pricing`).
 
-**Current:** `/content-lab/hooks` only shows hooks from the current org's runs.
+### Route + nav
 
-**New:** All hooks from all completed runs across the entire app, ranked by real engagement, filterable by niche, mechanism, and platform.
+- New route `/content-lab-feature` (the in-app authenticated `/content-lab` already exists, so we use a distinct public path to avoid collision).
+- Add it to `PublicNavbar.tsx` under **Solutions → Use Cases** as **"Content Lab (AI Content Engine)"**.
+- Add it to `PublicFooter.tsx` features column.
+- Lazy-import in `App.tsx` and wrap in `<PublicPageRoute>`.
 
-#### Backend
+### Page sections (top to bottom)
 
-New SQL migration adds a `SECURITY DEFINER` view + RPC that any authenticated user can read, joining hooks → source post (for engagement & platform) → run → niche. Privacy-safe: returns only the hook text, mechanism, why-it-works, niche label, platform, anonymised author handle (the source post's `author_handle`, which is already the public scraped creator handle, never your own org data), and computed performance score. **Never exposes** which org the hook belongs to, client names, or run ids belonging to other orgs.
+```text
+1. Hero
+   eyebrow: "AI Content Engine"
+   H1: "Stop Guessing What to Post.
+        Decode What's Working — Then Make It Yours."
+   sub: "Content Lab scrapes the last 60 days of viral content in any
+         niche, extracts the patterns behind it, and turns them into
+         12 ready-to-film ideas every month — with hooks, scripts,
+         filming checklists and phone-mockup previews."
+   CTAs: [Start Free Trial]  [See Live Demo ↓]
+   star decorations + warped grid background
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_global_hook_library(
-  _niche text DEFAULT NULL,
-  _platform text DEFAULT NULL,
-  _mechanism text DEFAULT NULL,
-  _limit int DEFAULT 200
-) RETURNS TABLE (
-  id uuid,
-  hook_text text,
-  mechanism text,
-  why_it_works text,
-  niche_label text,
-  platform text,
-  author_handle text,
-  source_views int,
-  source_engagement_rate numeric,
-  performance_score numeric,
-  created_at timestamptz
-) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT h.id, h.hook_text, h.mechanism, h.why_it_works,
-         n.label, p.platform::text, p.author_handle,
-         p.views, p.engagement_rate,
-         -- composite: log-views * (1 + engagement_rate)
-         ROUND((LN(GREATEST(p.views, 1)) * (1 + COALESCE(p.engagement_rate, 0)))::numeric, 2),
-         h.created_at
-  FROM content_lab_hooks h
-  JOIN content_lab_runs r ON r.id = h.run_id AND r.status = 'complete'
-  LEFT JOIN content_lab_posts p ON p.id = h.source_post_id
-  LEFT JOIN content_lab_niches n ON n.id = r.niche_id
-  WHERE h.hook_text IS NOT NULL
-    AND (_niche IS NULL OR n.label ILIKE _niche)
-    AND (_platform IS NULL OR p.platform::text = _platform)
-    AND (_mechanism IS NULL OR h.mechanism = _mechanism)
-  ORDER BY 10 DESC NULLS LAST
-  LIMIT _limit;
-$$;
-GRANT EXECUTE ON FUNCTION public.get_global_hook_library(text,text,text,int) TO authenticated;
+2. Social-proof strip (logos / "Trusted by AMW Media + creators")
+
+3. The problem (3 pain cards)
+   • "Spending hours scrolling for inspiration"
+   • "Posting and praying — no idea what works"
+   • "Burning out on the content treadmill"
+
+4. The 3-step solution (Discover → Decode → Create)
+   already exists as a tutorial banner inside the app — we restate
+   it for marketing with bigger illustrations + 1-line outcomes:
+   • Discover  — pulls own + benchmark + competitor content
+   • Decode    — AI extracts hooks, formats, hot topics, mechanisms
+   • Create    — 12 ready-to-film ideas with scripts + previews
+
+5. "Inside every run" — feature deep-dive (8 cards in a 4×2 grid)
+   • Viral Feed (own / benchmarks / competitors, last 60d)
+   • Pattern Insights (formats, topics, sentiment, posting cadence)
+   • 12 ready-to-film Ideas every month (+ wildcards 🚀)
+   • Hook Library (global, ranked across the platform)
+   • Trend Library (live momentum + recommendations)
+   • Pipeline Kanban (script → film → edit → posted)
+   • Swipe File (save the best ideas across all your runs)
+   • Client Sharing (share runs, DOCX export, comments)
+
+6. "What you get per idea" — phone mockup screenshot
+   single hero image / mock with annotations:
+   hook, 30-sec script, CTA, why-it-works, filming checklist,
+   hashtags, performance prediction. Re-uses existing IdeaCard
+   stacked layout.
+
+7. Built for (3 audience cards)
+   • Solo creators wanting consistent output
+   • Freelancers selling content as a service
+   • Agencies running content for multiple clients
+
+8. Pricing
+   Three tier cards mirroring the in-app structure:
+   • Creator  — 1 run / month        — included with free plan
+   • Studio   — 3 runs / month       — Most Popular
+   • Agency   — 10 runs / month      — full multi-client access
+   Plus a "Need more runs?" credit-pack subsection showing the
+   £15 / £60 / £200 packs (5 / 25 / 100 credits, never expire),
+   pulled verbatim from BuyCreditsDialog so they stay accurate.
+   Note: exact tier prices are managed in Stripe today; CTA on
+   each card is "Start trial" → /login?view=signup. Final pence
+   prices are read from the existing /pricing page if present, or
+   left as "From £X/mo · See pricing" with a link to /pricing.
+
+9. How runs work (timeline graphic)
+   minute-by-minute: scrape → analyse → ideate → ready
+   typical run completes in ~3–5 minutes. Live progress shown
+   in the app.
+
+10. FAQ (8 Q&A, expandable)
+    • What is Content Lab?
+    • What platforms does it scrape?
+    • Whose content does it look at?
+    • Are ideas unique to me?
+    • Can I share runs with clients?
+    • What does a credit cost?
+    • Do credits expire?
+    • Can I cancel anytime?
+
+11. Long-form SEO block
+    3–4 paragraphs: "How AI Content Research Saves Marketers 20+
+    Hours a Month" — keyword-targeted, mirrors the depth of the
+    HowItWorksPage SEO section.
+
+12. Final CTA
+    "Stop scrolling. Start shipping."
+    [Start Free Trial]  [Book a demo]
 ```
 
-Why an RPC and not a view + RLS: the existing `content_lab_hooks` RLS restricts rows to your own org. Loosening RLS is risky (could leak `run_id` references). An RPC bypasses RLS in a tightly controlled way and only returns whitelisted columns.
+### Visual + copy guardrails
 
-#### Frontend (`HookLibraryPage.tsx`)
-
-Rewritten to call the RPC. New filters above the grid:
-- **Search** (existing)
-- **Niche** (populated from RPC results)
-- **Platform** — Instagram / TikTok / Facebook / LinkedIn / Threads / YouTube
-- **Mechanism** — Curiosity gap / Negative / Social proof / Contrarian / Pattern interrupt / Stat shock / Question / Story open
-- **Sort** — Top performing (default) / Newest / Most engagement
-
-Each hook card now shows:
-- Hook text (display font)
-- Performance rank badge ("#1", "#2", … top 50 only) + small flame icon for top decile
-- Niche · Platform · Mechanism badges
-- Why-it-works snippet
-- "From @handle · 1.2M views · 8.4% ER" attribution line
-- Copy button (existing pattern from `HookLibrary.tsx`) — copies hook text to clipboard
-
-Removed: "View source run" link (other orgs' runs are private).
-
-Empty state copy updated: "No hooks match these filters yet — try a broader niche or platform."
-
-Header subtitle updated to: *"Every hook from every Content Lab run across the platform — ranked by real-world engagement. Filter by niche, platform or mechanism."*
-
-#### Risks
-- **Cross-org data exposure**: mitigated by whitelisted columns in the RPC. We expose hook copy patterns + the *public* author handle that was scraped (not the org that scraped it). No client names, no org ids, no run ids.
-- **Free-tier abuse**: the page is still gated behind `useContentLabAccess()`, so only paying users see it.
-- **Performance**: the join across 3 tables ordered by computed score is fine at current scale; if the table grows past ~100k rows we add an index on `(run_id, source_post_id)` and a materialised view. Not needed yet.
-
----
-
-### 2. Swipe File card → opens full phone-mockup detail
-
-**Current:** Swipe file already uses `<IdeaCard variant="grid" />` which DOES show the phone mockup preview thumbnail. Clicking it opens `IdeaDetailDrawer`, which is a text-only Sheet (no phone mockup).
-
-**New:** Replace the text-only drawer with the **same phone-mockup + full details** layout used on the run-detail page (the `<IdeaCard variant="stacked">`).
-
-#### Approach
-
-`IdeaDetailDrawer.tsx` is rewritten to fetch the idea's full data (it already does — includes `hook_variants`, `body`, `cta`, `hashtags`, `filming_checklist`, etc.) PLUS the parent run's `client_id` and `niche_id` (one extra select), then render `<IdeaCard variant="stacked">` inside a wider Sheet (`sm:max-w-3xl` instead of `sm:max-w-xl` so the 260px phone preview + content fits comfortably).
-
-This means the swipe file (and `/ideas` page) opens the **exact same premium card** users see on the run page — phone mockup on the left, hook variants / script / CTA / why-it-works / filming checklist / actions / performance strip on the right. Single source of truth: `IdeaCard` is the only place idea visuals live.
-
-The existing `Section`, `IdeaActionButtons`, `IdeaPerformanceStrip` imports are removed from the drawer (now provided by `IdeaCard` stacked variant).
-
-#### Risks
-- **Drawer width**: `sm:max-w-3xl` (~768px) is wide but still fits comfortably on tablets up. On mobile it's full-width as before.
-- **Stacked variant inside a drawer**: the `md:grid-cols-[260px_1fr]` collapses to single column below `md` — works fine in a narrower drawer too.
-
----
+- Reuses `<StarDecoration>`, `gradient-divider`, `section-light`, `font-heading` (Anton), `font-body`, `text-gradient-purple` — exactly like `HowItWorksPage`.
+- Dark theme only (project memory: public pages are dark).
+- Phone mockup screenshot: re-use existing `IdeaPreviewInstagram` rendering with a hardcoded sample idea (no live data fetch on a public page).
+- All in-app screenshots are referenced as inline component renders, not bitmap exports — so the page is always in sync with the real product.
+- `usePageMeta()` for SEO title/description.
 
 ### Files
 
-**New**
-- `supabase/migrations/<ts>_global_hook_library_rpc.sql` — RPC above
+**New (1)**
+```
+src/pages/ContentLabPublicPage.tsx
+```
 
-**Edited**
-- `src/pages/content-lab/HookLibraryPage.tsx` — call RPC, add Platform + Mechanism + Sort filters, redesign cards (rank, copy button, source attribution)
-- `src/components/content-lab/IdeaDetailDrawer.tsx` — replace text layout with `<IdeaCard variant="stacked">`, widen sheet
+**Edited (3)**
+```
+src/App.tsx                                  ← lazy import + route
+src/components/landing/PublicNavbar.tsx      ← add to Solutions menu
+src/components/landing/PublicFooter.tsx      ← add link
+```
 
-No other files change.
+No backend, no DB changes, no auth changes. One new public page + navigation wiring.
 
 ### Open questions
-None. AMW hook data confirmed in the table (94 hooks across 3 runs from inspection). Proceeding once approved.
+- **Tier prices**: I haven't found hardcoded Content Lab tier prices in the frontend (managed via Stripe). I'll show tier *features* (1 / 3 / 10 runs per month) with "From £X/mo" placeholders and a "See pricing" link, OR you can confirm the exact monthly prices for **Studio** and **Agency** Content Lab tiers and I'll bake them in. Which do you want?
 
