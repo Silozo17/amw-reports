@@ -125,6 +125,9 @@ const RunDetailPage = () => {
     : 0;
   const ownIsCompetitive = ownAvgViews > 0 && ownAvgViews >= benchmarkP50;
   const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+  const topOwnHook = ownPosts.length > 0
+    ? [...ownPosts].sort((a, b) => (b.views ?? 0) - (a.views ?? 0))[0]?.hook_text ?? null
+    : null;
 
   const { data: ideas = [] } = useQuery({
     queryKey: ['content-lab-ideas', id],
