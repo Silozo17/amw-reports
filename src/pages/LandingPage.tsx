@@ -10,6 +10,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import LandingHero from '@/components/landing/LandingHero';
+import TurnstileWidget from '@/components/auth/TurnstileWidget';
 import usePageMeta from '@/hooks/usePageMeta';
 
 type View = 'login' | 'signup' | 'otp' | 'magic-link';
@@ -49,6 +50,19 @@ const LandingPage = () => {
   const [companyName, setCompanyName] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Cloudflare Turnstile — bot protection on signup + password reset.
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
+  const [signupTurnstileToken, setSignupTurnstileToken] = useState('');
+  const [resetTurnstileToken, setResetTurnstileToken] = useState('');
+  useEffect(() => {
+    supabase.functions.invoke('verify-turnstile', { method: 'GET' })
+      .then(({ data }) => {
+        const key = (data as { site_key?: string } | null)?.site_key;
+        if (key) setTurnstileSiteKey(key);
+      })
+      .catch(() => { /* dev mode — widget hidden, server allows */ });
+  }, []);
 
   const [otpCode, setOtpCode] = useState('');
 
