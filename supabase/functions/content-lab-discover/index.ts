@@ -17,6 +17,12 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const APIFY_TOKEN = Deno.env.get("APIFY_TOKEN");
+
+// Verification thresholds for AI-suggested benchmark handles.
+const MIN_VERIFIED_FOLLOWERS = 5_000;
+const MAX_DAYS_SINCE_LAST_POST = 60;
+const VERIFY_BATCH_SIZE = 10;
 
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-pro";
@@ -100,6 +106,15 @@ Deno.serve(async (req) => {
 
     // Slugify the niche label into a stable niche_tag used for shared benchmark pooling.
     const nicheTag = slugify(discovery.niche_label);
+
+    // Verify AI-suggested benchmark handles via Apify (drop fake / dead / tiny accounts).
+    // Only Instagram benchmarks are verified — TikTok/FB profile lookups are unreliable.
+    const verifiedBenchmarks = await verifyBenchmarkHandles(
+      discovery.top_global_benchmarks,
+      admin,
+      nicheTag,
+    );
+    discovery.top_global_benchmarks = verifiedBenchmarks;
 
     if (input.niche_id) {
       const { error: uErr } = await admin
