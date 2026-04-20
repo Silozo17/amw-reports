@@ -310,11 +310,6 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
       .from("content_lab_ideas")
       .select("id", { count: "exact", head: true })
       .eq("run_id", runId);
-    await ideateStep.finish({
-      status: "ok",
-      message: `Generated ${ideaCount ?? 0} ideas`,
-      payload: { idea_count: ideaCount ?? 0 },
-    });
 
     await updateStatus("completed", { completed_at: new Date().toISOString() });
     await pipelineLog.finish({
