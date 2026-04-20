@@ -214,6 +214,7 @@ const DraggableIdeaCard = ({ idea, onSelect, isOverlay }: DraggableCardProps) =>
           {idea.is_wildcard && (
             <Badge variant="secondary" className="text-[9px]">Wildcard 🚀</Badge>
           )}
+          {!isOverlay && <SwipeFileHeart ideaId={idea.id} />}
           {!isOverlay && (
             <Button
               variant="ghost"
