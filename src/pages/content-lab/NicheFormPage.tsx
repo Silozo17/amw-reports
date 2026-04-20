@@ -159,6 +159,9 @@ const NicheFormPage = () => {
     if (!website && client.website) setWebsite(client.website);
     const handles = client.social_handles as Record<string, string> | null;
     if (!ownHandle && handles?.instagram) setOwnHandle(handles.instagram);
+    if (!tiktokHandle && handles?.tiktok) setTiktokHandle(handles.tiktok);
+    if (!facebookHandle && handles?.facebook) setFacebookHandle(handles.facebook);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, clients, isEdit]);
 
   const handleDiscover = async () => {
