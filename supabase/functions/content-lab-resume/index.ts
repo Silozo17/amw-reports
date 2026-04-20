@@ -1,10 +1,9 @@
 // content-lab-resume: re-runs analyse + ideate on an existing run that already has
-// scraped posts. Skips Apify scrape entirely and does NOT increment monthly usage.
-// Used when ideation failed (e.g. Anthropic outage / billing) and we want to retry
-// without spending another scrape credit.
+// scraped posts, OR (when rescrape=true) wipes posts and starts fresh from scrape.
+// Hands off to content-lab-step-runner using mode="resume" or mode="rescrape" so the
+// state machine handles the actual stepwise execution.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { logStepStart } from "../_shared/contentLabStepLog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +33,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Verify run exists and load niche so we can preflight platforms.
     const { data: run } = await admin
       .from("content_lab_runs").select("id, org_id, status, niche_id").eq("id", run_id).single();
     if (!run) return json({ error: "Run not found" }, 404);
@@ -43,32 +41,49 @@ Deno.serve(async (req) => {
       .from("content_lab_niches").select("platforms_to_scrape").eq("id", run.niche_id).single();
     const targetPlatforms: string[] = (niche?.platforms_to_scrape ?? ["instagram"]) as string[];
 
-    // Group existing posts by platform.
     const { data: postRows } = await admin
-      .from("content_lab_posts")
-      .select("platform")
-      .eq("run_id", run_id);
-    if (!postRows || postRows.length === 0) {
+      .from("content_lab_posts").select("platform").eq("run_id", run_id);
+    const hasPosts = !!(postRows && postRows.length > 0);
+
+    if (!rescrape && !hasPosts) {
       return json({ error: "Run has no posts to resume from — start a fresh run instead." }, 400);
     }
-    const postCount = postRows.length;
-    const availablePlatforms = new Set(postRows.map((p) => p.platform));
-    const missingPlatforms = targetPlatforms.filter((p) => !availablePlatforms.has(p));
-    if (missingPlatforms.length > 0) {
-      return json({
-        error: `Cannot resume: niche targets [${targetPlatforms.join(", ")}] but run only has posts for [${[...availablePlatforms].join(", ")}]. Missing: ${missingPlatforms.join(", ")}. Edit the niche or start a fresh run.`,
-      }, 400);
+
+    if (!rescrape && hasPosts) {
+      const availablePlatforms = new Set(postRows!.map((p) => p.platform));
+      const missing = targetPlatforms.filter((p) => !availablePlatforms.has(p));
+      if (missing.length > 0) {
+        return json({
+          error: `Cannot resume: niche targets [${targetPlatforms.join(", ")}] but run only has posts for [${[...availablePlatforms].join(", ")}]. Missing: ${missing.join(", ")}. Edit the niche or start a fresh run.`,
+        }, 400);
+      }
     }
 
-    // Fire as a true background task so the runtime keeps it alive
-    const bgTask = runResume(admin, run_id, rescrape === true).catch((e) => console.error("Resume crashed:", e));
-    // @ts-expect-error EdgeRuntime is provided by Supabase edge runtime
-    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
-      // @ts-expect-error see above
-      EdgeRuntime.waitUntil(bgTask);
-    }
+    // Reset to a clean active state and hand off.
+    const startStatus = rescrape ? "pending" : "analysing";
+    await admin.from("content_lab_runs").update({
+      status: startStatus,
+      error_message: null,
+      completed_at: null,
+      summary: {},
+      updated_at: new Date().toISOString(),
+    }).eq("id", run_id);
 
-    return json({ ok: true, run_id, post_count: postCount, platforms: [...availablePlatforms], rescrape: rescrape === true }, 202);
+    await admin.from("content_lab_ideas").delete().eq("run_id", run_id);
+
+    await fetch(`${SUPABASE_URL}/functions/v1/content-lab-step-runner`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ run_id, mode: rescrape ? "rescrape" : "resume" }),
+    }).catch((e) => console.error("step-runner kick failed:", e));
+
+    return json({
+      ok: true, run_id, post_count: postRows?.length ?? 0,
+      rescrape: rescrape === true,
+    }, 202);
   } catch (e) {
     console.error("content-lab-resume error:", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
@@ -77,128 +92,6 @@ Deno.serve(async (req) => {
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status, headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-async function runResume(admin: ReturnType<typeof createClient>, runId: string, rescrape: boolean) {
-  const updateStatus = async (status: string, extra: Record<string, unknown> = {}) => {
-    await admin.from("content_lab_runs").update({
-      status, updated_at: new Date().toISOString(), ...extra,
-    }).eq("id", runId);
-  };
-
-  const fail = async (msg: string) => {
-    console.error("Resume fail:", runId, msg);
-    await updateStatus("failed", { error_message: msg, completed_at: new Date().toISOString() });
-  };
-
-  const pipelineLog = await logStepStart({
-    runId,
-    step: "pipeline",
-    message: rescrape ? "Resume started (RESCRAPE)" : "Resume started (skip scrape)",
-  });
-
-  try {
-    // Always clear stale ideas
-    await admin.from("content_lab_ideas").delete().eq("run_id", runId);
-
-    // Optional rescrape: wipe existing posts + re-run scrape (costs Apify credits)
-    if (rescrape) {
-      const scrapeStep = await logStepStart({ runId, step: "scrape", message: "Rescraping (user-requested)" });
-      await admin.from("content_lab_posts").delete().eq("run_id", runId);
-      await updateStatus("scraping", { error_message: null, completed_at: null });
-      const scrapeRes = await callFn("content-lab-scrape", { run_id: runId });
-      if (!scrapeRes.ok) {
-        await scrapeStep.finish({ status: "failed", errorMessage: scrapeRes.error ?? "unknown" });
-        await pipelineLog.finish({ status: "failed", errorMessage: `Rescrape failed: ${scrapeRes.error ?? "unknown"}` });
-        return fail(`Rescrape failed: ${scrapeRes.error ?? "unknown"}`);
-      }
-      await scrapeStep.finish({ status: "ok", message: "Rescrape complete" });
-    }
-
-    await updateStatus("analysing", { error_message: null, completed_at: null });
-
-    // ANALYSE (best-effort)
-    const analyseStep = await logStepStart({ runId, step: "analyse", message: "Calling content-lab-analyse (resume)" });
-    const analyseRes = await callFn("content-lab-analyse", { run_id: runId });
-    if (!analyseRes.ok) {
-      console.error(`Analyse step failed (non-fatal) for ${runId}:`, analyseRes.error);
-      await analyseStep.finish({
-        status: "failed", message: "Non-fatal — pipeline continued",
-        errorMessage: analyseRes.error ?? "unknown",
-      });
-    } else {
-      await analyseStep.finish({ status: "ok", message: "Analyse complete" });
-    }
-
-    // IDEATE (required) — per-platform to stay under function timeout
-    await updateStatus("ideating");
-
-    const { data: nicheRow } = await admin
-      .from("content_lab_runs")
-      .select("niche:niche_id(platforms_to_scrape)")
-      .eq("id", runId)
-      .single();
-    const platforms: string[] =
-      ((nicheRow as { niche: { platforms_to_scrape?: string[] } } | null)?.niche?.platforms_to_scrape) ?? ["instagram"];
-
-    let anyPlatformSucceeded = false;
-    for (const platform of platforms) {
-      const ideateStep = await logStepStart({
-        runId,
-        step: "ideate",
-        message: `Calling content-lab-ideate (resume, ${platform})`,
-        payload: { platform },
-      });
-      const ideateRes = await callFn("content-lab-ideate", { run_id: runId, platform });
-      if (!ideateRes.ok) {
-        await ideateStep.finish({ status: "failed", errorMessage: ideateRes.error ?? "unknown", payload: { platform } });
-        console.error(`Resume ideate failed for ${platform}:`, ideateRes.error);
-      } else {
-        anyPlatformSucceeded = true;
-        await ideateStep.finish({ status: "ok", message: `Ideate complete for ${platform}`, payload: { platform } });
-      }
-    }
-
-    if (!anyPlatformSucceeded) {
-      await pipelineLog.finish({ status: "failed", errorMessage: "Ideate failed for all platforms" });
-      return fail("Ideate failed for all platforms — check the run logs.");
-    }
-
-    const { count: ideaCount } = await admin
-      .from("content_lab_ideas")
-      .select("id", { count: "exact", head: true })
-      .eq("run_id", runId);
-
-    await updateStatus("completed", { completed_at: new Date().toISOString() });
-    await pipelineLog.finish({
-      status: "ok",
-      message: "Resume completed",
-      payload: { idea_count: ideaCount ?? 0 },
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    await pipelineLog.finish({ status: "failed", errorMessage: msg });
-    await fail(msg);
-  }
-}
-
-async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${SERVICE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const text = await res.text();
-    if (!res.ok) return { ok: false, error: `${res.status} ${text}` };
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "fetch failed" };
-  }
 }
