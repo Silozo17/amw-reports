@@ -1,106 +1,61 @@
 
+
 ## Scope
-Analyse the failure end-to-end, fix the real cause, add preflight checks so we do not retry blindly again, and only then attempt one safe resume on the existing run data.
+Make the Viral Feed cards look like real Instagram posts: working thumbnails, full stat row (views, likes, comments, shares), and a "View reel" button that opens the original post. No backend re-scrape — work with the data we already have.
 
 ## What I found
-1. The current failure is not the API key anymore.
-   - The latest `content-lab-ideate` logs show the new key fingerprint (`...kgAA`) was loaded.
-   - `content-lab-resume` now fails with:
-     `Ideate failed: 502 {"error":"Anthropic (instagram): Claude response had no tool_use ideas"}`
-   - So the key is being read, the function is running, and the failure has moved into ideation output handling.
+1. `content_lab_posts` already stores: `thumbnail_url`, `post_url`, `likes`, `comments`, `shares`, `views`, `post_type`, `posted_at`.
+2. Thumbnails are blank because Instagram CDN URLs (from Apify `displayUrl` and IG Graph `thumbnail_url`) are signed + short-lived AND blocked by Instagram's referrer policy when loaded from another domain. So `<img src={p.thumbnail_url}>` 404s or returns blank.
+3. `shares` is always `0` for Instagram (Graph API and Apify do not expose share counts for organic posts). `views` is only present for videos/reels.
+4. The card layout in `RunDetailPage.tsx` only shows likes + comments and has no link out to the original post.
 
-2. The main bug is in `content-lab-ideate`.
-   - It calls Anthropic directly and assumes every successful response will contain `content[].type === "tool_use"`.
-   - If Anthropic returns a normal text block, a refusal, or any non-tool structured success response, the code throws the generic error `"Claude response had no tool_use ideas"`.
-   - That means the code is not capturing the real 200-response body, so it is still partially guessing.
+## Plan
 
-3. The prompt contract is internally inconsistent.
-   - `_shared/contentLabPrompts.ts` requires “3 hook variants” with labelled mechanisms.
-   - But `content-lab-ideate/index.ts` only accepts a single `hook: string` in the tool schema and DB row shape.
-   - This contradiction can make the model ignore the tool contract or respond in an unexpected format.
+### 1. Fix thumbnails (proxy through an edge function)
+- Add a tiny new edge function `content-lab-image-proxy` (verify_jwt = false) that:
+  - Accepts `?url=<encoded instagram cdn url>`.
+  - Validates the URL host is on an allowlist (`*.cdninstagram.com`, `*.fbcdn.net`, `scontent*.cdninstagram.com`, `*.tiktokcdn.com` for later).
+  - Fetches server-side (no browser referrer issue) and streams the bytes back with `Content-Type` from upstream + `Cache-Control: public, max-age=86400`.
+  - Returns a 1×1 transparent PNG on failure so the card never shows a broken icon.
+- In the frontend, render thumbnails via this proxy:
+  ```
+  /functions/v1/content-lab-image-proxy?url=<encoded>
+  ```
+- Add `<img loading="lazy" onError={hide}>` so any remaining failures collapse cleanly.
 
-4. Setup is not fully guarded.
-   - `NicheFormPage` can persist `platforms_to_scrape`, and old/edit data can still contain TikTok/Facebook.
-   - But `content-lab-scrape` currently only gathers Instagram posts.
-   - `content-lab-resume` does not validate that the run actually has source posts for every target platform before re-ideating.
+### 2. Real-looking post card
+Update the Viral Feed card in `src/pages/content-lab/RunDetailPage.tsx` (extracted into a new `src/components/content-lab/ViralPostCard.tsx` to keep file size sensible):
+- Header row: small circular avatar placeholder + `@handle` + platform badge.
+- Square (1:1) image area using the proxied thumbnail; fallback gradient if missing.
+- Action row beneath the image with icons (heart, comment, paper plane / share, bookmark) — visual only, like a real IG card.
+- Stats line: `{likes} likes · {comments} comments` and, when `views > 0`, a leading `{views} views` line above (matches how Reels display).
+- Caption: 2-line clamp.
+- Footer:
+  - **"View reel"** button (primary, small) when `post_type` is `video`/`reel`/`clip` AND `post_url` exists → opens `post_url` in a new tab.
+  - **"View post"** button otherwise, same behaviour.
+  - Posted-at relative time (e.g. "3d ago") on the right.
 
-5. There is a separate admin UI bug, but it is not the run failure.
-   - `Badge` is a plain function component, not `forwardRef`.
-   - Radix components in `RunDetailDrawer` are trying to attach refs through it, causing the console warning.
+### 3. Honest handling of missing metrics
+- If `views === 0` → hide the views line (don't show a misleading "0 views").
+- If `shares === 0` → hide the shares chip (Instagram organic doesn't expose it, showing 0 looks broken).
+- Keep the "Hook" highlight box as it is — it's useful.
 
-## Implementation plan
+### 4. No DB or scrape changes
+- We already have everything we need in `content_lab_posts`. No migration. No new Apify calls. No extra cost.
 
-### 1) Fix the ideation contract first
-Update:
-- `supabase/functions/_shared/contentLabPrompts.ts`
-- `supabase/functions/content-lab-ideate/index.ts`
+## Files to touch
+- `supabase/functions/content-lab-image-proxy/index.ts` (new)
+- `supabase/config.toml` (register new function with `verify_jwt = false`)
+- `src/components/content-lab/ViralPostCard.tsx` (new)
+- `src/pages/content-lab/RunDetailPage.tsx` (replace the inline card markup with `<ViralPostCard />`)
 
-Changes:
-- Make the prompt match the schema exactly.
-- Remove the “3 hook variants” requirement unless we also redesign the DB/UI to store them.
-- Keep one canonical `hook` per idea, since that matches the current DB and UI.
-- Tighten the tool schema so the model has one unambiguous output shape.
-
-### 2) Make Anthropic response handling diagnostic instead of guessy
-Update:
-- `supabase/functions/content-lab-ideate/index.ts`
-
-Changes:
-- Log request id and a safe preview of successful 200 responses when no `tool_use` is returned.
-- Preserve the actual response type/body summary in the returned error.
-- Validate the tool payload before insert and report exactly what field is missing.
-- If Anthropic returns text instead of tool output, surface that exact text preview into step logs and `content_lab_runs.error_message`.
-
-Result:
-- Next failure, if any, will be concrete, not “no tool_use ideas”.
-
-### 3) Add preflight guards before any retry
-Update:
-- `supabase/functions/content-lab-resume/index.ts`
-- `supabase/functions/content-lab-ideate/index.ts`
-- `src/pages/content-lab/NicheFormPage.tsx`
-
-Changes:
-- Before re-ideating, verify the run still has posts and group them by platform.
-- Verify `platforms_to_scrape` is compatible with the actual available source posts.
-- If the run only has Instagram posts, ideation should either:
-  - restrict itself to Instagram, or
-  - fail early with a clear setup error before calling AI.
-- Prevent unsupported platform combinations from being saved from the niche form until scrape support exists.
-
-Result:
-- No more retries against impossible platform setups.
-
-### 4) Clean up the noisy admin warning
-Update:
-- `src/components/ui/badge.tsx`
-
-Changes:
-- Convert `Badge` to `React.forwardRef` so Radix wrappers stop throwing ref warnings in `RunDetailDrawer`.
-
-This is not the run failure, but it removes misleading noise while debugging.
-
-### 5) Verify before the next retry, then do one controlled resume
-After implementing:
-1. Confirm prompt/schema alignment.
-2. Confirm ideate logs now capture non-tool 200 responses.
-3. Confirm run platform preflight passes for the existing run.
-4. Redeploy affected functions.
-5. Trigger a single `content-lab-resume` on the existing run so it reuses the already-scraped posts and does not spend another scrape credit.
-
-## Technical details
-Files to change:
-- `supabase/functions/content-lab-ideate/index.ts`
-- `supabase/functions/_shared/contentLabPrompts.ts`
-- `supabase/functions/content-lab-resume/index.ts`
-- `src/pages/content-lab/NicheFormPage.tsx`
-- `src/components/ui/badge.tsx`
-
-No database migration is required.
+## Risks / trade-offs
+- The image proxy is the only way to reliably show Instagram CDN images in the browser. It is a small egress cost (cached 24h per URL).
+- "Shares" will not appear for Instagram even after this fix — the platform doesn't expose it. I'll flag this in the UI by simply omitting the field, not by faking a number.
+- "Views" will only show on video/reel posts.
 
 ## Expected result
-After this fix:
-- we stop guessing
-- retry only runs when setup is valid
-- ideation either completes successfully from the existing posts or shows the exact AI response/problem
-- admin debugging no longer shows the `Badge` ref warning
+- Cards look like real Instagram posts: avatar + handle, square image, action icons, likes/comments/views line, caption, hook highlight, and a clear "View reel" / "View post" button that opens the original.
+- Thumbnails actually render.
+- No misleading zero values.
+
