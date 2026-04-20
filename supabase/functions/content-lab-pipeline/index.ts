@@ -269,14 +269,41 @@ async function runPipeline(admin: ReturnType<typeof createClient>, runId: string
       await analyseStep.finish({ status: "ok", message: "Analyse complete" });
     }
 
-    // 3. IDEATE (required)
+    // 3. IDEATE (required) — per-platform to stay under function timeout
     await updateStatus("ideating");
-    const ideateStep = await logStepStart({ runId, step: "ideate", message: "Calling content-lab-ideate" });
-    const ideateRes = await callFn("content-lab-ideate", { run_id: runId });
-    if (!ideateRes.ok) {
-      await ideateStep.finish({ status: "failed", errorMessage: ideateRes.error ?? "unknown" });
-      await pipelineLog.finish({ status: "failed", errorMessage: `Ideate failed: ${ideateRes.error ?? "unknown"}` });
-      return fail(`Ideate failed: ${ideateRes.error ?? "unknown"}`);
+    const { data: nicheRow } = await admin
+      .from("content_lab_runs")
+      .select("niche:niche_id(platforms_to_scrape)")
+      .eq("id", runId)
+      .single();
+    const platforms: string[] =
+      ((nicheRow as { niche: { platforms_to_scrape?: string[] } } | null)?.niche?.platforms_to_scrape) ?? ["instagram"];
+
+    let anyPlatformSucceeded = false;
+    for (const platform of platforms) {
+      const ideateStep = await logStepStart({
+        runId,
+        step: "ideate",
+        message: `Calling content-lab-ideate (${platform})`,
+        payload: { platform },
+      });
+      const ideateRes = await callFn("content-lab-ideate", { run_id: runId, platform });
+      if (!ideateRes.ok) {
+        await ideateStep.finish({
+          status: "failed",
+          errorMessage: ideateRes.error ?? "unknown",
+          payload: { platform },
+        });
+        console.error(`Ideate failed for ${platform}:`, ideateRes.error);
+      } else {
+        anyPlatformSucceeded = true;
+        await ideateStep.finish({ status: "ok", message: `Ideate complete for ${platform}`, payload: { platform } });
+      }
+    }
+
+    if (!anyPlatformSucceeded) {
+      await pipelineLog.finish({ status: "failed", errorMessage: "Ideate failed for all platforms" });
+      return fail("Ideate failed for all platforms — check the run logs.");
     }
 
     const { count: ideaCount } = await admin
