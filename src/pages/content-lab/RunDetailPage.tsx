@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Sparkles, Share2, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ import HookLibrary from '@/components/content-lab/HookLibrary';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
 import IdeaActionButtons from '@/components/content-lab/IdeaActionButtons';
 import IdeaPerformanceStrip from '@/components/content-lab/IdeaPerformanceStrip';
+import ShareWithClientDialog from '@/components/content-lab/ShareWithClientDialog';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
@@ -46,6 +47,29 @@ const RunDetailPage = () => {
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
   const [rescraping, setRescraping] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportDocx = async () => {
+    if (!id) return;
+    setExporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('content-lab-export-docx', {
+        body: { run_id: id },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+        toast.success('Brief ready');
+      } else if (data?.error) {
+        throw new Error(data.error);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleRetry = async () => {
     if (!id) return;
