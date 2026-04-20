@@ -1194,6 +1194,7 @@ export type Database = {
           display_name: string
           geo_focus: string | null
           keyword_queries: string[]
+          min_posts_floor: number
           min_views_facebook: number
           min_views_instagram: number
           min_views_tiktok: number
@@ -1206,6 +1207,7 @@ export type Database = {
           display_name: string
           geo_focus?: string | null
           keyword_queries?: string[]
+          min_posts_floor?: number
           min_views_facebook?: number
           min_views_instagram?: number
           min_views_tiktok?: number
@@ -1218,6 +1220,7 @@ export type Database = {
           display_name?: string
           geo_focus?: string | null
           keyword_queries?: string[]
+          min_posts_floor?: number
           min_views_facebook?: number
           min_views_instagram?: number
           min_views_tiktok?: number
