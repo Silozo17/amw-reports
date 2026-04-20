@@ -20,13 +20,15 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Per-org monthly run ceilings (precursor to full credit system).
+// Per-org monthly run ceilings. When the monthly allowance is exhausted, the org
+// can keep running by spending credits (1 credit = 1 extra run). Top-ups are
+// purchased separately.
 const RUN_LIMITS_BY_TIER: Record<string, number> = {
-  creator: 10,
-  studio: 25,
-  agency: 60,
+  creator: 1,
+  studio: 3,
+  agency: 10,
 };
-const DEFAULT_RUN_LIMIT = 10;
+const DEFAULT_RUN_LIMIT = 1;
 
 async function getMonthlyLimit(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
   const { data } = await admin
@@ -48,6 +50,15 @@ async function getCurrentUsage(admin: ReturnType<typeof createClient>, orgId: st
     .eq("month", now.getUTCMonth() + 1)
     .maybeSingle();
   return (data as { runs_count?: number } | null)?.runs_count ?? 0;
+}
+
+async function getCreditBalance(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
+  const { data } = await admin
+    .from("content_lab_credits")
+    .select("balance")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  return (data as { balance?: number } | null)?.balance ?? 0;
 }
 
 Deno.serve(async (req) => {
