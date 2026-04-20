@@ -54,7 +54,7 @@ const BASE_NAV_ITEMS = [
 const CONTENT_LAB_SUB_ITEMS = [
   { to: '/content-pipeline', label: 'Content Pipeline', icon: KanbanSquare },
   { to: '/ideas', label: 'Ideas', icon: Lightbulb },
-  { to: '/content-lab/trends', label: 'Trends', icon: TrendingUp },
+  { to: '/content-lab/trends', label: 'Trends', icon: TrendingUp, comingSoon: true },
   { to: '/content-lab/hooks', label: 'Hook Library', icon: Anchor },
   { to: '/content-lab/swipe-file', label: 'Swipe File', icon: Heart },
 ];
