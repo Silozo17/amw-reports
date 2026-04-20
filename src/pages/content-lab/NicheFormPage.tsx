@@ -557,11 +557,12 @@ const NicheFormPage = () => {
         </Card>
 
         {/* Discover button moved out so brief feeds it */}
-        <Card className="p-6">
+        <Card className="space-y-4 p-6">
           <Button onClick={handleDiscover} disabled={discovering} className="w-full" variant="secondary">
             {discovering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {hasDiscovered ? 'Re-discover' : 'Discover niche & competitors'}
           </Button>
+          <DiscoveryProgress active={discovering} />
         </Card>
 
         {/* Discovered niche review */}
