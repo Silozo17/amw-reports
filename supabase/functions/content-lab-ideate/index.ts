@@ -237,10 +237,13 @@ interface PostRow {
   post_url: string | null;
 }
 
+interface HookVariant { text: string; mechanism: string; why: string }
+
 interface GeneratedIdea {
   title: string;
   based_on_handle?: string;
   hook: string;
+  hook_variants?: HookVariant[];
   body: string;
   cta?: string;
   caption?: string;
