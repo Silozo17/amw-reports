@@ -110,10 +110,10 @@ const ContentLabPage = () => {
           <div className="flex items-center gap-3 shrink-0">
             {usage && (
               <Badge
-                variant={usageReached ? 'destructive' : usage.runsThisMonth >= usage.runsLimit * 0.8 ? 'secondary' : 'outline'}
+                variant={blocked ? 'destructive' : monthlyExhausted ? 'secondary' : 'outline'}
                 className="font-body text-xs"
               >
-                {usage.runsThisMonth} / {usage.runsLimit} runs this month
+                {usage.runsThisMonth} / {usage.runsLimit} runs · {usage.creditBalance} credits
               </Badge>
             )}
             <Button size="lg" onClick={() => navigate('/content-lab/niche/new')}>
