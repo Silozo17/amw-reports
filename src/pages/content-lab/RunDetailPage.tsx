@@ -333,7 +333,7 @@ const RunDetailPage = () => {
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
                         {(idea as { is_wildcard?: boolean }).is_wildcard && (
-                          <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/15">Wildcard 🚀</Badge>
+                          <Badge variant="secondary">Wildcard 🚀</Badge>
                         )}
                         {idea.duration_seconds && (
                           <Badge variant="outline">{idea.duration_seconds}s</Badge>
