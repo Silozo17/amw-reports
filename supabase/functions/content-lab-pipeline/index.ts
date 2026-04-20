@@ -90,15 +90,18 @@ Deno.serve(async (req) => {
         .from("content_lab_niches").select("id, client_id, org_id").eq("id", niche_id).single();
       if (nErr || !niche) return json({ error: "Niche not found" }, 404);
 
-      // Pre-flight monthly usage cap
-      const limit = await getMonthlyLimit(admin, (niche as { org_id: string }).org_id);
-      const used = await getCurrentUsage(admin, (niche as { org_id: string }).org_id);
-      if (used >= limit) {
+      // Pre-flight monthly usage cap. If exhausted, allow if credit balance > 0.
+      const orgIdNew = (niche as { org_id: string }).org_id;
+      const limit = await getMonthlyLimit(admin, orgIdNew);
+      const used = await getCurrentUsage(admin, orgIdNew);
+      const credits = await getCreditBalance(admin, orgIdNew);
+      if (used >= limit && credits <= 0) {
         return json({
-          error: `Monthly run limit reached (${used}/${limit}). Resets on the 1st.`,
+          error: `Monthly run limit reached (${used}/${limit}). Top up credits to keep running.`,
           limit_reached: true,
           runs_used: used,
           runs_limit: limit,
+          credit_balance: credits,
         }, 429);
       }
 
