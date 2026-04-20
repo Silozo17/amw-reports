@@ -29,6 +29,7 @@ import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
+import IdeaActionButtons from '@/components/content-lab/IdeaActionButtons';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
@@ -356,6 +357,9 @@ const RunDetailPage = () => {
                         ))}
                       </div>
                     )}
+                    <div className="border-t border-border/50 pt-3">
+                      <IdeaActionButtons ideaId={idea.id} runId={id!} />
+                    </div>
                   </div>
                 </Card>
               ))
