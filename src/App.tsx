@@ -147,6 +147,7 @@ const AppRoutes = () => (
       <Route path="/content-lab/run/:id" element={<ProtectedRoute><RunDetailPage /></ProtectedRoute>} />
       <Route path="/content-pipeline" element={<ProtectedRoute><ContentPipelinePage /></ProtectedRoute>} />
       <Route path="/ideas" element={<ProtectedRoute><IdeasLibraryPage /></ProtectedRoute>} />
+      <Route path="/content-lab/swipe-file" element={<ProtectedRoute><SwipeFilePage /></ProtectedRoute>} />
       <Route path="/debug" element={<AdminRoute><DebugConsole /></AdminRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/organisations" element={<AdminRoute><AdminOrgList /></AdminRoute>} />
