@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import SwipeFileHeart from '@/components/content-lab/SwipeFileHeart';
 
 export type PipelineStatus = 'not_started' | 'scripted' | 'filming' | 'posted' | 'archived';
 
