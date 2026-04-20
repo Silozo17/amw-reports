@@ -140,7 +140,7 @@ const ContentLabPage = () => {
             <Button variant="outline" size="lg" onClick={() => setCreditsDialogOpen(true)}>
               <CreditCard className="mr-2 h-4 w-4" /> Buy credits
             </Button>
-            <Button size="lg" onClick={() => navigate('/content-lab/niche/new')}>
+            <Button size="lg" onClick={() => navigate(`/content-lab/onboard${selectedClientId ? `?clientId=${selectedClientId}` : ''}`)}>
               <Plus className="mr-2 h-4 w-4" /> New Niche
             </Button>
           </div>
@@ -199,7 +199,7 @@ const ContentLabPage = () => {
           {nichesLoading ? (
             <p className="text-sm text-muted-foreground">Loading niches…</p>
           ) : niches.length === 0 ? (
-            <EmptyNiches onCreate={() => navigate('/content-lab/niche/new')} />
+            <EmptyNiches onCreate={() => navigate(`/content-lab/onboard${selectedClientId ? `?clientId=${selectedClientId}` : ''}`)} />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {niches.map((niche) => (
