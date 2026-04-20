@@ -42,7 +42,9 @@ const ContentLabPage = () => {
   usePageMeta({ title: 'Content Lab', description: 'Discover what is working in your niche and generate ready-to-film content ideas.' });
 
   const latestRun = runs[0];
-  const usageReached = usage ? usage.runsThisMonth >= usage.runsLimit : false;
+  const monthlyExhausted = usage ? usage.runsThisMonth >= usage.runsLimit : false;
+  const noCredits = (usage?.creditBalance ?? 0) <= 0;
+  const blocked = monthlyExhausted && noCredits;
 
   const RECENT_RUN_WINDOW_MS = 24 * 60 * 60 * 1000;
   const findRecentSuccessfulRun = (nicheId: string) =>
@@ -75,8 +77,8 @@ const ContentLabPage = () => {
 
   const handleRunNow = (nicheId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (usageReached) {
-      toast.error(`Monthly run limit reached (${usage?.runsThisMonth}/${usage?.runsLimit}). Resets on the 1st.`);
+    if (blocked) {
+      toast.error(`Monthly limit reached (${usage?.runsThisMonth}/${usage?.runsLimit}) and no credits left. Top up to keep running.`);
       return;
     }
     if (findRecentSuccessfulRun(nicheId)) {
