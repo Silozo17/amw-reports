@@ -545,6 +545,7 @@ export type Database = {
           label: string
           language: string
           location: string | null
+          media_types: string[]
           niche_description: string | null
           org_id: string
           own_handle: string | null
@@ -572,6 +573,7 @@ export type Database = {
           label: string
           language?: string
           location?: string | null
+          media_types?: string[]
           niche_description?: string | null
           org_id: string
           own_handle?: string | null
@@ -599,6 +601,7 @@ export type Database = {
           label?: string
           language?: string
           location?: string | null
+          media_types?: string[]
           niche_description?: string | null
           org_id?: string
           own_handle?: string | null
@@ -641,10 +644,14 @@ export type Database = {
           comments: number
           created_at: string
           engagement_rate: number
+          hashtags: string[]
           hook_text: string | null
           hook_type: string | null
           id: string
           likes: number
+          mentions: string[]
+          music_artist: string | null
+          music_title: string | null
           platform: Database["public"]["Enums"]["content_lab_platform"]
           post_type: string | null
           post_url: string | null
@@ -652,7 +659,10 @@ export type Database = {
           run_id: string
           shares: number
           source: Database["public"]["Enums"]["content_lab_post_source"]
+          tagged_users: string[]
           thumbnail_url: string | null
+          transcript: string | null
+          video_duration_seconds: number | null
           views: number
         }
         Insert: {
@@ -663,10 +673,14 @@ export type Database = {
           comments?: number
           created_at?: string
           engagement_rate?: number
+          hashtags?: string[]
           hook_text?: string | null
           hook_type?: string | null
           id?: string
           likes?: number
+          mentions?: string[]
+          music_artist?: string | null
+          music_title?: string | null
           platform: Database["public"]["Enums"]["content_lab_platform"]
           post_type?: string | null
           post_url?: string | null
@@ -674,7 +688,10 @@ export type Database = {
           run_id: string
           shares?: number
           source: Database["public"]["Enums"]["content_lab_post_source"]
+          tagged_users?: string[]
           thumbnail_url?: string | null
+          transcript?: string | null
+          video_duration_seconds?: number | null
           views?: number
         }
         Update: {
@@ -685,10 +702,14 @@ export type Database = {
           comments?: number
           created_at?: string
           engagement_rate?: number
+          hashtags?: string[]
           hook_text?: string | null
           hook_type?: string | null
           id?: string
           likes?: number
+          mentions?: string[]
+          music_artist?: string | null
+          music_title?: string | null
           platform?: Database["public"]["Enums"]["content_lab_platform"]
           post_type?: string | null
           post_url?: string | null
@@ -696,7 +717,10 @@ export type Database = {
           run_id?: string
           shares?: number
           source?: Database["public"]["Enums"]["content_lab_post_source"]
+          tagged_users?: string[]
           thumbnail_url?: string | null
+          transcript?: string | null
+          video_duration_seconds?: number | null
           views?: number
         }
         Relationships: [
