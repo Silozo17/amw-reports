@@ -259,7 +259,12 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
                       )}
                     >
                       <item.icon className="h-3.5 w-3.5" />
-                      {item.label}
+                      <span className="flex-1">{item.label}</span>
+                      {'comingSoon' in item && item.comingSoon && (
+                        <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary">
+                          Soon
+                        </span>
+                      )}
                     </NavLink>
                   );
                 })}
