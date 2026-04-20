@@ -183,7 +183,7 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {[...BASE_NAV_ITEMS, ...TAIL_NAV_ITEMS].map((item) => {
+        {BASE_NAV_ITEMS.map((item) => {
           const isActive = item.to === '/dashboard'
             ? location.pathname === '/dashboard'
             : location.pathname.startsWith(item.to);
