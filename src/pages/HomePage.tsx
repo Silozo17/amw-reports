@@ -249,13 +249,13 @@ const HomePage = () => {
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="font-accent text-lg text-primary mb-2">NEW · Content Lab</p>
+              <p className="font-accent text-lg text-primary mb-2">NEW · Content Lab · Paid add-on</p>
               <h2 className="text-3xl lg:text-5xl font-heading uppercase mb-4 leading-[1.05]">
                 Stop guessing what to post.<br />
                 <span className="text-gradient-purple">Decode what's working.</span>
               </h2>
               <p className="text-amw-offwhite/65 font-body mb-6 max-w-xl">
-                Content Lab is our AI content engine. It scrapes the last 60 days of viral content in your niche, decodes the winning patterns, and ships 12 ready-to-film ideas every month — with hooks, scripts and phone-mockup previews.
+                Content Lab is our AI content engine — a separate paid subscription, from £49/mo. It scrapes the last 60 days of viral content in your niche, decodes the winning patterns, and ships 12 ready-to-film ideas every month with hooks, scripts and phone-mockup previews.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-7">
                 {[
@@ -275,7 +275,7 @@ const HomePage = () => {
                   <Link to="/content-lab-feature#live-demo">See it in action <ArrowRight className="ml-2 h-4 w-4" /></Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <Link to="/content-lab-feature">Open Content Lab</Link>
+                  <Link to="/content-lab-feature#pricing">See pricing</Link>
                 </Button>
               </div>
             </div>

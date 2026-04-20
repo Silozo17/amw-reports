@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   Search,
@@ -17,12 +18,14 @@ import {
   Building2,
   Check,
   Rocket,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
 import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
@@ -30,6 +33,13 @@ import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
 import { useContentLabPublicDemo } from '@/hooks/useContentLabPublicDemo';
 import { AMW_DEMO_SHARE_SLUG } from '@/lib/contentLabDemo';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  CONTENT_LAB_TIER_LIST,
+  CONTENT_LAB_CREDIT_PACK_LIST,
+  type ContentLabTierKey,
+} from '@/lib/contentLabPricing';
 
 const SAMPLE_IDEA = {
   hook: '3 things I wish I knew before launching my agency',
@@ -66,17 +76,13 @@ const AUDIENCES = [
   { icon: Building2, title: 'Agencies', body: 'Scale content production across every client. Multi-tenant, white-labelled, kanban-tracked.' },
 ];
 
-const TIERS = [
-  { name: 'Creator', runs: '1 run / month', price: 'Free', highlight: false, perks: ['1 niche', 'Hook & Trend libraries', 'Swipe file', 'Phone-mockup previews'] },
-  { name: 'Studio', runs: '3 runs / month', price: 'Most popular', highlight: true, perks: ['Up to 5 niches', 'Pipeline kanban', 'DOCX export', 'Client sharing links'] },
-  { name: 'Agency', runs: '10 runs / month', price: 'For agencies', highlight: false, perks: ['Unlimited niches', 'Full multi-client access', 'White-label sharing', 'Priority compute'] },
-];
+// Pricing comes from CONTENT_LAB_TIER_LIST / CONTENT_LAB_CREDIT_PACK_LIST in contentLabPricing.ts.
 
-const CREDIT_PACKS = [
-  { credits: 5, price: '£15', per: '£3.00 / credit' },
-  { credits: 25, price: '£60', per: '£2.40 / credit', badge: 'Best value' },
-  { credits: 100, price: '£200', per: '£2.00 / credit', badge: 'Best deal' },
-];
+const TIER_PERKS: Record<ContentLabTierKey, string[]> = {
+  starter: ['1 niche', 'Hook & Trend libraries', 'Swipe file', 'Phone-mockup previews'],
+  growth:  ['Up to 5 niches', 'Pipeline kanban', 'DOCX export', 'Client sharing links'],
+  scale:   ['Unlimited niches', 'Full multi-client access', 'White-label sharing', 'Priority compute'],
+};
 
 const TIMELINE = [
   { t: '0:00', label: 'Run starts', body: 'You hit “New run” — we queue scrape jobs across Instagram, TikTok and Facebook.' },
@@ -88,20 +94,46 @@ const TIMELINE = [
 
 const FAQS = [
   { q: 'What is Content Lab?', a: 'An AI-powered content engine. It scrapes the last 60 days of viral content in your niche, extracts the patterns that drove engagement, and turns them into 12 ready-to-film ideas every month — with hooks, scripts, filming checklists and phone-mockup previews.' },
+  { q: 'Is Content Lab included with my AMW Reports plan?', a: 'No. Content Lab is a separate paid add-on with its own pricing — Starter (£49/mo · 3 runs), Growth (£149/mo · 5 runs), or Scale (£299/mo · 20 runs). It is not bundled with any AMW Reports plan.' },
+  { q: 'Can I try it for free?', a: 'No — Content Lab is 100% paid, no free trial. Start on the Starter tier (£49/mo) to evaluate, then cancel anytime in two clicks if it is not for you.' },
   { q: 'What platforms does it scrape?', a: 'Instagram, TikTok and Facebook today. Threads, LinkedIn and YouTube are on the roadmap. The Hook and Trend libraries pull across every platform we support.' },
   { q: 'Whose content does it look at?', a: 'Three pools per run: your own handle, a curated set of benchmark creators in your niche, and the competitors you specify. You stay in control of who is tracked.' },
   { q: 'Are the ideas unique to me?', a: 'Yes. Every idea is generated against your brand brief — tone of voice, do-not-use list, content styles, target audience and own context. No two runs (or two orgs) get the same output.' },
-  { q: 'Can I share runs with clients?', a: 'Yes. Generate a branded share link, comment on ideas together, or export the full run to DOCX. White-label is included on Agency.' },
-  { q: 'What does a credit cost?', a: 'One credit = one extra run beyond your monthly allowance. Packs start at £15 for 5 credits (£3 each) and scale to £200 for 100 credits (£2 each).' },
+  { q: 'Can I share runs with clients?', a: 'Yes. Generate a branded share link, comment on ideas together, or export the full run to DOCX.' },
+  { q: 'What does a credit buy?', a: '1 credit = 1 idea regeneration · OR · 1 remix (platform swap, tone shift, hook rewrite) · OR · 1 manual pool refresh. Packs start at £25 for 5 credits and scale to £149 for 100 credits (saving 70% per credit).' },
   { q: 'Do credits expire?', a: 'Never. Buy a pack, use it whenever — they sit in your balance until you spend them.' },
-  { q: 'Can I cancel anytime?', a: 'Yes. Cancel from your billing settings in two clicks. You keep access until the end of the period you’ve already paid for.' },
+  { q: 'Can I cancel anytime?', a: 'Yes. Cancel from your billing settings in two clicks. You keep access until the end of the period you have already paid for.' },
 ];
 
 const ContentLabPublicPage = () => {
   usePageMeta({
     title: 'Content Lab — AI Content Engine for Creators & Agencies',
-    description: 'Scrape what’s working in your niche, decode the patterns, and ship 12 ready-to-film ideas every month. Hooks, scripts, filming checklists — built for creators, freelancers and agencies.',
+    description: 'Scrape what is working in your niche, decode the patterns, and ship 12 ready-to-film ideas every month. Hooks, scripts, filming checklists — paid add-on from £49/mo.',
   });
+
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [loadingTier, setLoadingTier] = useState<ContentLabTierKey | null>(null);
+
+  const handleSubscribe = async (tier: ContentLabTierKey) => {
+    if (!user) {
+      navigate('/login?view=signup&redirect=/content-lab-feature%23pricing');
+      return;
+    }
+    setLoadingTier(tier);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-content-lab-subscription-checkout', {
+        body: { tier },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error('No checkout URL returned');
+      window.open(data.url, '_blank');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not start checkout');
+    } finally {
+      setLoadingTier(null);
+    }
+  };
 
   return (
     <>
@@ -113,10 +145,10 @@ const ContentLabPublicPage = () => {
           <StarDecoration size={14} color="purple" className="absolute top-[30%] left-[12%]" animated={false} />
         </div>
         <div className="max-w-4xl mx-auto px-4 relative">
-          <p className="font-accent text-xl text-primary mb-2">AI Content Engine</p>
+          <p className="font-accent text-xl text-primary mb-2">AI Content Engine · Paid add-on</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-5 leading-[1.05]">
             Stop Guessing What to Post.<br />
-            Decode What’s Working — <span className="text-gradient-purple">Then Make It Yours.</span>
+            Decode What's Working — <span className="text-gradient-purple">Then Make It Yours.</span>
           </h1>
           <p className="text-lg text-amw-offwhite/65 font-body max-w-2xl mx-auto mb-8">
             Content Lab scrapes the last 60 days of viral content in any niche, extracts the patterns behind it,
@@ -125,13 +157,13 @@ const ContentLabPublicPage = () => {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button size="lg" asChild>
-              <Link to="/login?view=signup">Start Free Trial <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <a href="#pricing">See pricing — from £49/mo <ArrowRight className="ml-2 h-4 w-4" /></a>
             </Button>
             <Button size="lg" variant="outline" asChild className="border-sidebar-border text-amw-offwhite hover:bg-sidebar-accent/40">
               <a href="#how-it-works">See how it works ↓</a>
             </Button>
           </div>
-          <p className="text-xs text-amw-offwhite/50 font-body mt-5">Includes a free run on the Creator plan. No credit card required.</p>
+          <p className="text-xs text-amw-offwhite/50 font-body mt-5">Sold separately from AMW Reports plans. No free trial — cancel anytime.</p>
         </div>
       </section>
 
@@ -259,17 +291,18 @@ const ContentLabPublicPage = () => {
         </div>
       </section>
 
-      {/* 7. Pricing */}
-      <section className="py-20 lg:py-28">
+      {/* 7. Pricing — paid add-on */}
+      <section id="pricing" className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 max-w-2xl mx-auto">
-            <p className="font-accent text-lg text-primary mb-2">Pricing</p>
-            <h2 className="text-3xl lg:text-5xl font-heading uppercase">Start free. <span className="text-gradient-purple">Scale when you’re ready.</span></h2>
+            <p className="font-accent text-lg text-primary mb-2">Pricing · Paid add-on</p>
+            <h2 className="text-3xl lg:text-5xl font-heading uppercase">Pick your plan. <span className="text-gradient-purple">No free trial.</span></h2>
+            <p className="text-amw-offwhite/60 font-body mt-4">Sold separately from AMW Reports. Cancel anytime in two clicks.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-            {TIERS.map((tier) => (
+            {CONTENT_LAB_TIER_LIST.map((tier) => (
               <div
-                key={tier.name}
+                key={tier.key}
                 className={`rounded-2xl border p-7 flex flex-col ${
                   tier.highlight ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-sidebar-border/50 bg-sidebar-accent/15'
                 }`}
@@ -278,42 +311,60 @@ const ContentLabPublicPage = () => {
                   <span className="self-start mb-3 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-[10px] uppercase tracking-wider font-body font-semibold">Most popular</span>
                 )}
                 <h3 className="text-2xl font-heading uppercase mb-1">{tier.name}</h3>
-                <p className="text-sm text-amw-offwhite/60 font-body mb-1">{tier.runs}</p>
-                <p className="text-sm font-body text-primary mb-5">{tier.price}</p>
+                <p className="text-4xl font-heading mb-1">£{tier.priceMonthly}<span className="text-base text-amw-offwhite/55 font-body"> /mo</span></p>
+                <p className="text-sm text-amw-offwhite/60 font-body mb-5">{tier.runsPerMonth} run{tier.runsPerMonth === 1 ? '' : 's'} / month</p>
                 <ul className="space-y-2 mb-6 flex-1">
-                  {tier.perks.map((p) => (
+                  {TIER_PERKS[tier.key].map((p) => (
                     <li key={p} className="flex items-start gap-2 text-sm font-body text-amw-offwhite/80">
                       <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                       <span>{p}</span>
                     </li>
                   ))}
                 </ul>
-                <Button asChild className="w-full" variant={tier.highlight ? 'default' : 'outline'}>
-                  <Link to="/login?view=signup">Start trial</Link>
+                <Button
+                  className="w-full"
+                  variant={tier.highlight ? 'default' : 'outline'}
+                  disabled={loadingTier !== null}
+                  onClick={() => handleSubscribe(tier.key)}
+                >
+                  {loadingTier === tier.key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Subscribe
                 </Button>
               </div>
             ))}
           </div>
 
           <div className="rounded-2xl border border-sidebar-border/50 bg-sidebar-accent/10 p-8">
-            <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-2">
               <div>
-                <p className="font-accent text-sm text-primary mb-1">Need more runs?</p>
-                <h3 className="text-2xl font-heading uppercase">Top up with credits — they never expire.</h3>
+                <p className="font-accent text-sm text-primary mb-1">Top up with credit packs</p>
+                <h3 className="text-2xl font-heading uppercase">1 credit = 1 regeneration · 1 remix · 1 pool refresh</h3>
               </div>
-              <Link to="/pricing" className="text-sm font-body text-primary hover:underline">See full pricing →</Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {CREDIT_PACKS.map((pack) => (
-                <div key={pack.credits} className="rounded-xl border border-sidebar-border/50 bg-amw-black/40 p-5">
-                  <div className="flex items-baseline justify-between mb-1">
-                    <p className="text-2xl font-heading">{pack.credits} credits</p>
-                    {pack.badge && <span className="text-[10px] font-body text-primary uppercase tracking-wider">{pack.badge}</span>}
+            <p className="text-sm text-amw-offwhite/55 font-body mb-6">Credits never expire. One-off purchase, no subscription.</p>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {CONTENT_LAB_CREDIT_PACK_LIST.map((pack) => {
+                const isHighlighted = pack.badge === 'Best value';
+                return (
+                  <div
+                    key={pack.key}
+                    className={`relative rounded-xl border bg-amw-black/40 p-5 ${
+                      isHighlighted ? 'border-primary/60 ring-1 ring-primary/30' : 'border-sidebar-border/50'
+                    }`}
+                  >
+                    {pack.badge && (
+                      <span className={`absolute -top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-body uppercase tracking-wider ${
+                        isHighlighted ? 'bg-primary text-primary-foreground' : 'bg-sidebar-accent text-amw-offwhite/80'
+                      }`}>
+                        {pack.badge}
+                      </span>
+                    )}
+                    <p className="text-xl font-heading text-amw-offwhite mb-1">{pack.credits} credits</p>
+                    <p className="text-2xl font-heading mb-1">£{pack.price}</p>
+                    <p className="text-xs font-body text-amw-offwhite/60">£{(pack.price / pack.credits).toFixed(2)} / credit</p>
                   </div>
-                  <p className="text-3xl font-heading text-amw-offwhite mb-1">{pack.price}</p>
-                  <p className="text-xs font-body text-amw-offwhite/60">{pack.per}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -418,10 +469,10 @@ const ContentLabPublicPage = () => {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button size="lg" asChild>
-              <Link to="/login?view=signup">Start Free Trial <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <a href="#pricing">See pricing — from £49/mo <ArrowRight className="ml-2 h-4 w-4" /></a>
             </Button>
             <Button size="lg" variant="outline" asChild className="border-sidebar-border text-amw-offwhite hover:bg-sidebar-accent/40">
-              <Link to="/pricing">See full pricing</Link>
+              <Link to="/pricing">AMW Reports plans</Link>
             </Button>
           </div>
         </div>

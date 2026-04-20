@@ -5,6 +5,14 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 
 const GRACE_PERIOD_DAYS = 7;
 
+// Content Lab subscription price ID → tier slug. Keep in sync with
+// src/lib/contentLabPricing.ts (PRICE_ID_TO_CONTENT_LAB_TIER).
+const CONTENT_LAB_PRICE_TO_TIER: Record<string, string> = {
+  "price_1TOPobHCGP7kst5Z1hSGxS82": "starter",
+  "price_1TOPocHCGP7kst5ZnFUAQP7a": "growth",
+  "price_1TOPoeHCGP7kst5ZC3DKF1ma": "scale",
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204 });
@@ -151,11 +159,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Sync content_lab_tier from subscription/price metadata if present
+      // Sync content_lab_tier from subscription/price metadata or known price ID
       if (customerEmail) {
         const subMetaTier = (sub.metadata?.content_lab_tier as string | undefined) ?? null;
         const priceMetaTier = (sub.items.data[0]?.price?.metadata?.content_lab_tier as string | undefined) ?? null;
-        const newTier = subMetaTier ?? priceMetaTier;
+        const newPriceId = sub.items.data[0]?.price?.id;
+        const tierFromPriceId = newPriceId ? CONTENT_LAB_PRICE_TO_TIER[newPriceId] : undefined;
+        const newTier = subMetaTier ?? priceMetaTier ?? tierFromPriceId;
         if (newTier) {
           await syncContentLabTier(customerEmail, newTier);
         }
@@ -233,6 +243,15 @@ Deno.serve(async (req) => {
         // Restore to active and clear grace period
         if (customerEmail) {
           await syncOrgSubscriptionStatus(customerEmail, "active", false, true);
+        }
+
+        // If this checkout was for a Content Lab subscription, set the tier now
+        // (customer.subscription.updated will also fire, but this is faster).
+        if (customerEmail && session.metadata?.type === "content_lab_subscription") {
+          const tierFromMeta = session.metadata.content_lab_tier as string | undefined;
+          if (tierFromMeta) {
+            await syncContentLabTier(customerEmail, tierFromMeta);
+          }
         }
       }
     } else if (event.type === "invoice.payment_failed") {
