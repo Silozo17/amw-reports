@@ -30,6 +30,9 @@ const MAX_BENCHMARK_HANDLES = 6;
 const MAX_TOTAL_POSTS = 80;
 const TOP_BENCHMARK_TO_ANALYSE = 10;
 const TOP_COMPETITOR_TO_ANALYSE = 10;
+// Recency window for competitor + benchmark posts (current + previous month).
+const RECENT_DAYS = 60;
+const RECENT_CUTOFF_MS = RECENT_DAYS * 24 * 60 * 60 * 1000;
 
 const APIFY_CHUNK_SIZE = 5;
 const APIFY_TIMEOUT_SEC = 75;
