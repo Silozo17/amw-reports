@@ -94,20 +94,46 @@ const TIMELINE = [
 
 const FAQS = [
   { q: 'What is Content Lab?', a: 'An AI-powered content engine. It scrapes the last 60 days of viral content in your niche, extracts the patterns that drove engagement, and turns them into 12 ready-to-film ideas every month — with hooks, scripts, filming checklists and phone-mockup previews.' },
+  { q: 'Is Content Lab included with my AMW Reports plan?', a: 'No. Content Lab is a separate paid add-on with its own pricing — Starter (£49/mo · 3 runs), Growth (£149/mo · 5 runs), or Scale (£299/mo · 20 runs). It is not bundled with any AMW Reports plan.' },
+  { q: 'Can I try it for free?', a: 'No — Content Lab is 100% paid, no free trial. Start on the Starter tier (£49/mo) to evaluate, then cancel anytime in two clicks if it is not for you.' },
   { q: 'What platforms does it scrape?', a: 'Instagram, TikTok and Facebook today. Threads, LinkedIn and YouTube are on the roadmap. The Hook and Trend libraries pull across every platform we support.' },
   { q: 'Whose content does it look at?', a: 'Three pools per run: your own handle, a curated set of benchmark creators in your niche, and the competitors you specify. You stay in control of who is tracked.' },
   { q: 'Are the ideas unique to me?', a: 'Yes. Every idea is generated against your brand brief — tone of voice, do-not-use list, content styles, target audience and own context. No two runs (or two orgs) get the same output.' },
-  { q: 'Can I share runs with clients?', a: 'Yes. Generate a branded share link, comment on ideas together, or export the full run to DOCX. White-label is included on Agency.' },
-  { q: 'What does a credit cost?', a: 'One credit = one extra run beyond your monthly allowance. Packs start at £15 for 5 credits (£3 each) and scale to £200 for 100 credits (£2 each).' },
+  { q: 'Can I share runs with clients?', a: 'Yes. Generate a branded share link, comment on ideas together, or export the full run to DOCX.' },
+  { q: 'What does a credit buy?', a: '1 credit = 1 idea regeneration · OR · 1 remix (platform swap, tone shift, hook rewrite) · OR · 1 manual pool refresh. Packs start at £25 for 5 credits and scale to £149 for 100 credits (saving 70% per credit).' },
   { q: 'Do credits expire?', a: 'Never. Buy a pack, use it whenever — they sit in your balance until you spend them.' },
-  { q: 'Can I cancel anytime?', a: 'Yes. Cancel from your billing settings in two clicks. You keep access until the end of the period you’ve already paid for.' },
+  { q: 'Can I cancel anytime?', a: 'Yes. Cancel from your billing settings in two clicks. You keep access until the end of the period you have already paid for.' },
 ];
 
 const ContentLabPublicPage = () => {
   usePageMeta({
     title: 'Content Lab — AI Content Engine for Creators & Agencies',
-    description: 'Scrape what’s working in your niche, decode the patterns, and ship 12 ready-to-film ideas every month. Hooks, scripts, filming checklists — built for creators, freelancers and agencies.',
+    description: 'Scrape what is working in your niche, decode the patterns, and ship 12 ready-to-film ideas every month. Hooks, scripts, filming checklists — paid add-on from £49/mo.',
   });
+
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [loadingTier, setLoadingTier] = useState<ContentLabTierKey | null>(null);
+
+  const handleSubscribe = async (tier: ContentLabTierKey) => {
+    if (!user) {
+      navigate('/login?view=signup&redirect=/content-lab-feature%23pricing');
+      return;
+    }
+    setLoadingTier(tier);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-content-lab-subscription-checkout', {
+        body: { tier },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error('No checkout URL returned');
+      window.open(data.url, '_blank');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not start checkout');
+    } finally {
+      setLoadingTier(null);
+    }
+  };
 
   return (
     <>
@@ -119,10 +145,10 @@ const ContentLabPublicPage = () => {
           <StarDecoration size={14} color="purple" className="absolute top-[30%] left-[12%]" animated={false} />
         </div>
         <div className="max-w-4xl mx-auto px-4 relative">
-          <p className="font-accent text-xl text-primary mb-2">AI Content Engine</p>
+          <p className="font-accent text-xl text-primary mb-2">AI Content Engine · Paid add-on</p>
           <h1 className="text-4xl lg:text-6xl font-heading uppercase mb-5 leading-[1.05]">
             Stop Guessing What to Post.<br />
-            Decode What’s Working — <span className="text-gradient-purple">Then Make It Yours.</span>
+            Decode What's Working — <span className="text-gradient-purple">Then Make It Yours.</span>
           </h1>
           <p className="text-lg text-amw-offwhite/65 font-body max-w-2xl mx-auto mb-8">
             Content Lab scrapes the last 60 days of viral content in any niche, extracts the patterns behind it,
@@ -131,13 +157,13 @@ const ContentLabPublicPage = () => {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button size="lg" asChild>
-              <Link to="/login?view=signup">Start Free Trial <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <a href="#pricing">See pricing — from £49/mo <ArrowRight className="ml-2 h-4 w-4" /></a>
             </Button>
             <Button size="lg" variant="outline" asChild className="border-sidebar-border text-amw-offwhite hover:bg-sidebar-accent/40">
               <a href="#how-it-works">See how it works ↓</a>
             </Button>
           </div>
-          <p className="text-xs text-amw-offwhite/50 font-body mt-5">Includes a free run on the Creator plan. No credit card required.</p>
+          <p className="text-xs text-amw-offwhite/50 font-body mt-5">Sold separately from AMW Reports plans. No free trial — cancel anytime.</p>
         </div>
       </section>
 
