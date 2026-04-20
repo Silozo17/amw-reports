@@ -108,3 +108,19 @@ export const PRICE_ID_TO_CONTENT_LAB_TIER: Record<string, ContentLabTierKey> = {
 };
 
 export const CONTENT_LAB_STARTING_PRICE_LABEL = `From £${CONTENT_LAB_TIERS.starter.priceMonthly}/mo`;
+
+// Tier slug → monthly run quota. Derived from CONTENT_LAB_TIERS so the pricing
+// table and the run-limit gate cannot drift. "100% paid" model: no tier = 0 runs.
+export const RUN_LIMITS_BY_TIER: Record<string, number> = {
+  starter: CONTENT_LAB_TIERS.starter.runsPerMonth,
+  growth: CONTENT_LAB_TIERS.growth.runsPerMonth,
+  scale: CONTENT_LAB_TIERS.scale.runsPerMonth,
+};
+
+export const DEFAULT_RUN_LIMIT = 0;
+
+export function runLimitForTier(tier: string | null | undefined): number {
+  if (!tier) return DEFAULT_RUN_LIMIT;
+  return RUN_LIMITS_BY_TIER[tier.toLowerCase()] ?? DEFAULT_RUN_LIMIT;
+}
+
