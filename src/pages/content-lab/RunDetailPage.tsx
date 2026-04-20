@@ -403,6 +403,7 @@ const RunDetailPage = () => {
                   target_platform: i.target_platform ?? null,
                   rating: i.rating ?? null,
                   status: i.status ?? 'not_started',
+                  is_wildcard: (i as { is_wildcard?: boolean }).is_wildcard ?? false,
                 }))}
                 onSelect={() => { /* click-to-detail can be wired later; drag is the primary action */ }}
               />
