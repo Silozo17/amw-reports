@@ -135,6 +135,35 @@ const ContentLabPage = () => {
           </div>
         </header>
 
+        {!guideDismissed && (
+          <Card className="relative border-primary/20 bg-primary/5 p-5">
+            <button
+              type="button"
+              onClick={dismissGuide}
+              className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+              aria-label="Dismiss guide"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <h3 className="font-display text-base">How Content Lab works</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              {[
+                { icon: Search, title: '1. Discover', body: 'We scrape your niche, top benchmarks and competitors.' },
+                { icon: Lightbulb, title: '2. Decode', body: 'AI analyses what is working and why — hooks, formats, trends.' },
+                { icon: Wand2, title: '3. Create', body: '12 ready-to-film ideas tailored to your brand voice.' },
+              ].map((s) => (
+                <div key={s.title} className="flex items-start gap-2 text-xs">
+                  <s.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-medium text-foreground">{s.title}</p>
+                    <p className="text-muted-foreground">{s.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
 
         <AlertDialog open={!!pendingNicheId} onOpenChange={(open) => !open && setPendingNicheId(null)}>
