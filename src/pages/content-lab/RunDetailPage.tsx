@@ -22,19 +22,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import usePageMeta from '@/hooks/usePageMeta';
-import IdeaPreviewInstagram from '@/components/content-lab/IdeaPreviewInstagram';
-import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
-import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
-import IdeaCommentsDrawer from '@/components/content-lab/IdeaCommentsDrawer';
-import { useSwipeFileIds, useToggleSwipe } from '@/hooks/useSwipeFile';
-import { useIdeaCommentCount } from '@/hooks/useIdeaComments';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
-import IdeaActionButtons from '@/components/content-lab/IdeaActionButtons';
-import IdeaPerformanceStrip from '@/components/content-lab/IdeaPerformanceStrip';
 import ShareWithClientDialog from '@/components/content-lab/ShareWithClientDialog';
+import IdeaCard from '@/components/content-lab/IdeaCard';
 import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 
