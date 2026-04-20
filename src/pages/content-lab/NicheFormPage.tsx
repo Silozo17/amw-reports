@@ -68,6 +68,20 @@ const NicheFormPage = () => {
   const [doNotUse, setDoNotUse] = useState<string[]>([]);
   const [doNotUseInput, setDoNotUseInput] = useState('');
 
+  // Structured brand brief
+  const [brfNiche, setBrfNiche] = useState('');
+  const [brfPositioning, setBrfPositioning] = useState('');
+  const [brfOffers, setBrfOffers] = useState<string[]>([]);
+  const [brfOfferInput, setBrfOfferInput] = useState('');
+  const [brfAudienceWho, setBrfAudienceWho] = useState('');
+  const [brfAudienceProblem, setBrfAudienceProblem] = useState('');
+  const [brfAudienceWhere, setBrfAudienceWhere] = useState('');
+  const [brfTones, setBrfTones] = useState<string[]>([]);
+  const [brfNeverDo, setBrfNeverDo] = useState<string[]>([]);
+  const [brfNeverDoInput, setBrfNeverDoInput] = useState('');
+  const [brfProducer, setBrfProducer] = useState('');
+  const [brfGoal, setBrfGoal] = useState('');
+
   const [discovering, setDiscovering] = useState(false);
   const [saving, setSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
