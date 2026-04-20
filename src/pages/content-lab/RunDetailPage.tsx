@@ -81,7 +81,7 @@ const RunDetailPage = () => {
     }
   };
 
-  usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' });
+  usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and platform-tailored content ideas for the month.' });
 
   const { data: run } = useQuery({
     queryKey: ['content-lab-run', id],
@@ -194,7 +194,10 @@ const RunDetailPage = () => {
           </div>
         </header>
 
-        <Tabs defaultValue="own" className="space-y-6">
+        {(() => {
+          const defaultTab = ownPosts.length > 0 ? 'own' : viralPosts.length > 0 ? 'feed' : ideas.length > 0 ? 'ideas' : 'own';
+          return (
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
             <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
@@ -323,6 +326,8 @@ const RunDetailPage = () => {
             )}
           </TabsContent>
         </Tabs>
+          );
+        })()}
       </div>
     </AppLayout>
   );
