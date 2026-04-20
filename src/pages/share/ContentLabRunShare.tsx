@@ -37,6 +37,7 @@ interface SharedPayload {
 
 const ContentLabRunShare = () => {
   const { slug } = useParams<{ slug: string }>();
+  const highlightedIdeaId = new URLSearchParams(window.location.search).get('idea');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['shared-run', slug],
@@ -53,6 +54,15 @@ const ContentLabRunShare = () => {
     if (!slug || !data) return;
     supabase.rpc('record_share_view', { _slug: slug }).then(() => undefined);
   }, [slug, data]);
+
+  // Scroll to highlighted idea once data is loaded
+  useEffect(() => {
+    if (!data || !highlightedIdeaId) return;
+    const el = document.getElementById(`idea-${highlightedIdeaId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [data, highlightedIdeaId]);
 
   if (isLoading) {
     return (
@@ -100,7 +110,13 @@ const ContentLabRunShare = () => {
           <h2 className="text-lg font-display mb-4">Content ideas ({ideas.length})</h2>
           <div className="grid gap-4 md:grid-cols-2">
             {ideas.map((idea) => (
-              <Card key={idea.id} className="p-5 space-y-3">
+              <Card
+                key={idea.id}
+                id={`idea-${idea.id}`}
+                className={`p-5 space-y-3 transition-shadow ${
+                  highlightedIdeaId === idea.id ? 'ring-2 ring-primary shadow-lg' : ''
+                }`}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-display text-base leading-tight">{idea.title}</h3>
                   {idea.is_wildcard && <Badge variant="secondary">Wildcard</Badge>}
