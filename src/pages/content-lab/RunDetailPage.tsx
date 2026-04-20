@@ -27,6 +27,7 @@ import IdeaPreviewTikTok from '@/components/content-lab/IdeaPreviewTikTok';
 import IdeaPreviewFacebook from '@/components/content-lab/IdeaPreviewFacebook';
 import ViralPostCard from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
+import HookLibrary from '@/components/content-lab/HookLibrary';
 
 const renderPreview = (platform: string | null, hook: string, caption: string | null) => {
   const p = (platform ?? 'instagram').toLowerCase();
