@@ -104,6 +104,16 @@ Deno.serve(async (req) => {
           hook_text: deep.hook_text ?? p.hook_text,
           hook_type: deep.hook_type ?? null,
         }).eq("id", p.id);
+        // Insert the deep-analysed hook into the library (overrides fast version on conflict-free runs).
+        if (deep.hook_text) {
+          await supabase.from("content_lab_hooks").upsert({
+            run_id,
+            hook_text: deep.hook_text,
+            mechanism: deep.hook_type || null,
+            why_it_works: deep.format_pattern || null,
+            source_post_id: p.id,
+          }, { onConflict: "run_id,hook_text", ignoreDuplicates: true });
+        }
         deepAnalysed++;
       }
     }
