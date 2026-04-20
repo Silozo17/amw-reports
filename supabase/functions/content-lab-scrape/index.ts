@@ -20,15 +20,21 @@ const corsHeaders = {
 
 const APIFY_ACTOR = "apify~instagram-scraper";
 // Cost caps — keep low to bound Apify spend per run.
-// Realistic worst case = 15 + (5*8) + (3*6) = 73 items.
+// Realistic worst case = 15 + (5*8) + (6*6) = 91 items (capped to MAX_TOTAL_POSTS).
 const MAX_POSTS_OWN = 15;
 const MAX_POSTS_COMPETITOR = 8;
 const MAX_POSTS_BENCHMARK = 6;
 const MAX_COMPETITOR_HANDLES = 5;
-const MAX_BENCHMARK_HANDLES = 3;
+// Raised from 3 → 6 so we have ~36 benchmark posts to pick top-30 from in ideate.
+const MAX_BENCHMARK_HANDLES = 6;
 const MAX_TOTAL_POSTS = 80;
 const APIFY_CHUNK_SIZE = 5;
-const APIFY_TIMEOUT_SEC = 90;
+// Lowered from 90 → 60s to keep total wall-clock under Supabase edge timeout (150s)
+// when running 3 buckets × 3 platforms in parallel.
+const APIFY_TIMEOUT_SEC = 60;
+// Engagement rate is a ratio (0-1). DB column is numeric(8,4) → max ~9999, but anything
+// >1 is a data anomaly. Clamp tightly to keep stats trustworthy.
+const MAX_ENGAGEMENT_RATE = 1;
 
 interface DiscoveredEntity { handle: string; reason?: string }
 
@@ -131,7 +137,7 @@ Deno.serve(async (req) => {
       const raw = p.views > 0
         ? (p.likes + p.comments) / p.views
         : (p.likes + p.comments) / Math.max(p.likes + p.comments + 1000, 1000);
-      const engagement_rate = Math.min(Math.max(raw, 0), 99.9999);
+      const engagement_rate = Math.min(Math.max(raw, 0), MAX_ENGAGEMENT_RATE);
       return {
         run_id,
         platform: p.platform,
@@ -216,6 +222,17 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// One retry on 5xx (Apify 503/504 are common). Returns the final response either way.
+async function fetchWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
+  const res = await fetch(url, init);
+  if (res.status >= 500 && res.status < 600) {
+    console.warn(`${label}: ${res.status}, retrying once after 1.5s`);
+    await new Promise((r) => setTimeout(r, 1500));
+    return fetch(url, init);
+  }
+  return res;
 }
 
 interface BucketResult { posts: ScrapedPost[]; errors: string[] }
@@ -388,11 +405,11 @@ async function runApifyForHandles(handles: string[], resultsLimit: number): Prom
   const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
 
   try {
-    const res = await fetch(runUrl, {
+    const res = await fetchWithRetry(runUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    });
+    }, "Apify IG");
     if (!res.ok) {
       console.error("Apify error:", res.status, await res.text());
       return [];
@@ -456,11 +473,11 @@ async function runTikTokScraper(handle: string, resultsLimit: number): Promise<S
   };
   const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    });
+    }, "Apify TikTok");
     if (!res.ok) {
       console.error("TikTok Apify error:", res.status, await res.text());
       return [];
@@ -522,11 +539,11 @@ async function runFacebookScraper(handle: string, resultsLimit: number): Promise
   };
   const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${APIFY_TIMEOUT_SEC}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
-    });
+    }, "Apify FB");
     if (!res.ok) {
       console.error("Facebook Apify error:", res.status, await res.text());
       return [];

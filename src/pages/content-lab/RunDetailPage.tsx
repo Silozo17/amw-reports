@@ -41,6 +41,7 @@ const RunDetailPage = () => {
   const queryClient = useQueryClient();
   const [retrying, setRetrying] = useState(false);
   const [rescraping, setRescraping] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | undefined>();
 
   const handleRetry = async () => {
     if (!id) return;
@@ -81,7 +82,7 @@ const RunDetailPage = () => {
     }
   };
 
-  usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' });
+  usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and platform-tailored content ideas for the month.' });
 
   const { data: run } = useQuery({
     queryKey: ['content-lab-run', id],
@@ -194,7 +195,11 @@ const RunDetailPage = () => {
           </div>
         </header>
 
-        <Tabs defaultValue="own" className="space-y-6">
+        {(() => {
+          const defaultTab = ownPosts.length > 0 ? 'own' : viralPosts.length > 0 ? 'feed' : ideas.length > 0 ? 'ideas' : 'own';
+          const currentTab = activeTab ?? defaultTab;
+          return (
+        <Tabs value={currentTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
             <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
@@ -260,7 +265,7 @@ const RunDetailPage = () => {
               <Card className="p-10 text-center text-sm text-muted-foreground">Ideas will appear here once the run completes.</Card>
             ) : (
               ideas.map((idea) => (
-                <Card key={idea.id} className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
+                <Card key={idea.id} id={`idea-${idea.id}`} className="grid gap-6 p-6 md:grid-cols-[260px_1fr] scroll-mt-24">
                   <div>
                     {renderPreview(idea.target_platform, idea.hook ?? idea.title, idea.caption)}
                     {idea.target_platform && (
@@ -318,11 +323,18 @@ const RunDetailPage = () => {
                   rating: i.rating ?? null,
                   status: i.status ?? 'not_started',
                 }))}
-                onSelect={() => { /* click-to-detail can be wired later; drag is the primary action */ }}
+                onSelect={(idea) => {
+                  setActiveTab('ideas');
+                  setTimeout(() => {
+                    document.getElementById(`idea-${idea.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 50);
+                }}
               />
             )}
           </TabsContent>
         </Tabs>
+          );
+        })()}
       </div>
     </AppLayout>
   );
