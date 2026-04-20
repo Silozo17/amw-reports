@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, FileText, Mail, Palette, Globe, Users, BarChart3, Share2, Clock, Layers, Shield } from 'lucide-react';
+import { ArrowRight, Check, X, ChevronDown, FileText, Share2, BarChart3, Mail, Info, Sparkles, Users, Clock, Palette, Globe, Layers, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import usePageMeta from '@/hooks/usePageMeta';
 import StarDecoration from '@/components/landing/StarDecoration';
