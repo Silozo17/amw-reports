@@ -238,6 +238,77 @@ const RunStatusBadge = ({ status }: { status: ContentLabRun['status'] }) => {
   );
 };
 
+interface NicheCardProps {
+  niche: ContentLabNiche;
+  isRunning: boolean;
+  onOpen: () => void;
+  onRun: (e: React.MouseEvent) => void;
+}
+
+const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
+  const { data: pool } = useBenchmarkPoolStatus(niche.niche_tag, niche.platforms_to_scrape, { poll: true });
+  const verifiedCount = pool?.verifiedCount ?? 0;
+  const canRun = pool?.canRun ?? false;
+  const blocked = !!pool && !canRun;
+  const tooltipMessage = blocked
+    ? `Pool building — ${verifiedCount}/${POOL_RUN_THRESHOLD} verified accounts. Add broader hashtags or wait for verification to finish.`
+    : null;
+
+  const runButton = (
+    <Button
+      size="sm"
+      className="mt-4 w-full"
+      onClick={onRun}
+      disabled={isRunning || blocked}
+    >
+      {isRunning ? (
+        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Play className="mr-2 h-3.5 w-3.5" />
+      )}
+      Run report now
+    </Button>
+  );
+
+  return (
+    <Card
+      className="cursor-pointer p-5 transition-colors hover:border-primary/40"
+      onClick={onOpen}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-display text-lg">{niche.label}</h3>
+        {pool && (
+          <BenchmarkQualityBadge quality={pool.quality} verifiedCount={pool.verifiedCount} />
+        )}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {niche.tracked_handles.length} handles · {niche.tracked_hashtags.length} hashtags
+      </p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {niche.tracked_hashtags.slice(0, 4).map((tag) => (
+          <Badge key={tag} variant="secondary" className="text-[10px]">
+            #{tag}
+          </Badge>
+        ))}
+      </div>
+      {blocked ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="block" onClick={(e) => e.stopPropagation()}>
+              {runButton}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+            {tooltipMessage}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        runButton
+      )}
+    </Card>
+  );
+};
+
 const EmptyNiches = ({ onCreate }: { onCreate: () => void }) => (
   <Card className="flex flex-col items-center gap-3 border-dashed p-10 text-center">
     <Sparkles className="h-8 w-8 text-muted-foreground" />
