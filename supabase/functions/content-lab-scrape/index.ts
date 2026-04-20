@@ -571,11 +571,13 @@ async function runApifyForHandles(
     .filter((u) => u.includes("instagram.com"));
   if (igUrls.length === 0) return [];
 
+  const onlyPostsNewerThan = new Date(Date.now() - RECENT_CUTOFF_MS).toISOString();
   const input = {
     directUrls: igUrls,
     resultsType: "posts",
     resultsLimit,
     addParentData: false,
+    onlyPostsNewerThan,
   };
   const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
 
@@ -638,12 +640,14 @@ async function runTikTokScraper(handle: string, resultsLimit: number, timeoutSec
   const apifyToken = Deno.env.get("APIFY_TOKEN");
   if (!apifyToken) return [];
   const cleaned = handle.replace(/^@/, "");
+  const oldestPostDate = new Date(Date.now() - RECENT_CUTOFF_MS).toISOString().slice(0, 10);
   const input = {
     profiles: [cleaned],
     resultsPerPage: resultsLimit,
     shouldDownloadVideos: false,
     shouldDownloadCovers: false,
     shouldDownloadSubtitles: true, // request subs so analyse can read transcripts
+    oldestPostDate, // YYYY-MM-DD; clockworks/tiktok-scraper supports this filter
   };
   const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
   try {
