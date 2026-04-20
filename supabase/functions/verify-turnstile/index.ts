@@ -11,6 +11,15 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // GET = expose the public site key so the frontend widget can render.
+  // Site key is non-secret by Cloudflare design; this avoids hard-coding it
+  // in the client bundle and keeps rotation server-side.
+  if (req.method === 'GET') {
+    const siteKey = Deno.env.get('TURNSTILE_SITE_KEY') ?? '';
+    return json({ site_key: siteKey, configured: !!siteKey });
+  }
+
   if (req.method !== 'POST') {
     return json({ error: 'method_not_allowed' }, 405);
   }
