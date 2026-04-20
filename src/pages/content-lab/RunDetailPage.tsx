@@ -144,6 +144,29 @@ const RunDetailPage = () => {
     },
   });
 
+  const { data: analysedHooks = [] } = useQuery({
+    queryKey: ['content-lab-hooks', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('content_lab_hooks')
+        .select('hook_text, mechanism, why_it_works, source_post_id')
+        .eq('run_id', id!);
+      if (error) throw error;
+      const postMap = new Map(posts.map((p) => [p.id, p]));
+      return (data ?? []).map((h) => {
+        const sp = h.source_post_id ? postMap.get(h.source_post_id) : null;
+        return {
+          hook_text: h.hook_text,
+          mechanism: h.mechanism,
+          why_it_works: h.why_it_works,
+          source_handle: sp?.author_handle ?? null,
+          source_url: sp?.post_url ?? null,
+        };
+      });
+    },
+  });
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
