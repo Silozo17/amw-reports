@@ -78,10 +78,15 @@ Deno.serve(async (req) => {
             hook_text: result.hook,
             hook_type: result.hook_type,
           }).eq("id", p.id);
+          // Mutate locally so the hook write below picks up the new value
+          p.hook_text = result.hook;
           fastAnalysed++;
         }
       }
     }
+
+    // Write extracted hooks to the global hook library (idempotent via unique index).
+    await upsertHooks(supabase, run_id, (posts ?? []) as PostRow[]);
 
     // Deep analysis for top-N — re-fetch including the IDs flagged by scraper that
     // may not be in the engagement-rate-ordered top 40 batch above.
@@ -99,6 +104,16 @@ Deno.serve(async (req) => {
           hook_text: deep.hook_text ?? p.hook_text,
           hook_type: deep.hook_type ?? null,
         }).eq("id", p.id);
+        // Insert the deep-analysed hook into the library (overrides fast version on conflict-free runs).
+        if (deep.hook_text) {
+          await supabase.from("content_lab_hooks").upsert({
+            run_id,
+            hook_text: deep.hook_text,
+            mechanism: deep.hook_type || null,
+            why_it_works: deep.format_pattern || null,
+            source_post_id: p.id,
+          }, { onConflict: "run_id,hook_text", ignoreDuplicates: true });
+        }
         deepAnalysed++;
       }
     }
@@ -127,6 +142,32 @@ function json(body: unknown, status = 200) {
 }
 
 interface FastResult { summary: string; hook: string; hook_type: string }
+
+// deno-lint-ignore no-explicit-any
+async function upsertHooks(supabase: any, run_id: string, posts: PostRow[]) {
+  const rows = posts
+    .filter((p) => p.hook_text && p.hook_text.trim().length > 0)
+    .map((p) => ({
+      run_id,
+      hook_text: p.hook_text!.trim(),
+      mechanism: p.hook_type || null,
+      why_it_works: null,
+      source_post_id: p.id,
+    }));
+  if (rows.length === 0) return;
+  // Dedupe within the batch by lowercased hook_text
+  const seen = new Set<string>();
+  const deduped = rows.filter((r) => {
+    const k = r.hook_text.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const { error } = await supabase
+    .from("content_lab_hooks")
+    .upsert(deduped, { onConflict: "run_id,hook_text", ignoreDuplicates: true });
+  if (error) console.error("upsertHooks error:", error.message);
+}
 
 async function analyseFast(apiKey: string, caption: string): Promise<FastResult | null> {
   try {
