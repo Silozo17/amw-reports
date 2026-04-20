@@ -5,6 +5,7 @@
 // runs stuck in `ideating` even when ideation succeeded.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { runLimitForTier } from "../_shared/contentLabTiers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,22 +17,25 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const RUN_LIMITS_BY_TIER: Record<string, number> = {
-  creator: 1,
-  studio: 3,
-  agency: 10,
-};
-const DEFAULT_RUN_LIMIT = 1;
-const STALE_RUN_MINUTES = 10;
+const STALE_RUN_MINUTES = 20;
 
-async function getMonthlyLimit(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
+interface OrgEntitlement {
+  tier: string | null;
+  status: string | null;
+  gracePeriodEnd: string | null;
+  monthlyLimit: number;
+}
+
+async function getOrgEntitlement(admin: ReturnType<typeof createClient>, orgId: string): Promise<OrgEntitlement> {
   const { data } = await admin
     .from("org_subscriptions")
-    .select("content_lab_tier")
+    .select("content_lab_tier, status, grace_period_end")
     .eq("org_id", orgId)
     .maybeSingle();
-  const tier = (data as { content_lab_tier?: string | null } | null)?.content_lab_tier?.toLowerCase();
-  return (tier && RUN_LIMITS_BY_TIER[tier]) ?? DEFAULT_RUN_LIMIT;
+  const tier = (data as { content_lab_tier?: string | null } | null)?.content_lab_tier ?? null;
+  const status = (data as { status?: string | null } | null)?.status ?? null;
+  const gracePeriodEnd = (data as { grace_period_end?: string | null } | null)?.grace_period_end ?? null;
+  return { tier, status, gracePeriodEnd, monthlyLimit: runLimitForTier(tier) };
 }
 
 async function getCurrentUsage(admin: ReturnType<typeof createClient>, orgId: string): Promise<number> {
@@ -88,15 +92,36 @@ Deno.serve(async (req) => {
       if (nErr || !niche) return json({ error: "Niche not found" }, 404);
 
       const orgIdNew = (niche as { org_id: string }).org_id;
-      const limit = await getMonthlyLimit(admin, orgIdNew);
+      const ent = await getOrgEntitlement(admin, orgIdNew);
+
+      // Hard gate: must have an active Content Lab subscription. No tier = no run.
+      // Past-grace cancellations / unpaid → block.
+      if (!ent.tier) {
+        return json({
+          error: "Content Lab subscription required. Choose a plan to start generating runs.",
+          subscription_required: true,
+        }, 402);
+      }
+      const graceActive = ent.gracePeriodEnd && new Date(ent.gracePeriodEnd) > new Date();
+      const isCancelled = ent.status === "cancelled" || ent.status === "canceled" || ent.status === "unpaid";
+      const pastGrace = isCancelled && !graceActive;
+      if (pastGrace) {
+        return json({
+          error: "Content Lab subscription is not active. Reactivate to continue generating runs.",
+          subscription_inactive: true,
+        }, 402);
+      }
+
       const used = await getCurrentUsage(admin, orgIdNew);
       const credits = await getCreditBalance(admin, orgIdNew);
-      if (used >= limit && credits <= 0) {
+      // Credits do NOT grant runs (they're for regen/remix/refresh per spec).
+      // Block when monthly quota is exhausted.
+      if (used >= ent.monthlyLimit) {
         return json({
-          error: `Monthly run limit reached (${used}/${limit}). Top up credits to keep running.`,
+          error: `Monthly run limit reached (${used}/${ent.monthlyLimit}). Upgrade your plan to keep generating.`,
           limit_reached: true,
           runs_used: used,
-          runs_limit: limit,
+          runs_limit: ent.monthlyLimit,
           credit_balance: credits,
         }, 429);
       }
