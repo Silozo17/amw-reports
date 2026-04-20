@@ -310,35 +310,6 @@ function toRow(
   };
 }
 
-function toRow(
-  runId: string,
-  ideaNumber: number,
-  platform: string,
-  idea: GeneratedIdea,
-  posts: PostRow[],
-  fallbackPostId: string | null,
-): IdeaRow {
-  return {
-    run_id: runId,
-    idea_number: ideaNumber,
-    target_platform: platform,
-    platform_style_notes: idea.platform_style_notes ?? null,
-    title: idea.title,
-    based_on_post_id: matchPost(posts, idea.based_on_handle) ?? fallbackPostId,
-    caption: idea.caption ?? null,
-    caption_with_hashtag: idea.caption_with_hashtag ?? null,
-    hook: idea.hook,
-    body: idea.body,
-    cta: idea.cta ?? null,
-    script_full: idea.script_full ?? null,
-    duration_seconds: idea.duration_seconds ?? null,
-    visual_direction: idea.visual_direction ?? null,
-    why_it_works: idea.why_it_works,
-    hashtags: idea.hashtags ?? [],
-    filming_checklist: idea.filming_checklist ?? [],
-    status: "not_started",
-  };
-}
 
 function matchPost(posts: PostRow[], handle?: string): string | null {
   if (!handle) return null;
