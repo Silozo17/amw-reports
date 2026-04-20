@@ -18,6 +18,7 @@ import {
   Sparkles,
   KanbanSquare,
   Lightbulb,
+  Heart,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrg } from '@/contexts/OrgContext';
