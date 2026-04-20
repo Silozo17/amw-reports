@@ -1,7 +1,7 @@
-// content-lab-discover: takes own_handle + website + location, returns niche label,
-// description, top competitors, top global benchmarks, suggested hashtags/keywords,
-// and default creative preferences. Uses Firecrawl to read the website and Lovable AI
-// (Gemini) for the structured output via tool calling.
+// content-lab-discover: takes own_handle + website + location + optional brand_brief,
+// returns niche label, description, EXACTLY 10 top global benchmark accounts (ranked
+// by typical reel views), up to 5 local competitors, suggested hashtags/keywords and
+// default creative preferences. Uses Firecrawl + Lovable AI (Gemini) tool calling.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -19,23 +19,38 @@ const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-pro"; // reasoning quality matters here
+const MODEL = "google/gemini-2.5-pro";
+const CURRENT_YEAR = new Date().getUTCFullYear();
+
+interface BrandBrief {
+  niche?: string;
+  positioning?: string;
+  offers?: string[];
+  audience_who?: string;
+  audience_problem?: string;
+  audience_where?: string;
+  tones?: string[];
+  never_do?: string[];
+  producer?: string;
+  goal?: string;
+}
 
 interface DiscoverInput {
-  niche_id?: string;          // existing niche to update
-  client_id?: string;         // OR client + new niche params
+  niche_id?: string;
+  client_id?: string;
   org_id?: string;
   own_handle: string;
   website: string;
   location?: string;
   language?: string;
+  brand_brief?: BrandBrief;
 }
 
 interface DiscoveryResult {
   niche_label: string;
   niche_description: string;
   top_competitors: Array<{ handle: string; platform: string; reason: string }>;
-  top_global_benchmarks: Array<{ handle: string; platform: string; reason: string }>;
+  top_global_benchmarks: Array<{ handle: string; platform: string; reason: string; est_avg_views?: string }>;
   suggested_hashtags: string[];
   suggested_keywords: string[];
   default_creative_prefs: {
@@ -65,27 +80,22 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "Unauthorized" }, 401);
 
     const input = await req.json() as DiscoverInput;
-    if (!input.own_handle || !input.website) {
-      return json({ error: "own_handle and website are required" }, 400);
+    if (!input.own_handle && !input.website) {
+      return json({ error: "own_handle or website is required" }, 400);
     }
 
-    // Note: discover is invoked from the niche form (pre-run), so it's not
-    // attached to a content_lab_runs row. Step-logging happens at pipeline level.
-
-    // 1. Scrape website
-    const siteSummary = await scrapeSite(input.website);
+    const siteSummary = input.website ? await scrapeSite(input.website) : "";
     console.log("Site scraped:", siteSummary.length, "chars");
 
-    // 2. Call Gemini for structured discovery
     const discovery = await runDiscovery({
       own_handle: input.own_handle,
       website: input.website,
       location: input.location ?? null,
       language: input.language ?? "en",
       site_summary: siteSummary,
+      brand_brief: input.brand_brief ?? null,
     });
 
-    // 3. Persist to niche if niche_id provided, else just return
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     if (input.niche_id) {
@@ -107,6 +117,7 @@ Deno.serve(async (req) => {
           video_length_preference: discovery.default_creative_prefs.video_length_preference,
           posting_cadence: discovery.default_creative_prefs.posting_cadence,
           do_not_use: discovery.default_creative_prefs.do_not_use,
+          brand_brief: input.brand_brief ?? {},
           discovered_at: new Date().toISOString(),
         })
         .eq("id", input.niche_id);
@@ -127,9 +138,7 @@ function json(body: unknown, status = 200) {
 }
 
 async function scrapeSite(url: string): Promise<string> {
-  // Normalise URL
   const target = url.startsWith("http") ? url : `https://${url}`;
-
   try {
     const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
       method: "POST",
@@ -146,13 +155,11 @@ async function scrapeSite(url: string): Promise<string> {
     const data = await res.json();
     if (!res.ok) {
       console.error("Firecrawl error:", res.status, JSON.stringify(data));
-      return ""; // non-fatal — discovery still runs from handle alone
+      return "";
     }
     const md = data.markdown ?? data.data?.markdown ?? "";
     const summary = data.summary ?? data.data?.summary ?? "";
-    // Cap to ~6k chars to keep prompt small
-    const combined = `${summary}\n\n${md}`.slice(0, 6000);
-    return combined;
+    return `${summary}\n\n${md}`.slice(0, 6000);
   } catch (e) {
     console.error("Firecrawl fetch failed:", e);
     return "";
@@ -165,30 +172,50 @@ interface DiscoveryPromptInput {
   location: string | null;
   language: string;
   site_summary: string;
+  brand_brief: BrandBrief | null;
+}
+
+function formatBrief(b: BrandBrief | null): string {
+  if (!b) return "";
+  const lines: string[] = ["", "Founder-supplied brand brief:"];
+  if (b.niche) lines.push(`- Niche they say they're in: ${b.niche}`);
+  if (b.positioning) lines.push(`- Positioning: ${b.positioning}`);
+  if (b.offers?.length) lines.push(`- What they sell/do: ${b.offers.join("; ")}`);
+  if (b.audience_who) lines.push(`- Audience: ${b.audience_who}`);
+  if (b.audience_problem) lines.push(`- Audience problem: ${b.audience_problem}`);
+  if (b.audience_where) lines.push(`- Where audience hangs out: ${b.audience_where}`);
+  if (b.tones?.length) lines.push(`- Preferred tones: ${b.tones.join(", ")}`);
+  if (b.never_do?.length) lines.push(`- Never say/do: ${b.never_do.join("; ")}`);
+  if (b.producer) lines.push(`- Producer: ${b.producer}`);
+  if (b.goal) lines.push(`- Primary goal: ${b.goal}`);
+  return lines.join("\n");
 }
 
 async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResult> {
   const systemPrompt = [
-    "You are a senior content strategist and competitive researcher.",
-    "Given a brand's website content + their social handle + their location,",
-    "you identify their precise niche, the top local/regional competitors,",
-    "the top worldwide best-in-class accounts in that niche,",
-    "and recommend sensible default creative preferences for short-form video.",
+    `You are the Head of Creative Direction at a top-tier social agency in ${CURRENT_YEAR}, with 12+ years identifying who the real best-in-class creators are in any vertical.`,
+    "Given a brand's website + their handle + location + structured brand brief,",
+    "you identify their PRECISE niche and produce TWO ranked lists:",
+    "1) top_global_benchmarks: EXACTLY 10 worldwide best-in-class accounts in this niche, RANKED BY TYPICAL REEL VIEWS (not engagement rate, not vibes — raw view count is the signal). These are the accounts you would tell the client to study and reverse-engineer.",
+    "2) top_competitors: up to 5 local/regional competitors operating in the same market.",
     "",
-    "Be specific. 'London wedding photographers' beats 'photographers'.",
-    "For competitors, list real Instagram handles you are highly confident exist.",
-    "If unsure about a handle, omit it — never invent.",
-    "For global benchmarks, pick accounts widely recognised as best-in-class in that niche worldwide.",
+    "Hard rules:",
+    "- Be ruthlessly specific. 'London wedding photographers serving £5k+ weddings' beats 'photographers'.",
+    "- For benchmarks, list real, verifiable Instagram handles you are highly confident exist and currently post in this niche. If unsure about a handle, OMIT it — never invent.",
+    "- Benchmarks must actually post the kind of short-form content this brand could film. A talking-head expert is not a benchmark for a wordless aesthetic brand.",
+    "- For each benchmark, give a 1-line reason that names their typical view range (rough est_avg_views like '500k-2M') and what mechanic makes them work.",
+    "- Default creative prefs should be tight and tailored — not generic.",
   ].join("\n");
 
   const userPrompt = [
-    `Brand handle: @${input.own_handle.replace(/^@/, "")}`,
+    `Brand handle: @${(input.own_handle ?? "").replace(/^@/, "")}`,
     `Website: ${input.website}`,
     input.location ? `Location/market: ${input.location}` : "",
     `Output language: ${input.language}`,
+    formatBrief(input.brand_brief),
     "",
     "Website content (excerpt):",
-    input.site_summary || "(no website content available — work from handle + location alone)",
+    input.site_summary || "(no website content available — work from handle + brief + location alone)",
   ].filter(Boolean).join("\n");
 
   const tool = {
@@ -199,17 +226,17 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
       parameters: {
         type: "object",
         properties: {
-          niche_label: { type: "string", description: "Specific niche label, e.g. 'London wedding photographers'" },
+          niche_label: { type: "string", description: "Specific niche label." },
           niche_description: { type: "string", description: "1-2 sentence description of the niche, audience and offer." },
           top_competitors: {
             type: "array",
-            description: "Up to 10 local/regional competitors in the same niche.",
+            description: "Up to 5 local/regional competitors.",
             items: {
               type: "object",
               properties: {
                 handle: { type: "string", description: "Instagram handle without @" },
                 platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
-                reason: { type: "string", description: "1 line on why they're a competitor." },
+                reason: { type: "string" },
               },
               required: ["handle", "platform", "reason"],
               additionalProperties: false,
@@ -217,15 +244,18 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
           },
           top_global_benchmarks: {
             type: "array",
-            description: "Up to 10 worldwide best-in-class accounts in the same niche.",
+            description: "EXACTLY 10 worldwide best-in-class accounts ranked by typical reel views.",
+            minItems: 10,
+            maxItems: 10,
             items: {
               type: "object",
               properties: {
                 handle: { type: "string" },
                 platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
-                reason: { type: "string" },
+                reason: { type: "string", description: "1 line: their mechanic + why they're top." },
+                est_avg_views: { type: "string", description: "Rough typical reel views, e.g. '500k-2M'." },
               },
-              required: ["handle", "platform", "reason"],
+              required: ["handle", "platform", "reason", "est_avg_views"],
               additionalProperties: false,
             },
           },
