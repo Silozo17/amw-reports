@@ -58,15 +58,15 @@ const ClientList = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-display">Clients</h1>
-            <div className="flex items-center gap-2 mt-1">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-display">Clients</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <p className="text-muted-foreground font-body">{clients.length} total clients</p>
               <UsageBadge current={currentClients} max={maxClients} label="clients" />
             </div>
           </div>
-          <Button onClick={() => navigate('/clients/new')} className="gap-2">
+          <Button onClick={() => navigate('/clients/new')} className="gap-2 w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Add Client
           </Button>
@@ -92,7 +92,7 @@ const ClientList = () => {
             </Button>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((client) => (
               <Card
                 key={client.id}

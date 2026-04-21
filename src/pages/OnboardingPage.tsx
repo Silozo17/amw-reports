@@ -255,13 +255,13 @@ function StepContainer({ title, subtitle, children }: { title: string; subtitle:
 
 function StepActions({ onNext, onBack, canContinue, nextLabel = 'Continue' }: { onNext: () => void; onBack?: () => void; canContinue: boolean; nextLabel?: string }) {
   return (
-    <div className="flex items-center justify-between pt-8">
+    <div className="flex flex-col-reverse gap-3 pt-8 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
       {onBack ? (
-        <Button variant="ghost" onClick={onBack} className="text-muted-foreground hover:text-foreground hover:bg-muted gap-2">
+        <Button variant="ghost" onClick={onBack} className="text-muted-foreground hover:text-foreground hover:bg-muted gap-2 w-full sm:w-auto">
           <ArrowLeft className="h-4 w-4" />Back
         </Button>
-      ) : <div />}
-      <Button onClick={onNext} disabled={!canContinue} className="gap-2 px-8 shadow-md shadow-primary/15">
+      ) : <div className="hidden sm:block" />}
+      <Button onClick={onNext} disabled={!canContinue} className="gap-2 px-8 shadow-md shadow-primary/15 w-full sm:w-auto">
         {nextLabel}<ArrowRight className="h-4 w-4" />
       </Button>
     </div>

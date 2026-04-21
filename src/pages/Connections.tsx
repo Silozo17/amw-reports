@@ -52,8 +52,8 @@ const Connections = () => {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-display">Connections</h1>
-          <div className="flex items-center gap-2 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-display">Connections</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
             <p className="text-muted-foreground font-body">Platform integrations across all clients</p>
             <UsageBadge current={currentConnections} max={maxConnections} label="connections" />
           </div>

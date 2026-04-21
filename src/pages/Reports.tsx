@@ -259,7 +259,7 @@ const Reports = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-display">Reports</h1>
+            <h1 className="text-2xl sm:text-3xl font-display">Reports</h1>
             <p className="text-muted-foreground font-body mt-1">Monthly client reports</p>
           </div>
         </div>
@@ -314,7 +314,7 @@ const Reports = () => {
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
           <Select value={filterClient} onValueChange={setFilterClient}>
-            <SelectTrigger className="w-40 sm:w-52">
+            <SelectTrigger className="flex-1 min-w-[10rem] sm:flex-initial sm:w-52">
               <SelectValue placeholder="All clients" />
             </SelectTrigger>
             <SelectContent>
@@ -327,7 +327,7 @@ const Reports = () => {
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="flex-1 min-w-[8rem] sm:flex-initial sm:w-32">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
