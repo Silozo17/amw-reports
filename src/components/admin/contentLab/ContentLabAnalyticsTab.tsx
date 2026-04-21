@@ -51,7 +51,7 @@ const ContentLabAnalyticsTab = () => {
       <Card>
         <CardHeader><CardTitle className="text-base font-display">Revenue by tier</CardTitle></CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow>
               <TableHead>Tier</TableHead><TableHead className="text-right">Orgs</TableHead><TableHead className="text-right">MRR</TableHead>
             </TableRow></TableHeader>
@@ -64,7 +64,7 @@ const ContentLabAnalyticsTab = () => {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table></div>
         </CardContent>
       </Card>
 
@@ -72,7 +72,7 @@ const ContentLabAnalyticsTab = () => {
       <Card>
         <CardHeader><CardTitle className="text-base font-display">Run completion by vertical</CardTitle></CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow>
               <TableHead>Vertical</TableHead><TableHead className="text-right">Completed</TableHead>
               <TableHead className="text-right">Failed</TableHead><TableHead className="text-right">Total</TableHead>
@@ -92,7 +92,7 @@ const ContentLabAnalyticsTab = () => {
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground font-body">No runs yet</TableCell></TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div>
         </CardContent>
       </Card>
 
@@ -100,7 +100,7 @@ const ContentLabAnalyticsTab = () => {
       <Card>
         <CardHeader><CardTitle className="text-base font-display">Pool quality by vertical</CardTitle></CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow>
               <TableHead>Vertical</TableHead><TableHead className="text-right">Niches</TableHead>
               <TableHead className="text-right">Limited</TableHead><TableHead className="text-right">% Limited</TableHead>
@@ -118,7 +118,7 @@ const ContentLabAnalyticsTab = () => {
                 <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground font-body">No niches yet</TableCell></TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div>
         </CardContent>
       </Card>
 
@@ -131,7 +131,7 @@ const ContentLabAnalyticsTab = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow>
               <TableHead>Organisation</TableHead><TableHead>Tier</TableHead>
               <TableHead className="text-right">Runs</TableHead><TableHead className="text-right">Credits</TableHead>
@@ -151,7 +151,7 @@ const ContentLabAnalyticsTab = () => {
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground font-body">No churn signals — healthy 🎉</TableCell></TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div>
         </CardContent>
       </Card>
     </div>
