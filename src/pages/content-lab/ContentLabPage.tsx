@@ -106,7 +106,7 @@ const ContentLabPage = () => {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1400px] space-y-8 p-6 md:p-8">
+      <div className="mx-auto max-w-[1400px] space-y-8 p-4 md:p-8">
         <ContentLabHeader
           eyebrow="Content Lab"
           icon={Sparkles}
@@ -202,11 +202,11 @@ const ContentLabPage = () => {
         </AlertDialog>
 
         {latestRun && (
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-5 md:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground">Latest Run</p>
-                <h2 className="mt-2 font-display text-2xl">
+                <h2 className="mt-2 font-display text-xl md:text-2xl truncate">
                   {niches.find((n) => n.id === latestRun.niche_id)?.label ?? 'Untitled niche'}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -216,7 +216,7 @@ const ContentLabPage = () => {
               <RunStatusBadge status={latestRun.status} />
             </div>
             {latestRun.status === 'completed' && (
-              <Button className="mt-4" onClick={() => navigate(`/content-lab/run/${latestRun.id}`)}>
+              <Button className="mt-4 w-full sm:w-auto" onClick={() => navigate(`/content-lab/run/${latestRun.id}`)}>
                 <FileText className="mr-2 h-4 w-4" /> View Report
               </Button>
             )}
@@ -230,7 +230,7 @@ const ContentLabPage = () => {
           ) : niches.length === 0 ? (
             <EmptyNiches onCreate={() => navigate('/content-lab/niche/new')} />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {niches.map((niche) => (
                 <NicheCard
                   key={niche.id}
