@@ -213,15 +213,15 @@ const RunDetailPage = () => {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
         <Button variant="ghost" size="sm" onClick={() => navigate('/content-lab')}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
 
-        <header className="flex items-start justify-between gap-4">
-          <div>
+        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
             <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Content Lab Report</p>
-            <h1 className="mt-2 font-display text-3xl">
+            <h1 className="mt-2 font-display text-2xl md:text-3xl">
               {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -232,7 +232,7 @@ const RunDetailPage = () => {
               <p className="mt-2 max-w-2xl text-sm text-destructive">{run.error_message}</p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {run?.status === 'failed' && posts.length > 0 && (
               <Button onClick={handleRetry} disabled={retrying} size="sm">
                 <RefreshCw className={`mr-2 h-4 w-4 ${retrying ? 'animate-spin' : ''}`} />
@@ -281,13 +281,15 @@ const RunDetailPage = () => {
         {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
         <SectionErrorBoundary>
         <Tabs defaultValue="own" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="own">Your Latest Content ({ownPosts.length})</TabsTrigger>
-            <TabsTrigger value="feed">Viral Feed ({viralPosts.length})</TabsTrigger>
-            <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
-            <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-            <TabsTrigger value="hooks">Hook Library</TabsTrigger>
-          </TabsList>
+          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+            <TabsList className="inline-flex w-max">
+              <TabsTrigger value="own" className="whitespace-nowrap">Your Latest ({ownPosts.length})</TabsTrigger>
+              <TabsTrigger value="feed" className="whitespace-nowrap">Viral Feed ({viralPosts.length})</TabsTrigger>
+              <TabsTrigger value="ideas" className="whitespace-nowrap">Ideas ({ideas.length})</TabsTrigger>
+              <TabsTrigger value="pipeline" className="whitespace-nowrap">Pipeline</TabsTrigger>
+              <TabsTrigger value="hooks" className="whitespace-nowrap">Hooks</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="own" className="space-y-4">
             {ownPosts.length === 0 ? (
@@ -312,7 +314,7 @@ const RunDetailPage = () => {
                     {ownIsCompetitive ? 'On par with benchmarks' : 'Below benchmarks — ideas reverse-engineer top accounts only'}
                   </Badge>
                 </Card>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {[...ownPosts]
                     .sort((a, b) => (b.posted_at ?? '').localeCompare(a.posted_at ?? ''))
                     .map((p) => (
@@ -327,7 +329,7 @@ const RunDetailPage = () => {
             {viralPosts.length === 0 ? (
               <Card className="p-10 text-center text-sm text-muted-foreground">No viral posts yet for this run.</Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {viralPosts.map((p) => (
                   <ViralPostCard key={p.id} post={p} />
                 ))}
