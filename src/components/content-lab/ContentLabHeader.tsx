@@ -23,7 +23,7 @@ const ContentLabHeader = ({ eyebrow, icon: Icon, title, subtitle, actions }: Pro
       <h1 className="mt-2 font-display text-3xl md:text-4xl">{title}</h1>
       {subtitle && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{subtitle}</p>}
     </div>
-    {actions && <div className="flex flex-wrap items-center gap-2 md:shrink-0">{actions}</div>}
+    {actions && <div className="flex flex-wrap items-center gap-2 [&>button]:flex-1 sm:[&>button]:flex-initial md:shrink-0">{actions}</div>}
   </header>
 );
 
