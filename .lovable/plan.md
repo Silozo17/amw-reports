@@ -1,92 +1,44 @@
 
 
-## Site-wide Responsive Pass — All Pages, All Devices
+## Fix: Content Lab header wrapping one-word-per-line on tablet
 
-### Scope: every route, grouped by area
+### What's broken
+On the `/content-lab` page at tablet widths (≈700–1000px), the subtitle ("Pull the highest-performing posts…") renders **one word per line**, as visible in your screenshot.
 
-**App (authenticated)**
-- Dashboard / client overview: `Index.tsx`, `clients/ClientList.tsx`, `clients/ClientDetail.tsx`, `clients/ClientForm.tsx`
-- Client dashboard widgets: `HeroKPIs`, `PerformanceOverview`, `PlatformSection`, `AdCampaignBreakdown`, `DeviceBreakdown`, `GeoHeatmap`, `HealthScore`, `OpportunityAlerts`, `PortalUpsells`, `VoiceBriefing`, `AiChatDrawer`, all `dashboard/platforms/*`
-- Client tabs & dialogs: `ClientConnectionsTab`, `ClientContentLabTab`, `ClientSettingsTab`, `AccountPickerDialog`, `ConnectionDialog`, `ShareDialog`, `RecipientDialog`, `DeleteClientDialog`, `ClientEditDialog`, `MetricConfigPanel`, `PortalUpsellsSettings`, `UpsellTab`
-- Connections, Reports, Logs, Settings: `Connections.tsx`, `Reports.tsx`, `Logs.tsx`, `SettingsPage.tsx` + all `settings/*` sections (Account, Billing, Branding, CustomDomain, MetricsDefaults, Organisation, ReportSettings, UpsellsOverview, AvatarCropDialog)
-- Onboarding: `OnboardingPage.tsx` + 7 step components
-- Auth: `ResetPassword.tsx`, `ClientPortalAuth.tsx`, `OAuthCallback.tsx`, `ThreadsCallback.tsx`
-- Client portal: `ClientPortal.tsx`
-- Content Lab: already passed — verify only
+### Root cause
+`ContentLabHeader.tsx` switches from stacked to side-by-side at the **`md:` breakpoint (768px)**:
 
-**Admin**
-- `AdminLayout.tsx`, `AdminDashboard`, `AdminUserList`, `AdminOrgList`, `AdminOrgDetail` (+ `AdminOrgClients`, `AdminOrgMembers`, `AdminOrgOnboarding`, `AdminOrgSubscription`), `AdminActivityLog`, `AdminSecurity`, `AdminContentLab` (+ `NichesTable`, `RunsTable`, `StepLogsTable`, `RunDetailDrawer`, `ContentLabAnalyticsTab`, `ContentLabHealthPanel`), `AdminSyncDialog`, `UserActionDialogs`, `UserEditDialog`, `UserResetPasswordDialog`, `DebugConsole.tsx`
+```
+<header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+```
 
-**Public marketing site** (`PublicLayout`, `PublicNavbar`, `PublicFooter`, `LandingHero`, `WarpedGrid`)
-- `LandingPage`, `HomePage`, `AboutPage`, `FeaturesPage`, `HowItWorksPage`, `IntegrationsPage`, `PricingPage`, `ForAgenciesPage`, `ForCreatorsPage`, `ForFreelancersPage`, `ForSmbsPage`, `PpcReportingPage`, `SeoReportingPage`, `SocialMediaReportingPage`, `WhiteLabelReportsPage`, `ContentLabPublicPage`, `NotFound`
+At 768px the right-hand `actions` slot contains **three wide items** (the runs/credits badge "4 / 0 runs · 1000000 credits" + "Buy credits" button + "New Niche" button). Together they need ~520px. The title column has no `flex-1` or `min-w-0` width guarantee, so flexbox shrinks it down to ~60–80px. Every word in the subtitle is wider than that column, forcing one word per line.
 
-**Shared public**: `share/ContentLabRunShare.tsx`
+The same bug affects every Content Lab subpage that uses this shared header (Pipeline, Ideas, Hooks, Swipe File, Trends, Niche form, Run detail, Onboard wizard).
 
-### Target breakpoints
-320px (small phone) · 375–414px (phone) · 768px (iPad portrait) · 1024px (iPad landscape) · 1280px (laptop) · 1536px+ (desktop)
+### Fix (single file, ~2 lines)
 
-### Common fix patterns to apply
+**`src/components/content-lab/ContentLabHeader.tsx`**
 
-1. **Page padding** — replace any `p-6`/`p-8` only with `p-4 md:p-6 lg:p-8`.
-2. **Grids** — convert any `grid-cols-2`/`grid-cols-3`/`grid-cols-4` lacking a breakpoint prefix to mobile-first: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`.
-3. **Tables** — wrap every `<Table>` in `<div className="overflow-x-auto">`; on phone, switch dense admin tables (`UserList`, `OrgList`, `RunsTable`, `NichesTable`, `StepLogsTable`, `ActivityLog`) to a stacked-card view via `useIsMobile`.
-4. **Headers / toolbars** — `flex` rows with multiple actions become `flex-col gap-3 md:flex-row md:items-center md:justify-between`. Buttons get `w-full sm:w-auto`.
-5. **Tabs** — long `TabsList` rows (settings, client detail, admin org detail) get `overflow-x-auto whitespace-nowrap` wrapper on mobile.
-6. **Dialogs / Sheets** — cap with `max-w-[95vw] sm:max-w-md` (or `sm:max-w-lg`/`2xl` as appropriate); `Sheet` sides use `w-full sm:max-w-md`.
-7. **Selects / filter bars** — `w-full sm:w-auto` on `SelectTrigger`s and dropdowns.
-8. **Charts** — wrap Recharts `ResponsiveContainer` in a parent with `min-h-[240px]` and ensure `width="100%"`; reduce label density on mobile (hide axis ticks below `sm`).
-9. **Heatmap / Leaflet** — set explicit `aspect-[4/3] md:aspect-[16/9]` to avoid 0-height on mobile.
-10. **Public marketing pages** — hero text scales `text-4xl sm:text-5xl md:text-6xl lg:text-7xl`; hero CTA stacks; nav becomes hamburger sheet on `<lg`; footer columns `grid-cols-2 md:grid-cols-4`.
-11. **Forms** — long `ClientForm`, `NicheFormPage`, settings sections: every field group `grid-cols-1 md:grid-cols-2`; sticky save bar buttons full-width on mobile.
-12. **Sticky bars / footers** — wizard footers stack on mobile (`flex-col-reverse sm:flex-row`).
-13. **Images** — add `loading="lazy"`, `decoding="async"`, intrinsic `width`/`height` (already done in Content Lab).
-14. **Dark mode** — preserve existing tokens; no colour changes.
+1. Move the row breakpoint from `md:` → `lg:` so header stays stacked on tablets where the actions are wide.
+2. Add `flex-1` to the title column so when it does go side-by-side it claims remaining space instead of collapsing.
 
-### Out of scope (will not change)
-- No new features, no copy changes, no design redesign.
-- No DB or auth changes.
-- No edge function changes.
-- Desktop layouts at ≥1280px stay pixel-identical (only adds smaller breakpoints, never removes `md:`/`lg:`).
-- Recharts/Leaflet library swaps — only container sizing tweaks.
+```tsx
+<header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+  <div className="min-w-0 flex-1">
+    …
+  </div>
+  {actions && <div className="flex flex-wrap items-center gap-2 [&>button]:flex-1 sm:[&>button]:flex-initial lg:shrink-0">{actions}</div>}
+</header>
+```
 
-### Execution plan (phased, in order)
+That's it. Title + subtitle get full width on phones and tablets; the actions sit below (already wrap nicely thanks to `flex-wrap`). On desktop (≥1024px) the original side-by-side layout returns.
 
-**Phase 1 — Foundations (shared layout)**
-- `AppLayout` content padding + max-width audit
-- `AppSidebar` mobile sheet polish
-- `AdminLayout` mobile nav
-- `PublicLayout` + `PublicNavbar` mobile menu, `PublicFooter` columns
+### Out of scope
+- No copy changes, no design changes, no other files touched.
+- Desktop (≥1024px) layout is unchanged.
+- All other Content Lab pages benefit automatically because they share this header.
 
-**Phase 2 — App pages**
-- Client area: `Index`, `ClientList`, `ClientDetail` (tabs scroll, header stack), `ClientForm`, all dialogs
-- Client dashboard widgets (KPIs grid, charts, geo map, platform sections)
-- Connections, Reports, Logs
-- Settings page (tabs scroll + every section grid)
-- Onboarding wizard footer + step content padding
-- Client portal
-
-**Phase 3 — Admin**
-- `AdminDashboard`, `AdminUserList`, `AdminOrgList`, `AdminOrgDetail` + sub-components
-- All admin tables → horizontal scroll + mobile card mode
-- `AdminContentLab` + tabs/tables/drawer
-- `AdminSecurity`, `AdminActivityLog`, `DebugConsole`
-- All admin dialogs cap widths
-
-**Phase 4 — Public marketing**
-- `LandingPage`, `HomePage`, `AboutPage`, `FeaturesPage`, `HowItWorksPage`, `IntegrationsPage`, `PricingPage`
-- 4× persona pages (Agencies, Creators, Freelancers, SMBs)
-- 4× reporting pages (PPC, SEO, Social, WhiteLabel)
-- `ContentLabPublicPage`, `NotFound`
-- `LandingHero` (font scale + CTA stack), `WarpedGrid` (mobile rendering)
-
-**Phase 5 — Verification**
-- Smoke-test critical routes at 320 / 375 / 768 / 1024 / 1280 / 1536 widths via browser tools (post-implementation)
-- Verify dark mode at each breakpoint on 5 sample pages
-
-### Risks / things flagged
-- **Admin tables are dense** — switching to a stacked-card mobile view changes IA; truncation may hide columns. Will preserve all data, just reorder.
-- **Recharts** — some chart legends become illegible <360px; will hide legend below `sm` and rely on tooltips.
-- **Leaflet GeoHeatmap** — needs explicit height; tile loading on slow mobile is unchanged.
-- **Public marketing hero animations** (`WarpedGrid`) may need `prefers-reduced-motion` and a simpler fallback on phones for perf.
-- This is a **large pass touching ~80+ files**. I'll work in the phases above and pause after each phase so you can review before proceeding to the next.
+### Verification after merge
+Resize the preview to 768px and 900px — subtitle should read as one or two normal lines, not stacked words.
 
