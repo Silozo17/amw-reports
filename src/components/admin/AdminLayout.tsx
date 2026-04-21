@@ -90,8 +90,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       <aside className="flex h-screen w-64 flex-col border-r border-border bg-card sticky top-0">
         <SidebarContent />
       </aside>
-      <main className="flex-1 p-6 md:p-8 overflow-auto">
-        <SectionErrorBoundary>{children}</SectionErrorBoundary>
+      <main className="flex-1 overflow-auto">
+        <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6 lg:p-8">
+          <SectionErrorBoundary>{children}</SectionErrorBoundary>
+        </div>
       </main>
     </div>
   );

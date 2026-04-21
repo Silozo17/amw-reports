@@ -56,7 +56,7 @@ const ContentLabHealthPanel = ({ onSelectRun }: Props) => {
       <Card>
         <CardHeader><CardTitle className="text-base font-display">Stuck runs</CardTitle></CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow>
               <TableHead>Run</TableHead><TableHead>Status</TableHead>
               <TableHead>Last update</TableHead><TableHead>Error</TableHead>
@@ -84,7 +84,7 @@ const ContentLabHealthPanel = ({ onSelectRun }: Props) => {
                 </TableCell></TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div>
         </CardContent>
       </Card>
 
@@ -92,7 +92,7 @@ const ContentLabHealthPanel = ({ onSelectRun }: Props) => {
       <Card>
         <CardHeader><CardTitle className="text-base font-display">Refund failures (last 7 days)</CardTitle></CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow>
               <TableHead>When</TableHead><TableHead>Run</TableHead>
               <TableHead>Ledger</TableHead><TableHead>Reason</TableHead>
@@ -123,7 +123,7 @@ const ContentLabHealthPanel = ({ onSelectRun }: Props) => {
                 </TableCell></TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div>
         </CardContent>
       </Card>
 
@@ -136,7 +136,7 @@ const ContentLabHealthPanel = ({ onSelectRun }: Props) => {
           </p>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader><TableRow>
               <TableHead>Organisation</TableHead><TableHead>Tier</TableHead><TableHead>Sub status</TableHead>
             </TableRow></TableHeader>
@@ -154,7 +154,7 @@ const ContentLabHealthPanel = ({ onSelectRun }: Props) => {
                 </TableCell></TableRow>
               )}
             </TableBody>
-          </Table>
+          </Table></div>
         </CardContent>
       </Card>
     </div>

@@ -29,7 +29,7 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
           {clients.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No clients yet</p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Company</TableHead>
@@ -63,7 +63,7 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
                   );
                 })}
               </TableBody>
-            </Table>
+            </Table></div>
           )}
         </CardContent>
       </Card>
@@ -81,7 +81,7 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Client</TableHead>
@@ -115,7 +115,7 @@ const AdminOrgClients = ({ orgId, clients, connections }: AdminOrgClientsProps) 
                   );
                 })}
               </TableBody>
-            </Table>
+            </Table></div>
           </CardContent>
         </Card>
       )}

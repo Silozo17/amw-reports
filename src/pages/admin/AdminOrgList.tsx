@@ -126,7 +126,7 @@ const AdminOrgList = () => {
         {isLoading ? (
           <div className="text-muted-foreground">Loading...</div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

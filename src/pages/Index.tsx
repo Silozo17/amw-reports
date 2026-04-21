@@ -216,14 +216,14 @@ const Dashboard = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-display">Dashboard</h1>
           <p className="text-muted-foreground font-body mt-1">Overview of your reporting platform</p>
         </div>
 
         {/* Status Cards — Actionable */}
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card
             className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-primary"
             onClick={() => navigate('/clients')}

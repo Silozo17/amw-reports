@@ -80,12 +80,12 @@ const Logs = () => {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-display">Activity Logs</h1>
+          <h1 className="text-2xl sm:text-3xl font-display">Activity Logs</h1>
           <p className="text-muted-foreground font-body mt-1">Sync, report, and email history</p>
         </div>
 
         <Tabs defaultValue="sync">
-          <TabsList>
+          <TabsList className="w-full overflow-x-auto flex-nowrap justify-start sm:w-auto sm:justify-center">
             <TabsTrigger value="sync">Sync Logs</TabsTrigger>
             <TabsTrigger value="reports">Report Logs</TabsTrigger>
             <TabsTrigger value="emails">Email Logs</TabsTrigger>
