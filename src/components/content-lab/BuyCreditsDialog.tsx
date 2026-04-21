@@ -41,7 +41,7 @@ const BuyCreditsDialog = ({ open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto max-w-[95vw] sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">Buy Content Lab credits</DialogTitle>
           <DialogDescription>
