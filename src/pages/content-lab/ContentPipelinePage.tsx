@@ -39,7 +39,7 @@ const ContentPipelinePage = () => {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
         <ContentLabHeader
           eyebrow="Content Lab · Pipeline"
           icon={KanbanSquare}
