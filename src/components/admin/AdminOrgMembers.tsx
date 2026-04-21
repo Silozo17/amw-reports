@@ -151,7 +151,7 @@ const AdminOrgMembers = ({ orgId, members, profileMap }: AdminOrgMembersProps) =
           {members.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No members</p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -191,7 +191,7 @@ const AdminOrgMembers = ({ orgId, members, profileMap }: AdminOrgMembersProps) =
                   );
                 })}
               </TableBody>
-            </Table>
+            </Table></div>
           )}
         </CardContent>
       </Card>

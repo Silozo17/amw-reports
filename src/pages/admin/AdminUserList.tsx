@@ -122,6 +122,7 @@ const AdminUserList = () => {
         ) : (
           <Card>
             <CardContent className="pt-6">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -180,6 +181,7 @@ const AdminUserList = () => {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         )}

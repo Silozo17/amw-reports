@@ -76,7 +76,7 @@ const AdminSecurity = () => {
         <Card>
           <CardHeader><CardTitle className="font-display text-lg">Top 10 orgs by 30d spend</CardTitle></CardHeader>
           <CardContent>
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader><TableRow><TableHead>Organisation</TableHead><TableHead className="text-right">30d spend</TableHead></TableRow></TableHeader>
               <TableBody>
                 {(data?.topOrgs ?? []).length === 0 ? (
@@ -85,7 +85,7 @@ const AdminSecurity = () => {
                   <TableRow key={o.org_id}><TableCell>{o.org_name}</TableCell><TableCell className="text-right">{fmtGbp(o.spend_pence)}</TableCell></TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           </CardContent>
         </Card>
       </div>

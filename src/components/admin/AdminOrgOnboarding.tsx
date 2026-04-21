@@ -43,7 +43,7 @@ const AdminOrgOnboarding = ({ orgId, members, profileMap }: AdminOrgOnboardingPr
         {onboardingData.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">No onboarding data yet</p>
         ) : (
-          <Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
@@ -75,7 +75,7 @@ const AdminOrgOnboarding = ({ orgId, members, profileMap }: AdminOrgOnboardingPr
                 );
               })}
             </TableBody>
-          </Table>
+          </Table></div>
         )}
       </CardContent>
     </Card>
