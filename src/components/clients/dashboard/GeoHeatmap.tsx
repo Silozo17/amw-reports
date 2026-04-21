@@ -135,7 +135,7 @@ const GeoHeatmap = ({ countries, cities }: GeoHeatmapProps) => {
               <MapPin className="h-4 w-4 text-primary" />
               <h4 className="text-sm font-semibold font-body">Top Cities</h4>
             </div>
-            <div className="rounded-lg border overflow-hidden">
+            <div className="rounded-lg border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

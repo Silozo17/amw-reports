@@ -230,7 +230,7 @@ const ContentLabPage = () => {
           ) : niches.length === 0 ? (
             <EmptyNiches onCreate={() => navigate('/content-lab/niche/new')} />
           ) : (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
               {niches.map((niche) => (
                 <NicheCard
                   key={niche.id}
@@ -353,9 +353,11 @@ const NicheCard = ({ niche, isRunning, onOpen, onRun }: NicheCardProps) => {
       onClick={onOpen}
     >
       <div className="flex items-start justify-between gap-2">
-        <h3 className="font-display text-lg">{niche.label}</h3>
+        <h3 className="font-display text-lg leading-tight break-words min-w-0 flex-1">{niche.label}</h3>
         {pool && (
-          <BenchmarkQualityBadge quality={pool.quality} verifiedCount={pool.verifiedCount} />
+          <div className="shrink-0">
+            <BenchmarkQualityBadge quality={pool.quality} verifiedCount={pool.verifiedCount} />
+          </div>
         )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
