@@ -1,75 +1,92 @@
 
 
-## Content Lab — Mobile Responsive Pass + Thumbnail Fix
+## Site-wide Responsive Pass — All Pages, All Devices
 
-### Part A — Every page & subpage in scope
+### Scope: every route, grouped by area
 
-**Top-level routes**
-1. `/content-lab` — `ContentLabPage.tsx` (header, niche cards, recent runs accordion)
-2. `/content-lab/niche/new` and `/content-lab/niche/:id` — `NicheFormPage.tsx` (long form, 795 lines)
-3. `/content-lab/niche/onboard` — `OnboardWizardPage.tsx` (6-step wizard + voice-building screen)
-4. `/content-lab/run/:id` — `RunDetailPage.tsx` (5 tabs: Your Latest, Viral Feed, Ideas, Pipeline, Hooks)
-5. `/content-lab/ideas` — `IdeasLibraryPage.tsx`
-6. `/content-lab/pipeline` — `ContentPipelinePage.tsx` (kanban DnD board)
-7. `/content-lab/swipe-file` — `SwipeFilePage.tsx`
-8. `/content-lab/hooks` — `HookLibraryPage.tsx`
-9. `/content-lab/trends` — `TrendsLibraryPage.tsx` (coming-soon, mostly fine)
-10. `/share/content-lab/:token` — `ContentLabRunShare.tsx` (public share)
+**App (authenticated)**
+- Dashboard / client overview: `Index.tsx`, `clients/ClientList.tsx`, `clients/ClientDetail.tsx`, `clients/ClientForm.tsx`
+- Client dashboard widgets: `HeroKPIs`, `PerformanceOverview`, `PlatformSection`, `AdCampaignBreakdown`, `DeviceBreakdown`, `GeoHeatmap`, `HealthScore`, `OpportunityAlerts`, `PortalUpsells`, `VoiceBriefing`, `AiChatDrawer`, all `dashboard/platforms/*`
+- Client tabs & dialogs: `ClientConnectionsTab`, `ClientContentLabTab`, `ClientSettingsTab`, `AccountPickerDialog`, `ConnectionDialog`, `ShareDialog`, `RecipientDialog`, `DeleteClientDialog`, `ClientEditDialog`, `MetricConfigPanel`, `PortalUpsellsSettings`, `UpsellTab`
+- Connections, Reports, Logs, Settings: `Connections.tsx`, `Reports.tsx`, `Logs.tsx`, `SettingsPage.tsx` + all `settings/*` sections (Account, Billing, Branding, CustomDomain, MetricsDefaults, Organisation, ReportSettings, UpsellsOverview, AvatarCropDialog)
+- Onboarding: `OnboardingPage.tsx` + 7 step components
+- Auth: `ResetPassword.tsx`, `ClientPortalAuth.tsx`, `OAuthCallback.tsx`, `ThreadsCallback.tsx`
+- Client portal: `ClientPortal.tsx`
+- Content Lab: already passed — verify only
 
-**Reusable components touched**
-- `ContentLabHeader` · `ContentLabFilterBar` · `ContentLabPaywall`
-- `ViralPostCard` · `IdeaCard` (grid + stacked variants) · `IdeaDetailDrawer` · `IdeaCommentsDrawer`
-- `IdeaPipelineBoard` (DnD) · `HookLibrary` · `BuyCreditsDialog` · `ShareWithClientDialog`
-- `IdeaPreviewInstagram/TikTok/Facebook` · `IdeaActionButtons` · `PatternInsightsWidget`
-- `onboard/Step1…Step6` + `VoiceBuildingScreen`
+**Admin**
+- `AdminLayout.tsx`, `AdminDashboard`, `AdminUserList`, `AdminOrgList`, `AdminOrgDetail` (+ `AdminOrgClients`, `AdminOrgMembers`, `AdminOrgOnboarding`, `AdminOrgSubscription`), `AdminActivityLog`, `AdminSecurity`, `AdminContentLab` (+ `NichesTable`, `RunsTable`, `StepLogsTable`, `RunDetailDrawer`, `ContentLabAnalyticsTab`, `ContentLabHealthPanel`), `AdminSyncDialog`, `UserActionDialogs`, `UserEditDialog`, `UserResetPasswordDialog`, `DebugConsole.tsx`
 
-### Part B — Concrete responsive issues found
+**Public marketing site** (`PublicLayout`, `PublicNavbar`, `PublicFooter`, `LandingHero`, `WarpedGrid`)
+- `LandingPage`, `HomePage`, `AboutPage`, `FeaturesPage`, `HowItWorksPage`, `IntegrationsPage`, `PricingPage`, `ForAgenciesPage`, `ForCreatorsPage`, `ForFreelancersPage`, `ForSmbsPage`, `PpcReportingPage`, `SeoReportingPage`, `SocialMediaReportingPage`, `WhiteLabelReportsPage`, `ContentLabPublicPage`, `NotFound`
 
-| Surface | Problem at <768px | Fix |
-|---|---|---|
-| `RunDetailPage` header | Title row + 3 action buttons forced side-by-side; overflows | Stack vertically, wrap action buttons full-width |
-| `RunDetailPage` Tabs | 5 tabs in a `TabsList` row don't fit 360-414px | Make tab list horizontally scrollable (`overflow-x-auto`, `whitespace-nowrap`); shrink labels |
-| Run Detail "Your latest" stats card | Badge + multi-segment text crammed | Stack on mobile, use `flex-col sm:flex-row` |
-| `IdeaCard` stacked variant | Fixed `md:grid-cols-[260px_1fr]` is fine but body actions row overflows | Wrap action buttons, allow phone-mockup full width on mobile |
-| `IdeaPipelineBoard` | DnD kanban with 5 columns side-by-side — unusable on phone | Already has `useIsMobile` import — switch to vertical column stack on mobile, keep DnD; or use status `<Select>` per card as the mobile interaction |
-| `ContentLabFilterBar` selects | Multiple `w-[180px]` triggers wrap awkwardly | Use `w-full sm:w-auto sm:min-w-[160px]` for triggers; bar already stacks |
-| `HookLibraryPage` | 4 selects of fixed width | Same select-width fix |
-| `NicheFormPage` (795 lines) | Multi-column grids, long form — needs audit per section | Replace any `grid-cols-2/3` without `md:` prefix with mobile-first `grid-cols-1 md:grid-cols-2` |
-| `OnboardWizardPage` + steps | Footer Back/Next buttons + step content padding | Ensure `p-4 md:p-6`, sticky footer stacks on mobile |
-| `BuyCreditsDialog` / `ShareWithClientDialog` | Fixed dialog widths | `max-w-[95vw] sm:max-w-md` |
-| `ViralPostCard` action row | "View reel" + "Transcript" buttons can wrap badly with date | `flex-wrap` with date on its own row at <360px |
-| `IdeaPreviewInstagram/TikTok/Facebook` | Fixed `max-w-[240px]` is fine; phone mockup centered |  Keep as-is, just ensure parent doesn't clip |
-| `ContentLabPage` Latest Run card | Action button row uses `justify-between` | Stack header + status badge on mobile |
-| `IdeaDetailDrawer` (Sheet) | Default Sheet width may be too narrow | Explicitly set `w-full sm:max-w-2xl` |
+**Shared public**: `share/ContentLabRunShare.tsx`
 
-### Part C — Thumbnail fix (root cause identified)
+### Target breakpoints
+320px (small phone) · 375–414px (phone) · 768px (iPad portrait) · 1024px (iPad landscape) · 1280px (laptop) · 1536px+ (desktop)
 
-**Problem:** `ViralPostCard` uses `<img src={proxiedSrc(url)}>` pointing at the `content-lab-image-proxy` edge function. The function rejects any request without an `Authorization: Bearer …` header (lines 47–50) and serves a 1×1 transparent PNG instead. Browsers cannot attach `Authorization` headers to `<img>` requests — so **every thumbnail returns the blank fallback** on web, PWA, and mobile alike. This is also why the viral feed appears empty of imagery.
+### Common fix patterns to apply
 
-**Fix:**
-1. Remove the `Authorization` requirement from `content-lab-image-proxy/index.ts`. Security is already provided by:
-   - Hostname allow-list (Instagram/Facebook/TikTok CDN suffixes)
-   - HTTPS-only check
-   - Public Cache-Control so Supabase edge caches absorb load
-2. Append the publishable anon key as a query string — Supabase Functions accept `apikey` as a query param — so the request is still attributed to the project for rate-limiting. Update `proxiedSrc()` in `ViralPostCard` to send `?url=…&apikey=…`. (`VITE_SUPABASE_PUBLISHABLE_KEY` is already in `.env`.)
-3. Add `loading="lazy"`, `decoding="async"`, and a `width`/`height` on the `<img>` to prevent CLS on mobile.
-4. Keep the existing `imgFailed` fallback to the original CDN URL — works on Wi-Fi where Instagram CDN is reachable directly.
+1. **Page padding** — replace any `p-6`/`p-8` only with `p-4 md:p-6 lg:p-8`.
+2. **Grids** — convert any `grid-cols-2`/`grid-cols-3`/`grid-cols-4` lacking a breakpoint prefix to mobile-first: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`.
+3. **Tables** — wrap every `<Table>` in `<div className="overflow-x-auto">`; on phone, switch dense admin tables (`UserList`, `OrgList`, `RunsTable`, `NichesTable`, `StepLogsTable`, `ActivityLog`) to a stacked-card view via `useIsMobile`.
+4. **Headers / toolbars** — `flex` rows with multiple actions become `flex-col gap-3 md:flex-row md:items-center md:justify-between`. Buttons get `w-full sm:w-auto`.
+5. **Tabs** — long `TabsList` rows (settings, client detail, admin org detail) get `overflow-x-auto whitespace-nowrap` wrapper on mobile.
+6. **Dialogs / Sheets** — cap with `max-w-[95vw] sm:max-w-md` (or `sm:max-w-lg`/`2xl` as appropriate); `Sheet` sides use `w-full sm:max-w-md`.
+7. **Selects / filter bars** — `w-full sm:w-auto` on `SelectTrigger`s and dropdowns.
+8. **Charts** — wrap Recharts `ResponsiveContainer` in a parent with `min-h-[240px]` and ensure `width="100%"`; reduce label density on mobile (hide axis ticks below `sm`).
+9. **Heatmap / Leaflet** — set explicit `aspect-[4/3] md:aspect-[16/9]` to avoid 0-height on mobile.
+10. **Public marketing pages** — hero text scales `text-4xl sm:text-5xl md:text-6xl lg:text-7xl`; hero CTA stacks; nav becomes hamburger sheet on `<lg`; footer columns `grid-cols-2 md:grid-cols-4`.
+11. **Forms** — long `ClientForm`, `NicheFormPage`, settings sections: every field group `grid-cols-1 md:grid-cols-2`; sticky save bar buttons full-width on mobile.
+12. **Sticky bars / footers** — wizard footers stack on mobile (`flex-col-reverse sm:flex-row`).
+13. **Images** — add `loading="lazy"`, `decoding="async"`, intrinsic `width`/`height` (already done in Content Lab).
+14. **Dark mode** — preserve existing tokens; no colour changes.
 
-### Part D — Implementation order
+### Out of scope (will not change)
+- No new features, no copy changes, no design redesign.
+- No DB or auth changes.
+- No edge function changes.
+- Desktop layouts at ≥1280px stay pixel-identical (only adds smaller breakpoints, never removes `md:`/`lg:`).
+- Recharts/Leaflet library swaps — only container sizing tweaks.
 
-1. **Fix thumbnails first** — edge function + `ViralPostCard` (single biggest visual win; unblocks viral feed)
-2. **Run Detail page** — tab scroll + header stack + stats card
-3. **Idea pipeline board** — mobile vertical layout with status select
-4. **List pages** — Ideas / Swipe File / Hooks / Pipeline filter bar selects → full-width mobile
-5. **Niche form** — pass through `NicheFormPage` for any non-mobile-first grids
-6. **Onboard wizard** — pad + footer button stack
-7. **Dialogs** — width caps for mobile (BuyCredits, Share, IdeaDetail Sheet)
-8. **Smoke test** at 360 / 390 / 414 / 768 / 1280
+### Execution plan (phased, in order)
 
-### Part E — What this does NOT change
+**Phase 1 — Foundations (shared layout)**
+- `AppLayout` content padding + max-width audit
+- `AppSidebar` mobile sheet polish
+- `AdminLayout` mobile nav
+- `PublicLayout` + `PublicNavbar` mobile menu, `PublicFooter` columns
 
-- No new features, no copy changes, no design overhaul
-- No DB migrations, no auth changes, no pricing changes
-- Desktop layouts remain identical (only adds `md:` breakpoints, never removes them)
-- Edge function security model stays equivalent (host allow-list + HTTPS), only the unusable `Authorization` gate is removed in favour of the public anon key
+**Phase 2 — App pages**
+- Client area: `Index`, `ClientList`, `ClientDetail` (tabs scroll, header stack), `ClientForm`, all dialogs
+- Client dashboard widgets (KPIs grid, charts, geo map, platform sections)
+- Connections, Reports, Logs
+- Settings page (tabs scroll + every section grid)
+- Onboarding wizard footer + step content padding
+- Client portal
+
+**Phase 3 — Admin**
+- `AdminDashboard`, `AdminUserList`, `AdminOrgList`, `AdminOrgDetail` + sub-components
+- All admin tables → horizontal scroll + mobile card mode
+- `AdminContentLab` + tabs/tables/drawer
+- `AdminSecurity`, `AdminActivityLog`, `DebugConsole`
+- All admin dialogs cap widths
+
+**Phase 4 — Public marketing**
+- `LandingPage`, `HomePage`, `AboutPage`, `FeaturesPage`, `HowItWorksPage`, `IntegrationsPage`, `PricingPage`
+- 4× persona pages (Agencies, Creators, Freelancers, SMBs)
+- 4× reporting pages (PPC, SEO, Social, WhiteLabel)
+- `ContentLabPublicPage`, `NotFound`
+- `LandingHero` (font scale + CTA stack), `WarpedGrid` (mobile rendering)
+
+**Phase 5 — Verification**
+- Smoke-test critical routes at 320 / 375 / 768 / 1024 / 1280 / 1536 widths via browser tools (post-implementation)
+- Verify dark mode at each breakpoint on 5 sample pages
+
+### Risks / things flagged
+- **Admin tables are dense** — switching to a stacked-card mobile view changes IA; truncation may hide columns. Will preserve all data, just reorder.
+- **Recharts** — some chart legends become illegible <360px; will hide legend below `sm` and rely on tooltips.
+- **Leaflet GeoHeatmap** — needs explicit height; tile loading on slow mobile is unchanged.
+- **Public marketing hero animations** (`WarpedGrid`) may need `prefers-reduced-motion` and a simpler fallback on phones for perf.
+- This is a **large pass touching ~80+ files**. I'll work in the phases above and pause after each phase so you can review before proceeding to the next.
 
