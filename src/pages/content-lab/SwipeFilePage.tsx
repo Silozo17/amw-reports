@@ -82,7 +82,7 @@ const SwipeFilePage = () => {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
         <ContentLabHeader
           eyebrow="Content Lab · Swipe File"
           icon={Heart}
@@ -124,7 +124,7 @@ const SwipeFilePage = () => {
         </ContentLabFilterBar>
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[420px]" />)}
           </div>
         ) : filtered.length === 0 ? (
@@ -137,7 +137,7 @@ const SwipeFilePage = () => {
             }
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((e) => e.idea && (
               <IdeaCard
                 key={e.id}

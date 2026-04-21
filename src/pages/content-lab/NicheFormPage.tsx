@@ -327,7 +327,7 @@ const NicheFormPage = () => {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-3xl space-y-6 p-6 md:p-8">
+      <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-8">
         <Button variant="ghost" size="sm" onClick={() => navigate('/content-lab')}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Content Lab
         </Button>

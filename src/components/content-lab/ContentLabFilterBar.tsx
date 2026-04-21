@@ -23,7 +23,7 @@ const ContentLabFilterBar = ({ search, onSearchChange, placeholder = 'Search…'
         className="border-0 bg-muted/30 pl-9 focus-visible:ring-1"
       />
     </div>
-    {children && <div className="flex flex-wrap items-center gap-2 md:shrink-0">{children}</div>}
+    {children && <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center [&_button[role=combobox]]:w-full sm:[&_button[role=combobox]]:w-auto md:shrink-0">{children}</div>}
   </Card>
 );
 

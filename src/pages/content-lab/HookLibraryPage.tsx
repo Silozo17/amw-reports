@@ -151,7 +151,7 @@ const HookLibraryPage = () => {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-[1400px] space-y-6 p-6 md:p-8">
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
         <ContentLabHeader
           eyebrow="Content Lab · Hooks"
           icon={Anchor}
@@ -199,7 +199,7 @@ const HookLibraryPage = () => {
             description="Try a broader niche or platform — the library grows with every run across the platform."
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((h, idx) => {
               const rank = idx + 1;
               const showRank = rank <= RANK_BADGE_LIMIT && sort === 'top';

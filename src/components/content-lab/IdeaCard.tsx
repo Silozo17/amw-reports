@@ -107,8 +107,8 @@ const IdeaCard = ({ idea, variant = 'grid' }: Props) => {
   if (variant === 'stacked') {
     return (
       <>
-        <Card className="grid gap-6 p-6 md:grid-cols-[260px_1fr]">
-          <div>
+        <Card className="grid gap-6 p-4 md:p-6 md:grid-cols-[260px_1fr]">
+          <div className="mx-auto w-full max-w-[260px] md:mx-0">
             <PreviewByPlatform {...previewProps} />
             {idea.target_platform && (
               <p className="mt-2 text-center text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -140,7 +140,7 @@ const IdeaCard = ({ idea, variant = 'grid' }: Props) => {
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Hook variants
                 </p>
-                <div className="grid gap-2 md:grid-cols-3">
+                <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                   {idea.hook_variants.map((v, vi) => (
                     <div
                       key={vi}

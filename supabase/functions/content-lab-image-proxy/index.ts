@@ -43,11 +43,10 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Require authentication so this isn't a free open image proxy.
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return fallback();
-  }
+  // Note: Auth headers cannot be sent from <img> tags, so this proxy is
+  // intentionally publicly callable. Abuse is bounded by the strict hostname
+  // allow-list (Instagram / Facebook / TikTok CDN suffixes only) and the
+  // long Cache-Control header letting Supabase edge cache absorb load.
 
   try {
     const { searchParams } = new URL(req.url);

@@ -92,7 +92,7 @@ const ShareWithClientDialog = ({ open, onOpenChange, runId }: ShareWithClientDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Share with client</DialogTitle>
           <DialogDescription>

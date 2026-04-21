@@ -116,6 +116,9 @@ const ViralPostCard = ({ post }: ViralPostCardProps) => {
             src={thumb}
             alt={post.caption ?? 'Post thumbnail'}
             loading="lazy"
+            decoding="async"
+            width={640}
+            height={640}
             referrerPolicy="no-referrer"
             className="h-full w-full object-cover"
             onError={(e) => {
@@ -202,8 +205,8 @@ const ViralPostCard = ({ post }: ViralPostCardProps) => {
       )}
 
       {/* Footer — explicit anchor (no Slot) + transcript trigger */}
-      <div className="mt-auto flex items-center justify-between gap-2 px-3 py-3">
-        <div className="flex items-center gap-2">
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 px-3 py-3">
+        <div className="flex flex-wrap items-center gap-2">
           {post.post_url ? (
             <a
               href={post.post_url}
@@ -228,7 +231,7 @@ const ViralPostCard = ({ post }: ViralPostCardProps) => {
                   Transcript
                 </button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-[95vw] sm:max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Reel transcript — @{post.author_handle}</DialogTitle>
                 </DialogHeader>
