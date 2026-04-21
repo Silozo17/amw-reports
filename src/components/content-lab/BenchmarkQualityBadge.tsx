@@ -41,7 +41,7 @@ const BenchmarkQualityBadge = ({ quality, verifiedCount }: Props) => {
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="inline-flex">
-          <Badge variant="outline" className={`gap-1.5 font-body text-[11px] ${cfg.className}`}>
+          <Badge variant="outline" className={`gap-1.5 font-body text-[11px] whitespace-nowrap ${cfg.className}`}>
             {cfg.label}
             <span className="opacity-70">· {verifiedCount}</span>
           </Badge>
