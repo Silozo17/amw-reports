@@ -31,7 +31,7 @@ const LandingHero = () => {
         <StarDecoration size={20} color="offwhite" className="absolute bottom-[30%] right-[15%] opacity-20" />
       </div>
 
-      <div className="relative z-10 px-8 xl:px-12 py-12 w-full">
+      <div className="relative z-10 px-4 sm:px-8 xl:px-12 py-8 sm:py-12 w-full">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-center">
           {/* Text content */}
           <div className="animate-fade-up-in">
