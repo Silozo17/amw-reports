@@ -29,7 +29,15 @@ const DELAY_BETWEEN_MONTHS_MS = 1_500;
 const MAX_JOBS_PER_INVOCATION = 20;
 const PARALLEL_BATCH_SIZE = 5;
 const CLAIM_WINDOW_MS = 5_000;
-const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000;
+// Reaped quickly because pg_cron also pokes us every minute.
+const STALE_JOB_THRESHOLD_MS = 3 * 60 * 1000;
+// Per platform-month watchdog — if a single sync invoke hangs longer than this,
+// abort it, mark that month as failed-with-retry, and move on.
+const MONTH_TIMEOUT_MS = 25_000;
+// Total wall-clock budget for one queue invocation. If we approach the edge
+// function's hard limit, hand the job back to `pending` cleanly so the next
+// cron tick or self-continuation resumes it instead of dying mid-loop.
+const INVOCATION_BUDGET_MS = 90_000;
 
 const PLATFORM_MAX_MONTHS: Record<string, number> = {
   pinterest: 3,
@@ -59,9 +67,25 @@ interface SyncJob {
   priority: number;
   force_resync: boolean;
   target_months: Array<{ month: number; year: number }> | null;
+  progress_completed?: number;
 }
 
-async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void> {
+// Race a promise against a timeout — used to bound a single sync invoke so a
+// hung HTTP call cannot block the entire queue.
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return await Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+async function processJob(
+  job: SyncJob,
+  supabase: SupabaseClient,
+  invocationStartedAt: number,
+): Promise<{ handedBack: boolean }> {
   console.log(
     `Processing job ${job.id}: ${job.platform} for connection ${job.connection_id} (force_resync=${job.force_resync ?? false})`
   );
@@ -82,7 +106,7 @@ async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void>
         completed_at: new Date().toISOString(),
       })
       .eq("id", job.id);
-    return;
+    return { handedBack: false };
   }
 
   const fnName = SYNC_FUNCTION_MAP[job.platform];
@@ -95,7 +119,7 @@ async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void>
         completed_at: new Date().toISOString(),
       })
       .eq("id", job.id);
-    return;
+    return { handedBack: false };
   }
 
   // Determine months to sync: use target_months if provided, otherwise calculate from months count
@@ -115,8 +139,8 @@ async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void>
     monthsRange = getMonthsRange(cappedMonths);
   }
 
-  // Filter out existing snapshots ONLY for backfill jobs (priority 0 or large month ranges)
-  // Daily/weekly jobs (1-2 target months) must always re-sync to get updated data
+  // Filter out existing snapshots ONLY for backfill jobs (priority 0 or large month ranges).
+  // This makes resuming a handed-back job cheap — completed months are skipped automatically.
   const isBackfillJob = job.priority === 0 || (!job.target_months && job.months > 2);
   let missingMonths = monthsRange;
 
@@ -151,6 +175,25 @@ async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void>
   let failCount = 0;
 
   for (const { month, year } of missingMonths) {
+    // Budget guard — hand the job back to pending so the next invocation/cron
+    // resumes it. progress_completed stays so the user sees no regression and
+    // backfill skip-list keeps it cheap.
+    if (Date.now() - invocationStartedAt > INVOCATION_BUDGET_MS) {
+      console.log(
+        `Job ${job.id}: invocation budget reached after ${completed}/${totalToSync} months — handing back to pending`
+      );
+      await supabase
+        .from("sync_jobs")
+        .update({
+          status: "pending",
+          started_at: null,
+          progress_completed: completed,
+          error_message: null,
+        })
+        .eq("id", job.id);
+      return { handedBack: true };
+    }
+
     await supabase
       .from("sync_jobs")
       .update({
@@ -161,9 +204,13 @@ async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void>
       .eq("id", job.id);
 
     try {
-      const { data, error } = await supabase.functions.invoke(fnName, {
-        body: { connection_id: job.connection_id, month, year },
-      });
+      const { data, error } = await withTimeout(
+        supabase.functions.invoke(fnName, {
+          body: { connection_id: job.connection_id, month, year },
+        }),
+        MONTH_TIMEOUT_MS,
+        `${job.platform} ${month}/${year}`
+      );
 
       if (error) {
         lastError = error.message;
@@ -177,6 +224,7 @@ async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void>
     } catch (e) {
       lastError = e instanceof Error ? e.message : "Unknown error";
       failCount++;
+      console.error(`Watchdog/error on ${job.platform} ${month}/${year}: ${lastError}`);
     }
 
     completed++;
@@ -208,6 +256,7 @@ async function processJob(job: SyncJob, supabase: SupabaseClient): Promise<void>
   console.log(
     `Job ${job.id} ${finalStatus}: ${completed - failCount} synced, ${failCount} failed out of ${totalToSync}`
   );
+  return { handedBack: false };
 }
 
 Deno.serve(async (req) => {
@@ -223,12 +272,24 @@ Deno.serve(async (req) => {
     })
   );
 
+  const invocationStartedAt = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // Always self-continue at the end if pending jobs remain — even on errors.
+  const triggerContinuation = () => {
+    fetch(`${supabaseUrl}/functions/v1/process-sync-queue`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+    }).catch((err) => console.warn("Self-continuation failed:", err));
+  };
+
   try {
-    // Reset stale processing jobs (stuck > 10 minutes)
+    // Reset stale processing jobs (now 3 min, paired with the 1-min cron).
     const staleThreshold = new Date(Date.now() - STALE_JOB_THRESHOLD_MS).toISOString();
     await supabase
       .from("sync_jobs")
@@ -305,38 +366,46 @@ Deno.serve(async (req) => {
       `Claimed ${ourJobs.length}/${candidateJobs.length} candidate jobs (others taken by concurrent invocation)`
     );
 
-    // Process in parallel batches
+    // Process in parallel batches. If any job hands itself back, we still
+    // continue — the budget guard will trip the rest as needed.
+    let anyHandedBack = false;
     for (let i = 0; i < ourJobs.length; i += PARALLEL_BATCH_SIZE) {
       const batch = ourJobs.slice(i, i + PARALLEL_BATCH_SIZE);
-      await Promise.allSettled(batch.map((job) => processJob(job, supabase)));
+      const results = await Promise.allSettled(
+        batch.map((job) => processJob(job, supabase, invocationStartedAt))
+      );
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value.handedBack) anyHandedBack = true;
+      }
+      // Stop launching new batches if we are over budget — they'd hand back immediately.
+      if (Date.now() - invocationStartedAt > INVOCATION_BUDGET_MS) break;
     }
 
-    // Self-continuation: if there are still pending jobs, trigger another run
+    // Self-continuation: if there are still pending jobs (or we handed any back),
+    // trigger another invocation. The pg_cron schedule is the safety net if this fails.
     const { count } = await supabase
       .from("sync_jobs")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending");
 
-    if (count && count > 0) {
-      console.log(`${count} pending jobs remain — triggering continuation...`);
-      fetch(`${supabaseUrl}/functions/v1/process-sync-queue`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${serviceRoleKey}`,
-          "Content-Type": "application/json",
-        },
-      }).catch((err) => console.warn("Self-continuation failed:", err));
+    if ((count && count > 0) || anyHandedBack) {
+      console.log(`${count ?? 0} pending jobs remain — triggering continuation...`);
+      triggerContinuation();
     }
 
     return new Response(
       JSON.stringify({
         message: `Processed ${ourJobs.length} job(s)`,
         jobs_processed: ourJobs.length,
+        handed_back: anyHandedBack,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("Process sync queue error:", e);
+    // Always try to self-continue even on top-level errors so the queue
+    // doesn't stall just because one invocation crashed.
+    triggerContinuation();
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       {
