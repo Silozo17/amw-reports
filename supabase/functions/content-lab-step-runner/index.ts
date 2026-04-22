@@ -179,19 +179,30 @@ async function chainNext(runId: string, mode: "fresh" | "resume" | "rescrape") {
       await new Promise((r) => setTimeout(r, CHAIN_RETRY_DELAYS_MS[attempt]));
     }
   }
-  // All attempts failed: leave a breadcrumb. Reaper will eventually fail the run.
-  console.error(`[step-runner] chainNext exhausted retries for ${runId}`);
+  // All in-process attempts failed: schedule a deferred re-dispatch via a fresh
+  // background invocation. The stale-run reaper still acts as the ultimate safety net
+  // but the run will keep self-healing instead of dying after one chain hop drop.
+  console.error(`[step-runner] chainNext exhausted in-process retries for ${runId}, deferring`);
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     await admin.from("content_lab_runs").update({
       error_message: "Step chain dropped (network). Auto-recovery will retry shortly.",
       updated_at: new Date().toISOString(),
     }).eq("id", runId);
-    const handle = await logStepStart({ runId, step: "chain", message: "chainNext retries exhausted" });
-    await handle.finish({ status: "failed", errorMessage: "chainNext exhausted retries" });
+    const handle = await logStepStart({ runId, step: "chain", message: "chainNext deferring re-dispatch" });
+    await handle.finish({ status: "ok", message: "chainNext deferred — will be picked up by reaper resume" });
   } catch (e) {
     console.error(`[step-runner] chainNext breadcrumb write failed for ${runId}:`, e);
   }
+  // Fire-and-forget one last detached call. If even this fails, the pipeline reaper
+  // will resume the run on the next pipeline invocation.
+  setTimeout(() => {
+    fetch(`${SUPABASE_URL}/functions/v1/content-lab-step-runner`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: runId, mode }),
+    }).catch(() => {});
+  }, 8000);
 }
 
 async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string; payload?: unknown }> {
