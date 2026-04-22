@@ -36,15 +36,15 @@ const AdminSecurity = () => {
         </div>
 
         <Card className={data?.freeze.active ? 'border-destructive' : undefined}>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="font-display text-lg flex items-center gap-2">
               {data?.freeze.active ? <ShieldAlert className="h-5 w-5 text-destructive" /> : <ShieldCheck className="h-5 w-5 text-primary" />}
               Spend circuit breaker
             </CardTitle>
             {data?.freeze.active ? (
-              <Button variant="outline" onClick={onLift} disabled={toggle.isPending}>Lift freeze</Button>
+              <Button variant="outline" onClick={onLift} disabled={toggle.isPending} className="w-full sm:w-auto">Lift freeze</Button>
             ) : (
-              <Button variant="destructive" onClick={onFreeze} disabled={toggle.isPending}>Force freeze</Button>
+              <Button variant="destructive" onClick={onFreeze} disabled={toggle.isPending} className="w-full sm:w-auto">Force freeze</Button>
             )}
           </CardHeader>
           <CardContent>
@@ -60,7 +60,7 @@ const AdminSecurity = () => {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           {[
             { label: 'Spend (24h)', value: data?.spendToday ?? 0 },
             { label: 'Spend (7d)', value: data?.spendWeek ?? 0 },

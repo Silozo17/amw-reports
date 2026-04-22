@@ -233,7 +233,7 @@ const Reports = () => {
               {STATUS_LABEL[report.status] ?? report.status}
             </Badge>
           </div>
-          <div className="flex items-center gap-1 justify-end">
+          <div className="flex items-center gap-1 justify-end flex-wrap">
             <Button size="icon" variant="ghost" className="h-9 w-9" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} aria-label="Preview report">
               <ExternalLink className="h-4 w-4" />
             </Button>
