@@ -30,13 +30,13 @@ const MAX_BENCHMARK_HANDLES = 6;
 const MAX_TOTAL_POSTS = 80;
 const TOP_BENCHMARK_TO_ANALYSE = 10;
 const TOP_COMPETITOR_TO_ANALYSE = 10;
-// Recency window for competitor + benchmark posts (current + previous month).
-const RECENT_DAYS = 60;
+// Recency window for competitor + benchmark posts (current month only).
+const RECENT_DAYS = 30;
 const RECENT_CUTOFF_MS = RECENT_DAYS * 24 * 60 * 60 * 1000;
 
 const APIFY_CHUNK_SIZE = 5;
-const APIFY_TIMEOUT_SEC = 75;
-const APIFY_RETRY_TIMEOUT_SEC = 120;
+const APIFY_TIMEOUT_SEC = 90;
+const APIFY_RETRY_TIMEOUT_SEC = 150;
 
 interface DiscoveredEntity { handle: string; reason?: string }
 
@@ -173,6 +173,49 @@ Deno.serve(async (req) => {
     // 4) Cap total inserted rows.
     deduped = deduped.slice(0, MAX_TOTAL_POSTS);
 
+    // 4b) Cross-platform benchmark fill: every enabled platform must have benchmark signal.
+    // If a platform has 0 benchmark posts after scraping, copy the top 10 benchmark posts
+    // from any other platform that has them, re-tagging the platform field. Ensures the
+    // ideation step always has reference material to learn from per platform.
+    {
+      const enabled = Array.from(new Set(deduped.map((p) => p.platform)));
+      // Determine which enabled platforms (from the run config) appear at all.
+      // We can only fill platforms that the user enabled, so derive from collected set.
+      const platformsInRun = new Set<"instagram" | "tiktok" | "facebook">();
+      collected.forEach((p) => platformsInRun.add(p.platform));
+      const benchByPlatform = new Map<string, typeof deduped>();
+      deduped.forEach((p) => {
+        if (p.bucket !== "benchmark") return;
+        const arr = benchByPlatform.get(p.platform) ?? [];
+        arr.push(p);
+        benchByPlatform.set(p.platform, arr);
+      });
+      for (const target of platformsInRun) {
+        const targetCount = benchByPlatform.get(target)?.length ?? 0;
+        if (targetCount > 0) continue;
+        // Find the platform with the most benchmark posts to source from.
+        let sourcePlatform: string | null = null;
+        let sourcePosts: typeof deduped = [];
+        for (const [plat, arr] of benchByPlatform.entries()) {
+          if (plat === target) continue;
+          if (arr.length > sourcePosts.length) {
+            sourcePlatform = plat;
+            sourcePosts = arr;
+          }
+        }
+        if (!sourcePlatform || sourcePosts.length === 0) continue;
+        // Sort by engagement signal and take top 10.
+        const top = [...sourcePosts]
+          .sort((a, b) => (b.views - a.views) || (b.likes - a.likes))
+          .slice(0, 10)
+          .map((p) => ({ ...p, platform: target }));
+        deduped.push(...top);
+        console.log(`Cross-platform benchmark fill: copied ${top.length} posts from ${sourcePlatform} to ${target}`);
+      }
+      // Re-cap after fill so we never exceed MAX_TOTAL_POSTS overall.
+      deduped = deduped.slice(0, MAX_TOTAL_POSTS);
+    }
+
     // 4) Build rows with engagement_rate + score, then mark top-N for analysis via summary.
     const rows = deduped.map((p) => {
       const raw = p.views > 0
@@ -234,6 +277,12 @@ Deno.serve(async (req) => {
       benchmark: rows.filter((r) => r.bucket === "benchmark").length,
     };
 
+    const per_platform_counts = {
+      instagram: rows.filter((r) => r.platform === "instagram").length,
+      tiktok: rows.filter((r) => r.platform === "tiktok").length,
+      facebook: rows.filter((r) => r.platform === "facebook").length,
+    };
+
     const { data: existing } = await supabase
       .from("content_lab_runs").select("summary").eq("id", run_id).single();
     const existingSummary = (existing?.summary ?? {}) as Record<string, unknown>;
@@ -247,6 +296,7 @@ Deno.serve(async (req) => {
           scrape_errors: errors.length > 0 ? errors : null,
           scrape_post_count: insertedCount,
           scrape_attempted_count: rows.length,
+          per_platform_counts,
           analyse_top_post_ids: [...topBenchmarkIds, ...topCompetitorIds],
         },
       })
@@ -733,8 +783,9 @@ async function runFacebookScraper(handle: string, resultsLimit: number, timeoutS
   const input = {
     startUrls: [{ url: `https://www.facebook.com/${cleaned}/` }],
     resultsLimit,
+    maxPostDate: new Date(Date.now() - RECENT_CUTOFF_MS).toISOString().slice(0, 10),
   };
-  const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
+  const url = `https://api.apify.com/v2/acts/apify~facebook-posts-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
   try {
     const res = await fetch(url, {
       method: "POST",
