@@ -85,10 +85,10 @@ const Logs = () => {
         </div>
 
         <Tabs defaultValue="sync">
-          <TabsList className="w-full overflow-x-auto flex-nowrap justify-start sm:w-auto sm:justify-center">
-            <TabsTrigger value="sync">Sync Logs</TabsTrigger>
-            <TabsTrigger value="reports">Report Logs</TabsTrigger>
-            <TabsTrigger value="emails">Email Logs</TabsTrigger>
+          <TabsList className="w-full overflow-x-auto flex-nowrap justify-start sm:w-auto sm:justify-center scrollbar-none">
+            <TabsTrigger value="sync" className="whitespace-nowrap">Sync Logs</TabsTrigger>
+            <TabsTrigger value="reports" className="whitespace-nowrap">Report Logs</TabsTrigger>
+            <TabsTrigger value="emails" className="whitespace-nowrap">Email Logs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sync" className="mt-4 space-y-2">
@@ -96,13 +96,13 @@ const Logs = () => {
               syncLogs.length === 0 ? <EmptyState icon={RefreshCw} message="No sync logs yet" /> :
                 syncLogs.map(log => (
                   <Card key={log.id}>
-                    <CardContent className="flex items-center justify-between p-3">
-                      <div>
-                        <p className="text-sm font-body font-medium">{log.clients?.company_name} — {PLATFORM_LABELS[log.platform]}</p>
+                    <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-body font-medium truncate">{log.clients?.company_name} — {PLATFORM_LABELS[log.platform]}</p>
                         <p className="text-xs text-muted-foreground">{new Date(log.started_at).toLocaleString()}</p>
-                        {log.error_message && <p className="text-xs text-destructive mt-1">{log.error_message}</p>}
+                        {log.error_message && <p className="text-xs text-destructive mt-1 break-words">{log.error_message}</p>}
                       </div>
-                      <Badge variant={STATUS_VARIANT[log.status] ?? 'secondary'}>{log.status}</Badge>
+                      <Badge variant={STATUS_VARIANT[log.status] ?? 'secondary'} className="self-start sm:self-auto shrink-0">{log.status}</Badge>
                     </CardContent>
                   </Card>
                 ))
@@ -114,13 +114,13 @@ const Logs = () => {
               reportLogs.length === 0 ? <EmptyState icon={FileText} message="No report logs yet" /> :
                 reportLogs.map(log => (
                   <Card key={log.id}>
-                    <CardContent className="flex items-center justify-between p-3">
-                      <div>
-                        <p className="text-sm font-body font-medium">{log.clients?.company_name}</p>
+                    <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-body font-medium truncate">{log.clients?.company_name}</p>
                         <p className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</p>
-                        {log.error_message && <p className="text-xs text-destructive mt-1">{log.error_message}</p>}
+                        {log.error_message && <p className="text-xs text-destructive mt-1 break-words">{log.error_message}</p>}
                       </div>
-                      <Badge variant={STATUS_VARIANT[log.status] ?? 'secondary'}>{log.status}</Badge>
+                      <Badge variant={STATUS_VARIANT[log.status] ?? 'secondary'} className="self-start sm:self-auto shrink-0">{log.status}</Badge>
                     </CardContent>
                   </Card>
                 ))
@@ -132,13 +132,13 @@ const Logs = () => {
               emailLogs.length === 0 ? <EmptyState icon={Mail} message="No email logs yet" /> :
                 emailLogs.map(log => (
                   <Card key={log.id}>
-                    <CardContent className="flex items-center justify-between p-3">
-                      <div>
-                        <p className="text-sm font-body font-medium">{log.clients?.company_name} → {log.recipient_email}</p>
+                    <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-body font-medium truncate">{log.clients?.company_name} → {log.recipient_email}</p>
                         <p className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</p>
-                        {log.error_message && <p className="text-xs text-destructive mt-1">{log.error_message}</p>}
+                        {log.error_message && <p className="text-xs text-destructive mt-1 break-words">{log.error_message}</p>}
                       </div>
-                      <Badge variant={STATUS_VARIANT[log.status] ?? 'secondary'}>{log.status}</Badge>
+                      <Badge variant={STATUS_VARIANT[log.status] ?? 'secondary'} className="self-start sm:self-auto shrink-0">{log.status}</Badge>
                     </CardContent>
                   </Card>
                 ))
