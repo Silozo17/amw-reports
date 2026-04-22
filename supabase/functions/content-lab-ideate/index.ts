@@ -241,13 +241,17 @@ Deno.serve(async (req) => {
           for (const w of wildcards.ideas) {
             ideaCounter += 1;
             const row = toRow(run_id, ideaCounter, wildcardPlatform, w, benchmarkPosts, benchmarkPosts[0]?.id ?? null);
-            row.is_wildcard = true;
+            (row as IdeaRow & { is_wildcard?: boolean }).is_wildcard = true;
             row.based_on_post_id = null; // wildcards aren't grounded in a specific post
             allRows.push(row);
           }
+          await wildcardLog.finish({ status: "ok", message: `Generated ${wildcards.ideas.length} wildcard ideas`, payload: { count: wildcards.ideas.length } });
+        } else {
+          await wildcardLog.finish({ status: "failed", errorMessage: wildcards.error });
         }
       } catch (e) {
         console.warn("wildcard generation failed (non-fatal):", e);
+        await wildcardLog.finish({ status: "failed", errorMessage: e instanceof Error ? e.message : "unknown" });
       }
     }
 
