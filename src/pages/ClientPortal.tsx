@@ -177,24 +177,24 @@ const ClientPortal = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="border-b bg-card px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {org.logo_url && (
-              <img src={org.logo_url} alt={org.name} className="h-8 w-auto object-contain" />
+              <img src={org.logo_url} alt={org.name} className="h-7 sm:h-8 w-auto object-contain shrink-0" />
             )}
-            <span className="font-display text-lg text-foreground">{org.name}</span>
+            <span className="font-display text-base sm:text-lg text-foreground truncate">{org.name}</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {client.logo_url && (
-              <img src={client.logo_url} alt={client.company_name} className="h-8 w-8 rounded-lg object-contain border bg-muted" />
+              <img src={client.logo_url} alt={client.company_name} className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg object-contain border bg-muted shrink-0" />
             )}
-            <span className="text-sm text-muted-foreground font-body">{client.company_name}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground font-body truncate">{client.company_name}</span>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <ClientDashboard
           clientId={client.id}
           clientName={client.company_name}
@@ -210,7 +210,7 @@ const ClientPortal = () => {
         />
       </main>
 
-      <footer className="border-t bg-card px-6 py-4 mt-8">
+      <footer className="border-t bg-card px-4 sm:px-6 py-4 mt-8">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-xs text-muted-foreground">
             Powered by {org.name}
