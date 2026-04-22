@@ -149,7 +149,28 @@ Deno.serve(async (req) => {
     // 2) Cross-platform dedupe: same caption fingerprint within the same posted-week.
     deduped = crossPlatformDedupe(deduped);
 
-    // 3) Cap total inserted rows.
+    // 3) Renderable-row filter: drop posts that have no usable display signal.
+    // A post is renderable if it has at least one strong signal (post_url OR thumbnail OR caption ≥10 chars)
+    // AND a non-placeholder author handle. Top-bucket benchmarks with strong engagement are kept even if one field missing.
+    deduped = deduped.filter((p) => {
+      const handle = (p.author_handle ?? "").trim().toLowerCase();
+      if (!handle || handle === "unknown" || handle === "n/a" || handle === "anonymous") {
+        // Allow only if there's still strong engagement signal (saves rare anonymous viral posts).
+        if ((p.views ?? 0) < 1000 && (p.likes ?? 0) < 100) return false;
+      }
+      const captionLen = (p.caption ?? "").trim().length;
+      const hasUrl = !!p.post_url;
+      const hasThumb = !!p.thumbnail_url;
+      const hasCaption = captionLen >= 10;
+      const hasEngagement = (p.views ?? 0) > 0 || (p.likes ?? 0) > 0 || (p.comments ?? 0) > 0;
+      // Need at least one display field + some engagement, OR two display fields.
+      const displayFieldCount = (hasUrl ? 1 : 0) + (hasThumb ? 1 : 0) + (hasCaption ? 1 : 0);
+      if (displayFieldCount === 0) return false;
+      if (displayFieldCount === 1 && !hasEngagement) return false;
+      return true;
+    });
+
+    // 4) Cap total inserted rows.
     deduped = deduped.slice(0, MAX_TOTAL_POSTS);
 
     // 4) Build rows with engagement_rate + score, then mark top-N for analysis via summary.
