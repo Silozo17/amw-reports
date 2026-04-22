@@ -396,24 +396,54 @@ async function runOneIdeatePlatformStep(
   const ideatedDone = new Set<string>(
     Array.isArray(summary.ideated_platforms) ? (summary.ideated_platforms as string[]) : [],
   );
+  const attemptCounts = (summary.ideate_attempts as Record<string, number> | undefined) ?? {};
   const next = platforms.find((p) => !ideatedDone.has(p));
 
   if (!next) {
-    // All platforms processed → finalise.
-    return finaliseRun(admin, runId);
+    // All platforms processed → finalise (strict completion check inside).
+    return finaliseRun(admin, runId, platforms);
   }
 
+  const attemptNo = (attemptCounts[next] ?? 0) + 1;
   const step = await logStepStart({
     runId,
     step: "ideate",
-    message: `Calling content-lab-ideate (${next})`,
-    payload: { platform: next },
+    message: `Calling content-lab-ideate (${next}, attempt ${attemptNo}/${MAX_PLATFORM_IDEATE_ATTEMPTS})`,
+    payload: { platform: next, attempt: attemptNo },
   });
   const res = await callFn("content-lab-ideate", { run_id: runId, platform: next });
-  if (!res.ok) {
-    await step.finish({ status: "failed", errorMessage: res.error ?? "unknown", payload: { platform: next } });
-    console.error(`[step-runner] ideate ${next} failed for ${runId}:`, res.error);
-    // Mark this platform as attempted (so we don't infinite-loop) but continue chain.
+  const newAttemptCounts = { ...attemptCounts, [next]: attemptNo };
+
+  if (res.ok) {
+    await step.finish({ status: "ok", message: `Ideate complete for ${next}`, payload: { platform: next } });
+    ideatedDone.add(next);
+    await admin.from("content_lab_runs").update({
+      summary: { ...summary, ideated_platforms: [...ideatedDone], ideate_attempts: newAttemptCounts },
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+  } else if (attemptNo < MAX_PLATFORM_IDEATE_ATTEMPTS) {
+    // Bounded internal retry — keep platform unmarked, just record the attempt and re-loop.
+    await step.finish({
+      status: "failed",
+      message: `Will retry ${next} (attempt ${attemptNo}/${MAX_PLATFORM_IDEATE_ATTEMPTS})`,
+      errorMessage: res.error ?? "unknown",
+      payload: { platform: next, attempt: attemptNo },
+    });
+    console.warn(`[step-runner] ideate ${next} attempt ${attemptNo} failed for ${runId}, will retry:`, res.error);
+    await admin.from("content_lab_runs").update({
+      summary: { ...summary, ideate_attempts: newAttemptCounts },
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+    // Brief backoff before re-dispatching
+    await new Promise((r) => setTimeout(r, 1500 * attemptNo));
+  } else {
+    // Bounded retries exhausted → record permanent failure for this platform and continue
+    await step.finish({
+      status: "failed",
+      errorMessage: `${res.error ?? "unknown"} (after ${attemptNo} attempts)`,
+      payload: { platform: next, attempt: attemptNo, exhausted: true },
+    });
+    console.error(`[step-runner] ideate ${next} exhausted ${attemptNo} attempts for ${runId}:`, res.error);
     ideatedDone.add(next);
     const failed = Array.isArray(summary.failed_ideate_platforms)
       ? new Set(summary.failed_ideate_platforms as string[]) : new Set<string>();
@@ -423,14 +453,8 @@ async function runOneIdeatePlatformStep(
         ...summary,
         ideated_platforms: [...ideatedDone],
         failed_ideate_platforms: [...failed],
+        ideate_attempts: newAttemptCounts,
       },
-      updated_at: new Date().toISOString(),
-    }).eq("id", runId);
-  } else {
-    await step.finish({ status: "ok", message: `Ideate complete for ${next}`, payload: { platform: next } });
-    ideatedDone.add(next);
-    await admin.from("content_lab_runs").update({
-      summary: { ...summary, ideated_platforms: [...ideatedDone] },
       updated_at: new Date().toISOString(),
     }).eq("id", runId);
   }
@@ -438,7 +462,7 @@ async function runOneIdeatePlatformStep(
   await chainNext(runId, "fresh");
 }
 
-async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string) {
+async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string, expectedPlatforms: string[]) {
   const { data: ideas } = await admin
     .from("content_lab_ideas")
     .select("target_platform, is_wildcard")
@@ -447,6 +471,22 @@ async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string
   const ideaCount = ideas?.length ?? 0;
   if (!ideaCount) {
     await failRun(admin, runId, "Ideation produced no ideas — see step logs for per-platform errors.");
+    return;
+  }
+
+  // STRICT COMPLETION: verify every expected platform has at least one idea.
+  const platformsWithIdeas = new Set(
+    ((ideas ?? []) as Array<{ target_platform: string | null }>)
+      .map((i) => i.target_platform)
+      .filter(Boolean) as string[],
+  );
+  const missingPlatforms = expectedPlatforms.filter((p) => !platformsWithIdeas.has(p));
+  if (missingPlatforms.length > 0) {
+    await failRun(
+      admin,
+      runId,
+      `Run incomplete — no ideas generated for: ${missingPlatforms.join(", ")}. Use Retry ideation to recover.`,
+    );
     return;
   }
 
