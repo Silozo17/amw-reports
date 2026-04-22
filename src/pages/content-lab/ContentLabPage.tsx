@@ -98,7 +98,7 @@ const ContentLabPage = () => {
   const handleRunNow = (nicheId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (blocked) {
-      toast.error(`Monthly limit reached (${usage?.runsThisMonth}/${usage?.runsLimit}) and no credits left. Top up to keep running.`);
+      toast.error('No credits left. Top up to keep running.');
       return;
     }
     setPendingNicheId(nicheId);
@@ -119,7 +119,7 @@ const ContentLabPage = () => {
                   variant={blocked ? 'destructive' : monthlyExhausted ? 'secondary' : 'outline'}
                   className="font-body text-xs"
                 >
-                  {usage.runsThisMonth} / {usage.runsLimit} runs · {usage.creditBalance} credits
+                  {usage.creditBalance.toLocaleString()} credits · {usage.runsThisMonth} runs this month
                 </Badge>
               )}
               <Button variant="outline" size="lg" onClick={() => setCreditsDialogOpen(true)}>
@@ -179,8 +179,10 @@ const ContentLabPage = () => {
                   </p>
                   {usage && (
                     <p className="text-xs text-muted-foreground">
-                      Uses 1 of {usage.runsLimit} monthly runs ({usage.runsThisMonth} used so far).
-                      {monthlyExhausted && ` Will spend 1 credit instead — ${usage.creditBalance} available.`}
+                      {usage.runsLimit >= Number.MAX_SAFE_INTEGER
+                        ? `Unlimited monthly runs (${usage.runsThisMonth} used so far this month).`
+                        : `Uses 1 of ${usage.runsLimit} monthly runs (${usage.runsThisMonth} used so far).`}
+                      {monthlyExhausted && ` Will spend 1 credit instead — ${usage.creditBalance.toLocaleString()} available.`}
                     </p>
                   )}
                 </div>
