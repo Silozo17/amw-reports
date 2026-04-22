@@ -119,7 +119,7 @@ const ContentLabPage = () => {
                   variant={blocked ? 'destructive' : monthlyExhausted ? 'secondary' : 'outline'}
                   className="font-body text-xs"
                 >
-                  {usage.runsThisMonth} / {usage.runsLimit} runs · {usage.creditBalance} credits
+                  {usage.creditBalance.toLocaleString()} credits · {usage.runsThisMonth} runs this month
                 </Badge>
               )}
               <Button variant="outline" size="lg" onClick={() => setCreditsDialogOpen(true)}>
