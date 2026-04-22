@@ -115,6 +115,7 @@ export const RUN_LIMITS_BY_TIER: Record<string, number> = {
   starter: CONTENT_LAB_TIERS.starter.runsPerMonth,
   growth: CONTENT_LAB_TIERS.growth.runsPerMonth,
   scale: CONTENT_LAB_TIERS.scale.runsPerMonth,
+  agency: Number.MAX_SAFE_INTEGER,
 };
 
 export const DEFAULT_RUN_LIMIT = 0;
