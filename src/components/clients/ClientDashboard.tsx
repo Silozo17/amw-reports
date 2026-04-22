@@ -192,7 +192,7 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
   return (
     <div className="space-y-8">
       {/* Header Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
         <DashboardHeader
           selectedPlatform={selectedPlatform}
           onPlatformChange={setSelectedPlatform}
@@ -200,9 +200,9 @@ const ClientDashboard = ({ clientId, clientName, currencyCode = "GBP", portalTok
           onPeriodChange={setSelectedPeriod}
           availablePlatforms={availablePlatforms}
         />
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           {!isPortal && lastSyncedAt && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground w-full sm:w-auto">
               <Clock className="h-3.5 w-3.5" />
               <span>Synced {formatDistanceToNow(lastSyncedAt, { addSuffix: true })}</span>
             </div>

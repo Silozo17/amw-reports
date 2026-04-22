@@ -185,11 +185,11 @@ const DashboardHeader = ({
   return (
     <div className="space-y-4">
       {/* Platform Multi-Select Dropdown + Time Range Controls on same row */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3">
         {/* Platform Multi-Select Dropdown */}
         <Popover open={platformDropdownOpen} onOpenChange={setPlatformDropdownOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 min-w-0 sm:min-w-[180px] justify-between">
+            <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto sm:min-w-[180px] justify-between">
               <div className="flex items-center gap-1.5">
                 {isAll ? (
                   <>
