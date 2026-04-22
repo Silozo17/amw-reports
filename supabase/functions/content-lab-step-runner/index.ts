@@ -29,6 +29,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const CHAIN_RETRY_DELAYS_MS = [250, 1000, 4000];
+const MAX_PLATFORM_IDEATE_ATTEMPTS = 3;
+const MAX_ANALYSE_ATTEMPTS = 2;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
