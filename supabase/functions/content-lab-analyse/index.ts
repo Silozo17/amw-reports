@@ -180,6 +180,7 @@ async function analyseFast(apiKey: string, caption: string): Promise<FastResult 
       },
       body: JSON.stringify({
         model: FAST_MODEL,
+        max_tokens: 400,
         messages: [
           {
             role: "system",
@@ -233,6 +234,7 @@ async function analyseDeep(apiKey: string, p: PostRow): Promise<DeepResult | nul
       },
       body: JSON.stringify({
         model: PRO_MODEL,
+        max_tokens: 1200,
         messages: [
           {
             role: "system",
