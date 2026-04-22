@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [clientUserInfo, setClientUserInfo] = useState<ClientUserInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isScopeReady, setIsScopeReady] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data: profileData } = await supabase
