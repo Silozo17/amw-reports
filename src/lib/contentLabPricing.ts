@@ -111,11 +111,11 @@ export const CONTENT_LAB_STARTING_PRICE_LABEL = `From £${CONTENT_LAB_TIERS.star
 
 // Tier slug → monthly run quota. Derived from CONTENT_LAB_TIERS so the pricing
 // table and the run-limit gate cannot drift. "100% paid" model: no tier = 0 runs.
+// Only Starter, Growth, and Scale exist — there is no "agency" Content Lab tier.
 export const RUN_LIMITS_BY_TIER: Record<string, number> = {
   starter: CONTENT_LAB_TIERS.starter.runsPerMonth,
   growth: CONTENT_LAB_TIERS.growth.runsPerMonth,
   scale: CONTENT_LAB_TIERS.scale.runsPerMonth,
-  agency: Number.MAX_SAFE_INTEGER,
 };
 
 export const DEFAULT_RUN_LIMIT = 0;
