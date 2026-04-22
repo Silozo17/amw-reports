@@ -314,14 +314,27 @@ async function runScrapeStep(
     return;
   }
 
-  // Charge usage now that scrape produced data.
+  // Charge usage now that scrape produced data. Idempotent per run via summary.usage_consumed
+  // so a resume / rescrape / retry never double-charges.
   if (orgId) {
-    const limit = await getMonthlyLimit(admin, orgId);
-    const used = await getCurrentUsage(admin, orgId);
-    if (used < limit) {
-      await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
-    } else {
-      await admin.rpc("consume_content_lab_credit", { _org_id: orgId, _run_id: runId, _amount: 1 });
+    const { data: runRowForCharge } = await admin
+      .from("content_lab_runs").select("summary").eq("id", runId).maybeSingle();
+    const summaryNow = ((runRowForCharge as { summary?: Record<string, unknown> } | null)?.summary ?? {}) as Record<string, unknown>;
+    if (!summaryNow.usage_consumed) {
+      const limit = await getMonthlyLimit(admin, orgId);
+      const used = await getCurrentUsage(admin, orgId);
+      let consumedVia: "monthly" | "credit" | "none" = "none";
+      if (used < limit) {
+        await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
+        consumedVia = "monthly";
+      } else {
+        const { data: ok } = await admin.rpc("consume_content_lab_credit", { _org_id: orgId, _run_id: runId, _amount: 1 });
+        consumedVia = ok ? "credit" : "none";
+      }
+      await admin.from("content_lab_runs").update({
+        summary: { ...summaryNow, usage_consumed: true, usage_consumed_via: consumedVia, usage_consumed_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }).eq("id", runId);
     }
   }
 
