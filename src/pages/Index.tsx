@@ -223,7 +223,7 @@ const Dashboard = () => {
         </div>
 
         {/* Status Cards — Actionable */}
-        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card
             className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-primary"
             onClick={() => navigate('/clients')}
