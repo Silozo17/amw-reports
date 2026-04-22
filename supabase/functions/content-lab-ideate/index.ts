@@ -222,6 +222,12 @@ Deno.serve(async (req) => {
     // Only added on the final platform pass (or single-platform mode) to avoid duplication.
     const isFinalPass = !singlePlatform || platformsToProcess.includes(allPlatforms[allPlatforms.length - 1]);
     if (isFinalPass) {
+      const wildcardLog = await logStepStart({
+        runId: run_id,
+        step: "wildcards",
+        message: `Generate ${WILDCARD_COUNT} wildcard ideas`,
+        payload: { count: WILDCARD_COUNT },
+      });
       try {
         const wildcardPlatform = (allPlatforms[0] ?? "instagram");
         const wildcards = await generateWildcards({
