@@ -8,7 +8,7 @@ export const ANALYTICS_KEY_METRICS = ['sessions', 'active_users', 'new_users', '
 export const GSC_KEY_METRICS = ['search_clicks', 'search_impressions', 'search_ctr', 'search_position'];
 export const GBP_KEY_METRICS = ['gbp_views', 'gbp_searches', 'gbp_calls', 'gbp_direction_requests', 'gbp_website_clicks', 'gbp_reviews_count', 'gbp_average_rating', 'gbp_new_reviews', 'gbp_conversations', 'gbp_bookings', 'gbp_maps_desktop', 'gbp_maps_mobile', 'gbp_search_desktop', 'gbp_search_mobile'];
 export const YOUTUBE_KEY_METRICS = ['views', 'video_views', 'watch_time', 'subscribers', 'likes', 'comments', 'avg_view_duration'];
-export const THREADS_KEY_METRICS = ['total_followers', 'follower_growth', 'views', 'likes', 'comments', 'shares', 'quotes', 'engagement', 'engagement_rate', 'clicks', 'posts_published'];
+export const THREADS_KEY_METRICS = ['total_followers', 'follower_growth', 'profile_views', 'views', 'likes', 'comments', 'reposts', 'shares', 'quotes', 'clicks', 'engagement', 'engagement_rate', 'posts_published'];
 
 export const PLATFORM_KEY_METRICS: Record<string, string[]> = {
   google_ads: AD_PLATFORM_KEY_METRICS,
