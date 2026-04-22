@@ -122,7 +122,7 @@ const HowItWorksPage = () => {
           <p className="text-amw-offwhite/60 font-body text-center max-w-xl mx-auto mb-8">
             Every PDF report includes a branded cover page, platform-by-platform sections with charts and key metrics, month-over-month comparisons, and a summary of performance highlights. All formatted with your agency logo, colours, and fonts.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {['Branded Cover Page', 'Platform Sections', 'Charts & Graphs', 'Key Metrics', 'MoM Comparisons', 'Top Content', 'Performance Summary', 'Your Brand Throughout'].map(item => (
               <div key={item} className="p-4 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/40 text-center hover:border-primary/50 transition-colors">
                 <p className="text-xs font-body text-amw-offwhite/70">{item}</p>

@@ -112,12 +112,12 @@ const AdminOrgList = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-display">Organisations</h1>
-            <p className="text-muted-foreground font-body mt-1">Manage all platform organisations</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-display">Organisations</h1>
+            <p className="text-muted-foreground font-body mt-1 text-sm">Manage all platform organisations</p>
           </div>
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
+          <Button onClick={() => setShowCreate(true)} className="gap-2 w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Create Organisation
           </Button>

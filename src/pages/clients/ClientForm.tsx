@@ -178,13 +178,13 @@ const ClientForm = () => {
   return (
     <AppLayout>
       <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/clients')} className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-display">New Client</h1>
-            <p className="text-muted-foreground font-body mt-1">Add a new client to the platform</p>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-display">New Client</h1>
+            <p className="text-muted-foreground font-body mt-1 text-sm">Add a new client to the platform</p>
           </div>
         </div>
 
@@ -193,9 +193,9 @@ const ClientForm = () => {
           <Card>
             <CardHeader><CardTitle className="font-display text-lg">Client Logo</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 {logoPreview ? (
-                  <div className="relative h-20 w-20 rounded-lg border overflow-hidden bg-muted">
+                  <div className="relative h-20 w-20 rounded-lg border overflow-hidden bg-muted shrink-0">
                     <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain" />
                     <button
                       type="button"
@@ -209,12 +209,12 @@ const ClientForm = () => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex h-20 w-20 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors"
+                    className="flex h-20 w-20 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors shrink-0"
                   >
                     <Upload className="h-6 w-6 text-muted-foreground" />
                   </button>
                 )}
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">Upload a logo</p>
                   <p className="text-xs text-muted-foreground">PNG, JPG or WEBP, max 5MB. Displayed on reports.</p>
                   {!logoPreview && (
@@ -434,12 +434,12 @@ const ClientForm = () => {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3">
-            <Button type="submit" disabled={isSubmitting || isOrgLoading}>
-              {isOrgLoading ? 'Loading...' : isSubmitting ? 'Creating...' : 'Create Client'}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => navigate('/clients')}>
+          <div className="flex flex-col-reverse sm:flex-row gap-3">
+            <Button type="button" variant="outline" onClick={() => navigate('/clients')} className="w-full sm:w-auto">
               Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting || isOrgLoading} className="w-full sm:w-auto">
+              {isOrgLoading ? 'Loading...' : isSubmitting ? 'Creating...' : 'Create Client'}
             </Button>
           </div>
         </form>

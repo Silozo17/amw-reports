@@ -233,7 +233,7 @@ const Reports = () => {
               {STATUS_LABEL[report.status] ?? report.status}
             </Badge>
           </div>
-          <div className="flex items-center gap-1 justify-end">
+          <div className="flex items-center gap-1 justify-end flex-wrap">
             <Button size="icon" variant="ghost" className="h-9 w-9" disabled={!report.pdf_storage_path || isActive} onClick={() => handlePreview(report)} aria-label="Preview report">
               <ExternalLink className="h-4 w-4" />
             </Button>
@@ -268,9 +268,9 @@ const Reports = () => {
         <Card>
           <CardContent className="p-4 space-y-3">
             <span className="text-sm font-medium text-muted-foreground">Generate Report</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
               <Select value={selectedClient} onValueChange={setSelectedClient}>
-                <SelectTrigger className="col-span-2 sm:col-span-1">
+                <SelectTrigger className="sm:col-span-2 lg:col-span-1">
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent>

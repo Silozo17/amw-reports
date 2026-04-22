@@ -164,10 +164,10 @@ const DebugConsole = () => {
 
         {selectedClientId && (
           <Tabs defaultValue="connections" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="connections">Connections ({connections.length})</TabsTrigger>
-              <TabsTrigger value="sync-logs">Sync Logs ({syncLogs.length})</TabsTrigger>
-              <TabsTrigger value="snapshots">Snapshots ({snapshots.length})</TabsTrigger>
+            <TabsList className="w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
+              <TabsTrigger value="connections" className="whitespace-nowrap">Connections ({connections.length})</TabsTrigger>
+              <TabsTrigger value="sync-logs" className="whitespace-nowrap">Sync Logs ({syncLogs.length})</TabsTrigger>
+              <TabsTrigger value="snapshots" className="whitespace-nowrap">Snapshots ({snapshots.length})</TabsTrigger>
             </TabsList>
 
             {/* CONNECTIONS TAB */}
