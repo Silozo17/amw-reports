@@ -43,12 +43,12 @@ const AdminContentLab = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="analytics">
-              <TabsList>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
-                <TabsTrigger value="health">Health</TabsTrigger>
-                <TabsTrigger value="runs">Runs ({runs.length})</TabsTrigger>
-                <TabsTrigger value="logs">Step Logs</TabsTrigger>
-                <TabsTrigger value="niches">Niches ({niches.length})</TabsTrigger>
+              <TabsList className="w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
+                <TabsTrigger value="analytics" className="whitespace-nowrap">Analytics</TabsTrigger>
+                <TabsTrigger value="health" className="whitespace-nowrap">Health</TabsTrigger>
+                <TabsTrigger value="runs" className="whitespace-nowrap">Runs ({runs.length})</TabsTrigger>
+                <TabsTrigger value="logs" className="whitespace-nowrap">Step Logs</TabsTrigger>
+                <TabsTrigger value="niches" className="whitespace-nowrap">Niches ({niches.length})</TabsTrigger>
               </TabsList>
               <TabsContent value="analytics" className="mt-4">
                 <ContentLabAnalyticsTab />

@@ -99,10 +99,10 @@ const AdminUserList = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-display">Users</h1>
-            <p className="text-muted-foreground font-body mt-1">Manage all platform users ({users.length} total)</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-display">Users</h1>
+            <p className="text-muted-foreground font-body mt-1 text-sm">Manage all platform users ({users.length} total)</p>
           </div>
         </div>
 
@@ -111,7 +111,7 @@ const AdminUserList = () => {
           <Input placeholder="Search by name, email, or org..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <Card><CardContent className="pt-6 flex items-center gap-3"><Users className="h-5 w-5 text-muted-foreground" /><div><p className="text-2xl font-display">{users.length}</p><p className="text-xs text-muted-foreground">Total Users</p></div></CardContent></Card>
           <Card><CardContent className="pt-6 flex items-center gap-3"><CheckCircle className="h-5 w-5 text-accent" /><div><p className="text-2xl font-display">{users.filter((u) => u.is_active).length}</p><p className="text-xs text-muted-foreground">Active</p></div></CardContent></Card>
           <Card><CardContent className="pt-6 flex items-center gap-3"><Ban className="h-5 w-5 text-destructive" /><div><p className="text-2xl font-display">{users.filter((u) => !u.is_active).length}</p><p className="text-xs text-muted-foreground">Orphaned / Inactive</p></div></CardContent></Card>

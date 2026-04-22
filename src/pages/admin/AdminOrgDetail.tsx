@@ -138,7 +138,7 @@ const AdminOrgDetail = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl space-y-6">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/admin/organisations')}>
@@ -193,11 +193,11 @@ const AdminOrgDetail = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="subscription">
-          <TabsList>
-            <TabsTrigger value="subscription">Subscription</TabsTrigger>
-            <TabsTrigger value="clients">Clients ({clients.length})</TabsTrigger>
-            <TabsTrigger value="members">Members ({members.length})</TabsTrigger>
-            <TabsTrigger value="onboarding">Onboarding Data</TabsTrigger>
+          <TabsList className="w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
+            <TabsTrigger value="subscription" className="whitespace-nowrap">Subscription</TabsTrigger>
+            <TabsTrigger value="clients" className="whitespace-nowrap">Clients ({clients.length})</TabsTrigger>
+            <TabsTrigger value="members" className="whitespace-nowrap">Members ({members.length})</TabsTrigger>
+            <TabsTrigger value="onboarding" className="whitespace-nowrap">Onboarding Data</TabsTrigger>
           </TabsList>
 
           <TabsContent value="subscription">
