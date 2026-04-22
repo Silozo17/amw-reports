@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import usePageMeta from '@/hooks/usePageMeta';
-import ViralPostCard from '@/components/content-lab/ViralPostCard';
+import ViralPostCard, { isRenderablePost } from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
