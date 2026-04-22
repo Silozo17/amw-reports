@@ -236,34 +236,35 @@ const ClientPortalAuth = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="border-b bg-card px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {org?.logo_url && (
-              <img src={org.logo_url} alt={org.name} className="h-8 w-auto object-contain" />
+              <img src={org.logo_url} alt={org.name} className="h-7 sm:h-8 w-auto object-contain shrink-0" />
             )}
-            <span className="font-display text-lg text-foreground">{org?.name}</span>
+            <span className="font-display text-base sm:text-lg text-foreground truncate">{org?.name}</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               {client.logo_url && (
-                <img src={client.logo_url} alt={client.company_name} className="h-8 w-8 rounded-lg object-contain border bg-muted" />
+                <img src={client.logo_url} alt={client.company_name} className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg object-contain border bg-muted shrink-0" />
               )}
-              <span className="text-sm text-muted-foreground font-body">{client.company_name}</span>
+              <span className="text-xs sm:text-sm text-muted-foreground font-body truncate hidden sm:inline">{client.company_name}</span>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-1" /> Sign Out
+              <LogOut className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Tab navigation */}
-      <div className="max-w-7xl mx-auto px-6 pt-4">
-        <div className="flex gap-1 border-b">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+        <div className="flex gap-1 border-b overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'dashboard'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -273,7 +274,7 @@ const ClientPortalAuth = () => {
           </button>
           <button
             onClick={() => setActiveTab('connections')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'connections'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -285,7 +286,7 @@ const ClientPortalAuth = () => {
       </div>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-6 py-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {activeTab === 'dashboard' && (
           <ClientDashboard
             clientId={client.id}
@@ -374,7 +375,7 @@ const ClientPortalAuth = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-card px-6 py-4 mt-8">
+      <footer className="border-t bg-card px-4 sm:px-6 py-4 mt-8">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-xs text-muted-foreground">
             Powered by {org?.name}
