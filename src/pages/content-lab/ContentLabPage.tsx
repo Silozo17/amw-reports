@@ -98,7 +98,7 @@ const ContentLabPage = () => {
   const handleRunNow = (nicheId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (blocked) {
-      toast.error(`Monthly limit reached (${usage?.runsThisMonth}/${usage?.runsLimit}) and no credits left. Top up to keep running.`);
+      toast.error('No credits left. Top up to keep running.');
       return;
     }
     setPendingNicheId(nicheId);
