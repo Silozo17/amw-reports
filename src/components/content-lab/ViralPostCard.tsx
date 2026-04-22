@@ -72,7 +72,15 @@ const isHookDistinct = (hook: string | null, caption: string | null): boolean =>
   return !c.startsWith(h);
 };
 
-const isRenderablePost = (post: ViralPostCardProps['post']): boolean => {
+export const isRenderablePost = (post: {
+  author_handle?: string | null;
+  caption?: string | null;
+  post_url?: string | null;
+  thumbnail_url?: string | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+}): boolean => {
   const handle = (post.author_handle ?? '').trim();
   if (!handle) return false;
   const captionLen = (post.caption ?? '').trim().length;
