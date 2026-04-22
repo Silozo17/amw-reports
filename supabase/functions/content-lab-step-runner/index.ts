@@ -344,17 +344,38 @@ async function runScrapeStep(
 
 async function runAnalyseStep(admin: ReturnType<typeof createClient>, runId: string) {
   const step = await logStepStart({ runId, step: "analyse", message: "Calling content-lab-analyse" });
-  const res = await callFn("content-lab-analyse", { run_id: runId });
-  if (!res.ok) {
-    // Best-effort: don't fail the whole pipeline on analyse failure.
-    await step.finish({
-      status: "failed",
-      message: "Non-fatal — pipeline continued",
-      errorMessage: res.error ?? "unknown",
-    });
-  } else {
-    await step.finish({ status: "ok", message: "Analyse complete" });
+  let lastErr: string | null = null;
+  for (let attempt = 1; attempt <= MAX_ANALYSE_ATTEMPTS; attempt++) {
+    const res = await callFn("content-lab-analyse", { run_id: runId });
+    if (res.ok) {
+      await step.finish({ status: "ok", message: `Analyse complete (attempt ${attempt})` });
+      await setStatus(admin, runId, "ideating");
+      await chainNext(runId, "fresh");
+      return;
+    }
+    lastErr = res.error ?? "unknown";
+    console.warn(`[step-runner] analyse attempt ${attempt}/${MAX_ANALYSE_ATTEMPTS} failed for ${runId}:`, lastErr);
+    if (attempt < MAX_ANALYSE_ATTEMPTS) await new Promise((r) => setTimeout(r, 2000 * attempt));
   }
+  // All retries failed → write deterministic fallback so ideate has structured input
+  // instead of silently degraded output.
+  const { data: runRow } = await admin
+    .from("content_lab_runs").select("summary").eq("id", runId).maybeSingle();
+  const sNow = ((runRow as { summary?: Record<string, unknown> } | null)?.summary ?? {}) as Record<string, unknown>;
+  await admin.from("content_lab_runs").update({
+    summary: {
+      ...sNow,
+      analyse_fallback: true,
+      analyse_fallback_reason: lastErr,
+      deep_analysis: sNow.deep_analysis ?? {},
+    },
+    updated_at: new Date().toISOString(),
+  }).eq("id", runId);
+  await step.finish({
+    status: "failed",
+    message: "Analyse retries exhausted — using deterministic fallback so pipeline can continue",
+    errorMessage: lastErr ?? "unknown",
+  });
   await setStatus(admin, runId, "ideating");
   await chainNext(runId, "fresh");
 }
