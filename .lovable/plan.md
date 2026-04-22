@@ -1,35 +1,42 @@
 
 
-## Fix the broken Content Lab usage badge
+## Cap AMW Media's agency tier at 10 runs/month, then spend credits
 
-Today the header badge renders `usage.runsThisMonth / usage.runsLimit runs · creditBalance credits`. For the AMW Media org (tier `agency`), `runLimitForTier('agency')` returns `Number.MAX_SAFE_INTEGER` (`9007199254740991`), which is printed verbatim. The credit balance (`1000000`) is also printed as a raw integer with no formatting.
+### What you have today
+- AMW Media is **already on the highest tier** (`agency`) — no upgrade needed.
+- `agency` is currently set to **unlimited** (`Number.MAX_SAFE_INTEGER`), which is why the badge showed `5 / 9007199254740991 runs`.
+- Step-runner already prefers monthly quota first and falls back to credits — but the pipeline gate currently **blocks** any run once the monthly cap is hit instead of letting credits cover it.
 
-You asked for: only show available credits, and optionally how many runs were done this month. No more "X / Y runs" display.
+### What you want
+- Agency tier gets **10 monthly runs**.
+- Badge shows `5 / 10 runs this month · {credits} credits`.
+- Once monthly runs are used up, **credits start being spent** (one credit per run) until they're gone.
+- When both monthly runs and credits are gone, the next run is blocked with a top-up prompt.
 
-### Change scope (1 file)
+### Changes (3 files, no schema changes)
 
-`src/pages/content-lab/ContentLabPage.tsx`
+**1. `src/lib/contentLabPricing.ts`** — set the agency cap
+- Change `RUN_LIMITS_BY_TIER.agency` from `Number.MAX_SAFE_INTEGER` to `10`.
 
-1. **Replace the badge label (line 122)** with a clean, agency-aware string:
-   - Always show: `"{creditBalance.toLocaleString()} credits"` (formats `1000000` → `1,000,000`).
-   - Append `" · {runsThisMonth} runs this month"` so you still see usage at a glance.
-   - No more "X / Y runs". The denominator is gone entirely.
+**2. `supabase/functions/_shared/contentLabTiers.ts`** — keep the edge mirror in sync
+- Change `RUN_LIMITS_BY_TIER.agency` from `Number.MAX_SAFE_INTEGER` to `10`.
 
-2. **Fix the dialog hint copy (lines 180–184)** so it doesn't print the unlimited sentinel either:
-   - Agency tier: `"Unlimited monthly runs ({runsThisMonth} used so far this month)."`
-   - Other tiers: keep current wording but format `runsLimit` normally (no MAX_SAFE_INTEGER risk for paid tiers).
+**3. `supabase/functions/content-lab-pipeline/index.ts`** — let credits cover overflow runs
+- Today: when `used >= ent.monthlyLimit`, the request is rejected with 429 and the comment "Credits do NOT grant runs".
+- New: when `used >= ent.monthlyLimit`, check `creditBalance`. If `>= 1`, allow the run (the step-runner already spends a credit instead of incrementing usage). If `0`, return the existing 429 with the top-up prompt.
+- No double-charge risk: charging is already idempotent per run via `summary.usage_consumed`, and the step-runner already routes to `consume_content_lab_credit` when `used >= limit`.
 
-3. **Fix the "blocked" toast (line 101)** for the same reason — for agency tier it can never trigger anyway, but the message should never reference the sentinel. Show `"No credits left. Top up to keep running."` when `noCredits` is true regardless of tier.
-
-4. **No changes to** `useContentLab.ts`, `contentLabPricing.ts`, the database, or the edge functions. The data model stays as-is; only the presentation is fixed. `MAX_SAFE_INTEGER` is still the correct internal "unlimited" sentinel for the gating logic in `content-lab-pipeline` etc.
+### Frontend display
+The `ContentLabPage` badge fix from the previous task already reads `runsThisMonth / runsLimit` correctly. With the cap at 10, AMW will now naturally show **`5 / 10 runs this month · 1,000,000 credits`**, and once 10 is reached, credits will tick down one-per-run on the next runs.
 
 ### Out of scope
-- No tier rename, no new "unlimited" enum, no schema change.
-- No change to how credits are charged or displayed elsewhere (`UsageBadge`, paywall screens).
-- Number formatting elsewhere in Content Lab is not touched in this pass.
+- No Stripe/product changes. Agency-tier pricing & billing untouched.
+- No change to credit packs, ledger, or refund logic.
+- No change to the dialog hint copy beyond what naturally follows from the new finite limit (the "Unlimited monthly runs" branch becomes dead code for agency and can be removed in a follow-up if you want — flag it and I'll do it then).
 
 ### Verification
-- AMW Media (agency tier, 1,000,000 credits, 5 runs this month) shows: **`1,000,000 credits · 5 runs this month`**.
-- A starter-tier org (3/month, 0 credits, 2 runs done) shows: **`0 credits · 2 runs this month`**, dialog hint reads `"Uses 1 of 3 monthly runs (2 used so far)."`.
-- No occurrence of `9007199254740991` anywhere in the UI.
+- AMW Media badge: `5 / 10 runs this month · 1,000,000 credits`.
+- Trigger 5 more runs → badge: `10 / 10 runs · 1,000,000 credits`.
+- Trigger an 11th run → succeeds, badge: `10 / 10 runs · 999,999 credits`, ledger shows a `-1 run_consumed` entry.
+- Drain credits to 0 with monthly cap exhausted → next run is blocked with the existing "buy credits" toast.
 
