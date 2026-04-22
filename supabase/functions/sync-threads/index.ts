@@ -11,6 +11,52 @@ const corsHeaders = {
 
 const THREADS_API = "https://graph.threads.net/v1.0";
 const SAFETY_DEADLINE_MS = 50_000;
+const MIN_FOLLOWERS_FOR_DEMOGRAPHICS = 100;
+const DEMO_BREAKDOWNS = ["country", "city", "age", "gender"] as const;
+
+type DemoBreakdown = typeof DEMO_BREAKDOWNS[number];
+
+interface PostRow {
+  id: string;
+  text: string;
+  timestamp: string;
+  likes: number;
+  comments: number;
+  reposts: number;
+  shares: number;
+  quotes: number;
+  views: number;
+  permalink_url: string | null;
+  media_url: string | null;
+  media_type: string;
+  is_quote_post: boolean;
+  username: string | null;
+  total_engagement: number;
+}
+
+async function fetchDemographicBreakdown(
+  threadsUserId: string,
+  accessToken: string,
+  breakdown: DemoBreakdown,
+): Promise<Record<string, number>> {
+  try {
+    const url = `${THREADS_API}/${threadsUserId}/threads_insights?metric=follower_demographics&breakdown=${breakdown}&access_token=${accessToken}`;
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const json = await res.json();
+    const metric = (json.data || []).find((m: { name: string }) => m.name === "follower_demographics");
+    const breakdowns = metric?.total_value?.breakdowns?.[0];
+    if (!breakdowns?.results) return {};
+    const out: Record<string, number> = {};
+    for (const r of breakdowns.results) {
+      const key = (r.dimension_values || []).join("|");
+      if (key) out[key] = Number(r.value) || 0;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -109,8 +155,33 @@ Deno.serve(async (req) => {
 
     const effectiveSince = Math.max(sinceTs, minTimestamp);
 
+    // ─── Fetch Profile Metadata (once per sync) ───
+    let profileMeta: {
+      username?: string;
+      display_name?: string;
+      profile_picture_url?: string;
+      biography?: string;
+      is_verified?: boolean;
+    } = {};
+    try {
+      const profileUrl = `${THREADS_API}/${threadsUserId}?fields=id,username,name,threads_profile_picture_url,threads_biography,is_verified&access_token=${accessToken}`;
+      const profileRes = await fetch(profileUrl);
+      if (profileRes.ok) {
+        const p = await profileRes.json();
+        profileMeta = {
+          username: p.username,
+          display_name: p.name,
+          profile_picture_url: p.threads_profile_picture_url,
+          biography: p.threads_biography,
+          is_verified: !!p.is_verified,
+        };
+      }
+    } catch (e) {
+      console.error("Threads profile fetch failed:", e);
+    }
+
     // ─── Fetch User Insights ───
-    let totalViews = 0;
+    let totalProfileViews = 0;
     let totalLikes = 0;
     let totalReplies = 0;
     let totalReposts = 0;
@@ -119,18 +190,33 @@ Deno.serve(async (req) => {
     let followersCount = 0;
 
     try {
-      const insightsUrl = `${THREADS_API}/${threadsUserId}/threads_insights?metric=views,likes,replies,reposts,quotes&since=${effectiveSince}&until=${untilTs}&access_token=${accessToken}`;
+      const insightsUrl = `${THREADS_API}/${threadsUserId}/threads_insights?metric=views,likes,replies,reposts,quotes,clicks&since=${effectiveSince}&until=${untilTs}&access_token=${accessToken}`;
       const insightsRes = await fetch(insightsUrl);
       if (insightsRes.ok) {
         const insightsData = await insightsRes.json();
         for (const metric of insightsData.data || []) {
-          const total = (metric.values || []).reduce((sum: number, v: { value?: number }) => sum + (Number(v.value) || 0), 0);
+          // `clicks` uses `link_total_values`; others use `values`.
+          let total = 0;
+          if (Array.isArray(metric.link_total_values)) {
+            total = metric.link_total_values.reduce(
+              (sum: number, v: { value?: number }) => sum + (Number(v.value) || 0),
+              0,
+            );
+          } else if (typeof metric.total_value?.value === "number") {
+            total = metric.total_value.value;
+          } else {
+            total = (metric.values || []).reduce(
+              (sum: number, v: { value?: number }) => sum + (Number(v.value) || 0),
+              0,
+            );
+          }
           switch (metric.name) {
-            case "views": totalViews = total; break;
+            case "views": totalProfileViews = total; break;
             case "likes": totalLikes = total; break;
             case "replies": totalReplies = total; break;
             case "reposts": totalReposts = total; break;
             case "quotes": totalQuotes = total; break;
+            case "clicks": totalClicks = total; break;
           }
         }
       } else {
@@ -158,22 +244,25 @@ Deno.serve(async (req) => {
       console.error("Threads followers_count fetch failed:", e);
     }
 
+    // ─── Fetch Follower Demographics (best-effort, only if ≥100 followers) ───
+    let followerDemographics: Record<DemoBreakdown, Record<string, number>> | null = null;
+    if (followersCount >= MIN_FOLLOWERS_FOR_DEMOGRAPHICS) {
+      const demos = await Promise.all(
+        DEMO_BREAKDOWNS.map((b) => fetchDemographicBreakdown(threadsUserId, accessToken, b)),
+      );
+      followerDemographics = {
+        country: demos[0],
+        city: demos[1],
+        age: demos[2],
+        gender: demos[3],
+      };
+    }
+
     // ─── Fetch Media (posts) ───
-    const allPosts: Array<{
-      text: string;
-      timestamp: string;
-      likes: number;
-      comments: number;
-      shares: number;
-      quotes: number;
-      views: number;
-      permalink_url: string | null;
-      media_type: string;
-      total_engagement: number;
-    }> = [];
+    const allPosts: PostRow[] = [];
 
     try {
-      let mediaUrl: string | null = `${THREADS_API}/${threadsUserId}/threads?fields=id,text,timestamp,media_type,permalink,like_count,reply_count&since=${effectiveSince}&until=${untilTs}&limit=50&access_token=${accessToken}`;
+      let mediaUrl: string | null = `${THREADS_API}/${threadsUserId}/threads?fields=id,text,timestamp,media_type,permalink,media_url,username,is_quote_post,like_count,reply_count&since=${effectiveSince}&until=${untilTs}&limit=50&access_token=${accessToken}`;
 
       while (mediaUrl && (Date.now() - startTime) < SAFETY_DEADLINE_MS) {
         const mediaRes = await fetch(mediaUrl);
@@ -182,35 +271,50 @@ Deno.serve(async (req) => {
 
         for (const post of mediaData.data || []) {
           let postViews = 0;
+          let postLikes = post.like_count || 0;
+          let postReplies = post.reply_count || 0;
           let postReposts = 0;
+          let postShares = 0;
           let postQuotes = 0;
 
-          // Per-post insights (non-blocking)
+          // Per-post insights (non-blocking) — full metric set
           try {
-            const postInsightsUrl = `${THREADS_API}/${post.id}/insights?metric=views,reposts,quotes&access_token=${accessToken}`;
+            const postInsightsUrl = `${THREADS_API}/${post.id}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${accessToken}`;
             const piRes = await fetch(postInsightsUrl);
             if (piRes.ok) {
               const piData = await piRes.json();
               for (const m of piData.data || []) {
-                const val = m.values?.[0]?.value || 0;
-                if (m.name === "views") postViews = val;
-                if (m.name === "reposts") postReposts = val;
-                if (m.name === "quotes") postQuotes = val;
+                const val = Number(m.values?.[0]?.value ?? m.total_value?.value ?? 0) || 0;
+                switch (m.name) {
+                  case "views": postViews = val; break;
+                  case "likes": postLikes = val || postLikes; break;
+                  case "replies": postReplies = val || postReplies; break;
+                  case "reposts": postReposts = val; break;
+                  case "shares": postShares = val; break;
+                  case "quotes": postQuotes = val; break;
+                }
               }
             }
           } catch {} // non-blocking
 
+          const totalEngagement = postLikes + postReplies + postReposts + postShares + postQuotes;
+
           allPosts.push({
-            text: (post.text || "").substring(0, 100),
+            id: post.id,
+            text: (post.text || "").substring(0, 140),
             timestamp: post.timestamp,
-            likes: post.like_count || 0,
-            comments: post.reply_count || 0,
-            shares: postReposts,
+            likes: postLikes,
+            comments: postReplies,
+            reposts: postReposts,
+            shares: postShares,
             quotes: postQuotes,
             views: postViews,
             permalink_url: post.permalink || null,
+            media_url: post.media_url || null,
             media_type: post.media_type || "TEXT_POST",
-            total_engagement: (post.like_count || 0) + (post.reply_count || 0) + postReposts + postQuotes,
+            is_quote_post: !!post.is_quote_post,
+            username: post.username || null,
+            total_engagement: totalEngagement,
           });
         }
 
@@ -226,14 +330,23 @@ Deno.serve(async (req) => {
       return d.getFullYear() === year && d.getMonth() + 1 === month;
     }).length;
 
-    const totalEngagement = totalLikes + totalReplies + totalReposts + totalQuotes;
-    const engagementRate = totalViews > 0 ? (totalEngagement / totalViews) * 100 : 0;
+    const sumPostViews = allPosts.reduce((s, p) => s + (p.views || 0), 0);
+    // user-insights `views` is profile views; engagement-rate denominator
+    // should be the larger of (profile views, sum of post views) so brand-new
+    // accounts with low profile views still get a meaningful rate.
+    const totalPostShares = allPosts.reduce((s, p) => s + (p.shares || 0), 0);
+    const totalEngagement = totalLikes + totalReplies + totalReposts + totalQuotes + totalPostShares;
+    const engagementDenominator = Math.max(totalProfileViews, sumPostViews);
+    const engagementRate = engagementDenominator > 0 ? (totalEngagement / engagementDenominator) * 100 : 0;
 
-    const metricsData: Record<string, number> = {
-      views: totalViews,
+    const metricsData: Record<string, number | Record<string, unknown>> = {
+      // Back-compat: keep `views` populated with the largest available view count.
+      views: Math.max(totalProfileViews, sumPostViews),
+      profile_views: totalProfileViews,
       likes: totalLikes,
       comments: totalReplies,
-      shares: totalReposts,
+      shares: totalPostShares,
+      reposts: totalReposts,
       quotes: totalQuotes,
       clicks: totalClicks,
       engagement: totalEngagement,
@@ -243,6 +356,9 @@ Deno.serve(async (req) => {
 
     if (followersCount > 0) {
       metricsData.total_followers = followersCount;
+    }
+    if (followerDemographics) {
+      metricsData.follower_demographics = followerDemographics;
     }
 
     // Top content
@@ -254,8 +370,13 @@ Deno.serve(async (req) => {
         likes: p.likes,
         comments: p.comments,
         shares: p.shares,
+        reposts: p.reposts,
+        quotes: p.quotes,
         views: p.views,
         permalink_url: p.permalink_url,
+        media_url: p.media_url,
+        is_quote_post: p.is_quote_post,
+        username: p.username,
         total_engagement: p.total_engagement,
         type: p.media_type,
       }));
@@ -278,13 +399,34 @@ Deno.serve(async (req) => {
       await supabaseClient.from("monthly_snapshots").insert({ client_id: clientId, platform: "threads", report_month: month, report_year: year, metrics_data: metricsData, top_content: topContent });
     }
 
-    await supabaseClient.from("platform_connections").update({ last_sync_at: new Date().toISOString(), last_sync_status: "success", last_error: null }).eq("id", connectionId);
+    // Update connection metadata + account_name with refreshed profile info
+    const mergedMetadata = {
+      ...(conn.metadata || {}),
+      ...(profileMeta.username ? { username: profileMeta.username } : {}),
+      ...(profileMeta.display_name ? { display_name: profileMeta.display_name } : {}),
+      ...(profileMeta.profile_picture_url ? { profile_picture_url: profileMeta.profile_picture_url } : {}),
+      ...(profileMeta.biography !== undefined ? { biography: profileMeta.biography } : {}),
+      ...(profileMeta.is_verified !== undefined ? { is_verified: profileMeta.is_verified } : {}),
+    };
+    const connectionUpdate: Record<string, unknown> = {
+      last_sync_at: new Date().toISOString(),
+      last_sync_status: "success",
+      last_error: null,
+      metadata: mergedMetadata,
+    };
+    if (profileMeta.display_name && profileMeta.display_name !== conn.account_name) {
+      connectionUpdate.account_name = profileMeta.display_name;
+    } else if (profileMeta.username && !conn.account_name) {
+      connectionUpdate.account_name = profileMeta.username;
+    }
+
+    await supabaseClient.from("platform_connections").update(connectionUpdate).eq("id", connectionId);
 
     if (syncLog?.id) {
       await supabaseClient.from("sync_logs").update({ status: "success", completed_at: new Date().toISOString() }).eq("id", syncLog.id);
     }
 
-    console.log(`Threads sync complete. views=${totalViews}, posts=${allPosts.length}, followers=${followersCount}`);
+    console.log(`Threads sync complete. profile_views=${totalProfileViews}, post_views_sum=${sumPostViews}, posts=${allPosts.length}, followers=${followersCount}, clicks=${totalClicks}, demo=${followerDemographics ? "yes" : "no"}`);
 
     return new Response(
       JSON.stringify({ success: true, metrics: metricsData }),

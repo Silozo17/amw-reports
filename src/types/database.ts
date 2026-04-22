@@ -506,9 +506,9 @@ export const PLATFORM_AVAILABLE_METRICS: Record<PlatformType, string[]> = {
     'total_pins', 'total_boards', 'top_boards',
   ],
   threads: [
-    'total_followers', 'follower_growth', 'views', 'likes', 'comments',
-    'shares', 'quotes', 'engagement', 'engagement_rate', 'clicks',
-    'posts_published',
+    'total_followers', 'follower_growth', 'profile_views', 'views',
+    'likes', 'comments', 'reposts', 'shares', 'quotes', 'clicks',
+    'engagement', 'engagement_rate', 'posts_published',
   ],
 };
 
