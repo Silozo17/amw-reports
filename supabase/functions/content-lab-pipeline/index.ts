@@ -19,6 +19,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const STALE_RUN_MINUTES = 20;
+const MAX_AUTO_RESUME_ATTEMPTS = 3;
 
 interface OrgEntitlement {
   tier: string | null;
