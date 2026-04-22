@@ -8,6 +8,10 @@ const corsHeaders = {
 };
 
 const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", fr: "French", de: "German", es: "Spanish", it: "Italian",
+  nl: "Dutch", pt: "Portuguese", pl: "Polish", da: "Danish",
+};
 const RATE_LIMIT_HOURS = 24;
 const SYNC_COOLDOWN_HOURS = 1;
 
@@ -140,7 +144,7 @@ Deno.serve(async (req) => {
 
     // ── Fetch data ──
     const [clientRes, snapshotsRes, prevSnapshotsRes] = await Promise.all([
-      supabase.from("clients").select("company_name, preferred_currency, industry, target_audience, service_area_type, service_areas, business_goals").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, preferred_currency, report_language, industry, target_audience, service_area_type, service_areas, business_goals").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
@@ -150,6 +154,8 @@ Deno.serve(async (req) => {
 
     const clientName = clientRes.data?.company_name || "your business";
     const preferredCurrency = clientRes.data?.preferred_currency || "GBP";
+    const languageCode = (clientRes.data?.report_language as string) || "en";
+    const languageName = LANGUAGE_NAMES[languageCode] || "English";
     const snapshots = snapshotsRes.data ?? [];
     const prevSnapshots = prevSnapshotsRes.data ?? [];
 
@@ -181,7 +187,7 @@ ${clientRes.data?.industry ? `\nIndustry: ${clientRes.data.industry}` : ''}${cli
 Tone: Professional but warm, like a trusted marketing advisor giving a quick morning update.
 
 Structure:
-- Start with "Here's your marketing update for ${MONTH_NAMES[month]}."
+- Open with a natural greeting introducing the marketing update for ${MONTH_NAMES[month]}
 - Cover the 2-3 most important things happening across their platforms
 - Mention specific numbers and month-over-month changes
 - End with one clear recommendation or thing to watch, tailored to their industry and goals if available
@@ -190,9 +196,10 @@ Rules:
 - Write for speech, not reading — use short sentences and natural pauses
 - No bullet points or formatting — just flowing speech
 - Use "your" not "the client's"
-- Round numbers naturally (say "about twelve hundred" not "1,247")
+- Round numbers naturally
 - Never use marketing jargon without explaining it
 - If business context is available, reference their industry and goals naturally
+- IMPORTANT: Write the entire script in ${languageName}. Speak naturally as a native ${languageName} speaker would, including the opening greeting and number phrasing.
 
 Data: ${dataContext}`
         }],

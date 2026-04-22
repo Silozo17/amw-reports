@@ -11,6 +11,11 @@ const corsHeaders = {
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 60_000;
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", fr: "French", de: "German", es: "Spanish", it: "Italian",
+  nl: "Dutch", pt: "Portuguese", pl: "Polish", da: "Danish",
+};
+
 const PLATFORM_CATEGORIES: Record<string, string[]> = {
   "Paid Advertising": ["google_ads", "meta_ads", "tiktok_ads", "linkedin_ads"],
   "Organic Social": ["facebook", "instagram", "tiktok", "linkedin", "youtube", "pinterest"],
@@ -112,7 +117,7 @@ Deno.serve(async (req) => {
 
     // Fetch client + snapshots
     const [clientRes, snapshotsRes, prevSnapshotsRes, connectionsRes] = await Promise.all([
-      supabase.from("clients").select("company_name, services_subscribed, preferred_currency, industry, target_audience, service_area_type, service_areas, business_goals, competitors, unique_selling_points, brand_voice").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, services_subscribed, preferred_currency, report_language, industry, target_audience, service_area_type, service_areas, business_goals, competitors, unique_selling_points, brand_voice").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data, top_content").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
@@ -208,7 +213,8 @@ Rules:
 - Only include category sections for categories that have data: ${activeCategories.join(", ")}
 - If business context is provided (industry, target audience, goals, service area), tailor your recommendations to be relevant to their specific industry, audience, and goals
 - Reference their competitors or USPs when making strategic suggestions
-- Consider their service area scope (local/national/international/worldwide) when recommending strategies`,
+- Consider their service area scope (local/national/international/worldwide) when recommending strategies
+- IMPORTANT: Write the entire response in ${LANGUAGE_NAMES[client.report_language as string] || "English"}. All headings, highlights, and recommendations must be in ${LANGUAGE_NAMES[client.report_language as string] || "English"}.`,
         }],
         tools: [{
           type: "function",

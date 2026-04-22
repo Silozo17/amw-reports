@@ -8,6 +8,10 @@ const corsHeaders = {
 };
 
 const MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", fr: "French", de: "German", es: "Spanish", it: "Italian",
+  nl: "Dutch", pt: "Portuguese", pl: "Polish", da: "Danish",
+};
 
 // In-memory rate limit: 30 requests per 60s window per actor
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -124,7 +128,7 @@ Deno.serve(async (req) => {
 
     // Fetch client data
     const [clientRes, snapshotsRes, prevSnapshotsRes] = await Promise.all([
-      supabase.from("clients").select("company_name, industry, target_audience, service_area_type, service_areas, business_goals, competitors, unique_selling_points, brand_voice").eq("id", client_id).single(),
+      supabase.from("clients").select("company_name, report_language, industry, target_audience, service_area_type, service_areas, business_goals, competitors, unique_selling_points, brand_voice").eq("id", client_id).single(),
       supabase.from("monthly_snapshots").select("platform, metrics_data").eq("client_id", client_id).eq("report_month", month).eq("report_year", year),
       supabase.from("monthly_snapshots").select("platform, metrics_data")
         .eq("client_id", client_id)
@@ -175,7 +179,8 @@ Rules:
 - Be encouraging but honest about areas needing improvement
 - Never make up data — only reference what's in the metrics above
 - If business context is available, tailor your answers to their industry, audience, goals, and service area
-- Consider their competitors and USPs when making suggestions`;
+- Consider their competitors and USPs when making suggestions
+- IMPORTANT: Always respond in ${LANGUAGE_NAMES[(client as any)?.report_language] || "English"}, regardless of the user's input language, unless the user explicitly asks for another language.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
