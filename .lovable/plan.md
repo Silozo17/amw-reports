@@ -1,48 +1,69 @@
 
 
-## Two unrelated fixes
+## Threads sync — full coverage of available API metrics
 
-### Fix 1 — Restore Content Lab tier limits (no "agency unlimited")
+### What the Threads API actually exposes (April 2026 docs)
 
-**Root cause:** I wrongly carried over an `agency: Number.MAX_SAFE_INTEGER` entry in `RUN_LIMITS_BY_TIER` in both `src/lib/contentLabPricing.ts` and `supabase/functions/_shared/contentLabTiers.ts`. There is no `agency` Content Lab product — the real tiers are **Starter (3), Growth (5), Scale (20)**. AMW Media's `org_subscriptions.content_lab_tier` was set to `agency`, so it resolved to "unlimited" by accident.
+**User Insights (`/{user-id}/threads_insights`)**
+- `views` (time series — profile views) ✅ already synced
+- `likes`, `replies`, `reposts`, `quotes` (totals) ✅ already synced
+- `clicks` (link total values — clicks on URLs in your posts) ⚠️ requested but never parsed
+- `followers_count` (total) ✅ already synced
+- `follower_demographics` (countries, cities, age, gender — needs ≥100 followers, separate breakdown call) ❌ not synced
 
-**Changes:**
-1. `src/lib/contentLabPricing.ts` — remove the `agency` line from `RUN_LIMITS_BY_TIER`. The map now contains only `starter`, `growth`, `scale` (derived from `CONTENT_LAB_TIERS`).
-2. `supabase/functions/_shared/contentLabTiers.ts` — remove the `agency` line. Mirror the frontend exactly: `starter: 3, growth: 5, scale: 20`.
-3. **Data fix (migration)**: update AMW Media's `org_subscriptions.content_lab_tier` from `'agency'` to `'scale'` (highest real Content Lab tier — 20 runs/mo). Credits still cover overflow runs as designed.
-4. Revert the leftover "agency unlimited" hint copy in `src/pages/content-lab/ContentLabPage.tsx` (the `>= MAX_SAFE_INTEGER` branch becomes dead and is removed).
+**Per-Media Insights (`/{media-id}/insights`)**
+- `views`, `likes`, `replies`, `reposts`, `quotes`, `shares` ⚠️ we currently fetch only `views,reposts,quotes` and use `like_count`/`reply_count` from the media object — missing `shares` (different from reposts)
 
-**Result:** AMW Media badge → `5 / 20 runs this month · 1,000,000 credits`. Once 20 runs used, credits start ticking down 1-per-run (this credit-overflow gate stays — you approved it earlier and it's the intended behaviour for paid tiers).
+**Profile (`/{user-id}?fields=...`)**
+- `id`, `username`, `name`, `threads_profile_picture_url`, `threads_biography`, `is_verified` ❌ not fetched at all
 
-### Fix 2 — Syncs no longer get stuck (Facebook stuck at 10/24 case)
+**Media object fields**
+- We currently request: `id, text, timestamp, media_type, permalink, like_count, reply_count`
+- Available and useful: `username`, `media_url` (image/video URL for thumbnails), `is_quote_post`, `has_replies`, `is_reply`, `children` (carousel) ❌ none fetched
 
-**Root cause confirmed in DB & code:**
-- `process-sync-queue` runs each month sequentially via `await invoke(syncFn)`. Facebook ≈ 15-20s/month × 24 months ≈ 7 min total.
-- The parent `process-sync-queue` invocation hits its own edge-function CPU/wall-clock limit mid-loop and dies silently.
-- Job row stays `status='processing'` with `started_at` frozen.
-- Stale-reset (10 min threshold) only runs **when `process-sync-queue` is invoked again** — but **nothing invokes it**. There is no cron schedule for it; the only triggers are the initial frontend `enqueueSync` and the function's own self-continuation (which can't fire if the function died). Result: jobs sit stuck forever.
-- Live evidence: job `1fb66ad9…cf1c` — Facebook, processing, 10/24, started 17:49, 11 snapshots actually written (last 17:52), then no progress for 25+ minutes.
+### Gap analysis vs. our DB / UI
 
-**Changes (no schema changes beyond a cron schedule):**
+Current `metricsData` written: `views, likes, comments, shares, quotes, clicks (always 0), engagement, engagement_rate, posts_published, total_followers`.
 
-1. `supabase/functions/process-sync-queue/index.ts`:
-   - **Per-job watchdog**: track wall-clock per `processJob`. If a single platform-month `invoke` takes >25s, abort it, mark that month as failed-with-retry, continue to the next month — no more silent hangs blocking the whole job.
-   - **Resume-friendly loop**: at the start of each `processJob` iteration, re-check elapsed time vs a 90s budget for the whole queue invocation. If exceeded, set the job back to `pending` (preserving `progress_completed`) so the next invocation picks up from where it left off, and exit the loop cleanly. No more dying mid-loop with the row frozen as `processing`.
-   - **Always self-continue at the end**, even on errors, as long as pending jobs exist.
-   - **Tighter stale threshold**: drop `STALE_JOB_THRESHOLD_MS` from 10 min → 3 min. Combined with the cron below, stuck rows get reaped within 3-4 min instead of forever.
-   - **`isBackfillJob` already filters out completed months**, so resuming is cheap and correct.
+Bugs and gaps:
+1. **`clicks` is always `0`** — we request the `clicks` metric but never parse it because the response uses `link_total_values` (not `values`). The user sees Clicks = 0 always.
+2. **No profile metadata persisted** — `is_verified`, profile picture, bio, display name, username are never stored on the connection; the dashboard can't show "verified" or profile-pic header.
+3. **No follower demographics** — we sync this for Instagram/Facebook but not for Threads, even though the API supports it (≥100 followers required).
+4. **Per-post `shares` missing** — we put `reposts` into the `shares` column. Threads has both `reposts` and `shares` (separate metrics in the docs); the post table's "Shares" column is misleading.
+5. **No post thumbnails** — `media_url` not requested; the post table can't show images even though the API exposes them.
+6. **Top-content table only shows posts that have engagement** — `ThreadsExtras` filters `caption || likes || comments || shares` so a brand-new post with views but zero engagement is hidden.
 
-2. **New pg_cron schedule (migration)**: invoke `process-sync-queue` every minute. This is the safety net — even if every self-continuation chain breaks, queued/stale jobs are picked up within 60s and stale ones reset within ~3 min. Light load: function returns immediately when queue is empty.
+### Changes (3 files, no schema changes — all data fits existing JSONB columns)
 
-3. `src/components/clients/SyncProgressBar.tsx`: when a `processing` job hasn't moved its `progress_completed` for >2 min, switch the bar copy from `"X% — Syncing…"` to `"Recovering — resuming shortly…"` so the user sees the system is self-healing instead of "stuck".
+**1. `supabase/functions/sync-threads/index.ts`** — full metric coverage
+- **Fix `clicks` parsing**: handle `link_total_values` array on the user-insights response and sum the `value` fields. Aggregate per-link click totals are already what we want as a single `clicks` number.
+- **Add per-post `shares`**: fetch `views,likes,replies,reposts,quotes,shares` on each post's `/insights` (currently only views/reposts/quotes). Store `reposts` and `shares` separately.
+- **Fetch profile fields once per sync**: `GET /{user-id}?fields=id,username,name,threads_profile_picture_url,threads_biography,is_verified` and persist to `platform_connections.metadata` (`username`, `display_name`, `profile_picture_url`, `biography`, `is_verified`). Also refresh `account_name` if it changed.
+- **Add follower demographics** (best-effort, non-blocking, only when `followers_count ≥ 100`): four breakdown calls (`country`, `city`, `age`, `gender`) against `/{user-id}/threads_insights?metric=follower_demographics&breakdown=...`. Store the merged result in `metricsData.follower_demographics` (same JSONB shape we use for Instagram/Facebook).
+- **Add `media_url` and `username`** to the media field list so the post table can render thumbnails and per-post author info. Persist `media_url` and `is_quote_post` in `top_content`.
+- **New aggregated metric**: `profile_views` (= the `views` time-series total, which is profile views per Meta's docs — currently we labelled it `views` only). Keep `views` for back-compat and add `profile_views` so the dashboard label is accurate.
+- **Engagement rate denominator fix**: per Meta docs, `views` on a user's `threads_insights` is *profile views*, not impressions. Compute `engagement_rate = totalEngagement / max(totalViews, sumOfPostViews) * 100` — fall back to summed per-post views (more meaningful) when profile-views is small.
 
-4. **One-shot data fix (migration)**: reset the currently stuck job (`1fb66ad9…cf1c`) to `pending`, clear `started_at`, so the new cron picks it up immediately on the next minute tick.
+**2. `src/components/clients/dashboard/platforms/ThreadsExtras.tsx`** — display the new data
+- Add a thumbnail column (uses `media_url`) before the post text.
+- Replace the empty-content filter with one that shows any post that has *any* of: caption, views, likes, comments, shares, quotes, reposts (so newly-published posts with views but no engagement still appear).
+- Add separate `Reposts` and `Shares` columns (currently one column conflates them).
+- Show a small badge for `is_quote_post` posts.
 
-**No changes** to the individual `sync-*` functions — they already work; the bug is purely in queue orchestration.
+**3. `src/types/database.ts` + `src/components/clients/dashboard/platforms/shared/constants.ts`** — register new metrics
+- Add `profile_views`, `reposts` (already in `METRIC_LABELS`) to the `threads` entry of `PLATFORM_METRIC_DEFINITIONS` and to `THREADS_KEY_METRICS`. Final ordered key metrics:
+  `total_followers, follower_growth, profile_views, views, likes, comments, replies (alias of comments), reposts, shares, quotes, clicks, engagement, engagement_rate, posts_published`.
+- No new metric labels needed for any of these — all already exist in `METRIC_LABELS`.
+
+### Out of scope
+- Profile-picture header rendering on the dashboard tile (would need a new component slot — flag for follow-up).
+- Geo-heatmap integration of Threads `follower_demographics` — data will be stored in the snapshot but the existing GeoHeatmap component already reads any platform's `follower_demographics.country`, so it picks up automatically once the data lands; no UI change required for that to start working.
+- Mentions / Keyword Search APIs (separate product, requires `threads_keyword_search` permission and an app review — out of scope for organic reporting).
+- `replies_count`, `likes_count` etc. from the public Profile Discovery API (different permission, different use case — competitor lookup, not own-account reporting).
 
 ### Verification
-- AMW Media badge shows `5 / 20 runs this month · 1,000,000 credits`. No `9007199254740991` anywhere.
-- The stuck Facebook job resumes within ~60s of cron deploying, completes the remaining 13 months in ≤2 more cron cycles.
-- Future syncs: any platform-month that hangs >25s is skipped with a retry; queue invocations that approach their own limit cleanly hand off to the next cron tick instead of dying mid-loop. No job stays `processing` for more than ~3 min without progress.
-- No new user-facing features. No Stripe/product changes. No connector changes.
+- After the change, a synced month for a Threads connection persists: `total_followers, follower_growth, profile_views, views, likes, comments, shares, reposts, quotes, clicks (>0 when links were shared), engagement, engagement_rate, posts_published, follower_demographics{...}` in `monthly_snapshots.metrics_data`.
+- `platform_connections.metadata` for Threads now contains `username, display_name, profile_picture_url, biography, is_verified`.
+- Dashboard Threads section shows the full metric grid (no missing-zero-only cards), and the post table renders thumbnails plus separate Reposts/Shares columns.
+- Existing snapshots stay valid (additive only — no removed metrics, no schema changes).
 
