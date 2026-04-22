@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import usePageMeta from '@/hooks/usePageMeta';
-import ViralPostCard from '@/components/content-lab/ViralPostCard';
+import ViralPostCard, { isRenderablePost } from '@/components/content-lab/ViralPostCard';
 import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
 import HookLibrary from '@/components/content-lab/HookLibrary';
 import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
@@ -159,8 +159,8 @@ const RunDetailPage = () => {
     if (p.bucket === 'benchmark' || p.bucket === 'competitor') return 'benchmark';
     return 'benchmark';
   };
-  const ownPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'own');
-  const viralPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'benchmark');
+  const ownPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'own' && isRenderablePost(p));
+  const viralPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'benchmark' && isRenderablePost(p));
   const ownAvgViews = ownPosts.length > 0
     ? Math.round(ownPosts.reduce((s, p) => s + (p.views ?? 0), 0) / ownPosts.length)
     : 0;

@@ -19,6 +19,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const STALE_RUN_MINUTES = 20;
+const MAX_AUTO_RESUME_ATTEMPTS = 3;
 
 interface OrgEntitlement {
   tier: string | null;
@@ -224,14 +225,41 @@ function json(body: unknown, status = 200) {
 
 async function reapStaleRuns(admin: ReturnType<typeof createClient>) {
   const cutoff = new Date(Date.now() - STALE_RUN_MINUTES * 60 * 1000).toISOString();
-  await admin
+  const { data: stale } = await admin
     .from("content_lab_runs")
-    .update({
-      status: "failed",
-      error_message: `Run timed out (>${STALE_RUN_MINUTES}min in active state). Auto-failed by orchestrator.`,
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+    .select("id, status, summary")
     .in("status", ["pending", "scraping", "analysing", "ideating"])
     .lt("updated_at", cutoff);
+
+  for (const row of (stale ?? []) as Array<{ id: string; status: string; summary: Record<string, unknown> | null }>) {
+    const summary = (row.summary ?? {}) as Record<string, unknown>;
+    const attempts = Number(summary.auto_resume_attempts ?? 0);
+
+    if (attempts < MAX_AUTO_RESUME_ATTEMPTS) {
+      // Self-heal: re-dispatch to the step runner. The runner is idempotent because
+      // it reads `status` and resumes from there. Charging is also idempotent via
+      // summary.usage_consumed.
+      await admin.from("content_lab_runs").update({
+        summary: { ...summary, auto_resume_attempts: attempts + 1, last_auto_resume_at: new Date().toISOString() },
+        error_message: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", row.id);
+
+      // Resume mode if we already have scraped posts; fresh-step otherwise.
+      const mode = row.status === "pending" || row.status === "scraping" ? "fresh" : "resume";
+      fetch(`${SUPABASE_URL}/functions/v1/content-lab-step-runner`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ run_id: row.id, mode }),
+      }).catch(() => { /* best-effort */ });
+    } else {
+      // Exhausted automatic recovery → terminal failure.
+      await admin.from("content_lab_runs").update({
+        status: "failed",
+        error_message: `Auto-recovery exhausted after ${attempts} attempts. Use Retry ideation or contact support.`,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("id", row.id);
+    }
+  }
 }

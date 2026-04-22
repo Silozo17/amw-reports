@@ -35,37 +35,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [clientUserInfo, setClientUserInfo] = useState<ClientUserInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isScopeReady, setIsScopeReady] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    setProfile(profileData as Profile | null);
-
-    const { data: memberData } = await supabase
-      .from('org_members')
-      .select('role')
-      .eq('user_id', userId)
-      .limit(1)
-      .single();
-    setRole((memberData?.role as AppRole) ?? null);
-
-    const { data: adminData } = await supabase
-      .from('platform_admins')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-    setIsPlatformAdmin(!!adminData);
-
-    // Check if user is a client_user
-    const { data: cuData } = await supabase
-      .rpc('get_client_user_info', { _user_id: userId });
-    if (cuData && cuData.length > 0) {
-      setClientUserInfo({ client_id: cuData[0].client_id, org_id: cuData[0].org_id });
-    } else {
-      setClientUserInfo(null);
+    setIsScopeReady(false);
+    try {
+      const [profileRes, memberRes, adminRes, cuRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('user_id', userId).single(),
+        supabase.from('org_members').select('role').eq('user_id', userId).limit(1).single(),
+        supabase.from('platform_admins').select('id').eq('user_id', userId).maybeSingle(),
+        supabase.rpc('get_client_user_info', { _user_id: userId }),
+      ]);
+      setProfile(profileRes.data as Profile | null);
+      setRole((memberRes.data?.role as AppRole) ?? null);
+      setIsPlatformAdmin(!!adminRes.data);
+      const cuData = cuRes.data as Array<{ client_id: string; org_id: string }> | null;
+      if (cuData && cuData.length > 0) {
+        setClientUserInfo({ client_id: cuData[0].client_id, org_id: cuData[0].org_id });
+      } else {
+        setClientUserInfo(null);
+      }
+    } finally {
+      setIsScopeReady(true);
     }
   }, []);
 

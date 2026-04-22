@@ -29,6 +29,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const CHAIN_RETRY_DELAYS_MS = [250, 1000, 4000];
+const MAX_PLATFORM_IDEATE_ATTEMPTS = 3;
+const MAX_ANALYSE_ATTEMPTS = 2;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -177,19 +179,30 @@ async function chainNext(runId: string, mode: "fresh" | "resume" | "rescrape") {
       await new Promise((r) => setTimeout(r, CHAIN_RETRY_DELAYS_MS[attempt]));
     }
   }
-  // All attempts failed: leave a breadcrumb. Reaper will eventually fail the run.
-  console.error(`[step-runner] chainNext exhausted retries for ${runId}`);
+  // All in-process attempts failed: schedule a deferred re-dispatch via a fresh
+  // background invocation. The stale-run reaper still acts as the ultimate safety net
+  // but the run will keep self-healing instead of dying after one chain hop drop.
+  console.error(`[step-runner] chainNext exhausted in-process retries for ${runId}, deferring`);
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     await admin.from("content_lab_runs").update({
       error_message: "Step chain dropped (network). Auto-recovery will retry shortly.",
       updated_at: new Date().toISOString(),
     }).eq("id", runId);
-    const handle = await logStepStart({ runId, step: "chain", message: "chainNext retries exhausted" });
-    await handle.finish({ status: "failed", errorMessage: "chainNext exhausted retries" });
+    const handle = await logStepStart({ runId, step: "chain", message: "chainNext deferring re-dispatch" });
+    await handle.finish({ status: "ok", message: "chainNext deferred — will be picked up by reaper resume" });
   } catch (e) {
     console.error(`[step-runner] chainNext breadcrumb write failed for ${runId}:`, e);
   }
+  // Fire-and-forget one last detached call. If even this fails, the pipeline reaper
+  // will resume the run on the next pipeline invocation.
+  setTimeout(() => {
+    fetch(`${SUPABASE_URL}/functions/v1/content-lab-step-runner`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: runId, mode }),
+    }).catch(() => {});
+  }, 8000);
 }
 
 async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string; payload?: unknown }> {
@@ -301,14 +314,27 @@ async function runScrapeStep(
     return;
   }
 
-  // Charge usage now that scrape produced data.
+  // Charge usage now that scrape produced data. Idempotent per run via summary.usage_consumed
+  // so a resume / rescrape / retry never double-charges.
   if (orgId) {
-    const limit = await getMonthlyLimit(admin, orgId);
-    const used = await getCurrentUsage(admin, orgId);
-    if (used < limit) {
-      await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
-    } else {
-      await admin.rpc("consume_content_lab_credit", { _org_id: orgId, _run_id: runId, _amount: 1 });
+    const { data: runRowForCharge } = await admin
+      .from("content_lab_runs").select("summary").eq("id", runId).maybeSingle();
+    const summaryNow = ((runRowForCharge as { summary?: Record<string, unknown> } | null)?.summary ?? {}) as Record<string, unknown>;
+    if (!summaryNow.usage_consumed) {
+      const limit = await getMonthlyLimit(admin, orgId);
+      const used = await getCurrentUsage(admin, orgId);
+      let consumedVia: "monthly" | "credit" | "none" = "none";
+      if (used < limit) {
+        await admin.rpc("increment_content_lab_usage", { _org_id: orgId });
+        consumedVia = "monthly";
+      } else {
+        const { data: ok } = await admin.rpc("consume_content_lab_credit", { _org_id: orgId, _run_id: runId, _amount: 1 });
+        consumedVia = ok ? "credit" : "none";
+      }
+      await admin.from("content_lab_runs").update({
+        summary: { ...summaryNow, usage_consumed: true, usage_consumed_via: consumedVia, usage_consumed_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }).eq("id", runId);
     }
   }
 
@@ -318,17 +344,38 @@ async function runScrapeStep(
 
 async function runAnalyseStep(admin: ReturnType<typeof createClient>, runId: string) {
   const step = await logStepStart({ runId, step: "analyse", message: "Calling content-lab-analyse" });
-  const res = await callFn("content-lab-analyse", { run_id: runId });
-  if (!res.ok) {
-    // Best-effort: don't fail the whole pipeline on analyse failure.
-    await step.finish({
-      status: "failed",
-      message: "Non-fatal — pipeline continued",
-      errorMessage: res.error ?? "unknown",
-    });
-  } else {
-    await step.finish({ status: "ok", message: "Analyse complete" });
+  let lastErr: string | null = null;
+  for (let attempt = 1; attempt <= MAX_ANALYSE_ATTEMPTS; attempt++) {
+    const res = await callFn("content-lab-analyse", { run_id: runId });
+    if (res.ok) {
+      await step.finish({ status: "ok", message: `Analyse complete (attempt ${attempt})` });
+      await setStatus(admin, runId, "ideating");
+      await chainNext(runId, "fresh");
+      return;
+    }
+    lastErr = res.error ?? "unknown";
+    console.warn(`[step-runner] analyse attempt ${attempt}/${MAX_ANALYSE_ATTEMPTS} failed for ${runId}:`, lastErr);
+    if (attempt < MAX_ANALYSE_ATTEMPTS) await new Promise((r) => setTimeout(r, 2000 * attempt));
   }
+  // All retries failed → write deterministic fallback so ideate has structured input
+  // instead of silently degraded output.
+  const { data: runRow } = await admin
+    .from("content_lab_runs").select("summary").eq("id", runId).maybeSingle();
+  const sNow = ((runRow as { summary?: Record<string, unknown> } | null)?.summary ?? {}) as Record<string, unknown>;
+  await admin.from("content_lab_runs").update({
+    summary: {
+      ...sNow,
+      analyse_fallback: true,
+      analyse_fallback_reason: lastErr,
+      deep_analysis: sNow.deep_analysis ?? {},
+    },
+    updated_at: new Date().toISOString(),
+  }).eq("id", runId);
+  await step.finish({
+    status: "failed",
+    message: "Analyse retries exhausted — using deterministic fallback so pipeline can continue",
+    errorMessage: lastErr ?? "unknown",
+  });
   await setStatus(admin, runId, "ideating");
   await chainNext(runId, "fresh");
 }
@@ -349,24 +396,54 @@ async function runOneIdeatePlatformStep(
   const ideatedDone = new Set<string>(
     Array.isArray(summary.ideated_platforms) ? (summary.ideated_platforms as string[]) : [],
   );
+  const attemptCounts = (summary.ideate_attempts as Record<string, number> | undefined) ?? {};
   const next = platforms.find((p) => !ideatedDone.has(p));
 
   if (!next) {
-    // All platforms processed → finalise.
-    return finaliseRun(admin, runId);
+    // All platforms processed → finalise (strict completion check inside).
+    return finaliseRun(admin, runId, platforms);
   }
 
+  const attemptNo = (attemptCounts[next] ?? 0) + 1;
   const step = await logStepStart({
     runId,
     step: "ideate",
-    message: `Calling content-lab-ideate (${next})`,
-    payload: { platform: next },
+    message: `Calling content-lab-ideate (${next}, attempt ${attemptNo}/${MAX_PLATFORM_IDEATE_ATTEMPTS})`,
+    payload: { platform: next, attempt: attemptNo },
   });
   const res = await callFn("content-lab-ideate", { run_id: runId, platform: next });
-  if (!res.ok) {
-    await step.finish({ status: "failed", errorMessage: res.error ?? "unknown", payload: { platform: next } });
-    console.error(`[step-runner] ideate ${next} failed for ${runId}:`, res.error);
-    // Mark this platform as attempted (so we don't infinite-loop) but continue chain.
+  const newAttemptCounts = { ...attemptCounts, [next]: attemptNo };
+
+  if (res.ok) {
+    await step.finish({ status: "ok", message: `Ideate complete for ${next}`, payload: { platform: next } });
+    ideatedDone.add(next);
+    await admin.from("content_lab_runs").update({
+      summary: { ...summary, ideated_platforms: [...ideatedDone], ideate_attempts: newAttemptCounts },
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+  } else if (attemptNo < MAX_PLATFORM_IDEATE_ATTEMPTS) {
+    // Bounded internal retry — keep platform unmarked, just record the attempt and re-loop.
+    await step.finish({
+      status: "failed",
+      message: `Will retry ${next} (attempt ${attemptNo}/${MAX_PLATFORM_IDEATE_ATTEMPTS})`,
+      errorMessage: res.error ?? "unknown",
+      payload: { platform: next, attempt: attemptNo },
+    });
+    console.warn(`[step-runner] ideate ${next} attempt ${attemptNo} failed for ${runId}, will retry:`, res.error);
+    await admin.from("content_lab_runs").update({
+      summary: { ...summary, ideate_attempts: newAttemptCounts },
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+    // Brief backoff before re-dispatching
+    await new Promise((r) => setTimeout(r, 1500 * attemptNo));
+  } else {
+    // Bounded retries exhausted → record permanent failure for this platform and continue
+    await step.finish({
+      status: "failed",
+      errorMessage: `${res.error ?? "unknown"} (after ${attemptNo} attempts)`,
+      payload: { platform: next, attempt: attemptNo, exhausted: true },
+    });
+    console.error(`[step-runner] ideate ${next} exhausted ${attemptNo} attempts for ${runId}:`, res.error);
     ideatedDone.add(next);
     const failed = Array.isArray(summary.failed_ideate_platforms)
       ? new Set(summary.failed_ideate_platforms as string[]) : new Set<string>();
@@ -376,14 +453,8 @@ async function runOneIdeatePlatformStep(
         ...summary,
         ideated_platforms: [...ideatedDone],
         failed_ideate_platforms: [...failed],
+        ideate_attempts: newAttemptCounts,
       },
-      updated_at: new Date().toISOString(),
-    }).eq("id", runId);
-  } else {
-    await step.finish({ status: "ok", message: `Ideate complete for ${next}`, payload: { platform: next } });
-    ideatedDone.add(next);
-    await admin.from("content_lab_runs").update({
-      summary: { ...summary, ideated_platforms: [...ideatedDone] },
       updated_at: new Date().toISOString(),
     }).eq("id", runId);
   }
@@ -391,7 +462,7 @@ async function runOneIdeatePlatformStep(
   await chainNext(runId, "fresh");
 }
 
-async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string) {
+async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string, expectedPlatforms: string[]) {
   const { data: ideas } = await admin
     .from("content_lab_ideas")
     .select("target_platform, is_wildcard")
@@ -400,6 +471,22 @@ async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string
   const ideaCount = ideas?.length ?? 0;
   if (!ideaCount) {
     await failRun(admin, runId, "Ideation produced no ideas — see step logs for per-platform errors.");
+    return;
+  }
+
+  // STRICT COMPLETION: verify every expected platform has at least one idea.
+  const platformsWithIdeas = new Set(
+    ((ideas ?? []) as Array<{ target_platform: string | null }>)
+      .map((i) => i.target_platform)
+      .filter(Boolean) as string[],
+  );
+  const missingPlatforms = expectedPlatforms.filter((p) => !platformsWithIdeas.has(p));
+  if (missingPlatforms.length > 0) {
+    await failRun(
+      admin,
+      runId,
+      `Run incomplete — no ideas generated for: ${missingPlatforms.join(", ")}. Use Retry ideation to recover.`,
+    );
     return;
   }
 

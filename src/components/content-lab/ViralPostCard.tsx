@@ -72,8 +72,32 @@ const isHookDistinct = (hook: string | null, caption: string | null): boolean =>
   return !c.startsWith(h);
 };
 
+export const isRenderablePost = (post: {
+  author_handle?: string | null;
+  caption?: string | null;
+  post_url?: string | null;
+  thumbnail_url?: string | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+}): boolean => {
+  const handle = (post.author_handle ?? '').trim();
+  if (!handle) return false;
+  const captionLen = (post.caption ?? '').trim().length;
+  const hasUrl = !!post.post_url;
+  const hasThumb = !!post.thumbnail_url;
+  const hasCaption = captionLen >= 10;
+  const hasEngagement = (post.views ?? 0) > 0 || (post.likes ?? 0) > 0 || (post.comments ?? 0) > 0;
+  const fieldCount = (hasUrl ? 1 : 0) + (hasThumb ? 1 : 0) + (hasCaption ? 1 : 0);
+  if (fieldCount === 0) return false;
+  if (fieldCount === 1 && !hasEngagement) return false;
+  return true;
+};
+
 const ViralPostCard = ({ post }: ViralPostCardProps) => {
   const [imgFailed, setImgFailed] = useState(false);
+  // Final defensive guard: never render a blank shell, even if upstream filters miss a row.
+  if (!isRenderablePost(post)) return null;
   const isVideo = VIDEO_TYPES.has((post.post_type ?? '').toLowerCase());
   const platformLower = (post.platform ?? '').toLowerCase();
   const ctaLabel = platformLower === 'tiktok'
