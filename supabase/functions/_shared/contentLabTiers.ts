@@ -9,7 +9,7 @@ export const RUN_LIMITS_BY_TIER: Record<string, number> = {
   starter: 3,
   growth: 5,
   scale: 20,
-  agency: Number.MAX_SAFE_INTEGER,
+  agency: 10,
 };
 
 export const DEFAULT_RUN_LIMIT = 0;
