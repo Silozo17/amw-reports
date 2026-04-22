@@ -565,8 +565,24 @@ const client_invite: TemplateBuilder = (data, b) => ({
 });
 
 // ═══════════════════════════════════════════════════════════
-// TEMPLATE REGISTRY
+// CATEGORY 9 — CONTENT LAB
 // ═══════════════════════════════════════════════════════════
+
+const content_lab_run_complete: TemplateBuilder = (data, b) => {
+  const nicheLabel = escapeHtml(String(data.niche_label ?? "your niche"));
+  const ideaCount = Number(data.idea_count ?? 0);
+  const reportUrl = String(data.report_url ?? "#");
+  return {
+    subject: `Your Content Lab report for ${nicheLabel} is ready`,
+    html: wrapEmail(b, [
+      heading(`Your Content Lab report is ready`),
+      para(`We've finished generating fresh content ideas for <strong>${nicheLabel}</strong>.`),
+      para(`<strong>${ideaCount}</strong> ready-to-film ideas — including hooks, scripts, captions and visual direction — are waiting for you.`),
+      buildButton("View Report", reportUrl, b),
+      smallNote("Tip: save your favourites to your Swipe File so you can come back to them later."),
+    ].join("")),
+  };
+};
 
 const TEMPLATES: Record<string, TemplateBuilder> = {
   // Auth
