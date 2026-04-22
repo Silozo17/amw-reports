@@ -30,13 +30,13 @@ const MAX_BENCHMARK_HANDLES = 6;
 const MAX_TOTAL_POSTS = 80;
 const TOP_BENCHMARK_TO_ANALYSE = 10;
 const TOP_COMPETITOR_TO_ANALYSE = 10;
-// Recency window for competitor + benchmark posts (current + previous month).
-const RECENT_DAYS = 60;
+// Recency window for competitor + benchmark posts (current month only).
+const RECENT_DAYS = 30;
 const RECENT_CUTOFF_MS = RECENT_DAYS * 24 * 60 * 60 * 1000;
 
 const APIFY_CHUNK_SIZE = 5;
-const APIFY_TIMEOUT_SEC = 75;
-const APIFY_RETRY_TIMEOUT_SEC = 120;
+const APIFY_TIMEOUT_SEC = 90;
+const APIFY_RETRY_TIMEOUT_SEC = 150;
 
 interface DiscoveredEntity { handle: string; reason?: string }
 
@@ -733,8 +733,9 @@ async function runFacebookScraper(handle: string, resultsLimit: number, timeoutS
   const input = {
     startUrls: [{ url: `https://www.facebook.com/${cleaned}/` }],
     resultsLimit,
+    maxPostDate: new Date(Date.now() - RECENT_CUTOFF_MS).toISOString().slice(0, 10),
   };
-  const url = `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
+  const url = `https://api.apify.com/v2/acts/apify~facebook-posts-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
   try {
     const res = await fetch(url, {
       method: "POST",
