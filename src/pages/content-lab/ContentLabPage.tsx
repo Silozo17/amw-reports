@@ -179,8 +179,10 @@ const ContentLabPage = () => {
                   </p>
                   {usage && (
                     <p className="text-xs text-muted-foreground">
-                      Uses 1 of {usage.runsLimit} monthly runs ({usage.runsThisMonth} used so far).
-                      {monthlyExhausted && ` Will spend 1 credit instead — ${usage.creditBalance} available.`}
+                      {usage.runsLimit >= Number.MAX_SAFE_INTEGER
+                        ? `Unlimited monthly runs (${usage.runsThisMonth} used so far this month).`
+                        : `Uses 1 of ${usage.runsLimit} monthly runs (${usage.runsThisMonth} used so far).`}
+                      {monthlyExhausted && ` Will spend 1 credit instead — ${usage.creditBalance.toLocaleString()} available.`}
                     </p>
                   )}
                 </div>
