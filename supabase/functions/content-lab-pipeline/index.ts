@@ -156,11 +156,11 @@ Deno.serve(async (req) => {
 
       const used = await getCurrentUsage(admin, orgIdNew);
       const credits = await getCreditBalance(admin, orgIdNew);
-      // Credits do NOT grant runs (they're for regen/remix/refresh per spec).
-      // Block when monthly quota is exhausted.
-      if (used >= ent.monthlyLimit) {
+      // Monthly quota first; once exhausted, credits cover overflow runs (1 credit per run).
+      // The step-runner already routes to consume_content_lab_credit when used >= limit.
+      if (used >= ent.monthlyLimit && credits < 1) {
         return json({
-          error: `Monthly run limit reached (${used}/${ent.monthlyLimit}). Upgrade your plan to keep generating.`,
+          error: `Monthly run limit reached (${used}/${ent.monthlyLimit}) and no credits available. Top up to keep generating.`,
           limit_reached: true,
           runs_used: used,
           runs_limit: ent.monthlyLimit,
