@@ -376,7 +376,7 @@ function toRow(
     caption: idea.caption ?? null,
     caption_with_hashtag: idea.caption_with_hashtag ?? null,
     hook: idea.hook,
-    hook_variants: Array.isArray(idea.hook_variants) ? idea.hook_variants.slice(0, 3) : [],
+    hook_variants: Array.isArray(idea.hook_variants) ? idea.hook_variants.slice(0, 2) : [],
     body: idea.body,
     cta: idea.cta ?? null,
     script_full: idea.script_full ?? null,
