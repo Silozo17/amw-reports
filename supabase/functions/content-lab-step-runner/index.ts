@@ -405,6 +405,40 @@ async function runOneIdeatePlatformStep(
   }
 
   const attemptNo = (attemptCounts[next] ?? 0) + 1;
+
+  // Check if ideas already exist for this platform — a previous attempt may have
+  // succeeded but the HTTP response timed out before step-runner received it.
+  const { count: existingCount } = await admin
+    .from("content_lab_ideas")
+    .select("id", { count: "exact", head: true })
+    .eq("run_id", runId)
+    .eq("target_platform", next);
+  if (existingCount && existingCount > 0) {
+    console.log(`[step-runner] ${next} already has ${existingCount} ideas — skipping ideation, marking done`);
+    ideatedDone.add(next);
+    await admin.from("content_lab_runs").update({
+      summary: {
+        ...summary,
+        ideated_platforms: [...ideatedDone],
+        ideate_attempts: { ...attemptCounts, [next]: attemptNo },
+      },
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+    const skipStep = await logStepStart({
+      runId,
+      step: "ideate",
+      message: `Detected existing ideas for ${next} — skipping`,
+      payload: { platform: next, attempt: attemptNo },
+    });
+    await skipStep.finish({
+      status: "ok",
+      message: `${next} ideas already present (${existingCount}) — HTTP timeout was a false failure`,
+      payload: { platform: next, idea_count: existingCount, recovered: true },
+    });
+    await chainNext(runId, "fresh");
+    return;
+  }
+
   const step = await logStepStart({
     runId,
     step: "ideate",
