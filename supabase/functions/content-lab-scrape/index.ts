@@ -103,9 +103,13 @@ Deno.serve(async (req) => {
       ownHandlesByPlatform.instagram = niche.own_handle.toLowerCase().replace(/^@/, '');
     }
 
+    const ownHandleSet = new Set<string>(Object.values(ownHandlesByPlatform).filter((h): h is string => !!h));
+    if (niche.own_handle) ownHandleSet.add(niche.own_handle.toLowerCase().replace(/^@/, ""));
+
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
       .filter((h): h is string => !!h)
+      .filter((h) => !ownHandleSet.has(h))
       .slice(0, MAX_COMPETITOR_HANDLES);
 
     const benchmarkHandles = await loadBenchmarkHandles({
@@ -113,6 +117,7 @@ Deno.serve(async (req) => {
       niche_tag: niche.niche_tag,
       enabledPlatforms,
       llmFallback: niche.top_global_benchmarks ?? [],
+      ownHandleSet,
     });
 
     const [ownResult, compResult, benchResult] = await Promise.allSettled([
