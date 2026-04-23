@@ -414,6 +414,20 @@ async function runOneIdeatePlatformStep(
   const res = await callFn("content-lab-ideate", { run_id: runId, platform: next });
   const newAttemptCounts = { ...attemptCounts, [next]: attemptNo };
 
+  // Don't retry a platform that has no posts — it will always fail
+  const noPostsError = (res.error ?? "").includes("No benchmark") || (res.error ?? "").includes("no posts");
+  if (noPostsError) {
+    // Mark done and move on — cross-platform fallback in ideate will handle it next pass
+    ideatedDone.add(next);
+    await admin.from("content_lab_runs").update({
+      summary: { ...summary, ideated_platforms: [...ideatedDone], ideate_attempts: newAttemptCounts },
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
+    await step.finish({ status: "failed", errorMessage: res.error ?? "unknown" });
+    await chainNext(runId, "fresh");
+    return;
+  }
+
   if (res.ok) {
     await step.finish({ status: "ok", message: `Ideate complete for ${next}`, payload: { platform: next } });
     ideatedDone.add(next);
@@ -482,13 +496,17 @@ async function finaliseRun(admin: ReturnType<typeof createClient>, runId: string
   );
   const missingPlatforms = expectedPlatforms.filter((p) => !platformsWithIdeas.has(p));
   if (missingPlatforms.length > 0) {
-    await failRun(
-      admin,
-      runId,
-      `Run incomplete — no ideas generated for: ${missingPlatforms.join(", ")}. Use Retry ideation to recover.`,
-    );
-    return;
+    console.warn(`[finalise] ${runId}: no ideas for ${missingPlatforms.join(', ')} — completing with partial results`);
+    // Log partial completion in summary but do NOT fail the run
+    const { data: runRowPartial } = await admin
+      .from("content_lab_runs").select("summary").eq("id", runId).maybeSingle();
+    const sPartial = ((runRowPartial as { summary?: Record<string, unknown> } | null)?.summary ?? {}) as Record<string, unknown>;
+    await admin.from("content_lab_runs").update({
+      summary: { ...sPartial, partial_platforms_missing: missingPlatforms },
+      updated_at: new Date().toISOString(),
+    }).eq("id", runId);
   }
+  // Continue to complete regardless
 
   // Build display_name + description for nicer UI labels.
   const { data: runRow } = await admin
