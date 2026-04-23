@@ -502,9 +502,9 @@ Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native
               hook: { type: "string", description: "Exact words spoken in first 3 seconds (the primary recommended hook)" },
               hook_variants: {
                 type: "array",
-                minItems: 3,
-                maxItems: 3,
-                description: "Three alternative opening hooks for the SAME idea, each using a different attention mechanism so the user can pick the one that fits their voice. The first variant should match `hook` above.",
+                minItems: 2,
+                maxItems: 2,
+                description: "Two alternative opening hooks for the SAME idea, each using a different attention mechanism so the user can pick the one that fits their voice. The first variant should match `hook` above.",
                 items: {
                   type: "object",
                   properties: {
@@ -519,12 +519,12 @@ Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native
               cta: { type: "string", description: "Specific, action-led CTA aligned with the brand's stated goal" },
               caption: { type: "string", description: "Post caption (no hashtags) — MUST NOT duplicate the hook" },
               caption_with_hashtag: { type: "string", description: "Caption with 1-3 hashtags appended" },
-              script_full: { type: "string", description: "Full word-for-word script: hook + body + CTA" },
+              script_full: { type: "string", description: "Max 150 words. Hook + body + CTA only, no stage directions." },
               duration_seconds: { type: "integer", minimum: 10, maximum: 90 },
               visual_direction: { type: "string", description: "What's on screen — angle, b-roll, text overlays" },
               why_it_works: { type: "string", description: "Name the source post's metric AND the structural mechanic you're borrowing" },
               hashtags: { type: "array", items: { type: "string" }, maxItems: 3 },
-              filming_checklist: { type: "array", items: { type: "string" }, maxItems: 6 },
+              filming_checklist: { type: "array", items: { type: "string" }, maxItems: 4 },
               platform_style_notes: { type: "string" },
             },
             required: ["title", "based_on_handle", "hook", "hook_variants", "body", "cta", "caption", "script_full", "duration_seconds", "why_it_works", "platform_style_notes"],
@@ -545,7 +545,7 @@ Use the generate_ideas tool to return exactly ${requestCount} ${platform}-native
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 16000,
+        max_tokens: 10000,
         tools: [tool],
         tool_choice: { type: "tool", name: "generate_ideas" },
         system: systemPrompt,
@@ -720,7 +720,7 @@ Use the generate_ideas tool to return exactly ${count} wildcard ${platform}-nati
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 8000,
+        max_tokens: 5000,
         tools: [tool],
         tool_choice: { type: "tool", name: "generate_ideas" },
         system: systemPrompt,
