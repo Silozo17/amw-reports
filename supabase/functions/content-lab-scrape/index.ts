@@ -26,7 +26,7 @@ const APIFY_ACTOR = "apify~instagram-scraper";
 const MAX_POSTS_OWN = 8;
 const MAX_POSTS_PER_ACCOUNT = 4;
 const MAX_COMPETITOR_HANDLES = 5;
-const MAX_BENCHMARK_HANDLES = 6;
+const MAX_BENCHMARK_HANDLES = 10;
 const MAX_TOTAL_POSTS = 80;
 const TOP_BENCHMARK_TO_ANALYSE = 10;
 const TOP_COMPETITOR_TO_ANALYSE = 10;
@@ -103,9 +103,13 @@ Deno.serve(async (req) => {
       ownHandlesByPlatform.instagram = niche.own_handle.toLowerCase().replace(/^@/, '');
     }
 
+    const ownHandleSet = new Set<string>(Object.values(ownHandlesByPlatform).filter((h): h is string => !!h));
+    if (niche.own_handle) ownHandleSet.add(niche.own_handle.toLowerCase().replace(/^@/, ""));
+
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
       .filter((h): h is string => !!h)
+      .filter((h) => !ownHandleSet.has(h))
       .slice(0, MAX_COMPETITOR_HANDLES);
 
     const benchmarkHandles = await loadBenchmarkHandles({
@@ -113,6 +117,7 @@ Deno.serve(async (req) => {
       niche_tag: niche.niche_tag,
       enabledPlatforms,
       llmFallback: niche.top_global_benchmarks ?? [],
+      ownHandleSet,
     });
 
     const [ownResult, compResult, benchResult] = await Promise.allSettled([
@@ -385,6 +390,7 @@ async function loadBenchmarkHandles(args: {
   niche_tag: string | null;
   enabledPlatforms: Array<"instagram" | "tiktok" | "facebook">;
   llmFallback: DiscoveredEntity[];
+  ownHandleSet: Set<string>;
 }): Promise<string[]> {
   if (args.niche_tag) {
     const { data } = await args.supabase
@@ -392,19 +398,23 @@ async function loadBenchmarkHandles(args: {
       .select("handle")
       .eq("niche_tag", args.niche_tag)
       .eq("status", "verified")
-      .in("platform", args.enabledPlatforms)
       .order("median_views", { ascending: false })
-      .limit(MAX_BENCHMARK_HANDLES);
+      .limit(MAX_BENCHMARK_HANDLES * 2);
+    const seenPool = new Set<string>();
     const fromPool = ((data ?? []) as Array<{ handle: string }>)
-      .map((r) => r.handle.toLowerCase().replace(/^@/, ""));
+      .map((r) => r.handle.toLowerCase().replace(/^@/, ""))
+      .filter((h) => !args.ownHandleSet.has(h) && !seenPool.has(h) && (seenPool.add(h), true))
+      .slice(0, MAX_BENCHMARK_HANDLES);
     if (fromPool.length > 0) {
       console.log(`Benchmarks: ${fromPool.length} from verified pool (${args.niche_tag})`);
       return fromPool;
     }
   }
-  const fallback = args.llmFallback
+  const seen = new Set<string>();
+  const fallback = (args.llmFallback ?? [])
     .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
     .filter((h): h is string => !!h)
+    .filter((h) => !args.ownHandleSet.has(h) && !seen.has(h) && (seen.add(h), true))
     .slice(0, MAX_BENCHMARK_HANDLES);
   console.log(`Benchmarks: ${fallback.length} from LLM fallback (pool empty for ${args.niche_tag ?? "no tag"})`);
   return fallback;
