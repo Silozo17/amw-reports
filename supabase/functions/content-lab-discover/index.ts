@@ -102,6 +102,37 @@ Deno.serve(async (req) => {
     const nicheTag = slugify(discovery.niche_label);
 
     if (input.niche_id) {
+      // Load existing tracked_handles + own_handle so we can strip them from
+      // benchmarks/competitors (no point benchmarking against ourselves).
+      const { data: existingNiche } = await admin
+        .from("content_lab_niches")
+        .select("own_handle, tracked_handles")
+        .eq("id", input.niche_id)
+        .maybeSingle();
+
+      const norm = (h: string | null | undefined) =>
+        (h ?? "").toLowerCase().replace(/^@/, "").trim();
+      const ownHandleSet = new Set<string>();
+      if (input.own_handle) ownHandleSet.add(norm(input.own_handle));
+      if (existingNiche?.own_handle) ownHandleSet.add(norm(existingNiche.own_handle as string));
+      const tracked = (existingNiche?.tracked_handles ?? []) as Array<{ handle?: string }>;
+      tracked.forEach((t) => { if (t?.handle) ownHandleSet.add(norm(t.handle)); });
+
+      const dedupeByHandle = <T extends { handle: string }>(arr: T[]): T[] => {
+        const seen = new Set<string>();
+        const out: T[] = [];
+        for (const item of arr) {
+          const key = norm(item.handle);
+          if (!key || seen.has(key) || ownHandleSet.has(key)) continue;
+          seen.add(key);
+          out.push(item);
+        }
+        return out;
+      };
+
+      const cleanedBenchmarks = dedupeByHandle(discovery.top_global_benchmarks ?? []);
+      const cleanedCompetitors = dedupeByHandle(discovery.top_competitors ?? []);
+
       const { error: uErr } = await admin
         .from("content_lab_niches")
         .update({
@@ -111,8 +142,8 @@ Deno.serve(async (req) => {
           label: discovery.niche_label,
           niche_tag: nicheTag,
           niche_description: discovery.niche_description,
-          top_competitors: discovery.top_competitors,
-          top_global_benchmarks: discovery.top_global_benchmarks,
+          top_competitors: cleanedCompetitors,
+          top_global_benchmarks: cleanedBenchmarks,
           tracked_hashtags: discovery.suggested_hashtags,
           tracked_keywords: discovery.suggested_keywords,
           tone_of_voice: discovery.default_creative_prefs.tone_of_voice,
@@ -254,12 +285,20 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
     `You are the Head of Creative Direction at a top-tier social agency in ${CURRENT_YEAR}, with 12+ years identifying who the real best-in-class creators are in any vertical.`,
     "Given a brand's website + their handle + location + structured brand brief,",
     "you identify their PRECISE niche and produce TWO ranked lists:",
-    "1) top_global_benchmarks: EXACTLY 10 worldwide best-in-class accounts in this niche, RANKED BY TYPICAL REEL VIEWS (not engagement rate, not vibes — raw view count is the signal). These are the accounts you would tell the client to study and reverse-engineer.",
+    "1) top_global_benchmarks: worldwide best-in-class accounts in this niche, RANKED BY TYPICAL REEL/SHORT-FORM VIEWS (not engagement rate, not vibes — raw view count is the signal). These are the accounts you would tell the client to study and reverse-engineer.",
     "2) top_competitors: up to 5 local/regional competitors operating in the same market.",
+    "",
+    "CROSS-PLATFORM COVERAGE (CRITICAL):",
+    "For each competitor and benchmark account, search for their presence on Instagram, TikTok AND Facebook. Return a SEPARATE entry for each platform they are active on. If you cannot confirm a handle on a platform, OMIT it rather than guessing.",
+    "Example — a single creator may yield 3 entries:",
+    "  { handle: 's_and_p_services', platform: 'instagram', reason: '...' }",
+    "  { handle: 'sandpservices',    platform: 'tiktok',    reason: '...' }",
+    "  { handle: 'S and P Services', platform: 'facebook',  reason: '...' }",
+    "Aim for ~10 distinct creators in benchmarks, which may produce 15-25 total entries across platforms.",
     "",
     "Hard rules:",
     "- Be ruthlessly specific. 'London wedding photographers serving £5k+ weddings' beats 'photographers'.",
-    "- For benchmarks, list real, verifiable Instagram handles you are highly confident exist and currently post in this niche. If unsure about a handle, OMIT it — never invent.",
+    "- Only return handles you are highly confident exist and currently post in this niche on that specific platform. If unsure, OMIT — never invent.",
     "- Benchmarks must actually post the kind of short-form content this brand could film. A talking-head expert is not a benchmark for a wordless aesthetic brand.",
     "- For each benchmark, give a 1-line reason that names their typical view range (rough est_avg_views like '500k-2M') and what mechanic makes them work.",
     "- Default creative prefs should be tight and tailored — not generic.",
@@ -288,11 +327,11 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
           niche_description: { type: "string", description: "1-2 sentence description of the niche, audience and offer." },
           top_competitors: {
             type: "array",
-            description: "Up to 5 local/regional competitors.",
+            description: "Local/regional competitors. One entry per (creator, platform) pair — same creator on IG + TikTok = 2 entries. Up to ~15 entries total.",
             items: {
               type: "object",
               properties: {
-                handle: { type: "string", description: "Instagram handle without @" },
+                handle: { type: "string", description: "Platform-specific handle without @ (or page name for Facebook)." },
                 platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
                 reason: { type: "string" },
               },
@@ -302,16 +341,16 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
           },
           top_global_benchmarks: {
             type: "array",
-            description: "EXACTLY 10 worldwide best-in-class accounts ranked by typical reel views.",
+            description: "Worldwide best-in-class accounts ranked by typical short-form views. One entry per (creator, platform) pair — aim for ~10 distinct creators which may produce 15-25 entries across IG/TikTok/Facebook.",
             minItems: 10,
-            maxItems: 10,
+            maxItems: 30,
             items: {
               type: "object",
               properties: {
-                handle: { type: "string" },
+                handle: { type: "string", description: "Platform-specific handle without @ (or page name for Facebook)." },
                 platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
                 reason: { type: "string", description: "1 line: their mechanic + why they're top." },
-                est_avg_views: { type: "string", description: "Rough typical reel views, e.g. '500k-2M'." },
+                est_avg_views: { type: "string", description: "Rough typical reel/short views, e.g. '500k-2M'." },
               },
               required: ["handle", "platform", "reason", "est_avg_views"],
               additionalProperties: false,
