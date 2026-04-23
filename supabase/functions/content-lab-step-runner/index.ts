@@ -205,7 +205,9 @@ async function chainNext(runId: string, mode: "fresh" | "resume" | "rescrape") {
   }, 8000);
 }
 
-async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string; payload?: unknown }> {
+async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string; payload?: unknown; timedOut?: boolean }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 140_000);
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
       method: "POST",
@@ -214,14 +216,22 @@ async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     const text = await res.text();
     if (!res.ok) return { ok: false, error: `${res.status} ${text.slice(0, 500)}` };
     let payload: unknown = null;
     try { payload = JSON.parse(text); } catch { /* non-JSON */ }
     return { ok: true, payload };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "fetch failed" };
+    clearTimeout(timeout);
+    const isTimeout = e instanceof Error && e.name === "AbortError";
+    return {
+      ok: false,
+      error: isTimeout ? "TIMEOUT_140S" : (e instanceof Error ? e.message : "fetch failed"),
+      timedOut: isTimeout,
+    };
   }
 }
 
@@ -447,6 +457,34 @@ async function runOneIdeatePlatformStep(
   });
   const res = await callFn("content-lab-ideate", { run_id: runId, platform: next });
   const newAttemptCounts = { ...attemptCounts, [next]: attemptNo };
+
+  // If the call timed out at the HTTP layer, the ideate function may still have
+  // completed and written ideas. Wait briefly, then check the DB before deciding.
+  if (res.timedOut) {
+    console.warn(`[step-runner] ideate ${next} timed out at 140s — waiting 5s then checking for ideas`);
+    await new Promise((r) => setTimeout(r, 5000));
+    const { count: postTimeoutCount } = await admin
+      .from("content_lab_ideas")
+      .select("id", { count: "exact", head: true })
+      .eq("run_id", runId)
+      .eq("target_platform", next);
+    if (postTimeoutCount && postTimeoutCount > 0) {
+      console.log(`[step-runner] ${next} recovered after timeout — ${postTimeoutCount} ideas present`);
+      ideatedDone.add(next);
+      await admin.from("content_lab_runs").update({
+        summary: { ...summary, ideated_platforms: [...ideatedDone], ideate_attempts: newAttemptCounts },
+        updated_at: new Date().toISOString(),
+      }).eq("id", runId);
+      await step.finish({
+        status: "ok",
+        message: `${next} recovered after HTTP timeout — ${postTimeoutCount} ideas present`,
+        payload: { platform: next, idea_count: postTimeoutCount, recovered: true },
+      });
+      await chainNext(runId, "fresh");
+      return;
+    }
+    // Otherwise fall through to normal retry logic below
+  }
 
   // Don't retry a platform that has no posts — it will always fail
   const noPostsError = (res.error ?? "").includes("No benchmark") || (res.error ?? "").includes("no posts");
