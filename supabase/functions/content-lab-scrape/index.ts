@@ -390,6 +390,7 @@ async function loadBenchmarkHandles(args: {
   niche_tag: string | null;
   enabledPlatforms: Array<"instagram" | "tiktok" | "facebook">;
   llmFallback: DiscoveredEntity[];
+  ownHandleSet: Set<string>;
 }): Promise<string[]> {
   if (args.niche_tag) {
     const { data } = await args.supabase
@@ -397,19 +398,23 @@ async function loadBenchmarkHandles(args: {
       .select("handle")
       .eq("niche_tag", args.niche_tag)
       .eq("status", "verified")
-      .in("platform", args.enabledPlatforms)
       .order("median_views", { ascending: false })
-      .limit(MAX_BENCHMARK_HANDLES);
+      .limit(MAX_BENCHMARK_HANDLES * 2);
+    const seenPool = new Set<string>();
     const fromPool = ((data ?? []) as Array<{ handle: string }>)
-      .map((r) => r.handle.toLowerCase().replace(/^@/, ""));
+      .map((r) => r.handle.toLowerCase().replace(/^@/, ""))
+      .filter((h) => !args.ownHandleSet.has(h) && !seenPool.has(h) && (seenPool.add(h), true))
+      .slice(0, MAX_BENCHMARK_HANDLES);
     if (fromPool.length > 0) {
       console.log(`Benchmarks: ${fromPool.length} from verified pool (${args.niche_tag})`);
       return fromPool;
     }
   }
-  const fallback = args.llmFallback
+  const seen = new Set<string>();
+  const fallback = (args.llmFallback ?? [])
     .map((b) => b.handle?.toLowerCase().replace(/^@/, ""))
     .filter((h): h is string => !!h)
+    .filter((h) => !args.ownHandleSet.has(h) && !seen.has(h) && (seen.add(h), true))
     .slice(0, MAX_BENCHMARK_HANDLES);
   console.log(`Benchmarks: ${fallback.length} from LLM fallback (pool empty for ${args.niche_tag ?? "no tag"})`);
   return fallback;
