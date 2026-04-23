@@ -296,11 +296,11 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
           niche_description: { type: "string", description: "1-2 sentence description of the niche, audience and offer." },
           top_competitors: {
             type: "array",
-            description: "Up to 5 local/regional competitors.",
+            description: "Local/regional competitors. One entry per (creator, platform) pair — same creator on IG + TikTok = 2 entries. Up to ~15 entries total.",
             items: {
               type: "object",
               properties: {
-                handle: { type: "string", description: "Instagram handle without @" },
+                handle: { type: "string", description: "Platform-specific handle without @ (or page name for Facebook)." },
                 platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
                 reason: { type: "string" },
               },
@@ -310,16 +310,16 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
           },
           top_global_benchmarks: {
             type: "array",
-            description: "EXACTLY 10 worldwide best-in-class accounts ranked by typical reel views.",
+            description: "Worldwide best-in-class accounts ranked by typical short-form views. One entry per (creator, platform) pair — aim for ~10 distinct creators which may produce 15-25 entries across IG/TikTok/Facebook.",
             minItems: 10,
-            maxItems: 10,
+            maxItems: 30,
             items: {
               type: "object",
               properties: {
-                handle: { type: "string" },
+                handle: { type: "string", description: "Platform-specific handle without @ (or page name for Facebook)." },
                 platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
                 reason: { type: "string", description: "1 line: their mechanic + why they're top." },
-                est_avg_views: { type: "string", description: "Rough typical reel views, e.g. '500k-2M'." },
+                est_avg_views: { type: "string", description: "Rough typical reel/short views, e.g. '500k-2M'." },
               },
               required: ["handle", "platform", "reason", "est_avg_views"],
               additionalProperties: false,
