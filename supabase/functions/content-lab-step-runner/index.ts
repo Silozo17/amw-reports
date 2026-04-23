@@ -205,7 +205,9 @@ async function chainNext(runId: string, mode: "fresh" | "resume" | "rescrape") {
   }, 8000);
 }
 
-async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string; payload?: unknown }> {
+async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error?: string; payload?: unknown; timedOut?: boolean }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 140_000);
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
       method: "POST",
@@ -214,14 +216,22 @@ async function callFn(name: string, body: unknown): Promise<{ ok: boolean; error
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     const text = await res.text();
     if (!res.ok) return { ok: false, error: `${res.status} ${text.slice(0, 500)}` };
     let payload: unknown = null;
     try { payload = JSON.parse(text); } catch { /* non-JSON */ }
     return { ok: true, payload };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "fetch failed" };
+    clearTimeout(timeout);
+    const isTimeout = e instanceof Error && e.name === "AbortError";
+    return {
+      ok: false,
+      error: isTimeout ? "TIMEOUT_140S" : (e instanceof Error ? e.message : "fetch failed"),
+      timedOut: isTimeout,
+    };
   }
 }
 
