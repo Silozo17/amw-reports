@@ -436,7 +436,7 @@ async function generateIdeasForPlatform(args: IdeatePlatformArgs): Promise<Ideat
   const { apiKey, niche, platform, count, benchmarkPosts, ownPosts, ownIsCompetitive, ownAvgViews, benchmarkP50Views } = args;
 
   // Generate a slight buffer so the validator can reject a few without starving the run.
-  const requestCount = Math.min(count + 2, count * 2);
+  const requestCount = count + 1;
 
   const inspirationPool = ownIsCompetitive
     ? [...benchmarkPosts, ...ownPosts.slice(0, 6)]
