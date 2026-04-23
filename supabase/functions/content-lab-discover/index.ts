@@ -102,6 +102,37 @@ Deno.serve(async (req) => {
     const nicheTag = slugify(discovery.niche_label);
 
     if (input.niche_id) {
+      // Load existing tracked_handles + own_handle so we can strip them from
+      // benchmarks/competitors (no point benchmarking against ourselves).
+      const { data: existingNiche } = await admin
+        .from("content_lab_niches")
+        .select("own_handle, tracked_handles")
+        .eq("id", input.niche_id)
+        .maybeSingle();
+
+      const norm = (h: string | null | undefined) =>
+        (h ?? "").toLowerCase().replace(/^@/, "").trim();
+      const ownHandleSet = new Set<string>();
+      if (input.own_handle) ownHandleSet.add(norm(input.own_handle));
+      if (existingNiche?.own_handle) ownHandleSet.add(norm(existingNiche.own_handle as string));
+      const tracked = (existingNiche?.tracked_handles ?? []) as Array<{ handle?: string }>;
+      tracked.forEach((t) => { if (t?.handle) ownHandleSet.add(norm(t.handle)); });
+
+      const dedupeByHandle = <T extends { handle: string }>(arr: T[]): T[] => {
+        const seen = new Set<string>();
+        const out: T[] = [];
+        for (const item of arr) {
+          const key = norm(item.handle);
+          if (!key || seen.has(key) || ownHandleSet.has(key)) continue;
+          seen.add(key);
+          out.push(item);
+        }
+        return out;
+      };
+
+      const cleanedBenchmarks = dedupeByHandle(discovery.top_global_benchmarks ?? []);
+      const cleanedCompetitors = dedupeByHandle(discovery.top_competitors ?? []);
+
       const { error: uErr } = await admin
         .from("content_lab_niches")
         .update({
@@ -111,8 +142,8 @@ Deno.serve(async (req) => {
           label: discovery.niche_label,
           niche_tag: nicheTag,
           niche_description: discovery.niche_description,
-          top_competitors: discovery.top_competitors,
-          top_global_benchmarks: discovery.top_global_benchmarks,
+          top_competitors: cleanedCompetitors,
+          top_global_benchmarks: cleanedBenchmarks,
           tracked_hashtags: discovery.suggested_hashtags,
           tracked_keywords: discovery.suggested_keywords,
           tone_of_voice: discovery.default_creative_prefs.tone_of_voice,
