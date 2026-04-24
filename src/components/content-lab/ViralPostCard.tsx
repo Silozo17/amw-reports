@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Eye, Heart } from 'lucide-react';
+import IgThumb from '@/components/content-lab/IgThumb';
 
 export interface ViralPostCardData {
   thumbnail_url: string | null;
@@ -12,11 +13,7 @@ export interface ViralPostCardData {
 
 const ViralPostCard = ({ post }: { post: ViralPostCardData }) => (
   <Card className="overflow-hidden">
-    <div className="aspect-square bg-muted">
-      {post.thumbnail_url && (
-        <img src={post.thumbnail_url} alt={post.caption ?? ''} className="w-full h-full object-cover" loading="lazy" />
-      )}
-    </div>
+    <IgThumb src={post.thumbnail_url} alt={post.caption ?? `Post by @${post.author_handle}`} className="aspect-square" />
     <div className="p-3 space-y-1">
       <p className="text-xs font-semibold truncate">@{post.author_handle}</p>
       {post.caption && <p className="text-[11px] text-muted-foreground line-clamp-2">{post.caption}</p>}
