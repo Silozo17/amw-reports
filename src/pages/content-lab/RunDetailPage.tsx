@@ -90,7 +90,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_posts')
-        .select('id, bucket, platform, author_handle, caption, thumbnail_url, post_url, views, likes, comments, engagement_rate, posted_at, hook_type, hook_text')
+        .select('id, bucket, platform, author_handle, caption, thumbnail_url, post_url, views, likes, comments, engagement_rate, posted_at, hook_type, hook_text, media_kind')
         .eq('run_id', id!)
         .order('engagement_rate', { ascending: false });
       if (error) throw error;
