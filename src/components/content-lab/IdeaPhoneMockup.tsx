@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { useSaveItem } from '@/hooks/useContentLabSaves';
+import IgThumb from '@/components/content-lab/IgThumb';
 
 const HOOK_AUTOROTATE_MS = 4000;
 
@@ -393,16 +394,11 @@ const WhyItWorks = ({ idea }: { idea: MockupIdea }) => {
         )}
         {inspiration && (
           <div className="flex items-center gap-3 rounded-md border border-border bg-background p-2">
-            {inspiration.thumbnail_url ? (
-              <img
-                src={inspiration.thumbnail_url}
-                alt={`Post by @${inspiration.author_handle}`}
-                loading="lazy"
-                className="h-14 w-14 shrink-0 rounded object-cover"
-              />
-            ) : (
-              <div className="h-14 w-14 shrink-0 rounded bg-muted" />
-            )}
+            <IgThumb
+              src={inspiration.thumbnail_url}
+              alt={`Post by @${inspiration.author_handle}`}
+              className="h-14 w-14 shrink-0 rounded"
+            />
             <div className="min-w-0 flex-1">
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 Inspired by

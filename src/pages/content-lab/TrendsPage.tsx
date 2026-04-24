@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
 import UsageHeader from '@/components/content-lab/UsageHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
+import IgThumb from '@/components/content-lab/IgThumb';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { useTrends, useDeleteTrend } from '@/hooks/useContentLabSaves';
 import usePageMeta from '@/hooks/usePageMeta';
@@ -65,9 +66,7 @@ const TrendsPage = () => {
                         const ev = e as Record<string, unknown>;
                         const thumb = ev.thumbnail_url as string | undefined;
                         return (
-                          <div key={i} className="aspect-square overflow-hidden rounded bg-muted">
-                            {thumb && <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />}
-                          </div>
+                          <IgThumb key={i} src={thumb ?? null} alt="" className="aspect-square rounded" />
                         );
                       })}
                     </div>

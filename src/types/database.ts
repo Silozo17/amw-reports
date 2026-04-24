@@ -117,6 +117,7 @@ export interface Client {
   brand_voice: string | null;
   show_health_score: boolean;
   show_portal_upsells: boolean;
+  services_offered: string[];
 }
 
 export type PortalUpsellCategory = 'paid_ads' | 'seo' | 'organic_content' | 'email' | 'web' | 'other';

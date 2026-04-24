@@ -14,6 +14,7 @@ import { useRunProgress } from '@/hooks/useRunProgress';
 import StartRunDialog from '@/components/content-lab/StartRunDialog';
 import UsageHeader from '@/components/content-lab/UsageHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
+import ServicesOfferedEditor from '@/components/content-lab/ServicesOfferedEditor';
 import { parseCompetitors } from '@/lib/competitors';
 import type { Client } from '@/types/database';
 
@@ -210,6 +211,8 @@ const ClientContentLabTab = ({ client, onEditClient }: Props) => {
           </div>
         </Card>
       </div>
+
+      <ServicesOfferedEditor clientId={client.id} initial={client.services_offered ?? []} />
 
       {/* Live progress */}
       {isActive && latest && (

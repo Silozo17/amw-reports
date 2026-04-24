@@ -17,6 +17,7 @@ import { useSaveItem, useSaveHook } from '@/hooks/useContentLabSaves';
 import UsageHeader from '@/components/content-lab/UsageHeader';
 import RunProgressStepper, { type RunStepDef } from '@/components/content-lab/RunProgressStepper';
 import IdeaPhoneMockup from '@/components/content-lab/IdeaPhoneMockup';
+import IgThumb from '@/components/content-lab/IgThumb';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const RUN_STEPS: RunStepDef[] = [
@@ -309,7 +310,7 @@ const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string
           <Card key={p.id} className="overflow-hidden">
             <div className="relative aspect-square bg-gradient-to-br from-muted to-muted/40">
               {p.thumbnail_url ? (
-                <img src={p.thumbnail_url} alt={p.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />
+                <IgThumb src={p.thumbnail_url} alt={p.caption ?? `Post by @${p.author_handle}`} className="h-full w-full" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center p-3 text-center">
                   <p className="line-clamp-4 text-[10px] text-muted-foreground">{p.caption ?? 'No preview available'}</p>

@@ -290,6 +290,7 @@ export type Database = {
           scheduled_deletion_at: string | null
           service_area_type: string
           service_areas: string | null
+          services_offered: string[]
           services_subscribed: string[] | null
           show_health_score: boolean
           show_portal_upsells: boolean
@@ -336,6 +337,7 @@ export type Database = {
           scheduled_deletion_at?: string | null
           service_area_type?: string
           service_areas?: string | null
+          services_offered?: string[]
           services_subscribed?: string[] | null
           show_health_score?: boolean
           show_portal_upsells?: boolean
@@ -382,6 +384,7 @@ export type Database = {
           scheduled_deletion_at?: string | null
           service_area_type?: string
           service_areas?: string | null
+          services_offered?: string[]
           services_subscribed?: string[] | null
           show_health_score?: boolean
           show_portal_upsells?: boolean
@@ -403,6 +406,7 @@ export type Database = {
       }
       content_lab_credit_ledger: {
         Row: {
+          bucket: string | null
           created_at: string
           delta: number
           id: string
@@ -413,6 +417,7 @@ export type Database = {
           stripe_payment_id: string | null
         }
         Insert: {
+          bucket?: string | null
           created_at?: string
           delta: number
           id?: string
@@ -423,6 +428,7 @@ export type Database = {
           stripe_payment_id?: string | null
         }
         Update: {
+          bucket?: string | null
           created_at?: string
           delta?: number
           id?: string
@@ -440,7 +446,10 @@ export type Database = {
           created_at: string
           lifetime_purchased: number
           lifetime_used: number
+          monthly_balance: number
+          monthly_period_start: string
           org_id: string
+          paid_balance: number
           updated_at: string
         }
         Insert: {
@@ -448,7 +457,10 @@ export type Database = {
           created_at?: string
           lifetime_purchased?: number
           lifetime_used?: number
+          monthly_balance?: number
+          monthly_period_start?: string
           org_id: string
+          paid_balance?: number
           updated_at?: string
         }
         Update: {
@@ -456,7 +468,10 @@ export type Database = {
           created_at?: string
           lifetime_purchased?: number
           lifetime_used?: number
+          monthly_balance?: number
+          monthly_period_start?: string
           org_id?: string
+          paid_balance?: number
           updated_at?: string
         }
         Relationships: []

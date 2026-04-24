@@ -747,7 +747,7 @@ Deno.serve(async (req: Request) => {
     // Load client + verify membership
     const { data: client, error: cErr } = await admin
       .from("clients")
-      .select("id, org_id, company_name, industry, location, website, competitors, social_handles, brand_voice, unique_selling_points, business_goals, target_audience")
+      .select("id, org_id, company_name, industry, location, website, competitors, social_handles, brand_voice, unique_selling_points, business_goals, target_audience, services_offered")
       .eq("id", clientId).maybeSingle();
     if (cErr || !client) return json({ error: "Client not found" }, 404);
 
