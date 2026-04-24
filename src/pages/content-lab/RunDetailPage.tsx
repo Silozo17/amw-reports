@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveItem, useSaveHook } from '@/hooks/useContentLabSaves';
 import UsageHeader from '@/components/content-lab/UsageHeader';
+import IdeaPhoneMockup from '@/components/content-lab/IdeaPhoneMockup';
 import usePageMeta from '@/hooks/usePageMeta';
 
 interface RunRow {
