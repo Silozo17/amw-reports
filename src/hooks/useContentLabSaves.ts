@@ -104,14 +104,14 @@ export const useSaveItem = () => {
   return useMutation({
     mutationFn: async (args: SaveItemArgs) => {
       if (!orgId) throw new Error('No org');
-      const { error } = await supabase.from('content_lab_saves').insert({
+      const { error } = await supabase.from('content_lab_saves').insert([{
         org_id: orgId,
         saved_by: user?.id ?? null,
         kind: args.kind,
         source_run_id: args.source_run_id ?? null,
         source_id: args.source_id ?? null,
-        payload: args.payload,
-      });
+        payload: args.payload as never,
+      }]);
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
