@@ -60,6 +60,7 @@ const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
 const SavesPage = lazy(() => import("./pages/content-lab/SavesPage"));
 const HookLibraryPage = lazy(() => import("./pages/content-lab/HookLibraryPage"));
 const TrendsPage = lazy(() => import("./pages/content-lab/TrendsPage"));
+const SharedIdeaPage = lazy(() => import("./pages/SharedIdeaPage"));
 
 const queryClient = new QueryClient();
 
