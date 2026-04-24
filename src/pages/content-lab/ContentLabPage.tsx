@@ -8,16 +8,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useContentLabRuns, useContentLabUsage, useClientsForPicker, type ContentLabRun, type ClientForPicker } from '@/hooks/useContentLab';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
+import { useStartContentLabRun } from '@/hooks/useStartContentLabRun';
 import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
 import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
+import StartRunDialog from '@/components/content-lab/StartRunDialog';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_TONE: Record<string, string> = {
@@ -36,11 +33,11 @@ const ContentLabPage = () => {
   const { data: clients = [], isLoading: clientsLoading } = useClientsForPicker();
   const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
   const { data: usage } = useContentLabUsage();
+  const { start, starting } = useStartContentLabRun();
 
   const [search, setSearch] = useState('');
   const [pendingClient, setPendingClient] = useState<ClientForPicker | null>(null);
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
-  const [starting, setStarting] = useState(false);
 
   usePageMeta({ title: 'Content Lab', description: 'Pick a client. Generate research-backed content ideas in minutes.' });
 
@@ -70,23 +67,8 @@ const ContentLabPage = () => {
   const noCredits = (usage?.creditBalance ?? 0) <= 0;
 
   const startRun = async (clientId: string) => {
-    setStarting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('content-lab-run', { body: { client_id: clientId } });
-      if (error) throw error;
-      toast.success("Run started — we'll email you when ideas are ready (~3-6 min).");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['content-lab-runs'] }),
-        queryClient.invalidateQueries({ queryKey: ['content-lab-usage'] }),
-      ]);
-      const runId = (data as { run_id?: string } | null)?.run_id;
-      if (runId) navigate(`/content-lab/run/${runId}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not start run');
-    } finally {
-      setStarting(false);
-      setPendingClient(null);
-    }
+    await start(clientId);
+    setPendingClient(null);
   };
 
   if (accessLoading) {
