@@ -4,95 +4,113 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY"
+  "X-Frame-Options": "DENY",
 };
+
+const PLACES_BASE = "https://places.googleapis.com/v1";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "google-places-lookup", method: req.method, connection_id: null }));
+  console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "google-places-lookup", method: req.method }));
 
   try {
-    // ── Auth verification ──
+    // ── Auth ──
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonError("Unauthorized", 401);
     }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
     const anonClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userError } = await anonClient.auth.getUser();
-    if (userError || !userData?.user?.id) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (userError || !userData?.user?.id) return jsonError("Unauthorized", 401);
 
     const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
-    if (!GOOGLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "GOOGLE_API_KEY is not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!GOOGLE_API_KEY) return jsonError("GOOGLE_API_KEY is not configured", 500);
+
+    const body = await req.json().catch(() => ({}));
+    const query = typeof body?.query === "string" ? body.query.trim() : "";
+    const placeId = typeof body?.place_id === "string" ? body.place_id.trim() : "";
+
+    // ── Mode B: resolve a single place by id ──
+    if (placeId) {
+      const res = await fetch(`${PLACES_BASE}/places/${encodeURIComponent(placeId)}`, {
+        method: "GET",
+        headers: {
+          "X-Goog-Api-Key": GOOGLE_API_KEY,
+          "X-Goog-FieldMask":
+            "id,displayName,formattedAddress,websiteUri,nationalPhoneNumber,internationalPhoneNumber",
+        },
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("Place Details error:", res.status, errText);
+        return jsonError(`Place Details error [${res.status}]`, 502);
+      }
+      const place = await res.json();
+      return json({
+        result: {
+          place_id: place.id || placeId,
+          name: place.displayName?.text || "",
+          address: place.formattedAddress || "",
+          website: place.websiteUri || "",
+          phone: place.nationalPhoneNumber || place.internationalPhoneNumber || "",
+        },
       });
     }
 
-    const { query } = await req.json();
-    if (!query || typeof query !== "string") {
-      return new Response(JSON.stringify({ error: "Missing 'query' parameter" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // ── Mode A: typeahead autocomplete ──
+    if (!query) return jsonError("Missing 'query' or 'place_id'", 400);
 
-    // Use Google Places API (New) Text Search
-    const url = `https://places.googleapis.com/v1/places:searchText`;
-    const res = await fetch(url, {
+    const res = await fetch(`${PLACES_BASE}/places:autocomplete`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_API_KEY,
-        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.nationalPhoneNumber,places.websiteUri,places.id",
       },
       body: JSON.stringify({
-        textQuery: query,
-        maxResultCount: 5,
+        input: query,
+        // "establishment" covers brick-and-mortar AND service-area businesses,
+        // brands, chains — same index Google Maps' search box uses.
+        includedPrimaryTypes: ["establishment"],
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error("Google Places API error:", res.status, errText);
-      return new Response(JSON.stringify({ error: `Google Places API error [${res.status}]` }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error("Places Autocomplete error:", res.status, errText);
+      return jsonError(`Places Autocomplete error [${res.status}]`, 502);
     }
 
     const data = await res.json();
-    const results = (data.places || []).map((place: any) => ({
-      name: place.displayName?.text || "",
-      address: place.formattedAddress || "",
-      phone: place.nationalPhoneNumber || place.internationalPhoneNumber || "",
-      website: place.websiteUri || "",
-      place_id: place.id || "",
-    }));
+    const results = (data.suggestions || [])
+      .map((s: any) => s.placePrediction)
+      .filter(Boolean)
+      .map((p: any) => ({
+        place_id: p.placeId || "",
+        name: p.structuredFormat?.mainText?.text || p.text?.text || "",
+        address: p.structuredFormat?.secondaryText?.text || "",
+        website: "", // resolved on click via Place Details
+      }));
 
-    return new Response(JSON.stringify({ results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ results });
   } catch (err) {
     console.error("Error:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonError(String(err), 500);
   }
 });
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+function jsonError(message: string, status: number) {
+  return json({ error: message }, status);
+}

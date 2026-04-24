@@ -12,10 +12,11 @@ import {
   type Competitor,
 } from '@/lib/competitors';
 
-interface SearchResult {
+interface Prediction {
+  place_id: string;
   name: string;
   address: string;
-  website: string;
+  website?: string;
 }
 
 interface Props {
@@ -24,7 +25,7 @@ interface Props {
   onChange: (next: string) => void;
 }
 
-const SEARCH_DEBOUNCE_MS = 350;
+const SEARCH_DEBOUNCE_MS = 250;
 const MIN_QUERY_LENGTH = 2;
 
 /** Search Google Places live as you type, or paste a URL, to add competitors one at a time. */
@@ -32,7 +33,8 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
   const list = parseCompetitors(value);
 
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<Prediction[]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -76,7 +78,7 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
         });
         if (mySeq !== requestSeq.current) return; // stale
         if (error) throw error;
-        setResults((data?.results ?? []) as SearchResult[]);
+        setResults((data?.results ?? []) as Prediction[]);
       } catch (e) {
         if (mySeq !== requestSeq.current) return;
         toast.error(e instanceof Error ? e.message : 'Search failed');
@@ -136,27 +138,57 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
             <p className="p-3 text-sm text-muted-foreground">No results. Try another name.</p>
           ) : (
             <ul className="max-h-72 overflow-y-auto">
-              {results.map((r, i) => (
-                <li key={`${r.name}-${i}`}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      addCompetitor({ name: r.name, website: r.website || undefined });
-                      setOpen(false);
-                      setQuery('');
-                      setResults([]);
-                    }}
-                    className="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-muted"
-                  >
-                    <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium truncate">{r.name}</span>
-                      {r.address && <span className="block truncate text-xs text-muted-foreground">{r.address}</span>}
-                      {r.website && <span className="block truncate text-xs text-primary">{hostnameFromUrl(r.website)}</span>}
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {results.map((r, i) => {
+                const loading = resolvingId === r.place_id;
+                return (
+                  <li key={`${r.place_id}-${i}`}>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={async () => {
+                        if (!r.place_id) {
+                          addCompetitor({ name: r.name });
+                          setOpen(false);
+                          setQuery('');
+                          setResults([]);
+                          return;
+                        }
+                        setResolvingId(r.place_id);
+                        try {
+                          const { data, error } = await supabase.functions.invoke(
+                            'google-places-lookup',
+                            { body: { place_id: r.place_id } },
+                          );
+                          if (error) throw error;
+                          const detail = data?.result;
+                          addCompetitor({
+                            name: detail?.name || r.name,
+                            website: detail?.website || undefined,
+                          });
+                          setOpen(false);
+                          setQuery('');
+                          setResults([]);
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : 'Could not load details');
+                        } finally {
+                          setResolvingId(null);
+                        }
+                      }}
+                      className="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-muted disabled:opacity-60"
+                    >
+                      {loading ? (
+                        <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+                      ) : (
+                        <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium truncate">{r.name}</span>
+                        {r.address && <span className="block truncate text-xs text-muted-foreground">{r.address}</span>}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </PopoverContent>
