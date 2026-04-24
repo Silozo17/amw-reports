@@ -499,21 +499,42 @@ async function phaseScrape(
     scrapeTT(ownTT, "own", 12),
     scrapeIG(compIG, "competitor", 6),
     scrapeTT(compTT, "competitor", 6),
-    scrapeIG(viralIG, "viral", 6),
+    // Viral IG: only reels, so we don't end up with 100 photo carousels.
+    scrapeIG(viralIG, "viral", 6, { onlyReels: true }),
     scrapeTT(viralTT, "viral", 6),
-    ...discover.viral_hashtags.slice(0, 3).map((t) => scrapeIGHashtag(t)),
+    // Hashtag-driven viral discovery now goes through TikTok (video-first).
+    ...discover.viral_hashtags.slice(0, 3).map((t) => scrapeTTHashtag(t)),
   ]);
 
   await logProgress(admin, runId, "scrape", "ok", "Scrape pools fetched", {
     own_ig: r1.length, own_tt: r2.length,
     comp_ig: r3.length, comp_tt: r4.length,
-    viral_ig: r5.length, viral_tt: r6.length,
-    viral_hashtag: hashtagResults.reduce((s, a) => s + a.length, 0),
+    viral_ig_reels: r5.length, viral_tt: r6.length,
+    viral_hashtag_tt: hashtagResults.reduce((s, a) => s + a.length, 0),
   });
 
   const all: RawPost[] = [...r1, ...r2, ...r3, ...r4, ...r5, ...r6, ...hashtagResults.flat()];
   for (const p of all) p.likes = Math.max(0, p.likes | 0);
-  return dedupePosts(all);
+
+  // Quality gate: the Viral bucket must be videos with real reach. If a post
+  // is in the viral bucket but isn't a video OR has tiny reach, drop it.
+  // Falls back gracefully — competitor / own buckets are untouched.
+  const VIRAL_MIN_VIEWS = 10_000;
+  const VIRAL_MIN_ER = 0.05;
+  const filtered = all.filter((p) => {
+    if (p.bucket !== "viral") return true;
+    if (p.media_kind && p.media_kind !== "video") return false;
+    const er = calcEngagement(p);
+    return (p.views ?? 0) >= VIRAL_MIN_VIEWS || er >= VIRAL_MIN_ER;
+  });
+
+  // Junk filter for all buckets: no caption AND no thumbnail AND no engagement.
+  const cleaned = filtered.filter((p) => {
+    const empty = !p.caption && !p.thumbnail_url && (p.likes + p.comments + p.shares + p.views) === 0;
+    return !empty;
+  });
+
+  return dedupePosts(cleaned);
 }
 
 // ─── PHASE: persist scraped posts ─────────────────────────────────────────────
