@@ -1,425 +1,332 @@
-
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, RefreshCw, Sparkles, Share2, FileDown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader2, Sparkles, Eye, Heart, MessageCircle, ArrowLeft, Wand2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/layout/AppLayout';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import usePageMeta from '@/hooks/usePageMeta';
-import ViralPostCard, { isRenderablePost } from '@/components/content-lab/ViralPostCard';
-import IdeaPipelineBoard from '@/components/content-lab/IdeaPipelineBoard';
-import HookLibrary from '@/components/content-lab/HookLibrary';
-import BenchmarkQualityBadge from '@/components/content-lab/BenchmarkQualityBadge';
-import ShareWithClientDialog from '@/components/content-lab/ShareWithClientDialog';
-import IdeaCard from '@/components/content-lab/IdeaCard';
-import { useBenchmarkPoolStatus } from '@/hooks/useBenchmarkPoolStatus';
-import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 
-// Idea previews + interactive states are now encapsulated in <IdeaCard />.
+interface RunRow {
+  id: string; status: string; current_phase: string | null;
+  created_at: string; client_id: string;
+  client_snapshot: { company_name?: string; industry?: string; location?: string } | null;
+  error_message: string | null;
+}
+interface PostRow {
+  id: string; bucket: string; platform: string; author_handle: string;
+  caption: string | null; thumbnail_url: string | null; post_url: string | null;
+  views: number; likes: number; comments: number; engagement_rate: number;
+  posted_at: string | null; hook_type: string | null; hook_text: string | null;
+}
+interface IdeaRow {
+  id: string; idea_number: number; title: string; hook: string | null;
+  script: string | null; caption: string | null; cta: string | null;
+  hashtags: string[]; best_fit_platform: string | null;
+  why_it_works: string | null; visual_direction: string | null;
+  edit_count: number;
+}
 
+const PHASE_LABELS: Record<string, string> = {
+  discover: 'Discovering competitors & viral accounts',
+  validate: 'Validating handles',
+  scrape: 'Scraping posts',
+  analyse: 'Analysing patterns',
+  ideate: 'Generating ideas',
+  notify: 'Sending notification',
+};
 
 const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [retrying, setRetrying] = useState(false);
-  const [rescraping, setRescraping] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [editingIdea, setEditingIdea] = useState<IdeaRow | null>(null);
 
-  const handleExportDocx = async () => {
-    if (!id) return;
-    setExporting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('content-lab-export-docx', {
-        body: { run_id: id },
-      });
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, '_blank');
-        toast.success('Brief ready');
-      } else if (data?.error) {
-        throw new Error(data.error);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export failed');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleRetry = async () => {
-    if (!id) return;
-    setRetrying(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('content-lab-resume', {
-        body: { run_id: id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success('Retry started — reusing existing scrape data, no new credits used.');
-      queryClient.invalidateQueries({ queryKey: ['content-lab-run', id] });
-      queryClient.invalidateQueries({ queryKey: ['content-lab-ideas', id] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Retry failed');
-    } finally {
-      setRetrying(false);
-    }
-  };
-
-  const handleRescrape = async () => {
-    if (!id) return;
-    setRescraping(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('content-lab-resume', {
-        body: { run_id: id, rescrape: true },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success('Rescrape started — refreshing posts with transcripts, music & hashtags.');
-      queryClient.invalidateQueries({ queryKey: ['content-lab-run', id] });
-      queryClient.invalidateQueries({ queryKey: ['content-lab-posts', id] });
-      queryClient.invalidateQueries({ queryKey: ['content-lab-ideas', id] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Rescrape failed');
-    } finally {
-      setRescraping(false);
-    }
-  };
-
-  usePageMeta({ title: 'Content Lab Report', description: 'Viral feed and 12 ideas for the month.' });
+  usePageMeta({ title: 'Content Lab Run', description: 'Research and ideas for this client run.' });
 
   const { data: run } = useQuery({
-    queryKey: ['content-lab-run', id],
+    queryKey: ['cl-run', id],
     enabled: !!id,
     refetchInterval: (query) => {
-      const status = (query.state.data as { status?: string } | undefined)?.status;
-      return status && ['completed', 'failed'].includes(status) ? false : 4000;
+      const r = (query.state.data as RunRow | null);
+      return r && (r.status === 'pending' || r.status === 'running') ? 4000 : false;
     },
     queryFn: async () => {
-      const { data, error } = await supabase.from('content_lab_runs').select('*').eq('id', id!).single();
+      const { data, error } = await supabase.from('content_lab_runs').select('*').eq('id', id!).maybeSingle();
       if (error) throw error;
-      return data;
+      return data as unknown as RunRow | null;
     },
   });
 
-  const { data: niche } = useQuery({
-    queryKey: ['content-lab-niche-for-run', run?.niche_id],
-    enabled: !!run?.niche_id,
+  const { data: progress = [] } = useQuery({
+    queryKey: ['cl-run-progress', id],
+    enabled: !!id,
+    refetchInterval: 4000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('content_lab_niches')
-        .select('id, client_id, niche_tag, platforms_to_scrape, label')
-        .eq('id', run!.niche_id)
-        .single();
+        .from('content_lab_run_progress')
+        .select('id, phase, status, message, created_at')
+        .eq('run_id', id!)
+        .order('created_at');
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
   });
 
-  const { data: pool } = useBenchmarkPoolStatus(niche?.niche_tag, niche?.platforms_to_scrape);
-
   const { data: posts = [] } = useQuery({
-    queryKey: ['content-lab-posts', id],
-    enabled: !!id,
+    queryKey: ['cl-run-posts', id],
+    enabled: !!id && run?.status === 'completed',
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_posts')
-        .select('*')
+        .select('id, bucket, platform, author_handle, caption, thumbnail_url, post_url, views, likes, comments, engagement_rate, posted_at, hook_type, hook_text')
         .eq('run_id', id!)
-        .order('views', { ascending: false })
-        .order('likes', { ascending: false })
-        .order('comments', { ascending: false })
-        .limit(80);
+        .order('engagement_rate', { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as PostRow[];
     },
   });
 
-  // Bucket fallback: legacy rows have bucket=null. Treat any non-'own' as benchmark
-  // so the dashboard isn't empty for older scrapes.
-  const bucketOf = (p: { bucket?: string | null; source?: string }): 'own' | 'benchmark' => {
-    if (p.bucket === 'own') return 'own';
-    if (p.bucket === 'benchmark' || p.bucket === 'competitor') return 'benchmark';
-    return 'benchmark';
-  };
-  const ownPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'own' && isRenderablePost(p));
-  const viralPosts = posts.filter((p) => bucketOf(p as { bucket?: string | null; source?: string }) === 'benchmark' && isRenderablePost(p));
-  const ownAvgViews = ownPosts.length > 0
-    ? Math.round(ownPosts.reduce((s, p) => s + (p.views ?? 0), 0) / ownPosts.length)
-    : 0;
-  const benchmarkViewsSorted = viralPosts.map((p) => p.views ?? 0).sort((a, b) => a - b);
-  const benchmarkP50 = benchmarkViewsSorted.length > 0
-    ? benchmarkViewsSorted[Math.floor(benchmarkViewsSorted.length / 2)]
-    : 0;
-  const ownIsCompetitive = ownAvgViews > 0 && ownAvgViews >= benchmarkP50;
-  const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
-  const topOwnHook = ownPosts.length > 0
-    ? [...ownPosts].sort((a, b) => (b.views ?? 0) - (a.views ?? 0))[0]?.hook_text ?? null
-    : null;
-
   const { data: ideas = [] } = useQuery({
-    queryKey: ['content-lab-ideas', id],
-    enabled: !!id,
+    queryKey: ['cl-run-ideas', id],
+    enabled: !!id && run?.status === 'completed',
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_ideas')
-        .select('*')
+        .select('id, idea_number, title, hook, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count')
         .eq('run_id', id!)
         .order('idea_number');
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as IdeaRow[];
     },
   });
 
-  const { data: analysedHooks = [] } = useQuery({
-    queryKey: ['content-lab-hooks', id],
-    enabled: !!id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('content_lab_hooks')
-        .select('hook_text, mechanism, why_it_works, source_post_id')
-        .eq('run_id', id!);
-      if (error) throw error;
-      const postMap = new Map(posts.map((p) => [p.id, p]));
-      return (data ?? []).map((h) => {
-        const sp = h.source_post_id ? postMap.get(h.source_post_id) : null;
-        return {
-          hook_text: h.hook_text,
-          mechanism: h.mechanism,
-          why_it_works: h.why_it_works,
-          source_handle: sp?.author_handle ?? null,
-          source_url: sp?.post_url ?? null,
-        };
-      });
-    },
-  });
+  const ownPosts = useMemo(() => posts.filter((p) => p.bucket === 'own'), [posts]);
+  const competitorPosts = useMemo(() => posts.filter((p) => p.bucket === 'competitor'), [posts]);
+  const viralPosts = useMemo(() => posts.filter((p) => p.bucket === 'viral').slice(0, 15), [posts]);
+
+  const competitorAccounts = useMemo(() => {
+    const map = new Map<string, { handle: string; platform: string; postCount: number }>();
+    competitorPosts.forEach((p) => {
+      const key = `${p.platform}:${p.author_handle}`;
+      const cur = map.get(key) ?? { handle: p.author_handle, platform: p.platform, postCount: 0 };
+      cur.postCount += 1;
+      map.set(key, cur);
+    });
+    return [...map.values()];
+  }, [competitorPosts]);
+
+  if (!run) {
+    return <AppLayout><p className="p-8 text-sm text-muted-foreground">Loading run…</p></AppLayout>;
+  }
+
+  const isProcessing = run.status === 'pending' || run.status === 'running';
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/content-lab')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/content-lab')}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Content Lab
+          </Button>
+        </div>
 
-        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Content Lab Report</p>
-            <h1 className="mt-2 font-display text-2xl md:text-3xl">
-              {run ? new Date(run.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '…'}
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {niche?.label && <span className="text-sm text-muted-foreground">{niche.label}</span>}
-              {pool && <BenchmarkQualityBadge quality={pool.quality} verifiedCount={pool.verifiedCount} />}
-            </div>
-            {run?.status === 'failed' && run?.error_message && (
-              <p className="mt-2 max-w-2xl text-sm text-destructive">{run.error_message}</p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {run?.status === 'failed' && posts.length > 0 && (
-              <Button onClick={handleRetry} disabled={retrying} size="sm">
-                <RefreshCw className={`mr-2 h-4 w-4 ${retrying ? 'animate-spin' : ''}`} />
-                {retrying ? 'Retrying…' : 'Retry ideation'}
-              </Button>
-            )}
-            {posts.length > 0 && ['completed', 'failed'].includes(run?.status ?? '') && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={rescraping}>
-                    <Sparkles className={`mr-2 h-4 w-4 ${rescraping ? 'animate-spin' : ''}`} />
-                    {rescraping ? 'Rescraping…' : 'Rescrape (uses credits)'}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Rescrape this run?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will delete the existing posts and pull fresh data from Instagram via Apify, including
-                      transcripts, hashtags, music and tagged users. <strong>This costs Apify credits</strong> (one
-                      full scrape, ~73 posts). Ideas will also be regenerated.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleRescrape}>Rescrape now</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            {ideas.length > 0 && run?.status === 'completed' && (
-              <>
-                <Button variant="outline" size="sm" onClick={handleExportDocx} disabled={exporting}>
-                  <FileDown className={`mr-2 h-4 w-4 ${exporting ? 'animate-pulse' : ''}`} />
-                  {exporting ? 'Exporting…' : 'Export brief'}
-                </Button>
-                <Button size="sm" onClick={() => setShareOpen(true)}>
-                  <Share2 className="mr-2 h-4 w-4" />
-                  Share with client
-                </Button>
-              </>
-            )}
-          </div>
+        <header>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Run</p>
+          <h1 className="mt-1 font-display text-3xl">{run.client_snapshot?.company_name ?? 'Client'}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {[run.client_snapshot?.industry, run.client_snapshot?.location].filter(Boolean).join(' · ')}
+            {' · '}{new Date(run.created_at).toLocaleString()}
+          </p>
         </header>
 
-        {id && <ShareWithClientDialog open={shareOpen} onOpenChange={setShareOpen} runId={id} />}
-        <SectionErrorBoundary>
-        <Tabs defaultValue="own" className="space-y-6">
-          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-            <TabsList className="inline-flex w-max">
-              <TabsTrigger value="own" className="whitespace-nowrap">Your Latest ({ownPosts.length})</TabsTrigger>
-              <TabsTrigger value="feed" className="whitespace-nowrap">Viral Feed ({viralPosts.length})</TabsTrigger>
-              <TabsTrigger value="ideas" className="whitespace-nowrap">Ideas ({ideas.length})</TabsTrigger>
-              <TabsTrigger value="pipeline" className="whitespace-nowrap">Pipeline</TabsTrigger>
-              <TabsTrigger value="hooks" className="whitespace-nowrap">Hooks</TabsTrigger>
+        {isProcessing && (
+          <Card className="space-y-3 border-primary/30 bg-primary/5 p-5">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <p className="font-display text-base">Working on your report…</p>
+            </div>
+            <ol className="space-y-1.5 text-xs">
+              {progress.map((p) => (
+                <li key={p.id} className="flex items-center gap-2">
+                  <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'failed' ? 'bg-destructive' : p.status === 'ok' ? 'bg-emerald-500' : 'bg-primary animate-pulse'}`} />
+                  <span className="text-muted-foreground">{PHASE_LABELS[p.phase] ?? p.phase}</span>
+                  {p.message && <span className="ml-2 text-muted-foreground">— {p.message}</span>}
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
+
+        {run.status === 'failed' && (
+          <Card className="border-destructive/30 bg-destructive/5 p-4 text-sm">
+            <p className="font-medium text-destructive">Run failed</p>
+            <p className="text-muted-foreground">{run.error_message ?? 'Unknown error.'}</p>
+          </Card>
+        )}
+
+        {run.status === 'completed' && (
+          <Tabs defaultValue="ideas">
+            <TabsList className="w-full overflow-x-auto">
+              <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
+              <TabsTrigger value="own">Your content ({ownPosts.length})</TabsTrigger>
+              <TabsTrigger value="competitors">Local competitors ({competitorAccounts.length})</TabsTrigger>
+              <TabsTrigger value="viral">Viral worldwide ({viralPosts.length})</TabsTrigger>
             </TabsList>
-          </div>
 
-          <TabsContent value="own" className="space-y-4">
-            {ownPosts.length === 0 ? (
-              <Card className="p-10 text-center text-sm text-muted-foreground">
-                No own posts scraped yet for this run. Add your handle in the niche to see how your content stacks up.
-              </Card>
-            ) : (
-              <>
-                <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Your avg views:</span>{' '}
-                    <span className="font-semibold">{fmt(ownAvgViews)}</span>
-                    <span className="mx-2 text-muted-foreground">vs benchmark median</span>{' '}
-                    <span className="font-semibold">{fmt(benchmarkP50)}</span>
-                    {topOwnHook && (
-                      <span className="ml-3 block text-xs text-muted-foreground md:inline">
-                        Top hook: <span className="italic">"{topOwnHook.slice(0, 80)}{topOwnHook.length > 80 ? '…' : ''}"</span>
-                      </span>
-                    )}
-                  </div>
-                  <Badge variant={ownIsCompetitive ? 'default' : 'outline'}>
-                    {ownIsCompetitive ? 'On par with benchmarks' : 'Below benchmarks — ideas reverse-engineer top accounts only'}
-                  </Badge>
-                </Card>
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {[...ownPosts]
-                    .sort((a, b) => (b.posted_at ?? '').localeCompare(a.posted_at ?? ''))
-                    .map((p) => (
-                      <ViralPostCard key={p.id} post={p} />
-                    ))}
+            <TabsContent value="ideas" className="mt-4">
+              {ideas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No ideas in this run.</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {ideas.map((i) => <IdeaCard key={i.id} idea={i} onEdit={() => setEditingIdea(i)} />)}
                 </div>
-              </>
-            )}
-          </TabsContent>
+              )}
+            </TabsContent>
 
-          <TabsContent value="feed" className="space-y-3">
-            {viralPosts.length === 0 ? (
-              <Card className="p-10 text-center text-sm text-muted-foreground">No viral posts yet for this run.</Card>
-            ) : (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {viralPosts.map((p) => (
-                  <ViralPostCard key={p.id} post={p} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
+            <TabsContent value="own" className="mt-4">
+              <PostGrid posts={ownPosts} emptyMsg="No own posts found in the last 30 days." />
+            </TabsContent>
 
-          <TabsContent value="ideas" className="space-y-4">
-            {ideas.length > 0 && ownPosts.length > 0 && (
-              <Card className="border-primary/30 bg-primary/5 p-3 text-sm">
-                {ownIsCompetitive
-                  ? 'Your views are on par with the top-10 benchmarks, so your top-performing posts are also being used as inspiration.'
-                  : 'Your views are below the top-10 benchmark median, so ideas are reverse-engineered from top accounts only — your weak posts are used as anti-examples.'}
-              </Card>
-            )}
-            {ideas.length === 0 ? (
-              <Card className="p-10 text-center text-sm text-muted-foreground">Ideas will appear here once the run completes.</Card>
-            ) : (
-              ideas.map((idea) => (
-                <IdeaCard
-                  key={idea.id}
-                  variant="stacked"
-                  idea={{
-                    id: idea.id,
-                    run_id: id!,
-                    client_id: niche?.client_id ?? null,
-                    niche_id: run?.niche_id ?? null,
-                    idea_number: idea.idea_number,
-                    title: idea.title,
-                    hook: idea.hook,
-                    caption: idea.caption,
-                    target_platform: idea.target_platform,
-                    rating: idea.rating,
-                    status: idea.status ?? 'not_started',
-                    duration_seconds: idea.duration_seconds,
-                    is_wildcard: (idea as { is_wildcard?: boolean }).is_wildcard ?? false,
-                    body: idea.body,
-                    cta: idea.cta,
-                    why_it_works: idea.why_it_works,
-                    hashtags: idea.hashtags,
-                    hook_variants:
-                      (idea.hook_variants as Array<{ text: string; mechanism: string; why: string }> | null) ?? null,
-                    regen_count: (idea as { regen_count?: number }).regen_count ?? 0,
-                    linked_post_id: (idea as { linked_post_id?: string | null }).linked_post_id ?? null,
-                    actual_views: (idea as { actual_views?: number | null }).actual_views ?? null,
-                    actual_engagement_rate:
-                      (idea as { actual_engagement_rate?: number | null }).actual_engagement_rate ?? null,
-                  }}
-                />
-              ))
-            )}
-          </TabsContent>
+            <TabsContent value="competitors" className="mt-4 space-y-6">
+              {competitorAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No local competitors found.</p>
+              ) : (
+                competitorAccounts.map((acc) => (
+                  <div key={`${acc.platform}:${acc.handle}`} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display text-base">@{acc.handle}</h3>
+                      <Badge variant="outline" className="text-[10px] capitalize">{acc.platform}</Badge>
+                      <span className="text-xs text-muted-foreground">{acc.postCount} posts</span>
+                    </div>
+                    <PostGrid posts={competitorPosts.filter((p) => p.author_handle === acc.handle && p.platform === acc.platform).slice(0, 6)} />
+                  </div>
+                ))
+              )}
+            </TabsContent>
 
-          <TabsContent value="pipeline" className="space-y-4">
-            {ideas.length === 0 ? (
-              <Card className="p-10 text-center text-sm text-muted-foreground">
-                The pipeline will appear once ideas have been generated.
-              </Card>
-            ) : (
-              <IdeaPipelineBoard
-                runId={id!}
-                ideas={ideas.map((i) => ({
-                  id: i.id,
-                  idea_number: i.idea_number,
-                  title: i.title,
-                  hook: i.hook ?? null,
-                  target_platform: i.target_platform ?? null,
-                  rating: i.rating ?? null,
-                  status: i.status ?? 'not_started',
-                  is_wildcard: (i as { is_wildcard?: boolean }).is_wildcard ?? false,
-                }))}
-                onSelect={() => { /* click-to-detail can be wired later; drag is the primary action */ }}
-              />
-            )}
-          </TabsContent>
+            <TabsContent value="viral" className="mt-4">
+              <PostGrid posts={viralPosts} emptyMsg="No viral posts found." />
+            </TabsContent>
+          </Tabs>
+        )}
 
-          <TabsContent value="hooks" className="space-y-4">
-            <HookLibrary
-              analysedHooks={analysedHooks}
-              ideas={ideas.map((i) => ({
-                idea_number: i.idea_number,
-                hook: i.hook ?? null,
-                hook_variants: (i.hook_variants as Array<{ text: string; mechanism: string; why: string }> | null) ?? null,
-              }))}
-            />
-          </TabsContent>
-        </Tabs>
-        </SectionErrorBoundary>
+        <EditIdeaDialog
+          idea={editingIdea}
+          onClose={() => setEditingIdea(null)}
+          onSaved={() => { void queryClient.invalidateQueries({ queryKey: ['cl-run-ideas', id] }); }}
+        />
       </div>
     </AppLayout>
+  );
+};
+
+const PostGrid = ({ posts, emptyMsg }: { posts: PostRow[]; emptyMsg?: string }) => {
+  if (posts.length === 0) return <p className="text-sm text-muted-foreground">{emptyMsg ?? 'No posts.'}</p>;
+  return (
+    <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      {posts.map((p) => (
+        <Card key={p.id} className="overflow-hidden">
+          <div className="aspect-square bg-muted">
+            {p.thumbnail_url && <img src={p.thumbnail_url} alt={p.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />}
+          </div>
+          <div className="space-y-1 p-2 text-[11px]">
+            <p className="font-semibold truncate">@{p.author_handle}</p>
+            {p.hook_type && <Badge variant="secondary" className="text-[9px]">{p.hook_type}</Badge>}
+            {p.caption && <p className="text-muted-foreground line-clamp-2">{p.caption}</p>}
+            <div className="flex items-center gap-2 pt-1 text-muted-foreground">
+              <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> {(p.views ?? 0).toLocaleString()}</span>
+              <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {(p.likes ?? 0).toLocaleString()}</span>
+              <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" /> {(p.comments ?? 0).toLocaleString()}</span>
+            </div>
+            {p.post_url && (
+              <a href={p.post_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                View <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+const IdeaCard = ({ idea, onEdit }: { idea: IdeaRow; onEdit: () => void }) => (
+  <Card className="flex flex-col gap-2 p-4">
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          Idea #{idea.idea_number}{idea.best_fit_platform && <> · <span className="capitalize">{idea.best_fit_platform}</span></>}
+        </p>
+        <h3 className="mt-1 font-display text-base leading-tight">{idea.title}</h3>
+      </div>
+      <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+    </div>
+    {idea.hook && <p className="text-sm font-medium">{idea.hook}</p>}
+    {idea.script && <p className="text-xs text-muted-foreground line-clamp-4 whitespace-pre-line">{idea.script}</p>}
+    {idea.caption && <p className="text-[11px] text-muted-foreground line-clamp-2">{idea.caption}</p>}
+    {idea.hashtags?.length > 0 && (
+      <div className="flex flex-wrap gap-1">
+        {idea.hashtags.slice(0, 5).map((h) => <Badge key={h} variant="secondary" className="text-[9px]">#{h}</Badge>)}
+      </div>
+    )}
+    <Button variant="outline" size="sm" onClick={onEdit} className="mt-auto">
+      <Wand2 className="mr-2 h-3 w-3" /> AI edit
+    </Button>
+  </Card>
+);
+
+const EditIdeaDialog = ({ idea, onClose, onSaved }: { idea: IdeaRow | null; onClose: () => void; onSaved: () => void }) => {
+  const [instruction, setInstruction] = useState('');
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!idea) throw new Error('No idea');
+      const { data, error } = await supabase.functions.invoke('content-lab-regenerate-idea', {
+        body: { idea_id: idea.id, instruction },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Idea updated');
+      setInstruction('');
+      onSaved();
+      onClose();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not update idea'),
+  });
+  return (
+    <Dialog open={!!idea} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Refine this idea with AI</DialogTitle>
+          <DialogDescription>
+            Free edits, rate-limited to prevent abuse. Tell us what to change.
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          placeholder="e.g. Make the hook more punchy, swap the CTA to focus on bookings, shorten the script"
+          rows={4}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button onClick={() => mutation.mutate()} disabled={!instruction.trim() || mutation.isPending}>
+            {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+            Refine
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
