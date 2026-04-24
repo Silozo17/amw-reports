@@ -500,6 +500,41 @@ export type Database = {
         }
         Relationships: []
       }
+      content_lab_idea_comments: {
+        Row: {
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          idea_id: string
+          user_id: string
+        }
+        Insert: {
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          idea_id: string
+          user_id: string
+        }
+        Update: {
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          idea_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_idea_comments_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_lab_idea_edits: {
         Row: {
           after_snapshot: Json
@@ -544,6 +579,76 @@ export type Database = {
           },
         ]
       }
+      content_lab_idea_reactions: {
+        Row: {
+          created_at: string
+          id: string
+          idea_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          idea_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          idea_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_idea_reactions_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_lab_idea_share_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          idea_id: string
+          is_active: boolean
+          org_id: string
+          slug: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          idea_id: string
+          is_active?: boolean
+          org_id: string
+          slug: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          idea_id?: string
+          is_active?: boolean
+          org_id?: string
+          slug?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_lab_idea_share_tokens_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_lab_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_lab_ideas: {
         Row: {
           best_fit_platform: string | null
@@ -554,10 +659,12 @@ export type Database = {
           edit_count: number
           hashtags: string[]
           hook: string | null
+          hooks: Json
           id: string
           idea_number: number
           inspiration_source: string | null
           inspired_by_post_id: string | null
+          like_count: number
           run_id: string
           script: string | null
           status: string
@@ -575,10 +682,12 @@ export type Database = {
           edit_count?: number
           hashtags?: string[]
           hook?: string | null
+          hooks?: Json
           id?: string
           idea_number: number
           inspiration_source?: string | null
           inspired_by_post_id?: string | null
+          like_count?: number
           run_id: string
           script?: string | null
           status?: string
@@ -596,10 +705,12 @@ export type Database = {
           edit_count?: number
           hashtags?: string[]
           hook?: string | null
+          hooks?: Json
           id?: string
           idea_number?: number
           inspiration_source?: string | null
           inspired_by_post_id?: string | null
+          like_count?: number
           run_id?: string
           script?: string | null
           status?: string
@@ -2092,6 +2203,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_shared_idea: { Args: { _slug: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
