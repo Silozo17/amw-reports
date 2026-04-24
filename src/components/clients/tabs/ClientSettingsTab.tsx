@@ -63,15 +63,23 @@ const ClientSettingsTab = ({
   onSettingChange,
 }: ClientSettingsTabProps) => {
   const [draft, setDraft] = useState<BusinessDraft>(() => pickDraft(client));
+  const [handles, setHandles] = useState<HandlesDraft>(() => pickHandles(client));
 
-  // Reset draft when client changes
+  // Reset drafts when client changes
   useEffect(() => {
     setDraft(pickDraft(client));
+    setHandles(pickHandles(client));
   }, [client.id]);
 
-  const isDirty = BUSINESS_CONTEXT_KEYS.some(
+  const isDraftDirty = BUSINESS_CONTEXT_KEYS.some(
     k => draft[k] !== (client[k as keyof Client] ?? (k === 'service_area_type' ? 'local' : ''))
   );
+  const original = pickHandles(client);
+  const isHandlesDirty =
+    handles.instagram !== original.instagram ||
+    handles.tiktok !== original.tiktok ||
+    handles.facebook !== original.facebook;
+  const isDirty = isDraftDirty || isHandlesDirty;
 
   // Warn on tab/window close with unsaved changes
   useEffect(() => {
@@ -88,14 +96,27 @@ const ClientSettingsTab = ({
     setDraft(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleHandleChange = useCallback((key: keyof HandlesDraft, value: string) => {
+    setHandles(prev => ({ ...prev, [key]: value.replace(/^@/, '').trim() }));
+  }, []);
+
   const handleSave = useCallback(() => {
     BUSINESS_CONTEXT_KEYS.forEach(key => {
-      const original = client[key as keyof Client] ?? (key === 'service_area_type' ? 'local' : '');
-      if (draft[key] !== original) {
+      const orig = client[key as keyof Client] ?? (key === 'service_area_type' ? 'local' : '');
+      if (draft[key] !== orig) {
         onSettingChange(key, draft[key]);
       }
     });
-  }, [draft, client, onSettingChange]);
+    if (isHandlesDirty) {
+      const existing = (client.social_handles ?? {}) as Record<string, string>;
+      const next: Record<string, string> = { ...existing };
+      (['instagram', 'tiktok', 'facebook'] as const).forEach(p => {
+        if (handles[p]) next[p] = handles[p];
+        else delete next[p];
+      });
+      onSettingChange('social_handles', next);
+    }
+  }, [draft, handles, isHandlesDirty, client, onSettingChange]);
 
   return (
     <>
