@@ -67,7 +67,7 @@ const RunsTable = ({ rows, isLoading, onSelect }: Props) => {
                 <div className="font-medium truncate max-w-[180px]">{r.client_name}</div>
                 <div className="text-xs text-muted-foreground truncate max-w-[180px]">{r.org_name}</div>
               </TableCell>
-              <TableCell className="text-sm truncate max-w-[200px]">{r.niche_label}</TableCell>
+              <TableCell className="text-sm truncate max-w-[200px]">{r.current_phase ?? '—'}</TableCell>
               <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                 {r.started_at ? format(new Date(r.started_at), 'dd MMM HH:mm') : format(new Date(r.created_at), 'dd MMM HH:mm')}
               </TableCell>
