@@ -207,8 +207,20 @@ const RunDetailPage = () => {
               {ideas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No ideas in this run.</p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {ideas.map((i) => <IdeaCard key={i.id} idea={i} onEdit={() => setEditingIdea(i)} />)}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {ideas
+                    .slice()
+                    .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0) || a.idea_number - b.idea_number)
+                    .map((i) => (
+                      <IdeaPhoneMockup
+                        key={i.id}
+                        idea={i}
+                        runId={id}
+                        orgHandle={(run.client_snapshot?.company_name ?? 'your.brand')
+                          .toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}
+                        onEdit={() => setEditingIdea(i)}
+                      />
+                    ))}
                 </div>
               )}
             </TabsContent>
