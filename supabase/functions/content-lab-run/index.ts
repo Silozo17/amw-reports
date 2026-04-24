@@ -105,26 +105,112 @@ async function callLovableAI(opts: {
 }
 
 // ─── PHASE: discover competitors + viral accounts + hashtags ──────────────────
-async function phaseDiscover(client: ClientRow): Promise<DiscoverResult> {
-  const seedCompetitors = (client.competitors ?? "")
-    .split(/[,\n]/).map((s) => s.trim()).filter(Boolean).slice(0, 5);
+
+interface CompetitorSeed { name: string; website?: string; }
+
+/** Parse "Name | https://site" lines (or comma-separated names) from clients.competitors. */
+function parseCompetitorSeeds(raw: string | null): CompetitorSeed[] {
+  if (!raw) return [];
+  const hasNew = raw.includes("\n") || raw.includes("|");
+  const lines = hasNew ? raw.split("\n") : raw.split(",");
+  return lines
+    .map((l) => l.trim()).filter(Boolean)
+    .map((line) => {
+      const [name, website] = line.split("|").map((p) => p.trim());
+      const w = website && /^https?:\/\//i.test(website) ? website : undefined;
+      return { name: name || website || "", website: w };
+    })
+    .filter((c) => c.name);
+}
+
+interface ResolvedCompetitor extends CompetitorSeed {
+  instagram?: string;
+  tiktok?: string;
+  facebook?: string;
+}
+
+/** Call firecrawl-find-socials for one URL. Never throws. */
+async function fetchCompetitorSocials(url: string): Promise<{ instagram?: string; tiktok?: string; facebook?: string }> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/firecrawl-find-socials`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) return {};
+    const data = await res.json().catch(() => ({}));
+    return {
+      instagram: typeof data?.instagram === "string" ? data.instagram : undefined,
+      tiktok: typeof data?.tiktok === "string" ? data.tiktok : undefined,
+      facebook: typeof data?.facebook === "string" ? data.facebook : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Resolve socials for up to N seeds in parallel batches of 5. */
+async function resolveCompetitorSocials(seeds: CompetitorSeed[]): Promise<ResolvedCompetitor[]> {
+  const out: ResolvedCompetitor[] = [];
+  const withSites = seeds.filter((s) => s.website);
+  const withoutSites = seeds.filter((s) => !s.website);
+  for (let i = 0; i < withSites.length; i += 5) {
+    const batch = withSites.slice(i, i + 5);
+    const results = await Promise.all(batch.map((s) => fetchCompetitorSocials(s.website!)));
+    batch.forEach((s, idx) => out.push({ ...s, ...results[idx] }));
+  }
+  return [...out, ...withoutSites];
+}
+
+async function phaseDiscover(
+  admin: SupabaseClient,
+  runId: string,
+  client: ClientRow,
+): Promise<DiscoverResult> {
+  const seeds = parseCompetitorSeeds(client.competitors).slice(0, 8);
   const handles = client.social_handles ?? {};
   const ownHandles = Object.entries(handles)
     .filter(([, v]) => v).map(([k, v]) => `${k}: @${v}`).join(", ");
+
+  // Step A: scrape each competitor's website to find their real socials.
+  const resolved = await resolveCompetitorSocials(seeds);
+  const verifiedFacts = resolved
+    .map((c) => {
+      const socials: string[] = [];
+      if (c.instagram) socials.push(`IG @${c.instagram}`);
+      if (c.tiktok) socials.push(`TikTok @${c.tiktok}`);
+      if (c.facebook) socials.push(`FB ${c.facebook}`);
+      return socials.length
+        ? `- ${c.name} (${c.website ?? "no website"}) → ${socials.join(", ")}`
+        : `- ${c.name} (${c.website ?? "no website"}) → no socials found`;
+    })
+    .join("\n");
+
+  const verifiedCount = resolved.filter((c) => c.instagram || c.tiktok).length;
+  await logProgress(admin, runId, "discover", "ok", `Resolved socials for ${verifiedCount}/${seeds.length} competitor websites`, {
+    resolved: resolved.map((c) => ({ name: c.name, instagram: c.instagram, tiktok: c.tiktok })),
+  });
 
   const userPrompt = `Client: ${client.company_name}
 Industry: ${client.industry ?? "unknown"}
 Location: ${client.location ?? "unknown"}
 Website: ${client.website ?? "unknown"}
 Their own social: ${ownHandles || "none"}
-User-provided competitors: ${seedCompetitors.join(", ") || "none"}
+
+VERIFIED competitor socials (scraped from their actual websites — use these EXACTLY as provided, do NOT change or guess them):
+${verifiedFacts || "(none provided)"}
 
 Task:
-1. List 10 LOCAL competitors (same industry & location) with their Instagram OR TikTok handle. Use the user-provided list first, top up with your own knowledge.
+1. Build a list of up to 10 LOCAL competitors with their Instagram OR TikTok handle.
+   - FIRST include every VERIFIED handle above as-is (one entry per platform per competitor).
+   - THEN top up to 10 with additional same-industry / same-location competitors you know about.
 2. List 10 VIRAL WORLDWIDE accounts in this industry/niche (any country, just very high engagement) with their Instagram OR TikTok handle.
 3. List 3 niche hashtags (no #, no spaces) that get viral content in this niche.
 
-Rules: handles must be plausible real accounts (no spaces, no "ltd"). Prefer accounts you're confident exist.`;
+Rules: handles must be plausible real accounts (no spaces, no "ltd"). Verified handles always win — never overwrite them with a guess.`;
 
   const r = await callLovableAI({
     model: "google/gemini-2.5-pro",
