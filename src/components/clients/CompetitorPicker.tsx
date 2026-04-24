@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, Loader2, Plus, X, Globe, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,7 +24,10 @@ interface Props {
   onChange: (next: string) => void;
 }
 
-/** Search Google Places by name, or paste a URL, to add competitors one at a time. */
+const SEARCH_DEBOUNCE_MS = 350;
+const MIN_QUERY_LENGTH = 2;
+
+/** Search Google Places live as you type, or paste a URL, to add competitors one at a time. */
 const CompetitorPicker = ({ value, onChange }: Props) => {
   const list = parseCompetitors(value);
 
@@ -33,6 +36,9 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+
+  // Latest-request-wins guard so fast typing doesn't flash old results.
+  const requestSeq = useRef(0);
 
   const setList = (next: Competitor[]) => onChange(serializeCompetitors(next));
 
@@ -52,24 +58,35 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
 
   const removeAt = (idx: number) => setList(list.filter((_, i) => i !== idx));
 
-  const handleSearch = async () => {
+  // Live debounced search.
+  useEffect(() => {
     const q = query.trim();
-    if (!q) return;
+    if (q.length < MIN_QUERY_LENGTH) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
     setSearching(true);
     setOpen(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('google-places-lookup', {
-        body: { query: q },
-      });
-      if (error) throw error;
-      setResults((data?.results ?? []) as SearchResult[]);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Search failed');
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  };
+    const mySeq = ++requestSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('google-places-lookup', {
+          body: { query: q },
+        });
+        if (mySeq !== requestSeq.current) return; // stale
+        if (error) throw error;
+        setResults((data?.results ?? []) as SearchResult[]);
+      } catch (e) {
+        if (mySeq !== requestSeq.current) return;
+        toast.error(e instanceof Error ? e.message : 'Search failed');
+        setResults([]);
+      } finally {
+        if (mySeq === requestSeq.current) setSearching(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const handleAddByUrl = () => {
     const url = urlInput.trim();
@@ -87,63 +104,63 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
 
   return (
     <div className="space-y-3">
-      {/* Search by name */}
-      <div className="space-y-2">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      void handleSearch();
-                    }
-                  }}
-                  placeholder="Search a competitor by name (Google)"
-                  className="pl-8"
-                />
-              </div>
-              <Button type="button" variant="outline" onClick={() => void handleSearch()} disabled={searching || !query.trim()}>
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
-              </Button>
-            </div>
-          </PopoverTrigger>
-          <PopoverContent className="w-[--radix-popover-trigger-width] p-1" align="start">
-            {searching ? (
-              <p className="p-3 text-sm text-muted-foreground">Searching…</p>
-            ) : results.length === 0 ? (
-              <p className="p-3 text-sm text-muted-foreground">No results. Try another name.</p>
-            ) : (
-              <ul className="max-h-72 overflow-y-auto">
-                {results.map((r, i) => (
-                  <li key={i}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        addCompetitor({ name: r.name, website: r.website || undefined });
-                        setOpen(false);
-                        setQuery('');
-                      }}
-                      className="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-muted"
-                    >
-                      <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-medium truncate">{r.name}</span>
-                        {r.address && <span className="block truncate text-xs text-muted-foreground">{r.address}</span>}
-                        {r.website && <span className="block truncate text-xs text-primary">{hostnameFromUrl(r.website)}</span>}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+      {/* Live search by name */}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => {
+                if (query.trim().length >= MIN_QUERY_LENGTH) setOpen(true);
+              }}
+              placeholder="Search a competitor by name (Google)"
+              className="pl-8 pr-9"
+            />
+            {searching && (
+              <Loader2 className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
             )}
-          </PopoverContent>
-        </Popover>
-      </div>
+          </div>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-[--radix-popover-trigger-width] p-1"
+          align="start"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          {query.trim().length < MIN_QUERY_LENGTH ? (
+            <p className="p-3 text-sm text-muted-foreground">Type at least 2 characters…</p>
+          ) : searching ? (
+            <p className="p-3 text-sm text-muted-foreground">Searching…</p>
+          ) : results.length === 0 ? (
+            <p className="p-3 text-sm text-muted-foreground">No results. Try another name.</p>
+          ) : (
+            <ul className="max-h-72 overflow-y-auto">
+              {results.map((r, i) => (
+                <li key={`${r.name}-${i}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addCompetitor({ name: r.name, website: r.website || undefined });
+                      setOpen(false);
+                      setQuery('');
+                      setResults([]);
+                    }}
+                    className="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-muted"
+                  >
+                    <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium truncate">{r.name}</span>
+                      {r.address && <span className="block truncate text-xs text-muted-foreground">{r.address}</span>}
+                      {r.website && <span className="block truncate text-xs text-primary">{hostnameFromUrl(r.website)}</span>}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </PopoverContent>
+      </Popover>
 
       {/* Add by URL */}
       <div className="flex gap-2">
