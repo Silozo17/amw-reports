@@ -384,6 +384,7 @@ function mapTT(item: TTItem, bucket: RawPost["bucket"], handle: string): RawPost
     post_url: item.webVideoUrl ?? null,
     external_id: item.id ?? null,
     post_type: "video",
+    media_kind: "video",
     caption: item.text ?? null,
     thumbnail_url: item.videoMeta?.coverUrl ?? null,
     hashtags: (item.hashtags ?? []).map((h) => h.name ?? "").filter(Boolean),
@@ -397,15 +398,31 @@ function mapTT(item: TTItem, bucket: RawPost["bucket"], handle: string): RawPost
   };
 }
 
-async function scrapeIG(handles: string[], bucket: RawPost["bucket"], maxPerHandle: number): Promise<RawPost[]> {
+async function scrapeIG(
+  handles: string[],
+  bucket: RawPost["bucket"],
+  maxPerHandle: number,
+  opts: { onlyReels?: boolean } = {},
+): Promise<RawPost[]> {
   if (handles.length === 0) return [];
   const r = await runApifyActor<IGItem>({
     actor: "apify~instagram-scraper",
-    input: { directUrls: handles.map((h) => `https://www.instagram.com/${h}/`), resultsType: "posts", resultsLimit: maxPerHandle, addParentData: false },
-    timeoutSec: 120, maxItems: handles.length * maxPerHandle,
+    input: {
+      directUrls: handles.map((h) => `https://www.instagram.com/${h}/`),
+      // resultsType "stories" is unrelated; "posts" returns the unified feed
+      // including reels. We filter to videos client-side when onlyReels is set.
+      resultsType: "posts",
+      resultsLimit: opts.onlyReels ? maxPerHandle * 3 : maxPerHandle,
+      addParentData: false,
+    },
+    timeoutSec: 120,
+    maxItems: handles.length * (opts.onlyReels ? maxPerHandle * 3 : maxPerHandle),
   });
   if (!r.ok) return [];
-  return r.items.map((item) => mapIG(item, bucket, item.ownerUsername ?? "")).filter((p) => isRecent(p.posted_at));
+  const mapped = r.items.map((item) => mapIG(item, bucket, item.ownerUsername ?? "")).filter((p) => isRecent(p.posted_at));
+  if (!opts.onlyReels) return mapped;
+  // Keep only videos so the Viral bucket isn't flooded with photo carousels.
+  return mapped.filter((p) => p.media_kind === "video").slice(0, handles.length * maxPerHandle);
 }
 
 async function scrapeTT(handles: string[], bucket: RawPost["bucket"], maxPerHandle: number): Promise<RawPost[]> {
@@ -419,15 +436,27 @@ async function scrapeTT(handles: string[], bucket: RawPost["bucket"], maxPerHand
   return r.items.map((item) => mapTT(item, bucket, item.authorMeta?.name ?? "")).filter((p) => isRecent(p.posted_at));
 }
 
-async function scrapeIGHashtag(tag: string): Promise<RawPost[]> {
-  const r = await runApifyActor<IGItem>({
-    actor: "apify~instagram-hashtag-scraper",
-    input: { hashtags: [tag], resultsLimit: 30 },
-    timeoutSec: 90, maxItems: 30,
+/**
+ * Hashtag-driven viral discovery via TikTok (video-first platform). The previous
+ * IG hashtag scraper returned mostly low-engagement photo carousels, so we route
+ * niche-tag discovery through TikTok and keep IG sourced exclusively from the
+ * AI-discovered viral accounts (filtered to reels above).
+ */
+async function scrapeTTHashtag(tag: string): Promise<RawPost[]> {
+  const r = await runApifyActor<TTItem>({
+    actor: "clockworks~tiktok-scraper",
+    input: {
+      hashtags: [tag.replace(/^#/, "")],
+      resultsPerPage: 20,
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+    },
+    timeoutSec: 120,
+    maxItems: 20,
   });
   if (!r.ok) return [];
   return r.items.map((item) => {
-    const p = mapIG(item, "viral", item.ownerUsername ?? "");
+    const p = mapTT(item, "viral", item.authorMeta?.name ?? "");
     p.source_query = `#${tag}`;
     return p;
   }).filter((p) => isRecent(p.posted_at));
