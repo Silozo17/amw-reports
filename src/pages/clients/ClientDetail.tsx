@@ -53,6 +53,7 @@ const ClientDetail = () => {
   const [pickerConnection, setPickerConnection] = useState<PlatformConnection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
   const entitlements = useEntitlements();
   const { isPlatformAdmin } = usePlatformAdmin();
   const { isOwner, isManager, isClientUser } = useAuth();
@@ -423,7 +424,7 @@ const ClientDetail = () => {
 
         {isAnySyncing && <SyncProgressBar jobs={activeJobs} />}
 
-        <Tabs defaultValue="dashboard">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="relative">
             <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none z-10 sm:hidden" />
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
@@ -462,7 +463,7 @@ const ClientDetail = () => {
 
           {hasContentLabAccess && (
             <TabsContent value="content-lab" className="mt-4">
-              <ClientContentLabTab clientId={client.id} />
+              <ClientContentLabTab client={client} onEditClient={() => setActiveTab('settings')} />
             </TabsContent>
           )}
 
