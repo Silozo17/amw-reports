@@ -45,7 +45,7 @@ const SharedIdeaPage = () => {
     void (async () => {
       const { data, error } = await supabase.rpc('get_shared_idea', { _slug: slug });
       if (error || !data) { setLoading(false); return; }
-      const payload = data as { idea: SharedIdea; org: SharedOrg };
+      const payload = data as unknown as { idea: SharedIdea; org: SharedOrg };
       setIdea(payload.idea);
       setOrg(payload.org);
       setLoading(false);
