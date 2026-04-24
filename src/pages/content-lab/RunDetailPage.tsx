@@ -198,7 +198,7 @@ const RunDetailPage = () => {
               <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
               <TabsTrigger value="own">Your content ({ownPosts.length})</TabsTrigger>
               <TabsTrigger value="competitors">Local competitors ({competitorAccounts.length})</TabsTrigger>
-              <TabsTrigger value="viral">Viral worldwide ({viralPosts.length})</TabsTrigger>
+              <TabsTrigger value="viral">Viral ({viralPosts.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="ideas" className="mt-4">
@@ -221,10 +221,12 @@ const RunDetailPage = () => {
               ) : (
                 competitorAccounts.map((acc) => (
                   <div key={`${acc.platform}:${acc.handle}`} className="space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-display text-base">@{acc.handle}</h3>
                       <Badge variant="outline" className="text-[10px] capitalize">{acc.platform}</Badge>
                       <span className="text-xs text-muted-foreground">{acc.postCount} posts</span>
+                      <span className="text-xs text-muted-foreground">· avg {acc.avgViews.toLocaleString()} views</span>
+                      <span className="text-xs text-muted-foreground">· avg {acc.avgLikes.toLocaleString()} likes</span>
                     </div>
                     <PostGrid posts={competitorPosts.filter((p) => p.author_handle === acc.handle && p.platform === acc.platform).slice(0, 6)} />
                   </div>
@@ -233,7 +235,7 @@ const RunDetailPage = () => {
             </TabsContent>
 
             <TabsContent value="viral" className="mt-4">
-              <PostGrid posts={viralPosts} emptyMsg="No viral posts found." />
+              <PostGrid posts={viralPosts} emptyMsg="No viral posts found yet — try running again or add more competitor handles." />
             </TabsContent>
           </Tabs>
         )}
