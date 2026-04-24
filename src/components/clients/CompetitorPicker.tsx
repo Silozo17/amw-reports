@@ -12,10 +12,11 @@ import {
   type Competitor,
 } from '@/lib/competitors';
 
-interface SearchResult {
+interface Prediction {
+  place_id: string;
   name: string;
   address: string;
-  website: string;
+  website?: string;
 }
 
 interface Props {
