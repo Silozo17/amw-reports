@@ -234,7 +234,9 @@ const RunDetailPage = () => {
   );
 };
 
-const PostGrid = ({ posts, emptyMsg }: { posts: PostRow[]; emptyMsg?: string }) => {
+const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string; emptyMsg?: string }) => {
+  const saveItem = useSaveItem();
+  const saveHook = useSaveHook();
   if (posts.length === 0) return <p className="text-sm text-muted-foreground">{emptyMsg ?? 'No posts.'}</p>;
   return (
     <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -252,11 +254,43 @@ const PostGrid = ({ posts, emptyMsg }: { posts: PostRow[]; emptyMsg?: string }) 
               <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {(p.likes ?? 0).toLocaleString()}</span>
               <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" /> {(p.comments ?? 0).toLocaleString()}</span>
             </div>
-            {p.post_url && (
-              <a href={p.post_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                View <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
+            <div className="flex items-center justify-between gap-1 pt-1">
+              {p.post_url ? (
+                <a href={p.post_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                  View <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : <span />}
+              <div className="flex items-center gap-0.5">
+                {p.hook_text && (
+                  <Button
+                    variant="ghost" size="icon" className="h-6 w-6"
+                    title="Save hook"
+                    onClick={() => saveHook.mutate({
+                      hook_text: p.hook_text!,
+                      hook_type: p.hook_type,
+                      platform: p.platform,
+                      source_post_id: p.id,
+                      example_caption: p.caption,
+                      example_post_url: p.post_url,
+                    })}
+                  >
+                    <Anchor className="h-3 w-3" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost" size="icon" className="h-6 w-6"
+                  title="Save post"
+                  onClick={() => saveItem.mutate({
+                    kind: 'post',
+                    source_run_id: runId ?? null,
+                    source_id: p.id,
+                    payload: { ...p },
+                  })}
+                >
+                  <Bookmark className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
           </div>
         </Card>
       ))}
@@ -264,30 +298,47 @@ const PostGrid = ({ posts, emptyMsg }: { posts: PostRow[]; emptyMsg?: string }) 
   );
 };
 
-const IdeaCard = ({ idea, onEdit }: { idea: IdeaRow; onEdit: () => void }) => (
-  <Card className="flex flex-col gap-2 p-4">
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          Idea #{idea.idea_number}{idea.best_fit_platform && <> · <span className="capitalize">{idea.best_fit_platform}</span></>}
-        </p>
-        <h3 className="mt-1 font-display text-base leading-tight">{idea.title}</h3>
+const IdeaCard = ({ idea, runId, onEdit }: { idea: IdeaRow; runId?: string; onEdit: () => void }) => {
+  const saveItem = useSaveItem();
+  return (
+    <Card className="flex flex-col gap-2 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Idea #{idea.idea_number}{idea.best_fit_platform && <> · <span className="capitalize">{idea.best_fit_platform}</span></>}
+          </p>
+          <h3 className="mt-1 font-display text-base leading-tight">{idea.title}</h3>
+        </div>
+        <Sparkles className="h-4 w-4 shrink-0 text-primary" />
       </div>
-      <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-    </div>
-    {idea.hook && <p className="text-sm font-medium">{idea.hook}</p>}
-    {idea.script && <p className="text-xs text-muted-foreground line-clamp-4 whitespace-pre-line">{idea.script}</p>}
-    {idea.caption && <p className="text-[11px] text-muted-foreground line-clamp-2">{idea.caption}</p>}
-    {idea.hashtags?.length > 0 && (
-      <div className="flex flex-wrap gap-1">
-        {idea.hashtags.slice(0, 5).map((h) => <Badge key={h} variant="secondary" className="text-[9px]">#{h}</Badge>)}
+      {idea.hook && <p className="text-sm font-medium">{idea.hook}</p>}
+      {idea.script && <p className="text-xs text-muted-foreground line-clamp-4 whitespace-pre-line">{idea.script}</p>}
+      {idea.caption && <p className="text-[11px] text-muted-foreground line-clamp-2">{idea.caption}</p>}
+      {idea.hashtags?.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {idea.hashtags.slice(0, 5).map((h) => <Badge key={h} variant="secondary" className="text-[9px]">#{h}</Badge>)}
+        </div>
+      )}
+      <div className="mt-auto flex gap-2">
+        <Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
+          <Wand2 className="mr-2 h-3 w-3" /> AI edit
+        </Button>
+        <Button
+          variant="outline" size="sm"
+          title="Save to library"
+          onClick={() => saveItem.mutate({
+            kind: 'idea',
+            source_run_id: runId ?? null,
+            source_id: idea.id,
+            payload: { ...idea },
+          })}
+        >
+          <Bookmark className="h-3 w-3" />
+        </Button>
       </div>
-    )}
-    <Button variant="outline" size="sm" onClick={onEdit} className="mt-auto">
-      <Wand2 className="mr-2 h-3 w-3" /> AI edit
-    </Button>
-  </Card>
-);
+    </Card>
+  );
+};
 
 const EditIdeaDialog = ({ idea, onClose, onSaved }: { idea: IdeaRow | null; onClose: () => void; onSaved: () => void }) => {
   const [instruction, setInstruction] = useState('');
