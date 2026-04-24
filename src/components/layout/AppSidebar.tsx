@@ -16,8 +16,6 @@ import {
   Building2,
   Activity,
   Sparkles,
-  KanbanSquare,
-  Lightbulb,
   Heart,
   TrendingUp,
   Anchor,
@@ -52,11 +50,9 @@ const BASE_NAV_ITEMS = [
 ];
 
 const CONTENT_LAB_SUB_ITEMS = [
-  { to: '/content-pipeline', label: 'Content Pipeline', icon: KanbanSquare },
-  { to: '/ideas', label: 'Ideas', icon: Lightbulb },
-  { to: '/content-lab/trends', label: 'Trends', icon: TrendingUp, comingSoon: true },
+  { to: '/content-lab/trends', label: 'Trends', icon: TrendingUp },
   { to: '/content-lab/hooks', label: 'Hook Library', icon: Anchor },
-  { to: '/content-lab/swipe-file', label: 'Swipe File', icon: Heart },
+  { to: '/content-lab/saves', label: 'Saves', icon: Heart },
 ];
 
 const TAIL_NAV_ITEMS = [
@@ -90,7 +86,7 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
 
   const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname === '/debug' || location.pathname === '/logs';
   const [adminOpen, setAdminOpen] = useState(isAdminRoute);
-  const isContentLabRoute = location.pathname.startsWith('/content-lab') || location.pathname === '/content-pipeline' || location.pathname === '/ideas';
+  const isContentLabRoute = location.pathname.startsWith('/content-lab');
   const [contentLabOpen, setContentLabOpen] = useState(isContentLabRoute);
 
   // Subtle "run in progress" pulse on the Content Lab parent.
