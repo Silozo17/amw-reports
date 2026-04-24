@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useAdminContentLab';
 import RunsTable from '@/components/admin/contentLab/RunsTable';
 import RunDetailDrawer from '@/components/admin/contentLab/RunDetailDrawer';
+import AdminPlansPanel from '@/components/admin/contentLab/AdminPlansPanel';
 
 const AdminContentLab = () => {
   usePageMeta({ title: 'Content Lab — Admin — AMW Reports', description: 'Platform-wide Content Lab runs.' });
@@ -29,6 +30,8 @@ const AdminContentLab = () => {
             Platform-wide debug console for client-centric Content Lab runs.
           </p>
         </div>
+
+        <AdminPlansPanel />
 
         <Card>
           <CardHeader>
