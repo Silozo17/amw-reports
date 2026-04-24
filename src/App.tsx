@@ -132,6 +132,7 @@ const AppRoutes = () => (
       <Route path="/login" element={<PublicRoute><LandingPage /></PublicRoute>} />
       <Route path="/auth/threads/callback" element={<ThreadsCallback />} />
       <Route path="/auth/callback" element={<OAuthCallback />} />
+      <Route path="/share/idea/:slug" element={<SharedIdeaPage />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
