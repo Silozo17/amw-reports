@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Sparkles, Eye, Heart, MessageCircle, ArrowLeft, Wand2, ExternalLink, Bookmark, Anchor } from 'lucide-react';
@@ -15,7 +15,29 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveItem, useSaveHook } from '@/hooks/useContentLabSaves';
 import UsageHeader from '@/components/content-lab/UsageHeader';
+import RunProgressStepper, { type RunStepDef } from '@/components/content-lab/RunProgressStepper';
 import usePageMeta from '@/hooks/usePageMeta';
+
+const RUN_STEPS: RunStepDef[] = [
+  { label: 'Indexing your connected platforms', detail: 'Syncing social accounts and ad platforms' },
+  { label: 'Mapping competitor landscape', detail: 'Discovering competitors in your niche' },
+  { label: 'Resolving competitor social profiles', detail: 'Matching Instagram, TikTok and Facebook handles' },
+  { label: 'Extracting content performance signals', detail: 'Scanning posts for engagement patterns' },
+  { label: 'Detecting viral content patterns', detail: 'Identifying high performing formats and hooks' },
+  { label: 'Benchmarking against industry metrics', detail: 'Comparing engagement rates, posting frequency, growth' },
+  { label: 'Compiling strategic recommendations', detail: 'Building your personalised content playbook' },
+];
+
+// Maps DB phase rows -> the 7 UI steps above. Some DB phases cover multiple UI steps.
+const PHASE_TO_STEP_INDEX: Record<string, number> = {
+  discover: 1,    // through step 1 (mapping competitors)
+  validate: 2,    // through step 2 (resolving handles)
+  scrape: 3,      // through step 3 (extracting signals)
+  analyse: 5,     // through step 5 (benchmarking)
+  ideate: 6,      // through step 6 (recommendations)
+  notify: 6,
+};
+
 
 interface RunRow {
   id: string; status: string; current_phase: string | null;
