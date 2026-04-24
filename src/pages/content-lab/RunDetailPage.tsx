@@ -141,13 +141,16 @@ const RunDetailPage = () => {
           </Button>
         </div>
 
-        <header>
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Run</p>
-          <h1 className="mt-1 font-display text-3xl">{run.client_snapshot?.company_name ?? 'Client'}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {[run.client_snapshot?.industry, run.client_snapshot?.location].filter(Boolean).join(' · ')}
-            {' · '}{new Date(run.created_at).toLocaleString()}
-          </p>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Run</p>
+            <h1 className="mt-1 font-display text-3xl">{run.client_snapshot?.company_name ?? 'Client'}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {[run.client_snapshot?.industry, run.client_snapshot?.location].filter(Boolean).join(' · ')}
+              {' · '}{new Date(run.created_at).toLocaleString()}
+            </p>
+          </div>
+          <UsageHeader buttonSize="sm" />
         </header>
 
         {isProcessing && (
