@@ -26,7 +26,7 @@ const IDEA_SCHEMA = {
           caption: { type: "string" },
           visual_direction: { type: "string" },
           cta: { type: "string" },
-          best_fit_platform: { type: "string", enum: ["instagram", "tiktok", "facebook", "any"] },
+          best_fit_platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
           why_it_works: { type: "string" },
           hashtags: { type: "array", items: { type: "string" } },
         },
@@ -117,7 +117,7 @@ ${competitorPosts.length ? competitorPosts.map(fmt).join("\n") : "(none)"}
 VIRAL WORLDWIDE CONTENT IN THIS NICHE
 ${viralPosts.length ? viralPosts.map(fmt).join("\n") : "(none)"}`;
 
-    const systemBase = `You are a senior social-media strategist. You write content ideas that mix the client's existing voice with proven viral patterns from their niche. Each idea must be platform-agnostic but include a "best_fit_platform" recommendation. Avoid generic advice — every idea should reference something specific from the client's industry, location, or audience.`;
+    const systemBase = `You are a senior social-media strategist. You write content ideas that mix the client's existing voice with proven viral patterns from their niche. Each idea must be platform-agnostic but include a "best_fit_platform" recommendation. best_fit_platform MUST be exactly one of: instagram, tiktok, facebook (lowercase, no other values). Avoid generic advice — every idea should reference something specific from the client's industry, location, or audience.`;
 
     const promptForBatch = (offset: number) =>
       `${sharedContext}
@@ -138,6 +138,18 @@ For each idea provide: title, hook (scroll-stopper opener), script (3–6 senten
 
     if (allIdeas.length === 0) return json({ error: "All ideate batches failed" }, 500);
 
+    // Normalise best_fit_platform to satisfy the DB CHECK constraint
+    // (instagram | tiktok | facebook). Map common aliases the AI sometimes
+    // returns; fall back to "instagram" for anything unrecognised so a single
+    // bad value never blows up the whole insert.
+    const normalisePlatform = (raw: string | undefined | null): string => {
+      const v = String(raw ?? "").trim().toLowerCase();
+      if (v === "instagram" || v === "ig" || v === "reels" || v === "instagram reels") return "instagram";
+      if (v === "tiktok" || v === "tt" || v === "shorts" || v === "youtube shorts") return "tiktok";
+      if (v === "facebook" || v === "fb" || v === "meta") return "facebook";
+      return "instagram";
+    };
+
     const rows = allIdeas.slice(0, 30).map((idea, idx) => ({
       run_id: runId,
       idea_number: idx + 1,
@@ -147,7 +159,7 @@ For each idea provide: title, hook (scroll-stopper opener), script (3–6 senten
       caption: idea.caption,
       visual_direction: idea.visual_direction,
       cta: idea.cta,
-      best_fit_platform: idea.best_fit_platform,
+      best_fit_platform: normalisePlatform(idea.best_fit_platform),
       why_it_works: idea.why_it_works,
       hashtags: idea.hashtags ?? [],
       status: "new",

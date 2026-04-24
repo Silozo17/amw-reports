@@ -429,10 +429,10 @@ const ClientDetail = () => {
             <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none z-10 sm:hidden" />
             <TabsList className="w-full overflow-x-auto flex-nowrap justify-start scrollbar-none">
               <TabsTrigger value="dashboard" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5 hidden sm:inline" />Dashboard</TabsTrigger>
-              <TabsTrigger value="connections">Connections</TabsTrigger>
-              <TabsTrigger value="upsells">Upsells</TabsTrigger>
               {hasContentLabAccess && <TabsTrigger value="content-lab">Content Lab</TabsTrigger>}
+              <TabsTrigger value="upsells">Upsells</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="connections">Connections</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
           </div>

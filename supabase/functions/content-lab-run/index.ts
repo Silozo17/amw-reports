@@ -580,12 +580,26 @@ async function runPipeline(
   client: ClientRow,
   ledgerId: string,
 ): Promise<void> {
+  // Wrap each phase so the failing phase + first 200 chars are logged before re-throw.
+  const runPhase = async <T>(phase: string, fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[content-lab-run] phase=${phase} failed:`, msg);
+      try {
+        await logProgress(admin, runId, phase, "failed", msg.slice(0, 200));
+      } catch { /* ignore log failure */ }
+      throw new Error(`${phase}: ${msg}`);
+    }
+  };
+
   try {
     await admin.from("content_lab_runs").update({ status: "running", started_at: new Date().toISOString() }).eq("id", runId);
 
     // 1. Discover
     await logProgress(admin, runId, "discover", "started");
-    const discover = await phaseDiscover(admin, runId, client);
+    const discover = await runPhase("discover", () => phaseDiscover(admin, runId, client));
     await admin.from("content_lab_runs").update({
       summary: { ...(client as unknown as Record<string, unknown>), discover },
     }).eq("id", runId);
@@ -593,25 +607,26 @@ async function runPipeline(
 
     // 2. Scrape
     await logProgress(admin, runId, "scrape", "started");
-    const posts = await phaseScrape(admin, runId, client, discover);
-    await persistPosts(admin, runId, posts);
+    const posts = await runPhase("scrape", () => phaseScrape(admin, runId, client, discover));
+    await runPhase("persist_posts", () => persistPosts(admin, runId, posts));
 
     // 3. Analyse
     await logProgress(admin, runId, "analyse", "started");
-    await phaseAnalyse(admin, runId);
+    await runPhase("analyse", () => phaseAnalyse(admin, runId));
     await logProgress(admin, runId, "analyse", "ok", "Tagged hooks & patterns");
 
     // 4. Ideate
     await logProgress(admin, runId, "ideate", "started");
-    await phaseIdeate(runId);
+    await runPhase("ideate", () => phaseIdeate(runId));
     await logProgress(admin, runId, "ideate", "ok", "Generated 30 ideas");
 
     await admin.from("content_lab_runs").update({
       status: "completed", completed_at: new Date().toISOString(), current_phase: "completed",
     }).eq("id", runId);
+    console.log(`[content-lab-run] run=${runId} completed`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[content-lab-run] failed:", msg);
+    console.error(`[content-lab-run] run=${runId} failed:`, msg);
     await logProgress(admin, runId, "pipeline", "failed", msg);
     await admin.from("content_lab_runs").update({
       status: "failed", error_message: msg, completed_at: new Date().toISOString(),
@@ -620,9 +635,12 @@ async function runPipeline(
     if (ledgerId) {
       try {
         await admin.rpc("refund_content_lab_credit", { _ledger_id: ledgerId, _refund_reason: `run_failed: ${msg.slice(0, 200)}` });
+        console.log(`[content-lab-run] refunded ledger=${ledgerId} run=${runId}`);
       } catch (refundErr) {
-        console.error("[content-lab-run] refund failed:", refundErr);
+        console.error(`[content-lab-run] refund FAILED ledger=${ledgerId} run=${runId}:`, refundErr);
       }
+    } else {
+      console.error(`[content-lab-run] no ledgerId for failed run=${runId} — manual refund required`);
     }
   }
 }
