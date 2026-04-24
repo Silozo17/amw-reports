@@ -28,6 +28,7 @@ interface PostRow {
   caption: string | null; thumbnail_url: string | null; post_url: string | null;
   views: number; likes: number; comments: number; engagement_rate: number;
   posted_at: string | null; hook_type: string | null; hook_text: string | null;
+  media_kind: 'video' | 'photo' | 'carousel' | null;
 }
 interface IdeaRow {
   id: string; idea_number: number; title: string; hook: string | null;
