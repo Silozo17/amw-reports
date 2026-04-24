@@ -81,10 +81,16 @@ Deno.serve(async (req: Request) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Load run + posts
+    // Load run + posts + client services
     const { data: run, error: runErr } = await admin
-      .from("content_lab_runs").select("id, client_snapshot, summary").eq("id", runId).maybeSingle();
+      .from("content_lab_runs").select("id, client_id, client_snapshot, summary").eq("id", runId).maybeSingle();
     if (runErr || !run) return json({ error: "Run not found" }, 404);
+
+    const { data: clientRow } = await admin
+      .from("clients").select("services_offered").eq("id", (run as { client_id: string }).client_id).maybeSingle();
+    const services: string[] = Array.isArray((clientRow as { services_offered?: string[] } | null)?.services_offered)
+      ? (clientRow as { services_offered: string[] }).services_offered
+      : [];
 
     const { data: posts } = await admin
       .from("content_lab_posts")
@@ -101,12 +107,19 @@ Deno.serve(async (req: Request) => {
     const fmt = (p: typeof ownPosts[number]) =>
       `(${p.platform}) @${p.author_handle} [${p.hook_type ?? "?"}/${p.pattern_tag ?? "?"}]: ${(p.caption ?? "").slice(0, 200).replace(/\n/g, " ")}`;
 
+    const servicesBlock = services.length > 0
+      ? `SERVICES THIS CLIENT ACTUALLY OFFERS (constrain ideas to these)
+${services.map((s) => `- ${s}`).join("\n")}`
+      : `SERVICES: not specified — fall back to general industry/niche ideas.`;
+
     const sharedContext = `CLIENT
 Company: ${snap.company_name}
 Industry: ${snap.industry ?? "unknown"}
 Location: ${snap.location ?? "unknown"}
 Audience: ${snap.target_audience ?? "unknown"}
 Brand voice: ${snap.brand_voice ?? "unknown"}
+
+${servicesBlock}
 
 THEIR RECENT CONTENT (what they've done)
 ${ownPosts.length ? ownPosts.map(fmt).join("\n") : "(none)"}
@@ -117,7 +130,13 @@ ${competitorPosts.length ? competitorPosts.map(fmt).join("\n") : "(none)"}
 VIRAL WORLDWIDE CONTENT IN THIS NICHE
 ${viralPosts.length ? viralPosts.map(fmt).join("\n") : "(none)"}`;
 
-    const systemBase = `You are a senior social-media strategist. You write content ideas that mix the client's existing voice with proven viral patterns from their niche. Each idea must be platform-agnostic but include a "best_fit_platform" recommendation. best_fit_platform MUST be exactly one of: instagram, tiktok, facebook (lowercase, no other values). Avoid generic advice — every idea should reference something specific from the client's industry, location, or audience.`;
+    const servicesRule = services.length > 0
+      ? `STRICT SERVICES RULE: At LEAST 8 of the 10 ideas in this batch MUST be directly about a service the client offers (listed above). Up to 2 ideas may be adjacent/audience-building content in the same niche. Never invent services they don't offer.`
+      : `No services list — generate niche-appropriate ideas.`;
+
+    const systemBase = `You are a senior social-media strategist. You write content ideas that mix the client's existing voice with proven viral patterns from their niche. Each idea must be platform-agnostic but include a "best_fit_platform" recommendation. best_fit_platform MUST be exactly one of: instagram, tiktok, facebook (lowercase, no other values). Avoid generic advice — every idea should reference something specific from the client's industry, location, or audience.
+
+${servicesRule}`;
 
     const promptForBatch = (offset: number) =>
       `${sharedContext}
