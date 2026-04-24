@@ -1,117 +1,121 @@
-# Content Lab Hardening + Navigation + Admin Plans
+## What you'll get
 
-## Why this plan exists
-
-Two AMW Media runs failed in the last hour. Money was spent on Apify scrapes and AI calls but the user got nothing usable. Root cause is two narrow bugs in the pipeline — both fixable, both preventable. While we're in there, restructure the client view so Content Lab sits next to Dashboard, fix the sidebar order, gate features by the paid Content Lab tier, and give admins the controls they need to manage tiers and credits.
+A Content Lab that actually delivers what it promises: every post has a thumbnail and view count, every "Viral" post is a real high-engagement video, and ideas are presented as interactive Instagram-style phone mockups your team can react to, comment on, and share with the client.
 
 ---
 
-## 1. Fix the failing runs (root causes)
+## 1. Ideas → interactive Instagram-style mockups
 
-Diagnosed from `content_lab_runs` history:
+Replace the current flat `IdeaCard` with a phone-frame mockup that feels like an Instagram preview.
 
-| Time | `error_message` | Bug |
-|---|---|---|
-| 18:13 | `Insert ideas failed … content_lab_ideas_best_fit_platform_check` | `content-lab-ideate` lets the AI return `"any"` as `best_fit_platform`, but the DB CHECK only allows `instagram / tiktok / facebook`. |
-| 18:01 | `persistPosts: invalid input syntax for type integer: "42.281"` | Apify returned a float for `video_duration_seconds`. (`toInt` is now in place — verify it covers every numeric column.) |
+**Per idea, the AI now returns:**
+- 3 hook variations (instead of 1)
+- 1 caption + 1 script outline + 1 CTA
+- Hashtags
+- "Why it works" with a citation back to a specific competitor or viral post in the run (credibility line)
+- Visual direction
 
-**Fixes (all in `supabase/functions/`):**
+**Mockup UI (right side of the card):**
+- Phone frame with IG header (client handle + avatar)
+- Square preview area showing the active hook (tap arrows to cycle through the 3 hooks)
+- IG action row: ❤️ Like, 💬 Comment, ↗️ Share, 🔖 Save
+- Caption + hashtags below
 
-- `content-lab-ideate/index.ts`
-  - Drop `"any"` from the JSON-schema enum for `best_fit_platform`.
-  - Tighten the system prompt: "best_fit_platform MUST be exactly one of: instagram, tiktok, facebook."
-  - Before insert, normalise: lower-case, map `"reels" → "instagram"`, `"shorts" → "tiktok"`, anything else → fall back to the post's source platform or `"instagram"`. Never insert an unknown value.
-- `content-lab-run/index.ts`
-  - Confirm `toInt()` is applied to every integer column (`likes`, `comments`, `shares`, `views`, `author_followers`, `video_duration_seconds`) — already done, just add a unit-style assertion log if a coerced value differs from the input.
-  - Wrap each phase (`discover`, `scrape`, `persistPosts`, `analyse`, `ideate`) in its own try/catch that logs the failing phase + first 200 chars of payload to `content_lab_run_progress` before re-throwing. Today everything bubbles up as `pipeline failed`, which makes debugging slow.
-  - Already refunds the credit on failure via `refund_content_lab_credit` — verify the `ledgerId` is set before the throw path. Add a structured log line `[content-lab-run] refunded ledger=<id>` so we can grep success in edge logs.
+**Interactive behaviour:**
+- **Like** — anyone in the org can like; ideas with the most likes float to the top of the list (sort: likes desc, then idea_number).
+- **Comment** — opens an inline thread; anyone with access to the run (org members + the client portal user) can read and post comments. Shows author name + timestamp.
+- **Share** — opens a dialog with a white-labelled public link (`/share/idea/{slug}`) plus an email/copy button. The shared page is read-only, branded with the org's logo/colours, and shows the mockup + hooks + caption.
 
-**Outcome:** the AMW Media run that failed at 18:13 would now insert ideas successfully (or fall back to `instagram`); the 18:01 run would not have failed in the first place.
+**DB additions:**
+- `content_lab_idea_hooks` (idea_id, hook_text, position 0–2)
+- `content_lab_idea_reactions` (idea_id, user_id, kind='like') — unique per (idea, user)
+- `content_lab_idea_comments` (idea_id, author_user_id or author_client_user_id, body, created_at)
+- `content_lab_idea_share_tokens` (idea_id, slug, org_id, is_active, view_count) + RLS for public read by slug
+- New public route `/share/idea/:slug` (no auth, like the existing run share)
 
----
-
-## 2. Restructure the client view tabs
-
-Current order: `Dashboard | Connections | Upsells | Content Lab | Reports | Settings`
-
-New order: `Dashboard | Content Lab | Upsells | Reports | Connections | Settings`
-
-(Content Lab moves to position 2, right of Dashboard. Connections moves between Reports and Settings.)
-
-File: `src/pages/clients/ClientDetail.tsx` — reorder `TabsTrigger` and `TabsContent` blocks. No logic changes.
+**Ideate prompt change:** ask for `hooks: string[3]` instead of single `hook`, and require `why_it_works` to reference a specific handle/post pulled from the prompt's "viral / competitor patterns" list.
 
 ---
 
-## 3. Gate Content Lab by the paid add-on (already wired — verify)
+## 2. Fix "Your content" — every post needs a thumbnail + views
 
-`useContentLabAccess()` already returns `hasAccess` (tier set) and `canGenerate` (tier set + active). The sidebar already hides Content Lab when `!hasAccess`. Add the same gate to the per-client tab so an org without a tier can't see "Content Lab" on the client page either.
+**Root causes from the latest run:**
+- IG carousel posts often expose images under `images[0]` not `displayUrl` — we currently miss them.
+- IG photo posts have no `videoPlayCount` so views show as 0.
 
-In `ClientDetail.tsx`:
-- The `hasContentLabAccess && <TabsTrigger>` guard is already there — verify it uses `useContentLabAccess`. If `canGenerate` is false but `hasAccess` is true, show the tab in read-only mode (no "New Run" button) — this matches existing sidebar behaviour and means paused subs still see their history.
+**Fixes in `content-lab-run/index.ts` `mapIG`:**
+- `thumbnail_url`: fall back through `displayUrl → images?.[0] → childPosts?.[0]?.displayUrl`
+- For IG photos (non-video), use `likesCount + commentsCount` impressions estimate is wrong — instead **hide the views row when `views === 0` AND it's not a video**, and show "Photo" badge instead. (IG doesn't expose photo view counts via this scraper — showing 0 is misleading.)
+- Add a `media_kind` field (video | photo | carousel) so the UI knows what to render.
 
----
-
-## 4. Admin: manage Content Lab tiers and credits
-
-New section in `src/pages/admin/AdminContentLab.tsx` (currently 48 lines, just shows runs). Add two cards:
-
-### A. Per-org tier management
-- Table of orgs with columns: org name, current `content_lab_tier`, `status`, runs this month, credits balance.
-- Inline `Select` to change tier (`null / starter / growth / scale`) — writes to `org_subscriptions.content_lab_tier`.
-- Inline button "Grant credits" → modal with amount input → calls `add_content_lab_credits(_org_id, _amount, null)` (already exists).
-- Inline button "Revoke credits" → modal → directly inserts a negative row into `content_lab_credit_ledger` and decrements `content_lab_credits.balance` via a new `admin_adjust_content_lab_credits` SECURITY DEFINER function (admin-only via `is_platform_admin`).
-
-### B. Tier definitions reference (read-only for now)
-- Render the tiers from `src/lib/contentLabPricing.ts` so admins can see what each tier includes (price, runs/month, Stripe price ID).
-- Note: the actual tier prices live in Stripe and `contentLabPricing.ts`. Editing them is a code change, not a runtime knob — that's intentional. If you want a fully runtime-editable tier table later, that's a separate plan (would need a `content_lab_tier_config` table). I'll flag it but not build it.
-
-### Required migration
-```sql
-create or replace function public.admin_adjust_content_lab_credits(
-  _org_id uuid, _delta int, _reason text
-) returns int
-language plpgsql security definer set search_path = public as $$
-declare _new int;
-begin
-  if not public.is_platform_admin(auth.uid()) then
-    raise exception 'forbidden';
-  end if;
-  insert into public.content_lab_credits(org_id, balance) values (_org_id, 0)
-    on conflict (org_id) do nothing;
-  update public.content_lab_credits
-    set balance = greatest(balance + _delta, 0), updated_at = now()
-    where org_id = _org_id
-    returning balance into _new;
-  insert into public.content_lab_credit_ledger(org_id, delta, reason)
-    values (_org_id, _delta, coalesce(_reason, 'admin_adjust'));
-  return _new;
-end $$;
-```
+**`PostGrid` UI fix:**
+- If no `thumbnail_url` → show a branded placeholder (caption excerpt on coloured tile) instead of an empty grey square so the user can still scan the post.
+- Show views only for videos; show a "Photo" / "Carousel" badge for non-video posts.
 
 ---
 
-## 5. Out of scope (intentionally)
+## 3. Fix "Local Competitors"
 
-- Rebuilding the pipeline phase UI (already done in last loop).
-- Stripe price changes (live IDs, not safe to touch without explicit approval).
-- A runtime-editable tier table (see §4 note).
+- Same thumbnail fallback chain as above fixes the missing IG carousel covers.
+- Apply the same "show views only for videos, badge non-video posts" rule.
+- Filter out posts where caption is null/empty AND no thumbnail AND no engagement — these are scraper junk rows and should never reach the UI.
+- Group header now shows aggregate stats (avg views, avg likes, post count) so the user can compare accounts at a glance.
 
 ---
 
-## Files touched
+## 4. Fix "Viral worldwide" → rename to "Viral" and make it actually viral
 
-```text
-supabase/functions/content-lab-ideate/index.ts   # enum + normaliser
-supabase/functions/content-lab-run/index.ts      # per-phase try/catch + log
-supabase/migrations/<new>.sql                    # admin_adjust_content_lab_credits
-src/pages/clients/ClientDetail.tsx               # tab reorder
-src/pages/admin/AdminContentLab.tsx              # tier + credits panel
-src/hooks/useAdminContentLab.ts                  # add mutations for tier/credits
-```
+**Rename the tab to just "Viral"** (drop "worldwide").
 
-## Verification after implementation
+**Quality fixes — this is the biggest one:**
+- **Drop the IG hashtag scrape entirely** for the Viral bucket. The current `apify~instagram-hashtag-scraper` returns mostly low-engagement photo carousels (today's run: 104 posts, 91 with 0 views, only 13 videos — exactly the user complaint).
+- Replace with a stricter sourcing pipeline:
+  1. **Always scrape the AI-discovered viral accounts** (already working — TikTok viral averaged 14k views, IG viral 0 views due to same photo issue).
+  2. **Use TikTok hashtag/keyword scraper** (`clockworks~tiktok-scraper` with `hashtags` input) for niche tags — TikTok hashtag content is video-first and high-signal.
+  3. **For IG**: scrape Reels-only via a Reels scraper actor input filter (`onlyReels: true` on the IG scraper), so we get videos not photos.
+- **Hard quality gate before showing in Viral:**
+  - Must be a video (`media_kind === 'video'`)
+  - Must have `views >= 10000` OR `engagement_rate >= 0.05`
+  - If after filtering the bucket has fewer than 10 posts, fall back to top engagement-rate posts from the viral pool but still video-only.
+- Sort the Viral tab by views desc, not engagement rate (engagement rate flatters tiny accounts).
 
-1. Trigger a fresh run for AMW Media — confirm it completes through `discover → scrape → analyse → ideate → completed`.
-2. Force an ideate failure (mock invalid platform) — confirm credit is refunded and `content_lab_run_progress` logs the phase.
-3. As platform admin, change one org's tier from `null → starter` and grant 5 credits — confirm the org sees Content Lab unlock and credits appear in the header.
-4. Confirm the client view tab order on `/clients/:id` matches §2.
+---
+
+## 5. Small ref warnings on `HookLibraryPage` / `RunDetailPage`
+
+The console shows: *"Function components cannot be given refs"* — `UsageHeader` is being given a ref by `ContentLabHeader` (likely `<UsageHeader />` inside an asChild slot). Fix by wrapping `UsageHeader` in `forwardRef`. 5-min change, included.
+
+---
+
+## Out of scope (flagging, not building)
+
+- Real-time comment notifications (email when a teammate comments) — can add later.
+- Image generation for idea mockups — currently shows the hook text on a styled background, not a generated image. We can wire Lovable AI image generation into the mockup later if you want.
+- Multi-language captions — English only for now.
+
+---
+
+## Technical summary
+
+**Edge functions:**
+- `content-lab-ideate/index.ts` — schema change: `hook` → `hooks[3]`, tighten `why_it_works` to require a citation.
+- `content-lab-run/index.ts`:
+  - `mapIG`: thumbnail fallback chain, `media_kind`, fix IG views logic.
+  - `phaseScrape`: drop IG hashtag scrape, add TikTok hashtag scrape, IG `onlyReels: true` for viral handles.
+  - Quality gate filter for Viral bucket before persist.
+
+**Migrations:**
+- `content_lab_idea_hooks`, `content_lab_idea_reactions`, `content_lab_idea_comments`, `content_lab_idea_share_tokens` with RLS (org_members manage, client_users view, public read for share tokens).
+- Add `media_kind` text column to `content_lab_posts`.
+
+**Frontend:**
+- New `IdeaMockupCard.tsx` (phone frame, hook carousel, IG action row, like/comment/share state).
+- `CommentThread.tsx`, `ShareIdeaDialog.tsx`.
+- New page `src/pages/share/SharedIdeaPage.tsx` + route `/share/idea/:slug`.
+- `RunDetailPage.tsx`: rename Viral tab, sort ideas by likes, swap `IdeaCard` → `IdeaMockupCard`.
+- `PostGrid` updates: thumbnail fallback, video-only views, photo/carousel badge.
+- `UsageHeader` → `forwardRef` to silence ref warning.
+
+---
+
+Want me to proceed with all 5 sections, or trim any of them first?
