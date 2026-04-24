@@ -155,22 +155,30 @@ For each idea provide: title, hook (primary scroll-stopper opener), hooks (exact
       return "instagram";
     };
 
-    const rows = allIdeas.slice(0, 30).map((idea, idx) => ({
-      run_id: runId,
-      idea_number: idx + 1,
-      title: idea.title,
-      hook: idea.hook,
-      script: idea.script,
-      caption: idea.caption,
-      visual_direction: idea.visual_direction,
-      cta: idea.cta,
-      best_fit_platform: normalisePlatform(idea.best_fit_platform),
-      why_it_works: idea.why_it_works,
-      hashtags: idea.hashtags ?? [],
-      status: "new",
-      current_version: 1,
-      edit_count: 0,
-    }));
+    const rows = allIdeas.slice(0, 30).map((idea, idx) => {
+      const primary = (idea.hook ?? "").trim();
+      const variants = Array.isArray(idea.hooks) ? idea.hooks.map((h) => String(h).trim()).filter(Boolean) : [];
+      const merged = [primary, ...variants].filter(Boolean);
+      const unique = [...new Set(merged)].slice(0, 3);
+      while (unique.length < 3 && primary) unique.push(primary);
+      return {
+        run_id: runId,
+        idea_number: idx + 1,
+        title: idea.title,
+        hook: primary,
+        hooks: unique,
+        script: idea.script,
+        caption: idea.caption,
+        visual_direction: idea.visual_direction,
+        cta: idea.cta,
+        best_fit_platform: normalisePlatform(idea.best_fit_platform),
+        why_it_works: idea.why_it_works,
+        hashtags: idea.hashtags ?? [],
+        status: "new",
+        current_version: 1,
+        edit_count: 0,
+      };
+    });
 
     const { error: insErr } = await admin.from("content_lab_ideas").insert(rows);
     if (insErr) return json({ error: `Insert ideas failed: ${insErr.message}` }, 500);
