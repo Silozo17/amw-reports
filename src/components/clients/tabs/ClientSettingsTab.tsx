@@ -357,6 +357,93 @@ const ClientSettingsTab = ({
         </CardContent>
       </Card>
 
+      {/* Content Lab Settings */}
+      <Card className="mt-4 border-primary/20">
+        <CardHeader>
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> Content Lab Settings
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Everything Content Lab uses to research and generate ideas for this client. All fields save together with the button at the top.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Audience & niche mirror */}
+          <div className="rounded-md border bg-muted/30 p-3 space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">Audience & niche (from Business Context above)</p>
+            <div className="grid gap-1 text-xs sm:grid-cols-3">
+              <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{draft.industry || '—'}</span></div>
+              <div><span className="text-muted-foreground">Audience:</span> <span className="font-medium">{draft.target_audience ? draft.target_audience.slice(0, 40) + (draft.target_audience.length > 40 ? '…' : '') : '—'}</span></div>
+              <div><span className="text-muted-foreground">Voice:</span> <span className="font-medium">{draft.brand_voice ? draft.brand_voice.slice(0, 40) + (draft.brand_voice.length > 40 ? '…' : '') : '—'}</span></div>
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Location</p>
+            <Input
+              value={draft.location}
+              onChange={e => handleDraftChange('location', e.target.value)}
+              placeholder="e.g. Manchester, UK"
+            />
+            <p className="text-xs text-muted-foreground">Used to find local competitors in the same area.</p>
+          </div>
+
+          {/* Social handles */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Social handles to scrape</p>
+              <p className="text-xs text-muted-foreground">Instagram or TikTok is required to run Content Lab. Enter the username without the @.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {(['instagram', 'tiktok', 'facebook'] as const).map(p => (
+                <div key={p} className="space-y-1.5">
+                  <p className="text-xs font-medium capitalize">{p}</p>
+                  <Input
+                    value={handles[p]}
+                    onChange={e => handleHandleChange(p, e.target.value)}
+                    placeholder={p === 'facebook' ? 'jane.doe' : 'janedoe'}
+                  />
+                  {handles[p] && (
+                    <a
+                      href={
+                        p === 'instagram' ? `https://instagram.com/${handles[p]}` :
+                        p === 'tiktok' ? `https://tiktok.com/@${handles[p]}` :
+                        `https://facebook.com/${handles[p]}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                    >
+                      View profile <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Competitors (shared with Business Context) */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Competitors</p>
+            <p className="text-xs text-muted-foreground">Search Google by name or paste a website URL. Shared with Business Context above.</p>
+            <CompetitorPicker
+              value={draft.competitors}
+              onChange={(next) => handleDraftChange('competitors', next)}
+            />
+          </div>
+
+          {isDirty && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <p className="text-sm text-amber-600 dark:text-amber-400">You have unsaved changes</p>
+              <Button onClick={handleSave} size="sm">
+                <Save className="h-4 w-4 mr-1" /> Save Changes
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Client Self-Service Access */}
       <Card className="mt-4">
         <CardHeader>
