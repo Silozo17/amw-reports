@@ -32,10 +32,11 @@ interface PostRow {
 }
 interface IdeaRow {
   id: string; idea_number: number; title: string; hook: string | null;
+  hooks: string[] | null;
   script: string | null; caption: string | null; cta: string | null;
   hashtags: string[]; best_fit_platform: string | null;
   why_it_works: string | null; visual_direction: string | null;
-  edit_count: number;
+  edit_count: number; like_count: number | null;
 }
 
 const PHASE_LABELS: Record<string, string> = {
