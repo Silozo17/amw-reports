@@ -551,6 +551,7 @@ async function persistPosts(admin: SupabaseClient, runId: string, posts: RawPost
     post_url: p.post_url ?? null,
     external_id: p.external_id ?? null,
     post_type: p.post_type ?? null,
+    media_kind: p.media_kind ?? null,
     caption: p.caption ?? null,
     thumbnail_url: p.thumbnail_url ?? null,
     hashtags: p.hashtags ?? [],
