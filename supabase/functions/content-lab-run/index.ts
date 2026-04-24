@@ -575,13 +575,23 @@ Deno.serve(async (req: Request) => {
       return json({ error: `Credit spend failed: ${msg}` }, 500);
     }
 
-    // Snapshot client
+    // Snapshot client (parse competitors into structured list for prompts)
+    const competitorsList = (client.competitors ?? "")
+      .split(/\n|,/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [name, website] = line.split("|").map((p) => p.trim());
+        return { name: name || website || "", website: website && /^https?:\/\//i.test(website) ? website : null };
+      });
+
     const snapshot = {
       company_name: client.company_name,
       industry: client.industry,
       location: client.location,
       website: client.website,
       competitors: client.competitors,
+      competitors_list: competitorsList,
       social_handles: client.social_handles,
       brand_voice: client.brand_voice,
       target_audience: client.target_audience,
