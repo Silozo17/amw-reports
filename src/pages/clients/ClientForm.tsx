@@ -20,6 +20,7 @@ import { useOrg } from '@/contexts/OrgContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import UpgradePrompt from '@/components/entitlements/UpgradePrompt';
 import usePageMeta from '@/hooks/usePageMeta';
+import CompetitorPicker from '@/components/clients/CompetitorPicker';
 
 const ClientForm = () => {
   usePageMeta({ title: 'New Client — AMW Reports', description: 'Add a new client to the platform.' });
@@ -408,7 +409,8 @@ const ClientForm = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Competitors</Label>
-                  <Input value={form.competitors} onChange={e => handleChange('competitors', e.target.value)} placeholder="e.g. Competitor A, Competitor B" />
+                  <p className="text-xs text-muted-foreground">Search Google by name or paste a website — added one at a time.</p>
+                  <CompetitorPicker value={form.competitors} onChange={(next) => handleChange('competitors', next)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Unique Selling Points</Label>

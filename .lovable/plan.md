@@ -1,158 +1,96 @@
-# Content Lab v5 — Client-First Rebuild (revised)
+## What we're building
 
-## What we're building (plain English)
+Two focused changes to make Content Lab much easier to use from inside a client:
 
-User picks a client → 1 credit → ~3-min research run → 30 ideas across 4 tabs (Your content / Local competitors / Viral worldwide / Ideas). Free AI edits per idea, rate-limited.
+1. **Smart competitor picker** in client Settings tab — search Google to find competitors by name, or paste a URL. Each pick is added to a chip list (one by one).
+2. **In-client Content Lab tab** becomes the full launchpad — shows the data the run will use, lets you launch a run inline, surfaces missing inputs, and shows progress/history without bouncing to the global page.
 
-## Hard rules folded in from your review
+Plus a couple of quality-of-life nudges so non-technical users always know what to do next.
 
-1. **Apify concurrency cap = 5.** Manual semaphore in `content-lab-scrape`. Every actor call awaits a slot. No parallel firehose.
-2. **OAuth-first for own content.** `content-lab-scrape` checks `platform_connections` per platform. If IG is connected via Graph API, use it (free, instant). Apify only as fallback for own posts. Competitors and viral pools always use Apify (no OAuth available).
-3. **Ideate = 3 parallel calls of 10.** Default. Same shared context (client snapshot + 3 pools + analyse output) sent to each call, with `idea_index_offset` 0/10/20 in the prompt so they don't overlap themes. Single 30-in-one is removed entirely.
-4. **`industry` + `location` live on `clients`.** Migration adds `clients.industry text` and `clients.location text` (nullable) — populated once in client onboarding/edit dialog, editable any time. Run reads them straight from the client row. No per-run Gemini website inference.
-5. **Analyse step kept (cheap).** New `content-lab-analyse` runs Claude Haiku on all scraped posts (own + competitor + viral) in one batched call: per-post `hook_type`, `hook_text`, `pattern_tag`. Output stored on `content_lab_posts`. Ideate prompt receives these tags so it has structured signal, not just raw captions.
-6. **Handle pre-filter regex** runs *before* Apify validation:
-   - IG: `^[A-Za-z0-9._]{1,30}$`
-   - TikTok: `^[A-Za-z0-9._]{2,24}$`
-   - Facebook: `^[A-Za-z0-9.\-]{5,50}$` (page slug rules)
-   - Anything containing spaces, "&", "ltd", "limited" → rejected without an Apify call.
-7. **Pre-migration export.** Before the destructive migration runs, a one-shot script dumps every Content Lab table to JSONL in `content-lab-reports/legacy-export-{timestamp}/` (private bucket). One file per table. Kept indefinitely.
+---
 
-## Phase order in `content-lab-run` (single orchestrator)
+## 1. Competitors → searchable, structured list
 
-```text
-0. spend_content_lab_credit (1 credit, refund on failure)
-1. snapshot client → runs.client_snapshot
-2. discover                              ← Gemini, 1 call
-   - 10 competitor handles (uses clients.competitors first, AI tops up)
-   - 10 viral worldwide accounts
-   - 3 niche hashtags
-3. pre-filter handles by regex
-4. validate competitors via Apify profile-info (semaphore=5)
-5. scrape (semaphore=5 across all Apify calls)
-   - own: OAuth where available, Apify fallback
-   - competitors: Apify
-   - viral accounts: Apify
-   - viral hashtags: Apify hashtag scrapers
-   - all scoped to last 30 days
-   - cross-platform dedupe by caption fingerprint + week
-6. analyse                               ← Haiku, 1 batched call
-7. ideate                                ← Claude Sonnet, 3 parallel calls × 10
-8. notify-complete (email)
-```
+Today `clients.competitors` is a single free-text string ("A, B, C"). It works but gives the AI fuzzy matches and no website signal.
 
-Each phase writes to `content_lab_run_progress` (renamed step_logs) so the UI shows live status. ≤1 retry per phase, partial success allowed (e.g. if Facebook scrape fails, run still completes with IG+TikTok).
+**Behaviour**
+- New `CompetitorPicker` component (used in `ClientSettingsTab` and the new client form):
+  - Search box → calls existing `google-places-lookup` edge function (already wired to Google Places API, returns name + address + website).
+  - Results show as a dropdown: name, address, website. Click → adds to the list below.
+  - Alternative input: "Add by URL" — paste any website, validated client-side, added as `{ name: <hostname>, website: <url> }`.
+  - List below shows each competitor as a removable chip with name + small website link.
+  - Reorder not needed for v1.
 
-## Schema (final)
+**Storage** (no schema change — keep it simple, low risk)
+- Continue using the existing `clients.competitors` text column.
+- Store as **newline-separated `Name | https://website`** entries (e.g. `Joe's Garage | https://joesgarage.co.uk`).
+- Parser/serialiser lives in `src/lib/competitors.ts` so both the picker and the edge functions can read it consistently.
+- Backwards compatible: existing comma-separated strings parse as name-only entries.
 
-Migration:
-```text
-ALTER TABLE clients ADD COLUMN industry text, ADD COLUMN location text;
--- (clients.competitors already exists as text — we'll parse it as comma-separated)
+**Edge function update**
+- `content-lab-run` (orchestrator) and `content-lab-discover-competitors` already read `client_snapshot.competitors`. Update the snapshot builder to also pass a parsed `competitors_list: [{name, website}]` so AI prompts can use the websites directly.
 
-DROP TABLE: content_lab_niches, content_lab_runs, content_lab_ideas,
-            content_lab_posts, content_lab_hooks, content_lab_trends,
-            content_lab_step_logs, content_lab_benchmark_pool,
-            content_lab_seed_pool, content_lab_pool_refresh_jobs,
-            content_lab_verticals, content_lab_swipe_file,
-            content_lab_swipe_insights, content_lab_idea_comments,
-            content_lab_run_share_tokens
-KEEP:    content_lab_credits, content_lab_credit_ledger, content_lab_usage
+---
 
-CREATE:
-  content_lab_runs(
-    id, org_id, client_id, status, credit_ledger_id,
-    client_snapshot jsonb,            -- handles, website, industry, location, competitors at run time
-    competitor_handles jsonb,         -- 10 validated
-    viral_accounts jsonb,             -- 10
-    viral_hashtags jsonb,             -- 3
-    summary jsonb, error_message,
-    started_at, completed_at, created_at, updated_at
-  )
-  content_lab_run_progress(
-    id, run_id, step, status, message, payload jsonb,
-    started_at, completed_at, duration_ms
-  )
-  content_lab_posts(
-    id, run_id, bucket('own'|'competitor'|'viral'),
-    platform, author_handle, post_url, thumbnail_url, caption,
-    views, likes, comments, shares, engagement_rate, posted_at,
-    transcript, hashtags[],
-    duplicate_group_id,               -- cross-platform dedupe key
-    hook_type, hook_text, pattern_tag -- from analyse step
-  )
-  content_lab_ideas(
-    id, run_id, idea_number, title, hook, hook_variants jsonb,
-    body, caption, visual_direction, cta, hashtags[],
-    best_fit_platform, source_post_id, why_it_works,
-    status, rating, ai_edit_count, last_edited_at, created_at
-  )
-  content_lab_idea_edits(            -- rate limiting
-    id, idea_id, user_id, prompt, created_at
-  )
-```
+## 2. Client → Content Lab tab becomes the full launchpad
 
-RLS mirrors existing org-member / client-user / platform-admin pattern.
+Today the tab is a thin teaser ("Open Content Lab"). We'll inline the whole flow scoped to this one client.
 
-## Edge functions
+**New layout for `ClientContentLabTab`** (replaces current file):
 
-**Delete:** `content-lab-discover`, `content-lab-onboard`, `content-lab-pool-refresh`, `content-lab-manual-pool-refresh`, `content-lab-validate-handle`, `content-lab-pipeline`, `content-lab-step-runner`, `content-lab-resume`, `content-lab-monthly-digest`, `content-lab-swipe-insights`, `content-lab-link-suggest`, `content-lab-remix-idea`.
+1. **Header** — "Content Lab for {company}" + credits badge + "Buy credits" link.
+2. **Readiness card** — a checklist of inputs the run will use, pulled from the client record:
+   - Industry ✓/✗
+   - Location ✓/✗
+   - Social handles (Instagram / TikTok / Facebook) — count connected
+   - Competitors — count in the new list
+   - Brand voice ✓/✗
+   - Each missing item links to the Settings tab with the relevant field focused.
+3. **"What this run will do" summary** — short bullets reflecting actual values: "We'll scan @handle's last 30 days, pull posts from N competitors, find viral content in {industry} worldwide, then draft 30 ideas."
+4. **Generate button** — calls `content-lab-run` directly (same call as the global page). Confirmation dialog warns about credit cost. Disabled with a helpful tooltip when no credits / no industry / no competitors.
+5. **Progress strip** — if the latest run is `pending`/`running`, show the live phase from `content_lab_run_progress` (reuse polling logic from `RunDetailPage`).
+6. **History list** — all previous runs for this client with status + open button.
 
-**New / rewritten:**
-- `content-lab-run` — orchestrator (spends credit, runs phases 1-8, refunds on failure)
-- `content-lab-scrape` — semaphore=5, OAuth-first own scrape, Apify fallback
-- `content-lab-analyse` — Haiku batched hook/pattern extraction
-- `content-lab-ideate` — 3 parallel Sonnet calls × 10 ideas
-- `content-lab-regenerate-idea` — free, rate-limited (5 per idea per user per 24h, 50 per org per day)
+**Reuse, don't duplicate**
+- Extract the run-trigger + confirmation dialog from `ContentLabPage` into `useStartContentLabRun` hook + `<StartRunDialog />` so both pages share one implementation.
+- Extract the live-progress polling from `RunDetailPage` into `useRunProgress(runId)` hook.
 
-**Kept and ported:** `content-lab-render-pdf`, `content-lab-export-docx`, `content-lab-image-proxy`, `content-lab-notify-complete`.
+---
 
-## Apify usage (verified)
+## 3. Easy-to-use nudges (small)
 
-- IG profile (own fallback / competitors / viral accounts): `apify~instagram-scraper`, `resultsLimit: 30`, `onlyPostsNewerThan: "30 days"`
-- TikTok profile: `clockworks~tiktok-scraper`, `resultsPerPage: 30`, date-filter in code
-- Facebook page: `apify~facebook-pages-scraper`, `resultsLimit: 30`
-- IG hashtag viral: `apify~instagram-hashtag-scraper`, `resultsLimit: 30`
-- TikTok hashtag viral: `clockworks~tiktok-scraper` (hashtag mode)
-- Profile validation: `apify/instagram-profile-scraper`, `clockworks/tiktok-profile-scraper`
+- **Empty competitors warning** in the readiness card: "Add 3-5 competitors for sharper local research" with a one-click jump to Settings.
+- **Industry/Location auto-suggest**: when the user picks a Google Places result for the *client itself* (already supported in `ClientForm`), pre-fill `location` from the result's city if currently empty.
+- **Tab badge**: show a small dot on the "Content Lab" client tab when a run is `running` so the user can see progress while on other tabs.
 
-All routed through one `runApifyActor()` helper that takes a semaphore slot before fetching.
+---
 
-## UI
+## Technical details
 
-**Removed routes:** `/content-lab/niche/new`, `/content-lab/onboard/*`, `/content-lab/trends`, `/content-lab/hooks`, `/content-lab/swipe`, `/content-lab/pipeline`.
+**New files**
+- `src/lib/competitors.ts` — `parseCompetitors(str): {name, website?}[]` and `serializeCompetitors(arr): string`.
+- `src/components/clients/CompetitorPicker.tsx` — search + URL input + chip list.
+- `src/hooks/useStartContentLabRun.ts` — wraps the `content-lab-run` invoke + toast + invalidations.
+- `src/hooks/useRunProgress.ts` — polls `content_lab_run_progress` every 4s.
+- `src/components/content-lab/StartRunDialog.tsx` — shared confirmation dialog.
+- `src/components/content-lab/RunReadinessCard.tsx` — checklist + "what will run" summary.
 
-**`/content-lab` (rewritten):** searchable client picker, credit balance, "Generate ideas" CTA per client, list of past runs grouped by client.
+**Edited files**
+- `src/components/clients/tabs/ClientSettingsTab.tsx` — replace competitors `<Input>` with `<CompetitorPicker>`.
+- `src/pages/clients/ClientForm.tsx` — same swap in new-client form.
+- `src/components/clients/tabs/ClientContentLabTab.tsx` — full rewrite to the launchpad layout above.
+- `src/pages/content-lab/ContentLabPage.tsx` — refactor to use the new shared hook + dialog (no behaviour change).
+- `src/pages/content-lab/RunDetailPage.tsx` — refactor to use `useRunProgress`.
+- `supabase/functions/content-lab-run/index.ts` — extend `client_snapshot` with `competitors_list` (parsed).
 
-**`/content-lab/run/:id` (new):** 4 tabs:
-- Your content — last 30d, deduped, per-platform sub-grids, hook tags shown
-- Local competitors — 10 cards, expand for top posts
-- Viral worldwide — top 15 posts grid
-- Ideas — 30 cards, filter by `best_fit_platform`, regenerate/edit button each
+**No DB migration needed.** `clients.competitors` stays as TEXT, with a documented format. If we later want first-class structure, that's a follow-up.
 
-**`ClientContentLabTab`:** simplified to "latest run + open report".
+**No new secrets needed.** `GOOGLE_API_KEY` already exists and `google-places-lookup` is already deployed.
 
-**`ClientForm` / edit dialog:** new fields for `industry` and `location`.
+---
 
-## Risks I want you aware of
+## Out of scope (flag for follow-up)
 
-1. **Wall time:** ~3-6 min with semaphore=5. UI shows live progress per phase.
-2. **Apify cost variance:** capped per actor at 30 results; worst case ~$0.50/run.
-3. **OAuth own-scrape only covers Instagram today** (Graph API). TikTok and Facebook own-scrape will still go through Apify until those platforms get OAuth scrape support — flagging now.
-4. **Hashtag actor returns hit-or-miss data on niche topics** (e.g. "car detailing UK" will work; "luxury car servicing milton keynes" likely won't). The fallback is the 10 viral accounts pool, which is more reliable.
-5. **Destructive migration** — confirmed full reset, JSONL export to private bucket runs first.
-
-## Build order (one task at a time)
-
-1. JSONL export script → run it → confirm files in `content-lab-reports/legacy-export-{timestamp}/`
-2. Migration: drop old tables, add `clients.industry`/`clients.location`, create new schema + RLS
-3. New `content-lab-run` orchestrator + simplified `content-lab-scrape` (semaphore + OAuth-first)
-4. New `content-lab-analyse` (Haiku batch)
-5. New `content-lab-ideate` (3×10 parallel)
-6. New `content-lab-regenerate-idea` (free, rate-limited)
-7. Port `render-pdf`, `notify-complete`, `image-proxy`, `export-docx` to new schema
-8. New `/content-lab` launchpad + run page with 4 tabs
-9. Add industry/location to ClientForm; simplify `ClientContentLabTab`; remove dead routes/components
-10. Smoke-test against Wheels VT
-
-Approve and I start at step 1.
+- Promoting `competitors` to a real `client_competitors` table — only worth doing if we start storing extra fields per competitor (notes, priority).
+- Automatically discovering competitor social handles from a website URL — possible via Firecrawl but adds cost; ask before adding.
+- Editing the run's input data inline from the Content Lab tab — current plan is "view here, edit in Settings". Confirm if you'd rather edit in place.

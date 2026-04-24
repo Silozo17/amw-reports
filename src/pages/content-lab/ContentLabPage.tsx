@@ -8,16 +8,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useContentLabRuns, useContentLabUsage, useClientsForPicker, type ContentLabRun, type ClientForPicker } from '@/hooks/useContentLab';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
+import { useStartContentLabRun } from '@/hooks/useStartContentLabRun';
 import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
 import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
+import StartRunDialog from '@/components/content-lab/StartRunDialog';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_TONE: Record<string, string> = {
@@ -36,11 +33,11 @@ const ContentLabPage = () => {
   const { data: clients = [], isLoading: clientsLoading } = useClientsForPicker();
   const { data: runs = [], isLoading: runsLoading } = useContentLabRuns();
   const { data: usage } = useContentLabUsage();
+  const { start, starting } = useStartContentLabRun();
 
   const [search, setSearch] = useState('');
   const [pendingClient, setPendingClient] = useState<ClientForPicker | null>(null);
   const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
-  const [starting, setStarting] = useState(false);
 
   usePageMeta({ title: 'Content Lab', description: 'Pick a client. Generate research-backed content ideas in minutes.' });
 
@@ -70,23 +67,8 @@ const ContentLabPage = () => {
   const noCredits = (usage?.creditBalance ?? 0) <= 0;
 
   const startRun = async (clientId: string) => {
-    setStarting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('content-lab-run', { body: { client_id: clientId } });
-      if (error) throw error;
-      toast.success("Run started — we'll email you when ideas are ready (~3-6 min).");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['content-lab-runs'] }),
-        queryClient.invalidateQueries({ queryKey: ['content-lab-usage'] }),
-      ]);
-      const runId = (data as { run_id?: string } | null)?.run_id;
-      if (runId) navigate(`/content-lab/run/${runId}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not start run');
-    } finally {
-      setStarting(false);
-      setPendingClient(null);
-    }
+    await start(clientId);
+    setPendingClient(null);
   };
 
   if (accessLoading) {
@@ -118,33 +100,17 @@ const ContentLabPage = () => {
 
         <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
 
-        <AlertDialog open={!!pendingClient} onOpenChange={(o) => !o && setPendingClient(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Generate ideas for {pendingClient?.company_name}?</AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div className="space-y-2 text-sm">
-                  <p>This uses <strong>1 credit</strong> and takes about 3-6 minutes. We'll scrape your client's last 30 days, find local competitors, pull viral worldwide content, then generate 30 ideas.</p>
-                  {(!pendingClient?.industry || !pendingClient?.location) && (
-                    <p className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-600 dark:text-amber-400">
-                      Tip: add an industry and location to the client for sharper local-competitor research.
-                    </p>
-                  )}
-                </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={starting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(e) => { e.preventDefault(); if (pendingClient) void startRun(pendingClient.id); }}
-                disabled={starting}
-              >
-                {starting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Start run
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <StartRunDialog
+          open={!!pendingClient}
+          onOpenChange={(o) => !o && setPendingClient(null)}
+          clientName={pendingClient?.company_name ?? ''}
+          missingHints={[
+            ...(pendingClient && !pendingClient.industry ? ['Industry'] : []),
+            ...(pendingClient && !pendingClient.location ? ['Location'] : []),
+          ]}
+          starting={starting}
+          onConfirm={() => { if (pendingClient) void startRun(pendingClient.id); }}
+        />
 
         <section className="space-y-4">
           <div className="flex items-center gap-3">

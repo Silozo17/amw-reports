@@ -9,6 +9,7 @@ import { Loader2, Mail, Save, Trash2, UserPlus, Users } from 'lucide-react';
 import type { Client } from '@/types/database';
 import { CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
+import CompetitorPicker from '@/components/clients/CompetitorPicker';
 
 interface ClientSettingsTabProps {
   client: Client;
@@ -288,10 +289,10 @@ const ClientSettingsTab = ({
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Competitors</p>
-            <Input
+            <p className="text-xs text-muted-foreground">Search Google by name or paste a website URL — added one at a time.</p>
+            <CompetitorPicker
               value={draft.competitors}
-              onChange={e => handleDraftChange('competitors', e.target.value)}
-              placeholder="e.g. Competitor A, Competitor B"
+              onChange={(next) => handleDraftChange('competitors', next)}
             />
           </div>
           <div className="space-y-2">
