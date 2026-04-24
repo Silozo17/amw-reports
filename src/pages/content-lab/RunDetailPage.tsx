@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSaveItem, useSaveHook } from '@/hooks/useContentLabSaves';
 import UsageHeader from '@/components/content-lab/UsageHeader';
 import RunProgressStepper, { type RunStepDef } from '@/components/content-lab/RunProgressStepper';
+import IdeaPhoneMockup from '@/components/content-lab/IdeaPhoneMockup';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const RUN_STEPS: RunStepDef[] = [
@@ -54,6 +55,7 @@ interface PostRow {
 }
 interface IdeaRow {
   id: string; idea_number: number; title: string; hook: string | null;
+  hooks: string[] | null;
   script: string | null; caption: string | null; cta: string | null;
   hashtags: string[]; best_fit_platform: string | null;
   why_it_works: string | null; visual_direction: string | null;
@@ -117,7 +119,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_ideas')
-        .select('id, idea_number, title, hook, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
+        .select('id, idea_number, title, hook, hooks, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
         .eq('run_id', id!)
         .order('idea_number');
       if (error) throw error;
@@ -231,12 +233,18 @@ const RunDetailPage = () => {
               {ideas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No ideas in this run.</p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {ideas
                     .slice()
                     .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0) || a.idea_number - b.idea_number)
                     .map((i) => (
-                      <IdeaCard key={i.id} idea={i} runId={id} onEdit={() => setEditingIdea(i)} />
+                      <IdeaPhoneMockup
+                        key={i.id}
+                        idea={i}
+                        runId={id}
+                        handle={(run.client_snapshot?.company_name ?? 'your.brand').toLowerCase().replace(/\s+/g, '.')}
+                        onEdit={() => setEditingIdea(i)}
+                      />
                     ))}
                 </div>
               )}
@@ -360,102 +368,6 @@ const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string
   );
 };
 
-const IdeaCard = ({ idea, runId, onEdit }: { idea: IdeaRow; runId?: string; onEdit: () => void }) => {
-  const saveItem = useSaveItem();
-  const queryClient = useQueryClient();
-  const [me, setMe] = useState<string | null>(null);
-
-  useEffect(() => {
-    void supabase.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
-  }, []);
-
-  const { data: liked = false } = useQuery({
-    queryKey: ['idea-liked', idea.id, me],
-    enabled: !!me,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('content_lab_idea_reactions')
-        .select('id')
-        .eq('idea_id', idea.id)
-        .eq('user_id', me!)
-        .maybeSingle();
-      if (error) throw error;
-      return !!data;
-    },
-  });
-
-  const toggleLike = useMutation({
-    mutationFn: async () => {
-      if (!me) throw new Error('Sign in to like');
-      if (liked) {
-        const { error } = await supabase
-          .from('content_lab_idea_reactions')
-          .delete().eq('idea_id', idea.id).eq('user_id', me);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('content_lab_idea_reactions')
-          .insert({ idea_id: idea.id, user_id: me });
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['idea-liked', idea.id, me] });
-      void queryClient.invalidateQueries({ queryKey: ['cl-run-ideas'] });
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not update like'),
-  });
-
-  return (
-    <Card className="flex flex-col gap-2 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Idea #{idea.idea_number}{idea.best_fit_platform && <> · <span className="capitalize">{idea.best_fit_platform}</span></>}
-          </p>
-          <h3 className="mt-1 font-display text-base leading-tight">{idea.title}</h3>
-        </div>
-        <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-      </div>
-      {idea.hook && <p className="text-sm font-medium">{idea.hook}</p>}
-      {idea.script && <p className="text-xs text-muted-foreground line-clamp-4 whitespace-pre-line">{idea.script}</p>}
-      {idea.caption && <p className="text-[11px] text-muted-foreground line-clamp-2">{idea.caption}</p>}
-      {idea.hashtags?.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {idea.hashtags.slice(0, 5).map((h) => <Badge key={h} variant="secondary" className="text-[9px]">#{h}</Badge>)}
-        </div>
-      )}
-      <div className="mt-auto flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => toggleLike.mutate()}
-          disabled={toggleLike.isPending || !me}
-          className="gap-1"
-          title={liked ? 'Unlike' : 'Like — top ideas surface first'}
-        >
-          <Heart className={`h-3 w-3 transition-colors ${liked ? 'fill-red-500 text-red-500' : ''}`} />
-          <span className="text-xs">{idea.like_count ?? 0}</span>
-        </Button>
-        <Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
-          <Wand2 className="mr-2 h-3 w-3" /> AI edit
-        </Button>
-        <Button
-          variant="outline" size="sm"
-          title="Save to library"
-          onClick={() => saveItem.mutate({
-            kind: 'idea',
-            source_run_id: runId ?? null,
-            source_id: idea.id,
-            payload: { ...idea },
-          })}
-        >
-          <Bookmark className="h-3 w-3" />
-        </Button>
-      </div>
-    </Card>
-  );
-};
 
 const EditIdeaDialog = ({ idea, onClose, onSaved }: { idea: IdeaRow | null; onClose: () => void; onSaved: () => void }) => {
   const [instruction, setInstruction] = useState('');
