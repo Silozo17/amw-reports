@@ -103,7 +103,7 @@ const AppSidebar = ({ onNavigate }: AppSidebarProps) => {
         .from('content_lab_runs')
         .select('id')
         .eq('org_id', orgId!)
-        .in('status', ['scraping', 'analysing', 'ideating', 'pending'])
+        .in('status', ['running', 'pending'])
         .limit(1);
       if (error) return false;
       return (data?.length ?? 0) > 0;
