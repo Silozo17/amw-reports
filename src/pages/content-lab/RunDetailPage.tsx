@@ -362,6 +362,50 @@ const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string
 
 const IdeaCard = ({ idea, runId, onEdit }: { idea: IdeaRow; runId?: string; onEdit: () => void }) => {
   const saveItem = useSaveItem();
+  const queryClient = useQueryClient();
+  const [me, setMe] = useState<string | null>(null);
+
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
+  }, []);
+
+  const { data: liked = false } = useQuery({
+    queryKey: ['idea-liked', idea.id, me],
+    enabled: !!me,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('content_lab_idea_reactions')
+        .select('id')
+        .eq('idea_id', idea.id)
+        .eq('user_id', me!)
+        .maybeSingle();
+      if (error) throw error;
+      return !!data;
+    },
+  });
+
+  const toggleLike = useMutation({
+    mutationFn: async () => {
+      if (!me) throw new Error('Sign in to like');
+      if (liked) {
+        const { error } = await supabase
+          .from('content_lab_idea_reactions')
+          .delete().eq('idea_id', idea.id).eq('user_id', me);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('content_lab_idea_reactions')
+          .insert({ idea_id: idea.id, user_id: me });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['idea-liked', idea.id, me] });
+      void queryClient.invalidateQueries({ queryKey: ['cl-run-ideas'] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not update like'),
+  });
+
   return (
     <Card className="flex flex-col gap-2 p-4">
       <div className="flex items-start justify-between gap-2">
@@ -381,7 +425,18 @@ const IdeaCard = ({ idea, runId, onEdit }: { idea: IdeaRow; runId?: string; onEd
           {idea.hashtags.slice(0, 5).map((h) => <Badge key={h} variant="secondary" className="text-[9px]">#{h}</Badge>)}
         </div>
       )}
-      <div className="mt-auto flex gap-2">
+      <div className="mt-auto flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => toggleLike.mutate()}
+          disabled={toggleLike.isPending || !me}
+          className="gap-1"
+          title={liked ? 'Unlike' : 'Like — top ideas surface first'}
+        >
+          <Heart className={`h-3 w-3 transition-colors ${liked ? 'fill-red-500 text-red-500' : ''}`} />
+          <span className="text-xs">{idea.like_count ?? 0}</span>
+        </Button>
         <Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
           <Wand2 className="mr-2 h-3 w-3" /> AI edit
         </Button>
