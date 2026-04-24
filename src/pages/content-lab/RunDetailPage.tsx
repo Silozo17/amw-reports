@@ -60,6 +60,8 @@ interface IdeaRow {
   hashtags: string[]; best_fit_platform: string | null;
   why_it_works: string | null; visual_direction: string | null;
   edit_count: number; like_count: number;
+  inspired_by_post_id: string | null;
+  inspiration_source: string | null;
 }
 
 const RunDetailPage = () => {
@@ -119,7 +121,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_ideas')
-        .select('id, idea_number, title, hook, hooks, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
+        .select('id, idea_number, title, hook, hooks, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count, inspired_by_post_id, inspiration_source')
         .eq('run_id', id!)
         .order('idea_number');
       if (error) throw error;
@@ -233,7 +235,7 @@ const RunDetailPage = () => {
               {ideas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No ideas in this run.</p>
               ) : (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 lg:grid-cols-2">
                   {ideas
                     .slice()
                     .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0) || a.idea_number - b.idea_number)

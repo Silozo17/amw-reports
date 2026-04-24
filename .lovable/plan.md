@@ -1,91 +1,62 @@
-# Fix likes + new animated run progress stepper
+# Redesign idea cards — everything visible, no clicks
 
-Two scoped changes. Nothing else touched.
+## What you'll see on each idea card
 
-## 1. Fix likes (heart not moving ideas to the top)
+A wide 2-column card (1 per row on mobile, 2 per row on large screens):
 
-**Root cause:** `IdeaPhoneMockup` writes to `content_lab_idea_reactions`, but the sort key on `RunDetailPage` is `content_lab_ideas.like_count`, which is never updated. So the heart toggles, the count under the heart updates (it counts rows from `reactions`), but the card never re-orders.
-
-**Fix:**
-
-- Add a Postgres trigger on `content_lab_idea_reactions` that keeps `content_lab_ideas.like_count` in sync (`+1` on insert, `-1` on delete, floored at 0). One-time backfill to set current counts.
-- In `IdeaPhoneMockup.tsx`, after a successful like/unlike, also invalidate `['cl-run-ideas', runId]` so the parent re-sorts immediately (currently it only invalidates `['cl-run-ideas']` without the id, which doesn't match the parent's query key `['cl-run-ideas', id]`).
-- Add an optimistic update on the reactions query so the heart fills instantly even on slow networks.
-
-No schema changes beyond the trigger. No RLS changes — trigger runs as `SECURITY DEFINER`.
-
-## 2. New `RunProgressStepper` component
-
-Replace the current plain `<ol>` inside the "Working on your report…" card on `RunDetailPage` with a polished animated stepper matching the reference screenshot.
-
-**File:** `src/components/content-lab/RunProgressStepper.tsx` (new, reusable, ~150 lines).
-
-**Props:**
-```ts
-interface StepDef { label: string; detail: string; badge?: string }
-interface Props {
-  steps: StepDef[];
-  currentStepIndex: number;        // -1 = not started, steps.length = done
-  estimatedSeconds?: number;       // drives top progress bar (default 120)
-  title?: string;                  // default "Generating your report"
-}
+```text
++-----------------------------------------------------------+
+|  [PHONE MOCKUP]    |  Idea #3 · Instagram Reel            |
+|  IG header         |  "How we doubled bookings in 30 days"|
+|                    |                                      |
+|  Hook 1/3 (auto-   |  HOOKS (tap to preview in phone)     |
+|  swipes every 4s,  |   1. Stop scrolling if you run a gym |
+|  arrows + dots)    |   2. The mistake 90% of trainers...  |
+|                    |   3. POV: your DMs after this reel   |
+|  ❤ 12  💬  ↗  🔖   |                                      |
+|  caption preview   |  SCRIPT                              |
+|  #hashtags         |   Full script paragraph here...      |
+|                    |                                      |
+|                    |  CAPTION                             |
+|                    |   Full caption text...               |
+|                    |                                      |
+|                    |  HASHTAGS  #a #b #c #d #e            |
+|                    |                                      |
+|                    |  WHY IT WORKS                        |
+|                    |  [pattern tag: POV hook]             |
+|                    |   Plain-English rationale...         |
+|                    |   Inspired by @handle on TikTok      |
+|                    |   124K views · 8.2K likes · ↗ link   |
+|                    |                                      |
+|                    |  [AI edit]  [Save]                   |
++-----------------------------------------------------------+
 ```
 
-**Layout:**
-- Header row: purple circle (40px) with `Layers` icon, title `font-display`, subtitle `Estimated time: Nm Ns`.
-- Thin progress bar (`h-1 bg-muted` with `bg-primary` fill) that fills smoothly over `estimatedSeconds` using a CSS transition on `width`.
-- Vertical stepper with connector line (`absolute left-[19px] top-0 bottom-0 w-px bg-border`).
+## How it behaves
 
-**Step states (no external libs):**
-- **Completed:** `bg-emerald-500/15 text-emerald-500` circle with `Check` icon (`animate-scale-in`). Label `text-muted-foreground`. Badge below detail using existing `Badge variant="secondary"` (`animate-fade-in`).
-- **Active:** `bg-primary/15 border border-primary text-primary` circle with `Loader2` (`animate-spin`). Detail uses `animate-pulse text-primary`.
-- **Pending:** `bg-muted text-muted-foreground` circle showing the step number. Both label and detail muted.
+- **Phone mockup (left, sticky)** — Instagram-style frame with the active hook displayed as the visual. Auto-rotates between the 3 hooks every 4 seconds, with arrows + dots to navigate manually.
+- **Hooks list (right)** — All 3 hooks numbered and always visible. Clicking one jumps the phone to that hook and pauses auto-rotation.
+- **Script, caption, hashtags** — Always rendered in full (no clamping, no "view more"). Long scripts scroll inside the card if they exceed a max height.
+- **Why it works** — Pattern tag badge (e.g. "POV hook", "before/after") + AI rationale paragraph + inspiration card showing the source post (handle, platform, views, likes, link out).
+- **Engagement** — Heart on the phone is wired to the existing like system; liked ideas still float to the top. Comments and Share dialogs stay as before.
 
-**Entry animation:** Each step uses `animate-fade-in` with inline `style={{ animationDelay: `${i * 150}ms` }}`. Reuses existing `fade-in`, `scale-in` keyframes already in `tailwind.config.ts`.
+## Technical changes
 
-**Driving the steps:**
-- Component is **fully controlled** via `currentStepIndex`. No internal timer (the real run is async).
-- `RunDetailPage` derives `currentStepIndex` from the `content_lab_run_progress` rows it already polls every 4s:
-  - For each of the 7 UI phases, find the latest matching DB phase row.
-  - `currentStepIndex` = count of rows with `status === 'ok'`.
-  - Pass `steps[i].badge` only for completed steps (pull counts from `run.summary` JSON when available, fallback to generic).
+**File: `src/components/content-lab/IdeaPhoneMockup.tsx`** (rewrite)
+- Switch to 2-column layout (`grid lg:grid-cols-[280px_1fr]`).
+- Add 4-second auto-rotation effect for hooks (clears on manual interaction).
+- Render hooks list, script, caption, hashtags, why-it-works inline. Remove the `DetailsDialog`.
+- Add an `InspirationBlock` sub-component that fetches the inspiration post (`content_lab_posts` row) when `inspired_by_post_id` is set: shows handle, platform, views, likes, thumbnail, link.
+- Show `pattern_tag` (from inspiration post) or `inspiration_source` as a badge above the why-it-works text.
 
-**The 7 steps** (mapped to existing DB phases):
+**File: `src/pages/content-lab/RunDetailPage.tsx`**
+- Extend `IdeaRow` type: add `inspired_by_post_id`, `inspiration_source`.
+- Add both fields to the ideas `select(...)`.
+- Switch grid from `lg:grid-cols-3` to `lg:grid-cols-2` so the wider cards have room.
 
-| # | Label | DB phase |
-|---|-------|----------|
-| 1 | Indexing your connected platforms | `discover` (own) |
-| 2 | Mapping competitor landscape | `discover` (competitors) |
-| 3 | Resolving competitor social profiles | `validate` |
-| 4 | Extracting content performance signals | `scrape` |
-| 5 | Detecting viral content patterns | `analyse` |
-| 6 | Benchmarking against industry metrics | `analyse` (second pass) |
-| 7 | Compiling strategic recommendations | `ideate` |
+**No DB changes** — `content_lab_ideas.inspired_by_post_id`, `inspiration_source`, and `content_lab_posts.pattern_tag` already exist.
 
-If the DB doesn't emit a distinct phase for #2 and #6, they piggyback on #1 and #5 with synthesised completion (counts from `run.summary`).
-
-**Integration in `RunDetailPage.tsx`:**
-- Replace the existing `isProcessing` `Card` block (~lines 172–188) with:
-  ```tsx
-  <RunProgressStepper
-    steps={STEPS}
-    currentStepIndex={derivedIndex}
-    estimatedSeconds={120}
-  />
-  ```
-- Keep the failed-run card as-is.
-
-## Out of scope
-
-- No changes to edge functions, scrape pipeline, or AI generation.
-- No new tables. The trigger is the only DB change.
-- The animated stepper does **not** simulate fake progress — it reflects real DB phase rows so users see truthful state.
-
-## Files
-
-- new: `src/components/content-lab/RunProgressStepper.tsx`
-- new: `supabase/migrations/<timestamp>_idea_like_count_trigger.sql`
-- edit: `src/components/content-lab/IdeaPhoneMockup.tsx` (invalidation key + optimistic update)
-- edit: `src/pages/content-lab/RunDetailPage.tsx` (swap progress UI, derive `currentStepIndex`)
-
-Ready to build?
+## Out of scope (unless you say otherwise)
+- No changes to the ideate edge function — uses whatever inspiration link is already saved.
+- No changes to comments, share links, like sync, or the run progress stepper.
+- Existing ideas without `hooks[]` still fall back to the single `hook` field.
