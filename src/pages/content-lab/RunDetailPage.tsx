@@ -159,6 +159,33 @@ const RunDetailPage = () => {
 
   const isProcessing = run.status === 'pending' || run.status === 'running';
 
+  // Derive current step from DB phase rows. Each completed (status='ok') phase
+  // bumps the UI stepper to its mapped index + 1.
+  const currentStepIndex = useMemo(() => {
+    if (!isProcessing) return RUN_STEPS.length;
+    let idx = 0;
+    progress.forEach((p) => {
+      if (p.status === 'ok' && PHASE_TO_STEP_INDEX[p.phase] !== undefined) {
+        idx = Math.max(idx, PHASE_TO_STEP_INDEX[p.phase] + 1);
+      }
+    });
+    return Math.min(idx, RUN_STEPS.length - 1);
+  }, [progress, isProcessing]);
+
+  const stepsWithBadges = useMemo<RunStepDef[]>(() => {
+    const sum = (run as RunRow & { summary?: Record<string, number | string> }).summary ?? {};
+    const badges: (string | undefined)[] = [
+      sum.connected_platforms ? `${sum.connected_platforms} platforms connected` : undefined,
+      sum.competitors_found ? `${sum.competitors_found} competitors found` : undefined,
+      sum.handles_resolved ? `${sum.handles_resolved} profiles resolved` : undefined,
+      sum.posts_scanned ? `${sum.posts_scanned.toLocaleString?.() ?? sum.posts_scanned} posts scanned` : undefined,
+      undefined,
+      undefined,
+      undefined,
+    ];
+    return RUN_STEPS.map((s, i) => ({ ...s, badge: badges[i] }));
+  }, [run]);
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
@@ -181,21 +208,7 @@ const RunDetailPage = () => {
         </header>
 
         {isProcessing && (
-          <Card className="space-y-3 border-primary/30 bg-primary/5 p-5">
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <p className="font-display text-base">Working on your report…</p>
-            </div>
-            <ol className="space-y-1.5 text-xs">
-              {progress.map((p) => (
-                <li key={p.id} className="flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'failed' ? 'bg-destructive' : p.status === 'ok' ? 'bg-emerald-500' : 'bg-primary animate-pulse'}`} />
-                  <span className="text-muted-foreground">{PHASE_LABELS[p.phase] ?? p.phase}</span>
-                  {p.message && <span className="ml-2 text-muted-foreground">— {p.message}</span>}
-                </li>
-              ))}
-            </ol>
-          </Card>
+          <RunProgressStepper steps={stepsWithBadges} currentStepIndex={currentStepIndex} />
         )}
 
         {run.status === 'failed' && (
