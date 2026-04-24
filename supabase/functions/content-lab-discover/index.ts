@@ -2,6 +2,15 @@
 // returns niche label, description, EXACTLY 10 top global benchmark accounts (ranked
 // by typical reel views), up to 5 local competitors, suggested hashtags/keywords and
 // default creative preferences. Uses Firecrawl + Lovable AI (Gemini) tool calling.
+//
+// v4 fixes (this revision):
+//  - niche_description is sanitised on save — truncates at any leaked JSON field name
+//    (e.g. "...dealerships.메,niche_label:") or non-standard control characters that
+//    Gemini occasionally bleeds into the string.
+//  - Pool refresh is fired with the niche's actual platforms_to_scrape (loaded from
+//    the existing niche row or passed in the request) instead of always "instagram".
+//  - Gemini prompt now explicitly tells the model which platforms the user intends
+//    to scrape, so the benchmark ranking prioritises those platforms' handles.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -21,6 +30,8 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-2.5-pro";
 const CURRENT_YEAR = new Date().getUTCFullYear();
+const DEFAULT_PLATFORMS: Array<"instagram" | "tiktok" | "facebook"> = ["instagram", "tiktok", "facebook"];
+const NICHE_DESCRIPTION_MAX_LEN = 500;
 
 interface BrandBrief {
   niche?: string;
@@ -43,6 +54,7 @@ interface DiscoverInput {
   website: string;
   location?: string;
   language?: string;
+  platforms_to_scrape?: string[];
   brand_brief?: BrandBrief;
 }
 
@@ -84,6 +96,24 @@ Deno.serve(async (req) => {
       return json({ error: "own_handle or website is required" }, 400);
     }
 
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // Determine which platforms the user intends to scrape so the prompt + pool refresh
+    // can prioritise them. Order of preference: explicit request → existing niche row →
+    // default (all three).
+    let platformsToScrape = sanitisePlatformList(input.platforms_to_scrape);
+    if (platformsToScrape.length === 0 && input.niche_id) {
+      const { data: nicheRow } = await admin
+        .from("content_lab_niches")
+        .select("platforms_to_scrape")
+        .eq("id", input.niche_id)
+        .maybeSingle();
+      platformsToScrape = sanitisePlatformList(
+        (nicheRow as { platforms_to_scrape?: string[] } | null)?.platforms_to_scrape,
+      );
+    }
+    if (platformsToScrape.length === 0) platformsToScrape = [...DEFAULT_PLATFORMS];
+
     const siteSummary = input.website ? await scrapeSite(input.website) : "";
     console.log("Site scraped:", siteSummary.length, "chars");
 
@@ -94,9 +124,12 @@ Deno.serve(async (req) => {
       language: input.language ?? "en",
       site_summary: siteSummary,
       brand_brief: input.brand_brief ?? null,
+      platforms_to_scrape: platformsToScrape,
     });
 
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    // Sanitise the niche description before saving — Gemini has been observed bleeding
+    // leaked JSON field names and stray non-Latin characters into this string.
+    discovery.niche_description = sanitiseNicheDescription(discovery.niche_description);
 
     // Slugify the niche label into a stable niche_tag used for shared benchmark pooling.
     const nicheTag = slugify(discovery.niche_label);
@@ -167,6 +200,7 @@ Deno.serve(async (req) => {
       hashtags: discovery.suggested_hashtags,
       keywords: discovery.suggested_keywords,
       org_id: input.org_id ?? null,
+      platforms: platformsToScrape,
     }).catch((e) => console.error("Pool refresh queue failed:", e));
 
     return json({ ok: true, discovery, niche_tag: nicheTag });
@@ -186,6 +220,53 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+function sanitisePlatformList(list?: string[] | null): Array<"instagram" | "tiktok" | "facebook"> {
+  if (!Array.isArray(list)) return [];
+  const allowed = new Set(["instagram", "tiktok", "facebook"]);
+  const seen = new Set<string>();
+  const out: Array<"instagram" | "tiktok" | "facebook"> = [];
+  for (const raw of list) {
+    const v = String(raw ?? "").toLowerCase().trim();
+    if (!allowed.has(v) || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v as "instagram" | "tiktok" | "facebook");
+  }
+  return out;
+}
+
+// Sanitise Gemini's niche_description output. Observed failure modes:
+//   1. Leaked schema field names bleeding into the string, e.g.
+//      "...main dealerships.메,niche_label:"
+//   2. Stray non-Latin code points followed by JSON-shaped garbage.
+//   3. Raw control characters.
+// Strategy: truncate at the first occurrence of any known schema key followed by
+// a colon, strip disallowed control characters, normalise whitespace, and cap length.
+function sanitiseNicheDescription(raw: string | null | undefined): string {
+  if (!raw) return "";
+  let s = String(raw);
+
+  // Strip control characters (except tab/newline/carriage return).
+  s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+
+  // Truncate at any leaked schema field name.
+  const leakPattern = /[^A-Za-z0-9]?(?:niche_label|niche_description|top_competitors|top_global_benchmarks|suggested_hashtags|suggested_keywords|default_creative_prefs|tone_of_voice|content_styles|producer_type|video_length_preference|posting_cadence|do_not_use|est_avg_views)\s*:/i;
+  const leakMatch = s.search(leakPattern);
+  if (leakMatch >= 0) s = s.slice(0, leakMatch);
+
+  // Truncate at any stray closing-JSON bracket pattern that could indicate leak.
+  const jsonLeakMatch = s.search(/[,}]\s*"[a-z_]+"\s*:/);
+  if (jsonLeakMatch >= 0) s = s.slice(0, jsonLeakMatch);
+
+  // Collapse whitespace and cap length.
+  s = s.replace(/\s+/g, " ").trim();
+  if (s.length > NICHE_DESCRIPTION_MAX_LEN) s = s.slice(0, NICHE_DESCRIPTION_MAX_LEN).trim();
+
+  // Re-trim any trailing punctuation artifact from truncation (e.g. trailing "메").
+  s = s.replace(/[\s,;:.\-–—]+$/u, "").trim();
+
+  return s;
+}
+
 const POOL_FRESH_DAYS = 14;
 
 async function queuePoolRefreshIfStale(args: {
@@ -194,6 +275,7 @@ async function queuePoolRefreshIfStale(args: {
   hashtags: string[];
   keywords: string[];
   org_id: string | null;
+  platforms: Array<"instagram" | "tiktok" | "facebook">;
 }): Promise<void> {
   // Skip if any verified pool entry exists for this niche_tag refreshed in the last POOL_FRESH_DAYS.
   const cutoff = new Date(Date.now() - POOL_FRESH_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -209,6 +291,8 @@ async function queuePoolRefreshIfStale(args: {
     return;
   }
 
+  const platforms = args.platforms.length > 0 ? args.platforms : [...DEFAULT_PLATFORMS];
+
   // Fire-and-forget. We don't await the response so discover stays fast.
   fetch(`${SUPABASE_URL}/functions/v1/content-lab-pool-refresh`, {
     method: "POST",
@@ -220,7 +304,7 @@ async function queuePoolRefreshIfStale(args: {
       niche_tag: args.niche_tag,
       hashtags: args.hashtags,
       keywords: args.keywords,
-      platforms: ["instagram"],
+      platforms,
       org_id: args.org_id,
     }),
   }).catch((e) => console.error("Pool refresh fire-and-forget failed:", e));
@@ -262,6 +346,7 @@ interface DiscoveryPromptInput {
   language: string;
   site_summary: string;
   brand_brief: BrandBrief | null;
+  platforms_to_scrape: Array<"instagram" | "tiktok" | "facebook">;
 }
 
 function formatBrief(b: BrandBrief | null): string {
@@ -281,6 +366,10 @@ function formatBrief(b: BrandBrief | null): string {
 }
 
 async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResult> {
+  const platformList = input.platforms_to_scrape.map((p) => p.toUpperCase()).join(", ");
+  const isSinglePlatform = input.platforms_to_scrape.length === 1;
+  const isMultiPlatform = input.platforms_to_scrape.length > 1;
+
   const systemPrompt = [
     `You are the Head of Creative Direction at a top-tier social agency in ${CURRENT_YEAR}, with 12+ years identifying who the real best-in-class creators are in any vertical.`,
     "Given a brand's website + their handle + location + structured brand brief,",
@@ -288,13 +377,20 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
     "1) top_global_benchmarks: worldwide best-in-class accounts in this niche, RANKED BY TYPICAL REEL/SHORT-FORM VIEWS (not engagement rate, not vibes — raw view count is the signal). These are the accounts you would tell the client to study and reverse-engineer.",
     "2) top_competitors: up to 5 local/regional competitors operating in the same market.",
     "",
+    `PLATFORM FOCUS FOR THIS NICHE: ${platformList}`,
+    isSinglePlatform
+      ? `The user will only scrape ${platformList}. Prioritise creators whose strongest channel is ${platformList}. Still list their other platform handles if they're genuinely active there, but the primary ranking signal is their ${platformList} performance.`
+      : isMultiPlatform
+        ? `The user will scrape ${platformList}. Rank accounts by their performance across these platforms, weighted toward whichever platform they dominate in. Omit creators who are only strong on platforms outside this list.`
+        : "",
+    "",
     "CROSS-PLATFORM COVERAGE (CRITICAL):",
-    "For each competitor and benchmark account, search for their presence on Instagram, TikTok AND Facebook. Return a SEPARATE entry for each platform they are active on. If you cannot confirm a handle on a platform, OMIT it rather than guessing.",
-    "Example — a single creator may yield 3 entries:",
+    `For each competitor and benchmark account, search for their presence on ${platformList}. Return a SEPARATE entry for each platform they are active on. If you cannot confirm a handle on a platform, OMIT it rather than guessing.`,
+    "Example — a single creator may yield multiple entries:",
     "  { handle: 's_and_p_services', platform: 'instagram', reason: '...' }",
     "  { handle: 'sandpservices',    platform: 'tiktok',    reason: '...' }",
     "  { handle: 'S and P Services', platform: 'facebook',  reason: '...' }",
-    "Aim for ~10 distinct creators in benchmarks, which may produce 15-25 total entries across platforms.",
+    `Aim for ~10 distinct creators in benchmarks, which may produce 10-25 total entries across the ${input.platforms_to_scrape.length} enabled platform(s).`,
     "",
     "Hard rules:",
     "- Be ruthlessly specific. 'London wedding photographers serving £5k+ weddings' beats 'photographers'.",
@@ -302,18 +398,29 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
     "- Benchmarks must actually post the kind of short-form content this brand could film. A talking-head expert is not a benchmark for a wordless aesthetic brand.",
     "- For each benchmark, give a 1-line reason that names their typical view range (rough est_avg_views like '500k-2M') and what mechanic makes them work.",
     "- Default creative prefs should be tight and tailored — not generic.",
-  ].join("\n");
+    "",
+    "OUTPUT FORMAT RULES:",
+    "- `niche_description` must be PLAIN PROSE only: 1-2 complete English sentences describing the niche, audience and offer. No JSON, no field names, no schema fragments, no stray non-Latin characters. Maximum 500 characters.",
+    "- Return all structured data via the tool call only. Never echo schema field names inside any string value.",
+  ].filter(Boolean).join("\n");
 
   const userPrompt = [
     `Brand handle: @${(input.own_handle ?? "").replace(/^@/, "")}`,
     `Website: ${input.website}`,
     input.location ? `Location/market: ${input.location}` : "",
     `Output language: ${input.language}`,
+    `Platforms the user will scrape: ${platformList}`,
     formatBrief(input.brand_brief),
     "",
     "Website content (excerpt):",
     input.site_summary || "(no website content available — work from handle + brief + location alone)",
   ].filter(Boolean).join("\n");
+
+  // Restrict the platform enum to only the platforms the user enabled — prevents
+  // Gemini from returning handles on platforms the run won't scrape.
+  const platformEnum = input.platforms_to_scrape.length > 0
+    ? input.platforms_to_scrape
+    : [...DEFAULT_PLATFORMS];
 
   const tool = {
     type: "function",
@@ -324,15 +431,15 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
         type: "object",
         properties: {
           niche_label: { type: "string", description: "Specific niche label." },
-          niche_description: { type: "string", description: "1-2 sentence description of the niche, audience and offer." },
+          niche_description: { type: "string", description: "PLAIN prose, 1-2 sentences, maximum 500 chars. Describes the niche, audience and offer. No JSON, no field names, no schema fragments." },
           top_competitors: {
             type: "array",
-            description: "Local/regional competitors. One entry per (creator, platform) pair — same creator on IG + TikTok = 2 entries. Up to ~15 entries total.",
+            description: "Local/regional competitors. One entry per (creator, platform) pair. Up to ~15 entries total.",
             items: {
               type: "object",
               properties: {
                 handle: { type: "string", description: "Platform-specific handle without @ (or page name for Facebook)." },
-                platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
+                platform: { type: "string", enum: platformEnum },
                 reason: { type: "string" },
               },
               required: ["handle", "platform", "reason"],
@@ -341,14 +448,14 @@ async function runDiscovery(input: DiscoveryPromptInput): Promise<DiscoveryResul
           },
           top_global_benchmarks: {
             type: "array",
-            description: "Worldwide best-in-class accounts ranked by typical short-form views. One entry per (creator, platform) pair — aim for ~10 distinct creators which may produce 15-25 entries across IG/TikTok/Facebook.",
+            description: "Worldwide best-in-class accounts ranked by typical short-form views. One entry per (creator, platform) pair.",
             minItems: 10,
             maxItems: 30,
             items: {
               type: "object",
               properties: {
                 handle: { type: "string", description: "Platform-specific handle without @ (or page name for Facebook)." },
-                platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
+                platform: { type: "string", enum: platformEnum },
                 reason: { type: "string", description: "1 line: their mechanic + why they're top." },
                 est_avg_views: { type: "string", description: "Rough typical reel/short views, e.g. '500k-2M'." },
               },
