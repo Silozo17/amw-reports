@@ -100,33 +100,17 @@ const ContentLabPage = () => {
 
         <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
 
-        <AlertDialog open={!!pendingClient} onOpenChange={(o) => !o && setPendingClient(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Generate ideas for {pendingClient?.company_name}?</AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div className="space-y-2 text-sm">
-                  <p>This uses <strong>1 credit</strong> and takes about 3-6 minutes. We'll scrape your client's last 30 days, find local competitors, pull viral worldwide content, then generate 30 ideas.</p>
-                  {(!pendingClient?.industry || !pendingClient?.location) && (
-                    <p className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-600 dark:text-amber-400">
-                      Tip: add an industry and location to the client for sharper local-competitor research.
-                    </p>
-                  )}
-                </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={starting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(e) => { e.preventDefault(); if (pendingClient) void startRun(pendingClient.id); }}
-                disabled={starting}
-              >
-                {starting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Start run
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <StartRunDialog
+          open={!!pendingClient}
+          onOpenChange={(o) => !o && setPendingClient(null)}
+          clientName={pendingClient?.company_name ?? ''}
+          missingHints={[
+            ...(pendingClient && !pendingClient.industry ? ['Industry'] : []),
+            ...(pendingClient && !pendingClient.location ? ['Location'] : []),
+          ]}
+          starting={starting}
+          onConfirm={() => { if (pendingClient) void startRun(pendingClient.id); }}
+        />
 
         <section className="space-y-4">
           <div className="flex items-center gap-3">
