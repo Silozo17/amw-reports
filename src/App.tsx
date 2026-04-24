@@ -57,6 +57,9 @@ const AdminContentLab = lazy(() => import("./pages/admin/AdminContentLab"));
 const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const ContentLabPage = lazy(() => import("./pages/content-lab/ContentLabPage"));
 const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
+const SavesPage = lazy(() => import("./pages/content-lab/SavesPage"));
+const HookLibraryPage = lazy(() => import("./pages/content-lab/HookLibraryPage"));
+const TrendsPage = lazy(() => import("./pages/content-lab/TrendsPage"));
 
 const queryClient = new QueryClient();
 
@@ -140,6 +143,13 @@ const AppRoutes = () => (
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="/content-lab" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
       <Route path="/content-lab/run/:id" element={<ProtectedRoute><RunDetailPage /></ProtectedRoute>} />
+      <Route path="/content-lab/saves" element={<ProtectedRoute><SavesPage /></ProtectedRoute>} />
+      <Route path="/content-lab/hooks" element={<ProtectedRoute><HookLibraryPage /></ProtectedRoute>} />
+      <Route path="/content-lab/trends" element={<ProtectedRoute><TrendsPage /></ProtectedRoute>} />
+      {/* Backwards compatibility */}
+      <Route path="/content-lab/swipe-file" element={<Navigate to="/content-lab/saves" replace />} />
+      <Route path="/content-pipeline" element={<Navigate to="/clients" replace />} />
+      <Route path="/ideas" element={<Navigate to="/content-lab/saves" replace />} />
       <Route path="/debug" element={<AdminRoute><DebugConsole /></AdminRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/organisations" element={<AdminRoute><AdminOrgList /></AdminRoute>} />
