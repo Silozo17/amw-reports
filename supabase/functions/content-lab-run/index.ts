@@ -298,6 +298,18 @@ function calcEngagement(p: RawPost): number {
   return (p.likes + p.comments + p.shares) / audience;
 }
 
+/**
+ * Coerce scraper values (often floats like 42.281 for video duration) to
+ * integers so DB inserts into integer columns don't fail with
+ * "invalid input syntax for type integer".
+ */
+function toInt(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!isFinite(n)) return null;
+  return Math.round(n);
+}
+
 interface IGItem {
   id?: string; shortCode?: string; url?: string; type?: string;
   caption?: string; displayUrl?: string; videoUrl?: string;
@@ -460,7 +472,8 @@ async function persistPosts(admin: SupabaseClient, runId: string, posts: RawPost
     platform: p.platform,
     author_handle: p.author_handle,
     author_display_name: p.author_display_name ?? null,
-    author_followers: p.author_followers ?? null,
+    // Scrapers occasionally return floats for counts; DB columns are integers.
+    author_followers: toInt(p.author_followers),
     post_url: p.post_url ?? null,
     external_id: p.external_id ?? null,
     post_type: p.post_type ?? null,
@@ -468,12 +481,12 @@ async function persistPosts(admin: SupabaseClient, runId: string, posts: RawPost
     thumbnail_url: p.thumbnail_url ?? null,
     hashtags: p.hashtags ?? [],
     mentions: p.mentions ?? [],
-    likes: p.likes ?? 0,
-    comments: p.comments ?? 0,
-    shares: p.shares ?? 0,
-    views: p.views ?? 0,
+    likes: toInt(p.likes) ?? 0,
+    comments: toInt(p.comments) ?? 0,
+    shares: toInt(p.shares) ?? 0,
+    views: toInt(p.views) ?? 0,
     engagement_rate: calcEngagement(p),
-    video_duration_seconds: p.video_duration_seconds ?? null,
+    video_duration_seconds: toInt(p.video_duration_seconds),
     posted_at: p.posted_at ?? null,
     source_query: p.source_query ?? null,
   }));

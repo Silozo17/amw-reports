@@ -1,46 +1,38 @@
-## Goal
+## Two issues, two fixes
 
-Make competitor search behave like Google Maps' search box:
-1. Show suggestions as soon as the user types 2-3 characters (not only after the full name).
-2. Return service-area businesses (plumbers, agencies, consultants, mobile groomers, etc.) — not just brick-and-mortar places with a pin.
+### 1. Content Lab run failed for AMW Media
 
-## Why the current setup fails
+**Root cause** (from edge logs):
+```
+[content-lab-run] failed: persistPosts: invalid input syntax for type integer: "42.281"
+```
+Apify scrapers (TikTok especially) return float values for fields like `videoDuration` and occasionally counts. The `content_lab_posts` table has these as `integer`: `likes`, `comments`, `shares`, `views`, `author_followers`, `video_duration_seconds`. The insert blew up on the first float.
 
-`google-places-lookup` calls **Places API (New) Text Search** (`places:searchText`). That endpoint is designed for fully-formed queries ("Joe's Pizza Brooklyn"), so partial strings return little or nothing. It also leans heavily on geocoded POIs, which is why service-only businesses are missing.
+**Fix** in `supabase/functions/content-lab-run/index.ts` `persistPosts`:
+Add a small `toInt(v)` helper (`Math.round(Number(v))`, returning `null` for nullish/NaN) and wrap all six integer fields. Pure defensive coercion — no schema change.
 
-## Fix
+### 2. Service-based businesses still missing from competitor search
 
-Switch the edge function to **Places Autocomplete (New)** (`places:autocomplete`) — the same API powering Google Maps' search box. It:
-- Returns predictions from ~2 characters (true typeahead).
-- Includes service-area businesses, brands, and non-physical establishments.
-- Is cheaper per call than Text Search.
+**Root cause**: The current call passes `includedPrimaryTypes: ["establishment"]`. In **Places Autocomplete (New)**, `establishment` is a *category root*, not a valid primary type — so it acts as an over-restrictive filter that drops service-area businesses, agencies, and brands without a strict POI primary type.
 
-Then resolve the picked suggestion to full details (name, address, website) via **Place Details (New)** (`places/{id}`) only when the user clicks a result — keeps cost low.
+**Fix** in `supabase/functions/google-places-lookup/index.ts`:
+- Remove `includedPrimaryTypes` entirely. Autocomplete defaults to the same broad index Google Maps' search box uses (covers physical + service-area + brands).
+- Keep `includeQueryPredictions: true` as a safety net so generic queries still surface results.
+- On a 0-result response, log the raw payload so we can see if Google is returning predictions in a different shape (e.g. `queryPredictions`).
+- Also map `queryPredictions` (no `placeId`) into the result list as name-only entries that skip the Place Details lookup on click.
 
-## Changes
+### 3. (bonus) React ref warning in `CompetitorPicker`
 
-### 1. `supabase/functions/google-places-lookup/index.ts`
-Two-mode endpoint based on request body:
+The console shows: *"Function components cannot be given refs… Check the render method of `CompetitorPicker`"* — caused by `<PopoverTrigger asChild>` wrapping a `<div>` containing the `Input`. Radix needs a single ref-forwarding child.
 
-- **Mode A — `{ query }` (typeahead)**: call `POST https://places.googleapis.com/v1/places:autocomplete` with `input`, `includedPrimaryTypes: ["establishment"]`, `languageCode`. Return lightweight predictions: `[{ place_id, name, secondary_text }]`. No field mask billing for full details yet.
-- **Mode B — `{ place_id }` (resolve on click)**: call `GET https://places.googleapis.com/v1/places/{place_id}` with field mask `id,displayName,formattedAddress,websiteUri,nationalPhoneNumber,internationalPhoneNumber`. Return the same shape today's UI expects: `{ name, address, website, phone, place_id }`.
-
-Keep existing JWT auth, CORS, and structured logging.
-
-### 2. `src/components/clients/CompetitorPicker.tsx`
-- Lower `MIN_QUERY_LENGTH` from 2 → 2 (already fine) and reduce debounce 350 → 250ms for snappier feel.
-- On keystroke: invoke function with `{ query }`, render predictions as `name` (bold) + `secondary_text` (muted).
-- On click: invoke function with `{ place_id }` to fetch the website/address, then `addCompetitor({ name, website })`.
-- Loading state on the clicked row while details resolve.
-- Latest-request-wins guard already in place — keep it.
-
-## Out of scope
-
-- No new tables, secrets, or UI surfaces.
-- No change to Firecrawl social-scrape pipeline.
-- `GOOGLE_API_KEY` already configured — no secret prompt needed. (Note: the key must have **Places API (New)** enabled in Google Cloud — flagging this in case Autocomplete returns 403 on first call.)
+**Fix** in `src/components/clients/CompetitorPicker.tsx`: drop `asChild` so PopoverTrigger renders its own button wrapper, OR put a real `forwardRef` element as the only child. Simplest: remove `asChild` and let the trigger be invisible/inline — keep the existing input layout outside the trigger and control popover open state programmatically (already done via `open`/`onOpenChange`).
 
 ## Files touched
 
-- `supabase/functions/google-places-lookup/index.ts` (rewrite handler — ~80 lines)
-- `src/components/clients/CompetitorPicker.tsx` (search effect + click handler)
+- `supabase/functions/content-lab-run/index.ts` — add `toInt` helper + wrap 6 fields in `persistPosts`
+- `supabase/functions/google-places-lookup/index.ts` — drop `includedPrimaryTypes`, add `includeQueryPredictions`, map `queryPredictions`
+- `src/components/clients/CompetitorPicker.tsx` — fix Popover ref warning, support query-only predictions (no place_id → add by name only)
+
+## Out of scope
+
+- No DB migrations. No Apify changes. No new secrets.

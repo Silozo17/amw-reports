@@ -108,6 +108,8 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
     <div className="space-y-3">
       {/* Live search by name */}
       <Popover open={open} onOpenChange={setOpen}>
+        {/* Anchor + trigger as a single forwardRef-friendly element to avoid
+            "Function components cannot be given refs" from Radix. */}
         <PopoverTrigger asChild>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -140,13 +142,14 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
             <ul className="max-h-72 overflow-y-auto">
               {results.map((r, i) => {
                 const loading = resolvingId === r.place_id;
+                const isQueryOnly = !r.place_id;
                 return (
-                  <li key={`${r.place_id}-${i}`}>
+                  <li key={`${r.place_id || 'q'}-${i}`}>
                     <button
                       type="button"
                       disabled={loading}
                       onClick={async () => {
-                        if (!r.place_id) {
+                        if (isQueryOnly) {
                           addCompetitor({ name: r.name });
                           setOpen(false);
                           setQuery('');
@@ -183,7 +186,11 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
                       )}
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium truncate">{r.name}</span>
-                        {r.address && <span className="block truncate text-xs text-muted-foreground">{r.address}</span>}
+                        {r.address ? (
+                          <span className="block truncate text-xs text-muted-foreground">{r.address}</span>
+                        ) : isQueryOnly ? (
+                          <span className="block truncate text-xs text-muted-foreground">Add as named competitor</span>
+                        ) : null}
                       </span>
                     </button>
                   </li>
