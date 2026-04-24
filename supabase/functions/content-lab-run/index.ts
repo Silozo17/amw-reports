@@ -271,6 +271,7 @@ interface RawPost {
   post_url?: string | null;
   external_id?: string | null;
   post_type?: string | null;
+  media_kind?: "video" | "photo" | "carousel" | null;
   caption?: string | null;
   thumbnail_url?: string | null;
   hashtags: string[];
