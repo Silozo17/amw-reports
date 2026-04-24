@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Sparkles, Eye, Heart, MessageCircle, ArrowLeft, Wand2, ExternalLink, Bookmark, Anchor } from 'lucide-react';
+import { Loader2, Sparkles, Eye, Heart, MessageCircle, ArrowLeft, Wand2, ExternalLink, Anchor } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
@@ -13,9 +13,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useSaveItem, useSaveHook } from '@/hooks/useContentLabSaves';
+import { useSaveHook } from '@/hooks/useContentLabSaves';
 import UsageHeader from '@/components/content-lab/UsageHeader';
 import RunProgressStepper, { type RunStepDef } from '@/components/content-lab/RunProgressStepper';
+import IdeaPhoneMockup from '@/components/content-lab/IdeaPhoneMockup';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const RUN_STEPS: RunStepDef[] = [
