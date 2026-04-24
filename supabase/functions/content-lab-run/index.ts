@@ -572,7 +572,7 @@ async function runPipeline(
 
     // 1. Discover
     await logProgress(admin, runId, "discover", "started");
-    const discover = await phaseDiscover(client);
+    const discover = await phaseDiscover(admin, runId, client);
     await admin.from("content_lab_runs").update({
       summary: { ...(client as unknown as Record<string, unknown>), discover },
     }).eq("id", runId);
