@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Sparkles, Eye, Heart, MessageCircle, ArrowLeft, Wand2, ExternalLink, Bookmark, Anchor } from 'lucide-react';
@@ -15,8 +15,29 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveItem, useSaveHook } from '@/hooks/useContentLabSaves';
 import UsageHeader from '@/components/content-lab/UsageHeader';
-import IdeaPhoneMockup from '@/components/content-lab/IdeaPhoneMockup';
+import RunProgressStepper, { type RunStepDef } from '@/components/content-lab/RunProgressStepper';
 import usePageMeta from '@/hooks/usePageMeta';
+
+const RUN_STEPS: RunStepDef[] = [
+  { label: 'Indexing your connected platforms', detail: 'Syncing social accounts and ad platforms' },
+  { label: 'Mapping competitor landscape', detail: 'Discovering competitors in your niche' },
+  { label: 'Resolving competitor social profiles', detail: 'Matching Instagram, TikTok and Facebook handles' },
+  { label: 'Extracting content performance signals', detail: 'Scanning posts for engagement patterns' },
+  { label: 'Detecting viral content patterns', detail: 'Identifying high performing formats and hooks' },
+  { label: 'Benchmarking against industry metrics', detail: 'Comparing engagement rates, posting frequency, growth' },
+  { label: 'Compiling strategic recommendations', detail: 'Building your personalised content playbook' },
+];
+
+// Maps DB phase rows -> the 7 UI steps above. Some DB phases cover multiple UI steps.
+const PHASE_TO_STEP_INDEX: Record<string, number> = {
+  discover: 1,    // through step 1 (mapping competitors)
+  validate: 2,    // through step 2 (resolving handles)
+  scrape: 3,      // through step 3 (extracting signals)
+  analyse: 5,     // through step 5 (benchmarking)
+  ideate: 6,      // through step 6 (recommendations)
+  notify: 6,
+};
+
 
 interface RunRow {
   id: string; status: string; current_phase: string | null;
@@ -33,21 +54,11 @@ interface PostRow {
 }
 interface IdeaRow {
   id: string; idea_number: number; title: string; hook: string | null;
-  hooks: string[] | null;
   script: string | null; caption: string | null; cta: string | null;
   hashtags: string[]; best_fit_platform: string | null;
   why_it_works: string | null; visual_direction: string | null;
-  edit_count: number; like_count: number | null;
+  edit_count: number; like_count: number;
 }
-
-const PHASE_LABELS: Record<string, string> = {
-  discover: 'Discovering competitors & viral accounts',
-  validate: 'Validating handles',
-  scrape: 'Scraping posts',
-  analyse: 'Analysing patterns',
-  ideate: 'Generating ideas',
-  notify: 'Sending notification',
-};
 
 const RunDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -106,7 +117,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_ideas')
-        .select('id, idea_number, title, hook, hooks, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
+        .select('id, idea_number, title, hook, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
         .eq('run_id', id!)
         .order('idea_number');
       if (error) throw error;
@@ -148,6 +159,33 @@ const RunDetailPage = () => {
 
   const isProcessing = run.status === 'pending' || run.status === 'running';
 
+  // Derive current step from DB phase rows. Each completed (status='ok') phase
+  // bumps the UI stepper to its mapped index + 1.
+  const currentStepIndex = useMemo(() => {
+    if (!isProcessing) return RUN_STEPS.length;
+    let idx = 0;
+    progress.forEach((p) => {
+      if (p.status === 'ok' && PHASE_TO_STEP_INDEX[p.phase] !== undefined) {
+        idx = Math.max(idx, PHASE_TO_STEP_INDEX[p.phase] + 1);
+      }
+    });
+    return Math.min(idx, RUN_STEPS.length - 1);
+  }, [progress, isProcessing]);
+
+  const stepsWithBadges = useMemo<RunStepDef[]>(() => {
+    const sum = (run as RunRow & { summary?: Record<string, number | string> }).summary ?? {};
+    const badges: (string | undefined)[] = [
+      sum.connected_platforms ? `${sum.connected_platforms} platforms connected` : undefined,
+      sum.competitors_found ? `${sum.competitors_found} competitors found` : undefined,
+      sum.handles_resolved ? `${sum.handles_resolved} profiles resolved` : undefined,
+      sum.posts_scanned ? `${sum.posts_scanned.toLocaleString?.() ?? sum.posts_scanned} posts scanned` : undefined,
+      undefined,
+      undefined,
+      undefined,
+    ];
+    return RUN_STEPS.map((s, i) => ({ ...s, badge: badges[i] }));
+  }, [run]);
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
@@ -170,21 +208,7 @@ const RunDetailPage = () => {
         </header>
 
         {isProcessing && (
-          <Card className="space-y-3 border-primary/30 bg-primary/5 p-5">
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <p className="font-display text-base">Working on your report…</p>
-            </div>
-            <ol className="space-y-1.5 text-xs">
-              {progress.map((p) => (
-                <li key={p.id} className="flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${p.status === 'failed' ? 'bg-destructive' : p.status === 'ok' ? 'bg-emerald-500' : 'bg-primary animate-pulse'}`} />
-                  <span className="text-muted-foreground">{PHASE_LABELS[p.phase] ?? p.phase}</span>
-                  {p.message && <span className="ml-2 text-muted-foreground">— {p.message}</span>}
-                </li>
-              ))}
-            </ol>
-          </Card>
+          <RunProgressStepper steps={stepsWithBadges} currentStepIndex={currentStepIndex} />
         )}
 
         {run.status === 'failed' && (
@@ -207,19 +231,12 @@ const RunDetailPage = () => {
               {ideas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No ideas in this run.</p>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {ideas
                     .slice()
                     .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0) || a.idea_number - b.idea_number)
                     .map((i) => (
-                      <IdeaPhoneMockup
-                        key={i.id}
-                        idea={i}
-                        runId={id}
-                        orgHandle={(run.client_snapshot?.company_name ?? 'your.brand')
-                          .toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}
-                        onEdit={() => setEditingIdea(i)}
-                      />
+                      <IdeaCard key={i.id} idea={i} runId={id} onEdit={() => setEditingIdea(i)} />
                     ))}
                 </div>
               )}
@@ -340,6 +357,103 @@ const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string
         );
       })}
     </div>
+  );
+};
+
+const IdeaCard = ({ idea, runId, onEdit }: { idea: IdeaRow; runId?: string; onEdit: () => void }) => {
+  const saveItem = useSaveItem();
+  const queryClient = useQueryClient();
+  const [me, setMe] = useState<string | null>(null);
+
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
+  }, []);
+
+  const { data: liked = false } = useQuery({
+    queryKey: ['idea-liked', idea.id, me],
+    enabled: !!me,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('content_lab_idea_reactions')
+        .select('id')
+        .eq('idea_id', idea.id)
+        .eq('user_id', me!)
+        .maybeSingle();
+      if (error) throw error;
+      return !!data;
+    },
+  });
+
+  const toggleLike = useMutation({
+    mutationFn: async () => {
+      if (!me) throw new Error('Sign in to like');
+      if (liked) {
+        const { error } = await supabase
+          .from('content_lab_idea_reactions')
+          .delete().eq('idea_id', idea.id).eq('user_id', me);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('content_lab_idea_reactions')
+          .insert({ idea_id: idea.id, user_id: me });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['idea-liked', idea.id, me] });
+      void queryClient.invalidateQueries({ queryKey: ['cl-run-ideas'] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not update like'),
+  });
+
+  return (
+    <Card className="flex flex-col gap-2 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Idea #{idea.idea_number}{idea.best_fit_platform && <> · <span className="capitalize">{idea.best_fit_platform}</span></>}
+          </p>
+          <h3 className="mt-1 font-display text-base leading-tight">{idea.title}</h3>
+        </div>
+        <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+      </div>
+      {idea.hook && <p className="text-sm font-medium">{idea.hook}</p>}
+      {idea.script && <p className="text-xs text-muted-foreground line-clamp-4 whitespace-pre-line">{idea.script}</p>}
+      {idea.caption && <p className="text-[11px] text-muted-foreground line-clamp-2">{idea.caption}</p>}
+      {idea.hashtags?.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {idea.hashtags.slice(0, 5).map((h) => <Badge key={h} variant="secondary" className="text-[9px]">#{h}</Badge>)}
+        </div>
+      )}
+      <div className="mt-auto flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => toggleLike.mutate()}
+          disabled={toggleLike.isPending || !me}
+          className="gap-1"
+          title={liked ? 'Unlike' : 'Like — top ideas surface first'}
+        >
+          <Heart className={`h-3 w-3 transition-colors ${liked ? 'fill-red-500 text-red-500' : ''}`} />
+          <span className="text-xs">{idea.like_count ?? 0}</span>
+        </Button>
+        <Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
+          <Wand2 className="mr-2 h-3 w-3" /> AI edit
+        </Button>
+        <Button
+          variant="outline" size="sm"
+          title="Save to library"
+          onClick={() => saveItem.mutate({
+            kind: 'idea',
+            source_run_id: runId ?? null,
+            source_id: idea.id,
+            payload: { ...idea },
+          })}
+        >
+          <Bookmark className="h-3 w-3" />
+        </Button>
+      </div>
+    </Card>
   );
 };
 
