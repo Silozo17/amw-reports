@@ -119,7 +119,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_ideas')
-        .select('id, idea_number, title, hook, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
+        .select('id, idea_number, title, hook, hooks, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
         .eq('run_id', id!)
         .order('idea_number');
       if (error) throw error;
