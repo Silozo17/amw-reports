@@ -43,7 +43,7 @@ const IDEA_SCHEMA = {
 };
 
 interface IdeaPayload {
-  title: string; hook: string; script: string; caption: string;
+  title: string; hook: string; hooks?: string[]; script: string; caption: string;
   visual_direction: string; cta: string; best_fit_platform: string;
   why_it_works: string; hashtags: string[];
 }
