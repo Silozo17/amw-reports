@@ -25,7 +25,7 @@ interface Props {
   onChange: (next: string) => void;
 }
 
-const SEARCH_DEBOUNCE_MS = 350;
+const SEARCH_DEBOUNCE_MS = 250;
 const MIN_QUERY_LENGTH = 2;
 
 /** Search Google Places live as you type, or paste a URL, to add competitors one at a time. */
