@@ -127,14 +127,34 @@ Generate 10 fresh content ideas (numbers ${offset + 1}–${offset + 10}). They m
 
 For each idea provide: title, hook (scroll-stopper opener), script (3–6 sentence outline), caption (ready to post), visual_direction (1 sentence), cta, best_fit_platform, why_it_works (1 sentence linking to a viral / competitor pattern above), hashtags (4–6).`;
 
-    const batches = await Promise.allSettled([
-      callIdeate(systemBase, promptForBatch(0)),
-      callIdeate(systemBase, promptForBatch(10)),
-      callIdeate(systemBase, promptForBatch(20)),
-    ]);
+    const offsets = [0, 10, 20];
+    const batches = await Promise.allSettled(
+      offsets.map((o) => callIdeate(systemBase, promptForBatch(o))),
+    );
 
     const allIdeas: IdeaPayload[] = [];
-    batches.forEach((b) => { if (b.status === "fulfilled") allIdeas.push(...b.value); });
+    const failedOffsets: number[] = [];
+    batches.forEach((b, i) => {
+      if (b.status === "fulfilled") {
+        console.log(`[ideate] batch ${i + 1} (offset ${offsets[i]}) → ok, ${b.value.length} ideas`);
+        allIdeas.push(...b.value);
+      } else {
+        const reason = b.reason instanceof Error ? b.reason.message : String(b.reason);
+        console.error(`[ideate] batch ${i + 1} (offset ${offsets[i]}) → FAILED: ${reason}`);
+        failedOffsets.push(offsets[i]);
+      }
+    });
+
+    // One sequential retry for any failed batches so we still hit ~30.
+    for (const o of failedOffsets) {
+      try {
+        const retried = await callIdeate(systemBase, promptForBatch(o));
+        console.log(`[ideate] retry offset ${o} → ok, ${retried.length} ideas`);
+        allIdeas.push(...retried);
+      } catch (e) {
+        console.error(`[ideate] retry offset ${o} → FAILED: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
 
     if (allIdeas.length === 0) return json({ error: "All ideate batches failed" }, 500);
 
