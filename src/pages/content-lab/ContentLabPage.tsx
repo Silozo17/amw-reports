@@ -7,13 +7,13 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+// Badge still used for run status indicators below.
 import { Input } from '@/components/ui/input';
 import { useContentLabRuns, useContentLabUsage, useClientsForPicker, type ContentLabRun, type ClientForPicker } from '@/hooks/useContentLab';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { useStartContentLabRun } from '@/hooks/useStartContentLabRun';
 import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
-import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
 import StartRunDialog from '@/components/content-lab/StartRunDialog';
 import UsageHeader from '@/components/content-lab/UsageHeader';
 import usePageMeta from '@/hooks/usePageMeta';
@@ -38,7 +38,6 @@ const ContentLabPage = () => {
 
   const [search, setSearch] = useState('');
   const [pendingClient, setPendingClient] = useState<ClientForPicker | null>(null);
-  const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
 
   usePageMeta({ title: 'Content Lab', description: 'Pick a client. Generate research-backed content ideas in minutes.' });
 
@@ -88,7 +87,7 @@ const ContentLabPage = () => {
           actions={<UsageHeader />}
         />
 
-        <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
+
 
         <StartRunDialog
           open={!!pendingClient}
