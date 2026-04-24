@@ -78,7 +78,7 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
         });
         if (mySeq !== requestSeq.current) return; // stale
         if (error) throw error;
-        setResults((data?.results ?? []) as SearchResult[]);
+        setResults((data?.results ?? []) as Prediction[]);
       } catch (e) {
         if (mySeq !== requestSeq.current) return;
         toast.error(e instanceof Error ? e.message : 'Search failed');
