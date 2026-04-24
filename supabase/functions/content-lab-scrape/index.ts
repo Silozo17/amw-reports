@@ -8,6 +8,19 @@
 //  - Score every post by views*0.6 + er*views*0.4 and tag the top 10 benchmark + top 10
 //    competitor pieces with bucket suffix `_top` so the analyser knows which to deep-analyse.
 //  - Hard cap retained at 80 inserted rows.
+//
+// v4 fixes (this revision):
+//  - Facebook actor corrected to apify~facebook-pages-scraper (was wrong actor → 404).
+//  - Removed Apify-level date pre-filters on IG + TikTok (starved inactive accounts);
+//    code-side recency filter in scrapeBucket handles this correctly with fallback.
+//  - All three scrapers now surface their Apify error text to the errors array so
+//    failures show up in scrape_errors instead of silent return [].
+//  - Renderable filter is now skipped for benchmark + competitor buckets (those are
+//    inspiration material — missing engagement fields are not a reason to drop them).
+//  - Competitor handle list is deduplicated by handle BEFORE being sliced to 5 so
+//    multi-platform entries for the same handle don't eat the slot budget.
+//  - TikTok subtitle links are best-effort fetched + parsed into `transcript`
+//    (time-boxed, non-blocking — null on any failure).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { decryptToken } from "../_shared/tokenCrypto.ts";
@@ -21,6 +34,7 @@ const corsHeaders = {
 };
 
 const APIFY_ACTOR = "apify~instagram-scraper";
+const FACEBOOK_ACTOR = "apify~facebook-pages-scraper";
 
 // New spec caps.
 const MAX_POSTS_OWN = 8;
@@ -38,7 +52,11 @@ const APIFY_CHUNK_SIZE = 5;
 const APIFY_TIMEOUT_SEC = 90;
 const APIFY_RETRY_TIMEOUT_SEC = 150;
 
-interface DiscoveredEntity { handle: string; reason?: string }
+// Best-effort subtitle fetching for TikTok.
+const SUBTITLE_FETCH_TIMEOUT_MS = 5000;
+const MAX_TRANSCRIPT_CHARS = 2000;
+
+interface DiscoveredEntity { handle: string; platform?: string; reason?: string }
 
 interface ScrapedPost {
   platform: "instagram" | "tiktok" | "facebook";
@@ -61,6 +79,7 @@ interface ScrapedPost {
   music_title: string | null;
   music_artist: string | null;
   tagged_users: string[];
+  subtitle_links?: Array<{ language?: string; downloadLink?: string }>;
 }
 
 Deno.serve(async (req) => {
@@ -106,10 +125,18 @@ Deno.serve(async (req) => {
     const ownHandleSet = new Set<string>(Object.values(ownHandlesByPlatform).filter((h): h is string => !!h));
     if (niche.own_handle) ownHandleSet.add(niche.own_handle.toLowerCase().replace(/^@/, ""));
 
+    // Dedupe competitor handles BEFORE slicing so multi-platform entries for the same
+    // creator (e.g. same handle on IG + TikTok) don't consume multiple slots.
+    const competitorSeen = new Set<string>();
     const competitorHandles = (niche.top_competitors ?? [])
       .map((c) => c.handle?.toLowerCase().replace(/^@/, ""))
       .filter((h): h is string => !!h)
       .filter((h) => !ownHandleSet.has(h))
+      .filter((h) => {
+        if (competitorSeen.has(h)) return false;
+        competitorSeen.add(h);
+        return true;
+      })
       .slice(0, MAX_COMPETITOR_HANDLES);
 
     const benchmarkHandles = await loadBenchmarkHandles({
@@ -152,15 +179,23 @@ Deno.serve(async (req) => {
     });
 
     // 2) Cross-platform dedupe: same caption fingerprint within the same posted-week.
+    //    This collapses the client's own content posted to IG + TikTok + FB into one row.
     deduped = crossPlatformDedupe(deduped);
 
-    // 3) Renderable-row filter: drop posts that have no usable display signal.
-    // A post is renderable if it has at least one strong signal (post_url OR thumbnail OR caption ≥10 chars)
-    // AND a non-placeholder author handle. Top-bucket benchmarks with strong engagement are kept even if one field missing.
+    // 3) Best-effort transcript fetch for TikTok posts that ship subtitle links.
+    //    Runs in parallel with a per-file timeout; any failure just keeps transcript=null.
+    await enrichTikTokTranscripts(deduped);
+
+    // 4) Renderable-row filter — only apply to OWN posts. Benchmark + competitor buckets
+    //    are inspiration material for the ideator; Apify frequently returns them with
+    //    zero engagement / missing fields, and filtering them out silently starves the
+    //    inspiration pool. Own posts still get filtered because they're displayed to
+    //    the user directly and incomplete rows make the UI look broken.
     deduped = deduped.filter((p) => {
+      if (p.bucket === "benchmark" || p.bucket === "competitor") return true;
+
       const handle = (p.author_handle ?? "").trim().toLowerCase();
       if (!handle || handle === "unknown" || handle === "n/a" || handle === "anonymous") {
-        // Allow only if there's still strong engagement signal (saves rare anonymous viral posts).
         if ((p.views ?? 0) < 1000 && (p.likes ?? 0) < 100) return false;
       }
       const captionLen = (p.caption ?? "").trim().length;
@@ -168,24 +203,20 @@ Deno.serve(async (req) => {
       const hasThumb = !!p.thumbnail_url;
       const hasCaption = captionLen >= 10;
       const hasEngagement = (p.views ?? 0) > 0 || (p.likes ?? 0) > 0 || (p.comments ?? 0) > 0;
-      // Need at least one display field + some engagement, OR two display fields.
       const displayFieldCount = (hasUrl ? 1 : 0) + (hasThumb ? 1 : 0) + (hasCaption ? 1 : 0);
       if (displayFieldCount === 0) return false;
       if (displayFieldCount === 1 && !hasEngagement) return false;
       return true;
     });
 
-    // 4) Cap total inserted rows.
+    // 5) Cap total inserted rows.
     deduped = deduped.slice(0, MAX_TOTAL_POSTS);
 
-    // 4b) Cross-platform benchmark fill: every enabled platform must have benchmark signal.
+    // 5b) Cross-platform benchmark fill: every enabled platform must have benchmark signal.
     // If a platform has 0 benchmark posts after scraping, copy the top 10 benchmark posts
     // from any other platform that has them, re-tagging the platform field. Ensures the
     // ideation step always has reference material to learn from per platform.
     {
-      const enabled = Array.from(new Set(deduped.map((p) => p.platform)));
-      // Determine which enabled platforms (from the run config) appear at all.
-      // We can only fill platforms that the user enabled, so derive from collected set.
       const platformsInRun = new Set<"instagram" | "tiktok" | "facebook">();
       collected.forEach((p) => platformsInRun.add(p.platform));
       const benchByPlatform = new Map<string, typeof deduped>();
@@ -198,7 +229,6 @@ Deno.serve(async (req) => {
       for (const target of platformsInRun) {
         const targetCount = benchByPlatform.get(target)?.length ?? 0;
         if (targetCount > 0) continue;
-        // Find the platform with the most benchmark posts to source from.
         let sourcePlatform: string | null = null;
         let sourcePosts: typeof deduped = [];
         for (const [plat, arr] of benchByPlatform.entries()) {
@@ -209,7 +239,6 @@ Deno.serve(async (req) => {
           }
         }
         if (!sourcePlatform || sourcePosts.length === 0) continue;
-        // Sort by engagement signal and take top 10.
         const top = [...sourcePosts]
           .sort((a, b) => (b.views - a.views) || (b.likes - a.likes))
           .slice(0, 10)
@@ -217,11 +246,10 @@ Deno.serve(async (req) => {
         deduped.push(...top);
         console.log(`Cross-platform benchmark fill: copied ${top.length} posts from ${sourcePlatform} to ${target}`);
       }
-      // Re-cap after fill so we never exceed MAX_TOTAL_POSTS overall.
       deduped = deduped.slice(0, MAX_TOTAL_POSTS);
     }
 
-    // 4) Build rows with engagement_rate + score, then mark top-N for analysis via summary.
+    // 6) Build rows with engagement_rate + score, then mark top-N for analysis via summary.
     const rows = deduped.map((p) => {
       const raw = p.views > 0
         ? (p.likes + p.comments) / p.views
@@ -267,7 +295,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 5) Resolve inserted row IDs and pick the top-N by score per bucket for the analyser.
+    // 7) Resolve inserted row IDs and pick the top-N by score per bucket for the analyser.
     const { data: inserted } = await supabase
       .from("content_lab_posts")
       .select("id, bucket, views, engagement_rate")
@@ -383,6 +411,72 @@ function postedWeekKey(iso: string | null): string {
   return `${d.getUTCFullYear()}-w${week}`;
 }
 
+// ---------- TikTok transcript enrichment ----------
+
+async function enrichTikTokTranscripts(posts: ScrapedPost[]): Promise<void> {
+  const candidates = posts.filter((p) =>
+    p.platform === "tiktok" &&
+    !p.transcript &&
+    Array.isArray(p.subtitle_links) &&
+    p.subtitle_links.length > 0
+  );
+  if (candidates.length === 0) return;
+
+  await Promise.allSettled(candidates.map(async (p) => {
+    try {
+      const link = pickBestSubtitleLink(p.subtitle_links ?? []);
+      if (!link) return;
+      const text = await fetchSubtitleText(link);
+      if (text) p.transcript = text;
+    } catch {
+      // Swallow — transcripts are best-effort.
+    } finally {
+      // Strip the link payload after processing so it doesn't leak into the DB row.
+      delete p.subtitle_links;
+    }
+  }));
+}
+
+function pickBestSubtitleLink(links: Array<{ language?: string; downloadLink?: string }>): string | null {
+  if (links.length === 0) return null;
+  const english = links.find((l) => (l.language ?? "").toLowerCase().startsWith("en"));
+  return (english?.downloadLink ?? links[0].downloadLink) ?? null;
+}
+
+async function fetchSubtitleText(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SUBTITLE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    const raw = await res.text();
+    const cleaned = parseSubtitleFile(raw);
+    return cleaned.length > 0 ? cleaned.slice(0, MAX_TRANSCRIPT_CHARS) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseSubtitleFile(raw: string): string {
+  // Handles both WebVTT and SRT. Strips timestamps, cue numbers, WEBVTT header,
+  // positioning hints and HTML-style tags. Collapses whitespace.
+  const lines = raw.split(/\r?\n/);
+  const keep: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^WEBVTT/i.test(trimmed)) continue;
+    if (/^\d+$/.test(trimmed)) continue; // cue number
+    if (/-->/i.test(trimmed)) continue; // timestamp line
+    if (/^NOTE\b/i.test(trimmed)) continue;
+    if (/^STYLE\b/i.test(trimmed)) continue;
+    keep.push(trimmed.replace(/<[^>]+>/g, ""));
+  }
+  return keep.join(" ").replace(/\s+/g, " ").trim();
+}
+
 interface BucketResult { posts: ScrapedPost[]; errors: string[] }
 
 async function loadBenchmarkHandles(args: {
@@ -453,10 +547,11 @@ async function scrapeOwn(
           console.log(`Own (OAuth IG): ${oauthPosts.length} posts for @${igHandle}`);
           collected.push(...oauthPosts);
         } else {
-          const apifyPosts = await runApifyForHandlesWithRetry([igHandle], MAX_POSTS_OWN);
-          apifyPosts.forEach((p) => { p.bucket = "own"; });
-          console.log(`Own (Apify IG): ${apifyPosts.length} posts for @${igHandle}`);
-          collected.push(...apifyPosts);
+          const apifyResult = await runApifyForHandlesWithRetry([igHandle], MAX_POSTS_OWN);
+          apifyResult.posts.forEach((p) => { p.bucket = "own"; });
+          console.log(`Own (Apify IG): ${apifyResult.posts.length} posts for @${igHandle}`);
+          collected.push(...apifyResult.posts);
+          if (apifyResult.errors.length > 0) errors.push(...apifyResult.errors.map((e) => `Own IG: ${e}`));
         }
       } catch (e) {
         const msg = `Own IG scrape failed: ${e instanceof Error ? e.message : e}`;
@@ -468,10 +563,11 @@ async function scrapeOwn(
 
   if (platforms.includes("tiktok") && ownHandlesByPlatform.tiktok) {
     try {
-      const ttPosts = await runTikTokScraperWithRetry(ownHandlesByPlatform.tiktok, MAX_POSTS_OWN);
-      ttPosts.forEach((p) => { p.bucket = "own"; });
-      console.log(`Own (TikTok): ${ttPosts.length} posts for @${ownHandlesByPlatform.tiktok}`);
-      collected.push(...ttPosts);
+      const ttResult = await runTikTokScraperWithRetry(ownHandlesByPlatform.tiktok, MAX_POSTS_OWN);
+      ttResult.posts.forEach((p) => { p.bucket = "own"; });
+      console.log(`Own (TikTok): ${ttResult.posts.length} posts for @${ownHandlesByPlatform.tiktok}`);
+      collected.push(...ttResult.posts);
+      if (ttResult.errors.length > 0) errors.push(...ttResult.errors.map((e) => `Own TikTok: ${e}`));
     } catch (e) {
       const msg = `Own TikTok scrape failed: ${e instanceof Error ? e.message : e}`;
       console.error(msg);
@@ -481,10 +577,11 @@ async function scrapeOwn(
 
   if (platforms.includes("facebook") && ownHandlesByPlatform.facebook) {
     try {
-      const fbPosts = await runFacebookScraperWithRetry(ownHandlesByPlatform.facebook, MAX_POSTS_OWN);
-      fbPosts.forEach((p) => { p.bucket = "own"; });
-      console.log(`Own (Facebook): ${fbPosts.length} posts for ${ownHandlesByPlatform.facebook}`);
-      collected.push(...fbPosts);
+      const fbResult = await runFacebookScraperWithRetry(ownHandlesByPlatform.facebook, MAX_POSTS_OWN);
+      fbResult.posts.forEach((p) => { p.bucket = "own"; });
+      console.log(`Own (Facebook): ${fbResult.posts.length} posts for ${ownHandlesByPlatform.facebook}`);
+      collected.push(...fbResult.posts);
+      if (fbResult.errors.length > 0) errors.push(...fbResult.errors.map((e) => `Own FB: ${e}`));
     } catch (e) {
       const msg = `Own Facebook scrape failed: ${e instanceof Error ? e.message : e}`;
       console.error(msg);
@@ -505,27 +602,38 @@ async function scrapeBucket(
   const errors: string[] = [];
   const posts: ScrapedPost[] = [];
 
-  const tasks: Array<Promise<ScrapedPost[]>> = [];
+  type TaskResult = { posts: ScrapedPost[]; errors: string[]; label: string };
+  const tasks: Array<Promise<TaskResult>> = [];
+
   if (platforms.includes("instagram")) {
     const chunks: string[][] = [];
     for (let i = 0; i < handles.length; i += APIFY_CHUNK_SIZE) {
       chunks.push(handles.slice(i, i + APIFY_CHUNK_SIZE));
     }
-    chunks.forEach((c) => tasks.push(runApifyForHandlesWithRetry(c, postsPerHandle)));
+    chunks.forEach((c, idx) => tasks.push(
+      runApifyForHandlesWithRetry(c, postsPerHandle).then((r) => ({ ...r, label: `IG chunk ${idx + 1} [${c.join(",")}]` })),
+    ));
   }
   if (platforms.includes("tiktok")) {
-    handles.forEach((h) => tasks.push(runTikTokScraperWithRetry(h, postsPerHandle)));
+    handles.forEach((h) => tasks.push(
+      runTikTokScraperWithRetry(h, postsPerHandle).then((r) => ({ ...r, label: `TikTok @${h}` })),
+    ));
   }
   if (platforms.includes("facebook")) {
-    handles.forEach((h) => tasks.push(runFacebookScraperWithRetry(h, postsPerHandle)));
+    handles.forEach((h) => tasks.push(
+      runFacebookScraperWithRetry(h, postsPerHandle).then((r) => ({ ...r, label: `FB ${h}` })),
+    ));
   }
 
   const settled = await Promise.allSettled(tasks);
   settled.forEach((r, idx) => {
     if (r.status === "fulfilled") {
-      posts.push(...r.value);
+      posts.push(...r.value.posts);
+      if (r.value.errors.length > 0) {
+        r.value.errors.forEach((e) => errors.push(`${bucket} ${r.value.label}: ${e}`));
+      }
     } else {
-      const msg = `scrape task ${idx + 1} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
+      const msg = `${bucket} scrape task ${idx + 1} crashed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`;
       console.error(msg);
       errors.push(msg);
     }
@@ -618,47 +726,56 @@ async function fetchOwnInstagramPosts(
 
 // ---------- Apify wrappers + retry ----------
 
-async function runApifyForHandlesWithRetry(handles: string[], resultsLimit: number): Promise<ScrapedPost[]> {
+interface ApifyResult { posts: ScrapedPost[]; errors: string[] }
+
+async function runApifyForHandlesWithRetry(handles: string[], resultsLimit: number): Promise<ApifyResult> {
   const first = await runApifyForHandles(handles, resultsLimit, APIFY_TIMEOUT_SEC);
-  if (first.length > 0) return first;
+  if (first.posts.length > 0) return first;
   console.log(`IG retry with ${APIFY_RETRY_TIMEOUT_SEC}s for ${handles.join(",")}`);
-  return runApifyForHandles(handles, resultsLimit, APIFY_RETRY_TIMEOUT_SEC);
+  const retry = await runApifyForHandles(handles, resultsLimit, APIFY_RETRY_TIMEOUT_SEC);
+  // Merge errors from both attempts so nothing is silently dropped.
+  return { posts: retry.posts, errors: [...first.errors, ...retry.errors] };
 }
 
-async function runTikTokScraperWithRetry(handle: string, resultsLimit: number): Promise<ScrapedPost[]> {
+async function runTikTokScraperWithRetry(handle: string, resultsLimit: number): Promise<ApifyResult> {
   const first = await runTikTokScraper(handle, resultsLimit, APIFY_TIMEOUT_SEC);
-  if (first.length > 0) return first;
+  if (first.posts.length > 0) return first;
   console.log(`TT retry with ${APIFY_RETRY_TIMEOUT_SEC}s for ${handle}`);
-  return runTikTokScraper(handle, resultsLimit, APIFY_RETRY_TIMEOUT_SEC);
+  const retry = await runTikTokScraper(handle, resultsLimit, APIFY_RETRY_TIMEOUT_SEC);
+  return { posts: retry.posts, errors: [...first.errors, ...retry.errors] };
 }
 
-async function runFacebookScraperWithRetry(handle: string, resultsLimit: number): Promise<ScrapedPost[]> {
+async function runFacebookScraperWithRetry(handle: string, resultsLimit: number): Promise<ApifyResult> {
   const first = await runFacebookScraper(handle, resultsLimit, APIFY_TIMEOUT_SEC);
-  if (first.length > 0) return first;
+  if (first.posts.length > 0) return first;
   console.log(`FB retry with ${APIFY_RETRY_TIMEOUT_SEC}s for ${handle}`);
-  return runFacebookScraper(handle, resultsLimit, APIFY_RETRY_TIMEOUT_SEC);
+  const retry = await runFacebookScraper(handle, resultsLimit, APIFY_RETRY_TIMEOUT_SEC);
+  return { posts: retry.posts, errors: [...first.errors, ...retry.errors] };
 }
 
 async function runApifyForHandles(
   handles: string[], resultsLimit: number, timeoutSec: number,
-): Promise<ScrapedPost[]> {
+): Promise<ApifyResult> {
+  const errors: string[] = [];
   const apifyToken = Deno.env.get("APIFY_TOKEN");
   if (!apifyToken) {
-    console.error("APIFY_TOKEN not configured; skipping Apify scrape");
-    return [];
+    const msg = "APIFY_TOKEN not configured";
+    console.error(msg);
+    return { posts: [], errors: [msg] };
   }
   const igUrls = handles
     .map((h) => `https://www.instagram.com/${h.replace(/^@/, "")}/`)
     .filter((u) => u.includes("instagram.com"));
-  if (igUrls.length === 0) return [];
+  if (igUrls.length === 0) return { posts: [], errors: [] };
 
-  const onlyPostsNewerThan = new Date(Date.now() - RECENT_CUTOFF_MS).toISOString();
+  // NOTE: Removed `onlyPostsNewerThan` — it pre-filters at Apify level and starves
+  // accounts that post infrequently. The post-fetch recency filter in scrapeBucket
+  // handles this with a fallback for inactive accounts.
   const input = {
     directUrls: igUrls,
     resultsType: "posts",
     resultsLimit,
     addParentData: false,
-    onlyPostsNewerThan,
   };
   const runUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
 
@@ -669,13 +786,16 @@ async function runApifyForHandles(
       body: JSON.stringify(input),
     });
     if (!res.ok) {
-      console.error("Apify error:", res.status, await res.text());
-      return [];
+      const bodyText = await res.text();
+      const msg = `Apify IG ${res.status}: ${bodyText.slice(0, 300)}`;
+      console.error(msg);
+      errors.push(msg);
+      return { posts: [], errors };
     }
     const items = await res.json();
-    if (!Array.isArray(items)) return [];
+    if (!Array.isArray(items)) return { posts: [], errors };
 
-    return items.map((it: {
+    const posts = items.map((it: {
       ownerUsername?: string; url?: string; type?: string; productType?: string; caption?: string;
       displayUrl?: string; likesCount?: number; commentsCount?: number;
       videoViewCount?: number; videoPlayCount?: number; videoDuration?: number;
@@ -711,24 +831,30 @@ async function runApifyForHandles(
           : [],
       };
     });
+    return { posts, errors };
   } catch (e) {
-    console.error("Apify fetch failed:", e);
-    return [];
+    const msg = `Apify IG fetch failed: ${e instanceof Error ? e.message : String(e)}`;
+    console.error(msg);
+    errors.push(msg);
+    return { posts: [], errors };
   }
 }
 
-async function runTikTokScraper(handle: string, resultsLimit: number, timeoutSec: number): Promise<ScrapedPost[]> {
+async function runTikTokScraper(handle: string, resultsLimit: number, timeoutSec: number): Promise<ApifyResult> {
+  const errors: string[] = [];
   const apifyToken = Deno.env.get("APIFY_TOKEN");
-  if (!apifyToken) return [];
+  if (!apifyToken) return { posts: [], errors: ["APIFY_TOKEN not configured"] };
   const cleaned = handle.replace(/^@/, "");
-  const oldestPostDate = new Date(Date.now() - RECENT_CUTOFF_MS).toISOString().slice(0, 10);
+
+  // NOTE: Removed `oldestPostDate` — it pre-filters at Apify level and starves
+  // accounts that post infrequently. The post-fetch recency filter in scrapeBucket
+  // handles this with a fallback for inactive accounts.
   const input = {
     profiles: [cleaned],
     resultsPerPage: resultsLimit,
     shouldDownloadVideos: false,
     shouldDownloadCovers: false,
-    shouldDownloadSubtitles: true, // request subs so analyse can read transcripts
-    oldestPostDate, // YYYY-MM-DD; clockworks/tiktok-scraper supports this filter
+    shouldDownloadSubtitles: true, // request subs so enrichTikTokTranscripts can parse them
   };
   const url = `https://api.apify.com/v2/acts/clockworks~tiktok-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
   try {
@@ -738,12 +864,15 @@ async function runTikTokScraper(handle: string, resultsLimit: number, timeoutSec
       body: JSON.stringify(input),
     });
     if (!res.ok) {
-      console.error("TikTok Apify error:", res.status, await res.text());
-      return [];
+      const bodyText = await res.text();
+      const msg = `Apify TikTok ${res.status}: ${bodyText.slice(0, 300)}`;
+      console.error(msg);
+      errors.push(msg);
+      return { posts: [], errors };
     }
     const items = await res.json();
-    if (!Array.isArray(items)) return [];
-    return items.map((it: {
+    if (!Array.isArray(items)) return { posts: [], errors };
+    const posts = items.map((it: {
       authorMeta?: { name?: string };
       webVideoUrl?: string;
       text?: string;
@@ -779,23 +908,30 @@ async function runTikTokScraper(handle: string, resultsLimit: number, timeoutSec
       music_title: it.musicMeta?.musicName ?? null,
       music_artist: it.musicMeta?.musicAuthor ?? null,
       tagged_users: [],
+      subtitle_links: Array.isArray(it.subtitleLinks) ? it.subtitleLinks : undefined,
     }));
+    return { posts, errors };
   } catch (e) {
-    console.error("TikTok fetch failed:", e);
-    return [];
+    const msg = `Apify TikTok fetch failed: ${e instanceof Error ? e.message : String(e)}`;
+    console.error(msg);
+    errors.push(msg);
+    return { posts: [], errors };
   }
 }
 
-async function runFacebookScraper(handle: string, resultsLimit: number, timeoutSec: number): Promise<ScrapedPost[]> {
+async function runFacebookScraper(handle: string, resultsLimit: number, timeoutSec: number): Promise<ApifyResult> {
+  const errors: string[] = [];
   const apifyToken = Deno.env.get("APIFY_TOKEN");
-  if (!apifyToken) return [];
+  if (!apifyToken) return { posts: [], errors: ["APIFY_TOKEN not configured"] };
   const cleaned = handle.replace(/^@/, "");
+
+  // Uses apify~facebook-pages-scraper. Input schema does NOT include maxPostDate —
+  // the previous wrong actor name + wrong schema was the cause of the instant 404s.
   const input = {
     startUrls: [{ url: `https://www.facebook.com/${cleaned}/` }],
     resultsLimit,
-    maxPostDate: new Date(Date.now() - RECENT_CUTOFF_MS).toISOString().slice(0, 10),
   };
-  const url = `https://api.apify.com/v2/acts/apify~facebook-posts-scraper/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
+  const url = `https://api.apify.com/v2/acts/${FACEBOOK_ACTOR}/run-sync-get-dataset-items?token=${apifyToken}&timeout=${timeoutSec}`;
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -803,12 +939,15 @@ async function runFacebookScraper(handle: string, resultsLimit: number, timeoutS
       body: JSON.stringify(input),
     });
     if (!res.ok) {
-      console.error("Facebook Apify error:", res.status, await res.text());
-      return [];
+      const bodyText = await res.text();
+      const msg = `Apify Facebook ${res.status}: ${bodyText.slice(0, 300)}`;
+      console.error(msg);
+      errors.push(msg);
+      return { posts: [], errors };
     }
     const items = await res.json();
-    if (!Array.isArray(items)) return [];
-    return items.map((it: {
+    if (!Array.isArray(items)) return { posts: [], errors };
+    const posts = items.map((it: {
       pageName?: string;
       url?: string;
       text?: string;
@@ -842,8 +981,11 @@ async function runFacebookScraper(handle: string, resultsLimit: number, timeoutS
       music_artist: null,
       tagged_users: [],
     }));
+    return { posts, errors };
   } catch (e) {
-    console.error("Facebook fetch failed:", e);
-    return [];
+    const msg = `Apify Facebook fetch failed: ${e instanceof Error ? e.message : String(e)}`;
+    console.error(msg);
+    errors.push(msg);
+    return { posts: [], errors };
   }
 }
