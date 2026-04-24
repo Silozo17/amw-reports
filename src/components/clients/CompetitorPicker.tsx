@@ -33,7 +33,8 @@ const CompetitorPicker = ({ value, onChange }: Props) => {
   const list = parseCompetitors(value);
 
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<Prediction[]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
