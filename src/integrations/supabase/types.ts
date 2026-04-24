@@ -116,13 +116,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "client_portal_upsells_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       client_recipients: {
@@ -209,13 +202,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "client_share_tokens_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       client_users: {
@@ -264,13 +250,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "client_users_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       clients: {
@@ -297,6 +276,7 @@ export type Database = {
           id: string
           industry: string | null
           is_active: boolean
+          location: string | null
           logo_url: string | null
           notes: string | null
           org_id: string
@@ -342,6 +322,7 @@ export type Database = {
           id?: string
           industry?: string | null
           is_active?: boolean
+          location?: string | null
           logo_url?: string | null
           notes?: string | null
           org_id: string
@@ -387,6 +368,7 @@ export type Database = {
           id?: string
           industry?: string | null
           is_active?: boolean
+          location?: string | null
           logo_url?: string | null
           notes?: string | null
           org_id?: string
@@ -417,74 +399,7 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "clients_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
-      }
-      content_lab_benchmark_pool: {
-        Row: {
-          created_at: string
-          display_name: string | null
-          follower_count: number | null
-          handle: string
-          id: string
-          last_post_at: string | null
-          median_engagement_rate: number | null
-          median_views: number | null
-          niche_tag: string
-          platform: string
-          posts_analysed: number | null
-          profile_url: string | null
-          rejection_reason: string | null
-          status: string
-          thumbnail_url: string | null
-          updated_at: string
-          verified_at: string
-        }
-        Insert: {
-          created_at?: string
-          display_name?: string | null
-          follower_count?: number | null
-          handle: string
-          id?: string
-          last_post_at?: string | null
-          median_engagement_rate?: number | null
-          median_views?: number | null
-          niche_tag: string
-          platform: string
-          posts_analysed?: number | null
-          profile_url?: string | null
-          rejection_reason?: string | null
-          status?: string
-          thumbnail_url?: string | null
-          updated_at?: string
-          verified_at?: string
-        }
-        Update: {
-          created_at?: string
-          display_name?: string | null
-          follower_count?: number | null
-          handle?: string
-          id?: string
-          last_post_at?: string | null
-          median_engagement_rate?: number | null
-          median_views?: number | null
-          niche_tag?: string
-          platform?: string
-          posts_analysed?: number | null
-          profile_url?: string | null
-          rejection_reason?: string | null
-          status?: string
-          thumbnail_url?: string | null
-          updated_at?: string
-          verified_at?: string
-        }
-        Relationships: []
       }
       content_lab_credit_ledger: {
         Row: {
@@ -546,211 +461,118 @@ export type Database = {
         }
         Relationships: []
       }
-      content_lab_hooks: {
+      content_lab_idea_edits: {
         Row: {
+          after_snapshot: Json
+          before_snapshot: Json
           created_at: string
-          engagement_score: number | null
-          hook_text: string
+          edited_by: string | null
           id: string
-          mechanism: string | null
-          run_id: string
-          source_post_id: string | null
-          why_it_works: string | null
+          idea_id: string
+          instruction: string
+          org_id: string
+          version: number
         }
         Insert: {
+          after_snapshot?: Json
+          before_snapshot?: Json
           created_at?: string
-          engagement_score?: number | null
-          hook_text: string
+          edited_by?: string | null
           id?: string
-          mechanism?: string | null
-          run_id: string
-          source_post_id?: string | null
-          why_it_works?: string | null
+          idea_id: string
+          instruction: string
+          org_id: string
+          version: number
         }
         Update: {
+          after_snapshot?: Json
+          before_snapshot?: Json
           created_at?: string
-          engagement_score?: number | null
-          hook_text?: string
+          edited_by?: string | null
           id?: string
-          mechanism?: string | null
-          run_id?: string
-          source_post_id?: string | null
-          why_it_works?: string | null
+          idea_id?: string
+          instruction?: string
+          org_id?: string
+          version?: number
         }
         Relationships: [
           {
-            foreignKeyName: "content_lab_hooks_run_id_fkey"
-            columns: ["run_id"]
+            foreignKeyName: "content_lab_idea_edits_idea_id_fkey"
+            columns: ["idea_id"]
             isOneToOne: false
-            referencedRelation: "content_lab_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_hooks_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_regen_rate"
-            referencedColumns: ["run_id"]
-          },
-          {
-            foreignKeyName: "content_lab_hooks_source_post_id_fkey"
-            columns: ["source_post_id"]
-            isOneToOne: false
-            referencedRelation: "content_lab_posts"
+            referencedRelation: "content_lab_ideas"
             referencedColumns: ["id"]
           },
         ]
       }
-      content_lab_idea_comments: {
-        Row: {
-          author_client_user_id: string | null
-          author_label: string
-          author_user_id: string | null
-          body: string
-          created_at: string
-          id: string
-          idea_id: string
-          org_id: string
-          updated_at: string
-        }
-        Insert: {
-          author_client_user_id?: string | null
-          author_label: string
-          author_user_id?: string | null
-          body: string
-          created_at?: string
-          id?: string
-          idea_id: string
-          org_id: string
-          updated_at?: string
-        }
-        Update: {
-          author_client_user_id?: string | null
-          author_label?: string
-          author_user_id?: string | null
-          body?: string
-          created_at?: string
-          id?: string
-          idea_id?: string
-          org_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       content_lab_ideas: {
         Row: {
-          actual_comments: number | null
-          actual_engagement_rate: number | null
-          actual_likes: number | null
-          actual_views: number | null
-          based_on_post_id: string | null
-          body: string | null
+          best_fit_platform: string | null
           caption: string | null
-          caption_with_hashtag: string | null
           created_at: string
           cta: string | null
-          duration_seconds: number | null
-          filming_checklist: string[]
+          current_version: number
+          edit_count: number
           hashtags: string[]
           hook: string | null
-          hook_variants: Json
           id: string
           idea_number: number
-          is_wildcard: boolean
-          last_modified_via: string | null
-          linked_at: string | null
-          linked_post_id: string | null
-          platform_style_notes: string | null
-          rating: number | null
-          regen_count: number
-          remix_count: number
+          inspiration_source: string | null
+          inspired_by_post_id: string | null
           run_id: string
-          script_full: string | null
+          script: string | null
           status: string
-          target_platform: string | null
           title: string
+          updated_at: string
           visual_direction: string | null
           why_it_works: string | null
         }
         Insert: {
-          actual_comments?: number | null
-          actual_engagement_rate?: number | null
-          actual_likes?: number | null
-          actual_views?: number | null
-          based_on_post_id?: string | null
-          body?: string | null
+          best_fit_platform?: string | null
           caption?: string | null
-          caption_with_hashtag?: string | null
           created_at?: string
           cta?: string | null
-          duration_seconds?: number | null
-          filming_checklist?: string[]
+          current_version?: number
+          edit_count?: number
           hashtags?: string[]
           hook?: string | null
-          hook_variants?: Json
           id?: string
           idea_number: number
-          is_wildcard?: boolean
-          last_modified_via?: string | null
-          linked_at?: string | null
-          linked_post_id?: string | null
-          platform_style_notes?: string | null
-          rating?: number | null
-          regen_count?: number
-          remix_count?: number
+          inspiration_source?: string | null
+          inspired_by_post_id?: string | null
           run_id: string
-          script_full?: string | null
+          script?: string | null
           status?: string
-          target_platform?: string | null
           title: string
+          updated_at?: string
           visual_direction?: string | null
           why_it_works?: string | null
         }
         Update: {
-          actual_comments?: number | null
-          actual_engagement_rate?: number | null
-          actual_likes?: number | null
-          actual_views?: number | null
-          based_on_post_id?: string | null
-          body?: string | null
+          best_fit_platform?: string | null
           caption?: string | null
-          caption_with_hashtag?: string | null
           created_at?: string
           cta?: string | null
-          duration_seconds?: number | null
-          filming_checklist?: string[]
+          current_version?: number
+          edit_count?: number
           hashtags?: string[]
           hook?: string | null
-          hook_variants?: Json
           id?: string
           idea_number?: number
-          is_wildcard?: boolean
-          last_modified_via?: string | null
-          linked_at?: string | null
-          linked_post_id?: string | null
-          platform_style_notes?: string | null
-          rating?: number | null
-          regen_count?: number
-          remix_count?: number
+          inspiration_source?: string | null
+          inspired_by_post_id?: string | null
           run_id?: string
-          script_full?: string | null
+          script?: string | null
           status?: string
-          target_platform?: string | null
           title?: string
+          updated_at?: string
           visual_direction?: string | null
           why_it_works?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "content_lab_ideas_based_on_post_id_fkey"
-            columns: ["based_on_post_id"]
-            isOneToOne: false
-            referencedRelation: "content_lab_posts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_ideas_linked_post_id_fkey"
-            columns: ["linked_post_id"]
+            foreignKeyName: "content_lab_ideas_inspired_by_post_id_fkey"
+            columns: ["inspired_by_post_id"]
             isOneToOne: false
             referencedRelation: "content_lab_posts"
             referencedColumns: ["id"]
@@ -762,283 +584,91 @@ export type Database = {
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "content_lab_ideas_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_regen_rate"
-            referencedColumns: ["run_id"]
-          },
         ]
-      }
-      content_lab_niches: {
-        Row: {
-          admired_accounts: Json
-          brand_brief: Json
-          brand_voice_snapshot: Json | null
-          client_id: string
-          competitor_accounts: Json
-          competitor_urls: string[]
-          content_styles: string[]
-          created_at: string
-          discovered_at: string | null
-          do_not_use: string[]
-          id: string
-          industry_slug: string | null
-          label: string
-          language: string
-          location: string | null
-          media_types: string[]
-          niche_description: string | null
-          niche_tag: string | null
-          org_id: string
-          own_handle: string | null
-          platforms_to_scrape: string[]
-          pool_status: string
-          posting_cadence: string | null
-          producer_type: string | null
-          tone_of_voice: string | null
-          top_competitors: Json
-          top_global_benchmarks: Json
-          tracked_handles: Json
-          tracked_hashtags: string[]
-          tracked_keywords: string[]
-          updated_at: string
-          video_length_preference: string | null
-          voice_built_at: string | null
-          website: string | null
-        }
-        Insert: {
-          admired_accounts?: Json
-          brand_brief?: Json
-          brand_voice_snapshot?: Json | null
-          client_id: string
-          competitor_accounts?: Json
-          competitor_urls?: string[]
-          content_styles?: string[]
-          created_at?: string
-          discovered_at?: string | null
-          do_not_use?: string[]
-          id?: string
-          industry_slug?: string | null
-          label: string
-          language?: string
-          location?: string | null
-          media_types?: string[]
-          niche_description?: string | null
-          niche_tag?: string | null
-          org_id: string
-          own_handle?: string | null
-          platforms_to_scrape?: string[]
-          pool_status?: string
-          posting_cadence?: string | null
-          producer_type?: string | null
-          tone_of_voice?: string | null
-          top_competitors?: Json
-          top_global_benchmarks?: Json
-          tracked_handles?: Json
-          tracked_hashtags?: string[]
-          tracked_keywords?: string[]
-          updated_at?: string
-          video_length_preference?: string | null
-          voice_built_at?: string | null
-          website?: string | null
-        }
-        Update: {
-          admired_accounts?: Json
-          brand_brief?: Json
-          brand_voice_snapshot?: Json | null
-          client_id?: string
-          competitor_accounts?: Json
-          competitor_urls?: string[]
-          content_styles?: string[]
-          created_at?: string
-          discovered_at?: string | null
-          do_not_use?: string[]
-          id?: string
-          industry_slug?: string | null
-          label?: string
-          language?: string
-          location?: string | null
-          media_types?: string[]
-          niche_description?: string | null
-          niche_tag?: string | null
-          org_id?: string
-          own_handle?: string | null
-          platforms_to_scrape?: string[]
-          pool_status?: string
-          posting_cadence?: string | null
-          producer_type?: string | null
-          tone_of_voice?: string | null
-          top_competitors?: Json
-          top_global_benchmarks?: Json
-          tracked_handles?: Json
-          tracked_hashtags?: string[]
-          tracked_keywords?: string[]
-          updated_at?: string
-          video_length_preference?: string | null
-          voice_built_at?: string | null
-          website?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_niches_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_niches_industry_slug_fkey"
-            columns: ["industry_slug"]
-            isOneToOne: false
-            referencedRelation: "content_lab_verticals"
-            referencedColumns: ["slug"]
-          },
-          {
-            foreignKeyName: "content_lab_niches_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organisations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_niches_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
-        ]
-      }
-      content_lab_pool_refresh_jobs: {
-        Row: {
-          candidates_found: number | null
-          candidates_verified: number | null
-          completed_at: string | null
-          created_at: string
-          error_message: string | null
-          id: string
-          niche_tag: string
-          platform: string
-          started_at: string | null
-          status: string
-          triggered_by_org_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          candidates_found?: number | null
-          candidates_verified?: number | null
-          completed_at?: string | null
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          niche_tag: string
-          platform: string
-          started_at?: string | null
-          status?: string
-          triggered_by_org_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          candidates_found?: number | null
-          candidates_verified?: number | null
-          completed_at?: string | null
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          niche_tag?: string
-          platform?: string
-          started_at?: string | null
-          status?: string
-          triggered_by_org_id?: string | null
-          updated_at?: string
-        }
-        Relationships: []
       }
       content_lab_posts: {
         Row: {
-          ai_summary: string | null
+          author_display_name: string | null
+          author_followers: number | null
           author_handle: string
-          bucket: string | null
+          bucket: Database["public"]["Enums"]["content_lab_post_bucket"]
           caption: string | null
           comments: number
           created_at: string
           engagement_rate: number
+          external_id: string | null
           hashtags: string[]
           hook_text: string | null
           hook_type: string | null
           id: string
           likes: number
           mentions: string[]
-          music_artist: string | null
-          music_title: string | null
-          platform: Database["public"]["Enums"]["content_lab_platform"]
+          pattern_tag: string | null
+          platform: string
           post_type: string | null
           post_url: string | null
           posted_at: string | null
           run_id: string
           shares: number
-          source: Database["public"]["Enums"]["content_lab_post_source"]
-          tagged_users: string[]
+          source_query: string | null
           thumbnail_url: string | null
           transcript: string | null
           video_duration_seconds: number | null
           views: number
         }
         Insert: {
-          ai_summary?: string | null
+          author_display_name?: string | null
+          author_followers?: number | null
           author_handle: string
-          bucket?: string | null
+          bucket: Database["public"]["Enums"]["content_lab_post_bucket"]
           caption?: string | null
           comments?: number
           created_at?: string
           engagement_rate?: number
+          external_id?: string | null
           hashtags?: string[]
           hook_text?: string | null
           hook_type?: string | null
           id?: string
           likes?: number
           mentions?: string[]
-          music_artist?: string | null
-          music_title?: string | null
-          platform: Database["public"]["Enums"]["content_lab_platform"]
+          pattern_tag?: string | null
+          platform: string
           post_type?: string | null
           post_url?: string | null
           posted_at?: string | null
           run_id: string
           shares?: number
-          source: Database["public"]["Enums"]["content_lab_post_source"]
-          tagged_users?: string[]
+          source_query?: string | null
           thumbnail_url?: string | null
           transcript?: string | null
           video_duration_seconds?: number | null
           views?: number
         }
         Update: {
-          ai_summary?: string | null
+          author_display_name?: string | null
+          author_followers?: number | null
           author_handle?: string
-          bucket?: string | null
+          bucket?: Database["public"]["Enums"]["content_lab_post_bucket"]
           caption?: string | null
           comments?: number
           created_at?: string
           engagement_rate?: number
+          external_id?: string | null
           hashtags?: string[]
           hook_text?: string | null
           hook_type?: string | null
           id?: string
           likes?: number
           mentions?: string[]
-          music_artist?: string | null
-          music_title?: string | null
-          platform?: Database["public"]["Enums"]["content_lab_platform"]
+          pattern_tag?: string | null
+          platform?: string
           post_type?: string | null
           post_url?: string | null
           posted_at?: string | null
           run_id?: string
           shares?: number
-          source?: Database["public"]["Enums"]["content_lab_post_source"]
-          tagged_users?: string[]
+          source_query?: string | null
           thumbnail_url?: string | null
           transcript?: string | null
           video_duration_seconds?: number | null
@@ -1051,99 +681,58 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_posts_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_regen_rate"
-            referencedColumns: ["run_id"]
           },
         ]
       }
-      content_lab_run_share_tokens: {
+      content_lab_run_progress: {
         Row: {
-          client_logo_url: string | null
           created_at: string
-          created_by: string | null
-          expires_at: string | null
           id: string
-          is_active: boolean
-          last_viewed_at: string | null
-          org_id: string
+          message: string | null
+          payload: Json
+          phase: string
           run_id: string
-          slug: string
-          view_count: number
+          status: string
         }
         Insert: {
-          client_logo_url?: string | null
           created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
           id?: string
-          is_active?: boolean
-          last_viewed_at?: string | null
-          org_id: string
+          message?: string | null
+          payload?: Json
+          phase: string
           run_id: string
-          slug?: string
-          view_count?: number
+          status: string
         }
         Update: {
-          client_logo_url?: string | null
           created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
           id?: string
-          is_active?: boolean
-          last_viewed_at?: string | null
-          org_id?: string
+          message?: string | null
+          payload?: Json
+          phase?: string
           run_id?: string
-          slug?: string
-          view_count?: number
+          status?: string
         }
         Relationships: [
           {
-            foreignKeyName: "content_lab_run_share_tokens_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organisations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_run_share_tokens_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
-          {
-            foreignKeyName: "content_lab_run_share_tokens_run_id_fkey"
+            foreignKeyName: "content_lab_run_progress_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
             referencedRelation: "content_lab_runs"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_run_share_tokens_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_regen_rate"
-            referencedColumns: ["run_id"]
           },
         ]
       }
       content_lab_runs: {
         Row: {
           client_id: string
+          client_snapshot: Json
           completed_at: string | null
           cost_pence: number
           created_at: string
-          email_on_complete: boolean
+          current_phase: string | null
           error_message: string | null
           id: string
-          niche_id: string
           org_id: string
-          pdf_storage_path: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["content_lab_run_status"]
           summary: Json
@@ -1152,15 +741,14 @@ export type Database = {
         }
         Insert: {
           client_id: string
+          client_snapshot?: Json
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
-          email_on_complete?: boolean
+          current_phase?: string | null
           error_message?: string | null
           id?: string
-          niche_id: string
           org_id: string
-          pdf_storage_path?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["content_lab_run_status"]
           summary?: Json
@@ -1169,332 +757,21 @@ export type Database = {
         }
         Update: {
           client_id?: string
+          client_snapshot?: Json
           completed_at?: string | null
           cost_pence?: number
           created_at?: string
-          email_on_complete?: boolean
+          current_phase?: string | null
           error_message?: string | null
           id?: string
-          niche_id?: string
           org_id?: string
-          pdf_storage_path?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["content_lab_run_status"]
           summary?: Json
           triggered_by?: string | null
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_runs_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_runs_niche_id_fkey"
-            columns: ["niche_id"]
-            isOneToOne: false
-            referencedRelation: "content_lab_niches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_runs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organisations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_runs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
-        ]
-      }
-      content_lab_seed_pool: {
-        Row: {
-          avg_views_est: number | null
-          created_at: string
-          display_name: string | null
-          followers_est: number | null
-          geo: string | null
-          handle: string
-          id: string
-          is_active: boolean
-          notes: string | null
-          platform: string
-          sub_niche: string | null
-          updated_at: string
-          verified_at: string | null
-          vertical_slug: string
-        }
-        Insert: {
-          avg_views_est?: number | null
-          created_at?: string
-          display_name?: string | null
-          followers_est?: number | null
-          geo?: string | null
-          handle: string
-          id?: string
-          is_active?: boolean
-          notes?: string | null
-          platform: string
-          sub_niche?: string | null
-          updated_at?: string
-          verified_at?: string | null
-          vertical_slug: string
-        }
-        Update: {
-          avg_views_est?: number | null
-          created_at?: string
-          display_name?: string | null
-          followers_est?: number | null
-          geo?: string | null
-          handle?: string
-          id?: string
-          is_active?: boolean
-          notes?: string | null
-          platform?: string
-          sub_niche?: string | null
-          updated_at?: string
-          verified_at?: string | null
-          vertical_slug?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_seed_pool_vertical_slug_fkey"
-            columns: ["vertical_slug"]
-            isOneToOne: false
-            referencedRelation: "content_lab_verticals"
-            referencedColumns: ["slug"]
-          },
-        ]
-      }
-      content_lab_step_logs: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          duration_ms: number | null
-          error_message: string | null
-          id: string
-          message: string | null
-          payload: Json
-          run_id: string
-          started_at: string
-          status: Database["public"]["Enums"]["content_lab_step_status"]
-          step: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          message?: string | null
-          payload?: Json
-          run_id: string
-          started_at?: string
-          status: Database["public"]["Enums"]["content_lab_step_status"]
-          step: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          message?: string | null
-          payload?: Json
-          run_id?: string
-          started_at?: string
-          status?: Database["public"]["Enums"]["content_lab_step_status"]
-          step?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_step_logs_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "content_lab_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_step_logs_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_regen_rate"
-            referencedColumns: ["run_id"]
-          },
-        ]
-      }
-      content_lab_swipe_file: {
-        Row: {
-          client_id: string | null
-          id: string
-          idea_id: string
-          niche_id: string | null
-          notes: string | null
-          org_id: string
-          saved_at: string
-          saved_by_user_id: string
-          tags: string[]
-        }
-        Insert: {
-          client_id?: string | null
-          id?: string
-          idea_id: string
-          niche_id?: string | null
-          notes?: string | null
-          org_id: string
-          saved_at?: string
-          saved_by_user_id: string
-          tags?: string[]
-        }
-        Update: {
-          client_id?: string | null
-          id?: string
-          idea_id?: string
-          niche_id?: string | null
-          notes?: string | null
-          org_id?: string
-          saved_at?: string
-          saved_by_user_id?: string
-          tags?: string[]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_swipe_file_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_swipe_file_idea_id_fkey"
-            columns: ["idea_id"]
-            isOneToOne: false
-            referencedRelation: "content_lab_ideas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_swipe_file_niche_id_fkey"
-            columns: ["niche_id"]
-            isOneToOne: false
-            referencedRelation: "content_lab_niches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_swipe_file_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organisations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_swipe_file_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
-        ]
-      }
-      content_lab_swipe_insights: {
-        Row: {
-          generated_at: string
-          ideas_count: number
-          org_id: string
-          pattern_breakdown: Json
-          summary: string
-        }
-        Insert: {
-          generated_at?: string
-          ideas_count?: number
-          org_id: string
-          pattern_breakdown?: Json
-          summary: string
-        }
-        Update: {
-          generated_at?: string
-          ideas_count?: number
-          org_id?: string
-          pattern_breakdown?: Json
-          summary?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_swipe_insights_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: true
-            referencedRelation: "organisations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_swipe_insights_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: true
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
-        ]
-      }
-      content_lab_trends: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          label: string
-          momentum: string | null
-          recommendation: string | null
-          run_id: string
-          supporting_post_ids: string[]
-          verification_source: string | null
-          verification_url: string | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          label: string
-          momentum?: string | null
-          recommendation?: string | null
-          run_id: string
-          supporting_post_ids?: string[]
-          verification_source?: string | null
-          verification_url?: string | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          label?: string
-          momentum?: string | null
-          recommendation?: string | null
-          run_id?: string
-          supporting_post_ids?: string[]
-          verification_source?: string | null
-          verification_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_trends_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "content_lab_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_trends_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_regen_rate"
-            referencedColumns: ["run_id"]
-          },
-        ]
+        Relationships: []
       }
       content_lab_usage: {
         Row: {
@@ -1523,48 +800,6 @@ export type Database = {
           runs_count?: number
           updated_at?: string
           year?: number
-        }
-        Relationships: []
-      }
-      content_lab_verticals: {
-        Row: {
-          created_at: string
-          display_name: string
-          geo_focus: string | null
-          keyword_queries: string[]
-          min_posts_floor: number
-          min_views_facebook: number
-          min_views_instagram: number
-          min_views_tiktok: number
-          notes: string | null
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          display_name: string
-          geo_focus?: string | null
-          keyword_queries?: string[]
-          min_posts_floor?: number
-          min_views_facebook?: number
-          min_views_instagram?: number
-          min_views_tiktok?: number
-          notes?: string | null
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          display_name?: string
-          geo_focus?: string | null
-          keyword_queries?: string[]
-          min_posts_floor?: number
-          min_views_facebook?: number
-          min_views_instagram?: number
-          min_views_tiktok?: number
-          notes?: string | null
-          slug?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -1637,13 +872,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "custom_domains_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       email_logs: {
@@ -1697,13 +925,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
           },
           {
             foreignKeyName: "email_logs_report_id_fkey"
@@ -1881,13 +1102,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "onboarding_responses_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       org_members: {
@@ -1928,13 +1142,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_members_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -2000,13 +1207,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "organisations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_subscriptions_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: true
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
           },
           {
             foreignKeyName: "org_subscriptions_plan_id_fkey"
@@ -2271,13 +1471,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "profiles_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       report_logs: {
@@ -2325,13 +1518,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "report_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
           },
           {
             foreignKeyName: "report_logs_report_id_fkey"
@@ -2407,13 +1593,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "report_upsells_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       reports: {
@@ -2482,13 +1661,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organisations"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reports_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
           },
         ]
       }
@@ -2679,13 +1851,6 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "sync_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
       user_roles: {
@@ -2752,80 +1917,11 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "voice_briefings_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
         ]
       }
     }
     Views: {
-      v_content_lab_churn_signals: {
-        Row: {
-          content_lab_tier: string | null
-          current_credit_balance: number | null
-          days_since_last_run: number | null
-          last_run_at: string | null
-          lifetime_runs: number | null
-          org_id: string | null
-          org_name: string | null
-        }
-        Relationships: []
-      }
-      v_content_lab_mrr_by_tier: {
-        Row: {
-          mrr_gbp: number | null
-          org_count: number | null
-          tier: string | null
-        }
-        Relationships: []
-      }
-      v_content_lab_pool_quality: {
-        Row: {
-          industry_slug: string | null
-          limited_count: number | null
-          limited_pct: number | null
-          niche_count: number | null
-        }
-        Relationships: []
-      }
-      v_content_lab_regen_rate: {
-        Row: {
-          avg_regens_per_idea: number | null
-          idea_count: number | null
-          org_id: string | null
-          run_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_lab_runs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organisations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_lab_runs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "v_content_lab_churn_signals"
-            referencedColumns: ["org_id"]
-          },
-        ]
-      }
-      v_content_lab_run_completion: {
-        Row: {
-          completed: number | null
-          completion_rate_pct: number | null
-          failed: number | null
-          industry_slug: string | null
-          total: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       add_content_lab_credits: {
@@ -2856,28 +1952,6 @@ export type Database = {
           org_id: string
         }[]
       }
-      get_content_lab_analytics: { Args: never; Returns: Json }
-      get_global_hook_library: {
-        Args: {
-          _limit?: number
-          _mechanism?: string
-          _niche?: string
-          _platform?: string
-        }
-        Returns: {
-          author_handle: string
-          created_at: string
-          hook_text: string
-          id: string
-          mechanism: string
-          niche_label: string
-          performance_score: number
-          platform: string
-          source_engagement_rate: number
-          source_views: number
-          why_it_works: string
-        }[]
-      }
       get_org_by_domain: { Args: { _domain: string }; Returns: string }
       get_portal_client: { Args: { _client_id: string }; Returns: Json }
       get_portal_org: { Args: { _org_id: string }; Returns: Json }
@@ -2896,7 +1970,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_shared_run: { Args: { _slug: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2929,7 +2002,6 @@ export type Database = {
         Returns: undefined
       }
       run_spend_pence: { Args: { _run_id: string }; Returns: number }
-      slugify_niche_tag: { Args: { _label: string }; Returns: string }
       spend_content_lab_credit: {
         Args: {
           _amount: number
@@ -2956,17 +2028,14 @@ export type Database = {
     Enums: {
       app_role: "owner" | "manager"
       content_lab_platform: "instagram" | "tiktok" | "facebook"
+      content_lab_post_bucket: "own" | "competitor" | "viral"
       content_lab_post_source: "oauth" | "apify"
       content_lab_run_status:
         | "pending"
-        | "scraping"
-        | "analysing"
-        | "ideating"
-        | "rendering"
+        | "running"
         | "completed"
         | "failed"
-        | "discovering"
-        | "completed_empty"
+        | "cancelled"
       content_lab_step_status: "started" | "ok" | "failed"
       job_status: "pending" | "running" | "success" | "failed" | "partial"
       platform_type:
@@ -3121,17 +2190,14 @@ export const Constants = {
     Enums: {
       app_role: ["owner", "manager"],
       content_lab_platform: ["instagram", "tiktok", "facebook"],
+      content_lab_post_bucket: ["own", "competitor", "viral"],
       content_lab_post_source: ["oauth", "apify"],
       content_lab_run_status: [
         "pending",
-        "scraping",
-        "analysing",
-        "ideating",
-        "rendering",
+        "running",
         "completed",
         "failed",
-        "discovering",
-        "completed_empty",
+        "cancelled",
       ],
       content_lab_step_status: ["started", "ok", "failed"],
       job_status: ["pending", "running", "success", "failed", "partial"],
