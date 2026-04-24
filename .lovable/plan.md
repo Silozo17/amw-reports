@@ -1,62 +1,69 @@
-# Redesign idea cards — everything visible, no clicks
+# Content Lab — Crash, Mobile & Idea-Count Fixes
 
-## What you'll see on each idea card
+## Issues found
 
-A wide 2-column card (1 per row on mobile, 2 per row on large screens):
+### 1. React error #310 on the run page (the "Something went wrong" screen)
+`src/pages/content-lab/RunDetailPage.tsx` early-returns at line 160 (`if (!run) return ...`) **before** calling `useMemo` on lines 168 and 179. When the run loads, the hook order changes between renders → React error #310. This is the crash you saw.
 
-```text
-+-----------------------------------------------------------+
-|  [PHONE MOCKUP]    |  Idea #3 · Instagram Reel            |
-|  IG header         |  "How we doubled bookings in 30 days"|
-|                    |                                      |
-|  Hook 1/3 (auto-   |  HOOKS (tap to preview in phone)     |
-|  swipes every 4s,  |   1. Stop scrolling if you run a gym |
-|  arrows + dots)    |   2. The mistake 90% of trainers...  |
-|                    |   3. POV: your DMs after this reel   |
-|  ❤ 12  💬  ↗  🔖   |                                      |
-|  caption preview   |  SCRIPT                              |
-|  #hashtags         |   Full script paragraph here...      |
-|                    |                                      |
-|                    |  CAPTION                             |
-|                    |   Full caption text...               |
-|                    |                                      |
-|                    |  HASHTAGS  #a #b #c #d #e            |
-|                    |                                      |
-|                    |  WHY IT WORKS                        |
-|                    |  [pattern tag: POV hook]             |
-|                    |   Plain-English rationale...         |
-|                    |   Inspired by @handle on TikTok      |
-|                    |   124K views · 8.2K likes · ↗ link   |
-|                    |                                      |
-|                    |  [AI edit]  [Save]                   |
-+-----------------------------------------------------------+
-```
+### 2. Only 20 ideas saved instead of 30
+- `content-lab-ideate` runs 3 parallel batches of 10 with `Promise.allSettled`. When one batch fails (rate limit / parse error), it is silently dropped and `INSERT` proceeds with only 20.
+- `content-lab-run` then logs a **hardcoded** "Generated 30 ideas" message regardless of the real count (line 696), masking the failure.
+- AI schema currently allows `minItems: 8, maxItems: 12` per batch — variance compounds the problem.
 
-## How it behaves
+### 3. Mobile responsiveness — Content Lab
+- `RunDetailPage` tabs (`Ideas / Your content / Local competitors / Viral`) overflow on a 402px viewport.
+- `IdeaPhoneMockup` uses `lg:grid-cols-[280px_1fr]` (good) but the parent grid forces `lg:grid-cols-2` even on tablet portrait, and the phone frame has fixed `max-w-[280px]` that doesn't shrink centred on small screens — the right-hand breakdown becomes squashed under it on phones because nothing tells it to stack cleanly.
+- Header on `RunDetailPage` puts the title + `UsageHeader` in `flex-wrap` — on mobile the credits pill ends up on a half-line. Needs to stack.
+- Section labels & dialog widths inside `IdeaPhoneMockup` (Comments + Share dialogs) need mobile-safe widths.
 
-- **Phone mockup (left, sticky)** — Instagram-style frame with the active hook displayed as the visual. Auto-rotates between the 3 hooks every 4 seconds, with arrows + dots to navigate manually.
-- **Hooks list (right)** — All 3 hooks numbered and always visible. Clicking one jumps the phone to that hook and pauses auto-rotation.
-- **Script, caption, hashtags** — Always rendered in full (no clamping, no "view more"). Long scripts scroll inside the card if they exceed a max height.
-- **Why it works** — Pattern tag badge (e.g. "POV hook", "before/after") + AI rationale paragraph + inspiration card showing the source post (handle, platform, views, likes, link out).
-- **Engagement** — Heart on the phone is wired to the existing like system; liked ideas still float to the top. Comments and Share dialogs stay as before.
+### 4. Bonus issue spotted
+`PostGrid` is rendered on RunDetailPage **without** passing `runId` (line 256, 272, 279) → "Save post" stores `source_run_id: null` for every saved post.
 
-## Technical changes
+---
 
-**File: `src/components/content-lab/IdeaPhoneMockup.tsx`** (rewrite)
-- Switch to 2-column layout (`grid lg:grid-cols-[280px_1fr]`).
-- Add 4-second auto-rotation effect for hooks (clears on manual interaction).
-- Render hooks list, script, caption, hashtags, why-it-works inline. Remove the `DetailsDialog`.
-- Add an `InspirationBlock` sub-component that fetches the inspiration post (`content_lab_posts` row) when `inspired_by_post_id` is set: shows handle, platform, views, likes, thumbnail, link.
-- Show `pattern_tag` (from inspiration post) or `inspiration_source` as a badge above the why-it-works text.
+## Plan
 
-**File: `src/pages/content-lab/RunDetailPage.tsx`**
-- Extend `IdeaRow` type: add `inspired_by_post_id`, `inspiration_source`.
-- Add both fields to the ideas `select(...)`.
-- Switch grid from `lg:grid-cols-3` to `lg:grid-cols-2` so the wider cards have room.
+### A. Fix the crash (Issue 1)
+In `RunDetailPage.tsx`:
+- Move both `useMemo` calls (`currentStepIndex`, `stepsWithBadges`) **above** the `if (!run) return …` early return.
+- Compute their inputs defensively when `run` is `null` (treat as not-yet-processing).
 
-**No DB changes** — `content_lab_ideas.inspired_by_post_id`, `inspiration_source`, and `content_lab_posts.pattern_tag` already exist.
+### B. Fix the 30-idea generation (Issue 2)
+In `supabase/functions/content-lab-ideate/index.ts`:
+- Tighten schema to **exactly 10 per batch**: `minItems: 10, maxItems: 10`.
+- Detect failed batches: if any of the 3 settle as `rejected`, retry **once sequentially** before giving up.
+- Log per-batch outcome (`console.log` "[ideate] batch N → ok/failed: …") so we can see failures in function logs.
+- Return `{ inserted: rows.length }` and surface a warning if `< 30`.
 
-## Out of scope (unless you say otherwise)
-- No changes to the ideate edge function — uses whatever inspiration link is already saved.
-- No changes to comments, share links, like sync, or the run progress stepper.
-- Existing ideas without `hooks[]` still fall back to the single `hook` field.
+In `supabase/functions/content-lab-run/index.ts`:
+- Replace the hardcoded `"Generated 30 ideas"` log with the actual `inserted` count returned by `content-lab-ideate`.
+
+### C. Mobile responsiveness (Issue 3)
+- **`RunDetailPage` header**: stack title + `UsageHeader` vertically on `<sm`, keep flex-row on `≥sm`.
+- **Tabs**: wrap `<TabsList>` in a horizontal scroll container with `whitespace-nowrap` so all 4 tabs are reachable on 360px.
+- **Ideas grid**: keep `grid-cols-1` on mobile/tablet, only switch to `lg:grid-cols-2` at `xl:` (≥1280px) so each card has room for the 2-column phone+breakdown layout.
+- **`IdeaPhoneMockup`**:
+  - On mobile, render phone full-width-but-capped (`max-w-[260px] mx-auto`) above the breakdown — already does via `lg:grid-cols-[280px_1fr]`, just verify spacing/padding shrinks (`p-3 md:p-5`).
+  - Hooks list, script, caption sections use smaller text + tighter padding on mobile.
+  - Comments and Share dialogs: `max-w-[calc(100vw-2rem)]` so they fit phones.
+- **`PostGrid`**: already `grid-cols-2 md:grid-cols-3 lg:grid-cols-5` — leave it but verify text sizes are legible at 320px.
+- **`ContentLabPage`**: client cards already stack well; verify the "Your clients" row search input wraps under the heading on mobile (currently `ml-auto` keeps it on the same row → squashes the heading).
+
+### D. Bonus fix (Issue 4)
+Pass `runId={id}` to all three `<PostGrid>` instances on `RunDetailPage`.
+
+---
+
+## Files touched
+- `src/pages/content-lab/RunDetailPage.tsx` — fix hook order, header stacking, tabs scroll, ideas grid breakpoints, pass `runId` to PostGrid.
+- `src/components/content-lab/IdeaPhoneMockup.tsx` — mobile padding/typography, dialog max-widths.
+- `src/pages/content-lab/ContentLabPage.tsx` — search row stacking on mobile.
+- `supabase/functions/content-lab-ideate/index.ts` — exact-10 schema, retry on rejection, per-batch logging.
+- `supabase/functions/content-lab-run/index.ts` — log real inserted count.
+
+## Out of scope (will not touch unless asked)
+- Hook Library, Trends, Saves pages — confirm responsiveness in a follow-up if you flag them.
+- Visual redesign of the phone mockup itself.
+- Changing AI model / prompt content.
+
+Approve and I'll implement all five files in one pass.

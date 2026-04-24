@@ -157,14 +157,11 @@ const RunDetailPage = () => {
     }));
   }, [competitorPosts]);
 
-  if (!run) {
-    return <AppLayout><p className="p-8 text-sm text-muted-foreground">Loading run…</p></AppLayout>;
-  }
-
-  const isProcessing = run.status === 'pending' || run.status === 'running';
+  const isProcessing = !!run && (run.status === 'pending' || run.status === 'running');
 
   // Derive current step from DB phase rows. Each completed (status='ok') phase
   // bumps the UI stepper to its mapped index + 1.
+  // NOTE: hooks must run on EVERY render (no early return above) — React #310.
   const currentStepIndex = useMemo(() => {
     if (!isProcessing) return RUN_STEPS.length;
     let idx = 0;
@@ -177,7 +174,7 @@ const RunDetailPage = () => {
   }, [progress, isProcessing]);
 
   const stepsWithBadges = useMemo<RunStepDef[]>(() => {
-    const sum = (run as RunRow & { summary?: Record<string, number | string> }).summary ?? {};
+    const sum = (run as (RunRow & { summary?: Record<string, number | string> }) | null | undefined)?.summary ?? {};
     const badges: (string | undefined)[] = [
       sum.connected_platforms ? `${sum.connected_platforms} platforms connected` : undefined,
       sum.competitors_found ? `${sum.competitors_found} competitors found` : undefined,
@@ -190,6 +187,10 @@ const RunDetailPage = () => {
     return RUN_STEPS.map((s, i) => ({ ...s, badge: badges[i] }));
   }, [run]);
 
+  if (!run) {
+    return <AppLayout><p className="p-8 text-sm text-muted-foreground">Loading run…</p></AppLayout>;
+  }
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-8">
@@ -199,16 +200,18 @@ const RunDetailPage = () => {
           </Button>
         </div>
 
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Run</p>
-            <h1 className="mt-1 font-display text-3xl">{run.client_snapshot?.company_name ?? 'Client'}</h1>
+            <h1 className="mt-1 font-display text-2xl md:text-3xl break-words">{run.client_snapshot?.company_name ?? 'Client'}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {[run.client_snapshot?.industry, run.client_snapshot?.location].filter(Boolean).join(' · ')}
               {' · '}{new Date(run.created_at).toLocaleString()}
             </p>
           </div>
-          <UsageHeader buttonSize="sm" />
+          <div className="sm:ml-auto">
+            <UsageHeader buttonSize="sm" />
+          </div>
         </header>
 
         {isProcessing && (
@@ -224,18 +227,20 @@ const RunDetailPage = () => {
 
         {run.status === 'completed' && (
           <Tabs defaultValue="ideas">
-            <TabsList className="w-full overflow-x-auto">
-              <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
-              <TabsTrigger value="own">Your content ({ownPosts.length})</TabsTrigger>
-              <TabsTrigger value="competitors">Local competitors ({competitorAccounts.length})</TabsTrigger>
-              <TabsTrigger value="viral">Viral ({viralPosts.length})</TabsTrigger>
-            </TabsList>
+            <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+              <TabsList className="inline-flex w-max min-w-full whitespace-nowrap">
+                <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
+                <TabsTrigger value="own">Your content ({ownPosts.length})</TabsTrigger>
+                <TabsTrigger value="competitors">Competitors ({competitorAccounts.length})</TabsTrigger>
+                <TabsTrigger value="viral">Viral ({viralPosts.length})</TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="ideas" className="mt-4">
               {ideas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No ideas in this run.</p>
               ) : (
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid gap-6 xl:grid-cols-2">
                   {ideas
                     .slice()
                     .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0) || a.idea_number - b.idea_number)
@@ -253,7 +258,7 @@ const RunDetailPage = () => {
             </TabsContent>
 
             <TabsContent value="own" className="mt-4">
-              <PostGrid posts={ownPosts} emptyMsg="No own posts found in the last 30 days." />
+              <PostGrid posts={ownPosts} runId={id} emptyMsg="No own posts found in the last 30 days." />
             </TabsContent>
 
             <TabsContent value="competitors" className="mt-4 space-y-6">
@@ -269,14 +274,14 @@ const RunDetailPage = () => {
                       <span className="text-xs text-muted-foreground">· avg {acc.avgViews.toLocaleString()} views</span>
                       <span className="text-xs text-muted-foreground">· avg {acc.avgLikes.toLocaleString()} likes</span>
                     </div>
-                    <PostGrid posts={competitorPosts.filter((p) => p.author_handle === acc.handle && p.platform === acc.platform).slice(0, 6)} />
+                    <PostGrid posts={competitorPosts.filter((p) => p.author_handle === acc.handle && p.platform === acc.platform).slice(0, 6)} runId={id} />
                   </div>
                 ))
               )}
             </TabsContent>
 
             <TabsContent value="viral" className="mt-4">
-              <PostGrid posts={viralPosts} emptyMsg="No viral posts found yet — try running again or add more competitor handles." />
+              <PostGrid posts={viralPosts} runId={id} emptyMsg="No viral posts found yet — try running again or add more competitor handles." />
             </TabsContent>
           </Tabs>
         )}
