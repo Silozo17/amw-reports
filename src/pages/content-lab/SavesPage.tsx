@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
 import UsageHeader from '@/components/content-lab/UsageHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
+import IgThumb from '@/components/content-lab/IgThumb';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { useSaves, useDeleteSave, type SaveKind, type SavedItem } from '@/hooks/useContentLabSaves';
 import usePageMeta from '@/hooks/usePageMeta';
@@ -124,9 +125,7 @@ const SaveCard = ({ save, onDelete }: { save: SavedItem; onDelete: () => void })
         </Button>
       </div>
       {thumbnail && (
-        <div className="aspect-video overflow-hidden rounded-md bg-muted">
-          <img src={thumbnail} alt="" loading="lazy" className="h-full w-full object-cover" />
-        </div>
+        <IgThumb src={thumbnail} alt={title} className="aspect-video rounded-md" />
       )}
       <p className="font-display text-sm leading-tight">{title}</p>
       {subtitle && <p className="line-clamp-3 text-xs text-muted-foreground">{subtitle}</p>}
