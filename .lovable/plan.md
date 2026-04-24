@@ -1,35 +1,31 @@
-## Two fixes
+## Three changes
 
-### 1. Fix `google-places-lookup` edge function (broken right now)
+### 1. Live search in `CompetitorPicker`
+- Drop the "Search" button.
+- Debounce input (350ms). Fire `google-places-lookup` automatically once the query is ≥ 2 chars.
+- Open the popover as soon as the user starts typing; show "Searching…" while a request is in flight; show results live.
+- Cancel stale requests (latest-wins) so fast typing doesn't show outdated results.
+- Keep the URL-paste flow exactly as it is.
 
-The function uses `anonClient.auth.getClaims()` which doesn't exist on supabase-js v2.49.1 — that's why competitor search fails with `500 TypeError`. Swap for the standard `auth.getUser()` token check, then redeploy.
+### 2. New edge function `firecrawl-find-socials`
+- POST `{ url }` → `{ instagram?, tiktok?, facebook?, source: 'firecrawl' | 'none' }`.
+- Calls Firecrawl `/v2/scrape` with `formats: ['links']`, `onlyMainContent: false` (header/footer needed). One credit per call, fast.
+- Filters returned links for `instagram.com/<handle>`, `tiktok.com/@<handle>`, `facebook.com/<handle>`. Strips junk paths (`/share`, `/p`, `/explore`, `/intent`, etc.) and validates handle format.
+- Returns the first valid handle per platform.
+- Auth: accepts a user JWT or the service-role key (so the orchestrator can call it).
+- On any failure (no key, Firecrawl error, no links found) returns `{ source: 'none' }` with HTTP 200 — never throws — so the caller can fall back cleanly.
 
-### 2. Reorganise Settings tab
+### 3. Wire into `content-lab-run` discover phase
+- For every competitor with a `website` in `clients.competitors`, call `firecrawl-find-socials` (parallel, max 5 at a time) **before** the AI discovery step.
+- Build a "known competitors" string that includes the real `instagram` / `tiktok` handles found via Firecrawl.
+- Inject this into the AI discover prompt as **verified facts**, telling the AI: use these as-is, only add MORE competitors to fill the list to 10. This guarantees real handles win and AI only fills in gaps (the existing fallback behaviour).
+- Log which competitors had socials found via Firecrawl vs needed AI assistance, into `content_lab_run_progress` for transparency.
 
-The page is messy because the new **Content Lab Settings** card duplicates fields from the old **Business Context** card (industry, target audience, brand voice, competitors, location). Same draft, two places — confusing.
-
-Fix:
-
-- **Delete the standalone "Business Context" card.** All those fields now live in **Content Lab Settings** (the only place they're actually used).
-- Move `service_area_type` and `service_areas` into Content Lab Settings under Location, since they're the same concept.
-- Move `business_goals` and `unique_selling_points` into Content Lab Settings (used by the AI ideation prompt).
-- Final card order, top to bottom:
-  1. **Report Configuration** (detail level, language, comparisons, currency, timezone)
-  2. **Email Preferences** (delivery, recipient mode, etc.)
-  3. **Content Lab Settings** — single source of truth for everything Content Lab uses:
-     - Industry + Target audience + Brand voice
-     - Location + Service area type + Service areas
-     - Social handles (IG / TikTok / FB)
-     - Competitors (`CompetitorPicker`)
-     - Business goals + Unique selling points
-     - Single Save button at the bottom
-  4. **Client Access** (invite client users)
-- Drop the read-only "mirror" block — no longer needed since fields aren't duplicated.
-
-No DB / type / pipeline changes. Pure UI cleanup + 1-line edge function fix + deploy.
+No DB / type changes. No new secrets — `FIRECRAWL_API_KEY` is already configured.
 
 ## Files touched
 
-- `supabase/functions/google-places-lookup/index.ts` — replace `getClaims` with `getUser`.
-- `src/components/clients/tabs/ClientSettingsTab.tsx` — remove Business Context card, expand Content Lab Settings to hold all context fields in a clean grouped layout.
-- Deploy `google-places-lookup`.
+- `src/components/clients/CompetitorPicker.tsx` — debounced live search.
+- `supabase/functions/firecrawl-find-socials/index.ts` — new function (created).
+- `supabase/functions/content-lab-run/index.ts` — augment `phaseDiscover` with Firecrawl-resolved socials before calling the AI.
+- Deploy `firecrawl-find-socials` and `content-lab-run`.
