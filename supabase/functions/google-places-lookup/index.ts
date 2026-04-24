@@ -75,9 +75,13 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         input: query,
-        // "establishment" covers brick-and-mortar AND service-area businesses,
-        // brands, chains — same index Google Maps' search box uses.
-        includedPrimaryTypes: ["establishment"],
+        // No `includedPrimaryTypes` filter: 'establishment' is a category root,
+        // not a valid primary type, and restricting to it drops service-area
+        // businesses, agencies and brands. Defaulting (no filter) returns the
+        // same broad index Google Maps' search box uses (POIs + services + brands).
+        // `includeQueryPredictions` ensures generic queries still surface results
+        // (returned without a placeId; we add those by name only).
+        includeQueryPredictions: true,
       }),
     });
 
@@ -88,15 +92,39 @@ Deno.serve(async (req) => {
     }
 
     const data = await res.json();
-    const results = (data.suggestions || [])
-      .map((s: any) => s.placePrediction)
-      .filter(Boolean)
-      .map((p: any) => ({
-        place_id: p.placeId || "",
-        name: p.structuredFormat?.mainText?.text || p.text?.text || "",
-        address: p.structuredFormat?.secondaryText?.text || "",
-        website: "", // resolved on click via Place Details
-      }));
+    const suggestions = (data.suggestions ?? []) as any[];
+
+    const results = suggestions
+      .map((s) => {
+        // Place predictions (real businesses/POIs) — have placeId.
+        if (s.placePrediction) {
+          const p = s.placePrediction;
+          return {
+            place_id: p.placeId || "",
+            name: p.structuredFormat?.mainText?.text || p.text?.text || "",
+            address: p.structuredFormat?.secondaryText?.text || "",
+            website: "",
+          };
+        }
+        // Query predictions (generic search terms) — no placeId; add by name only.
+        if (s.queryPrediction) {
+          const q = s.queryPrediction;
+          return {
+            place_id: "",
+            name: q.text?.text || "",
+            address: "",
+            website: "",
+          };
+        }
+        return null;
+      })
+      .filter((r): r is { place_id: string; name: string; address: string; website: string } =>
+        Boolean(r && r.name),
+      );
+
+    if (results.length === 0) {
+      console.log("Autocomplete returned 0 results. Raw payload:", JSON.stringify(data).slice(0, 500));
+    }
 
     return json({ results });
   } catch (err) {
