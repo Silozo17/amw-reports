@@ -114,17 +114,30 @@ const RunDetailPage = () => {
 
   const ownPosts = useMemo(() => posts.filter((p) => p.bucket === 'own'), [posts]);
   const competitorPosts = useMemo(() => posts.filter((p) => p.bucket === 'competitor'), [posts]);
-  const viralPosts = useMemo(() => posts.filter((p) => p.bucket === 'viral').slice(0, 15), [posts]);
+  const viralPosts = useMemo(
+    () => posts
+      .filter((p) => p.bucket === 'viral')
+      .slice()
+      .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+      .slice(0, 15),
+    [posts],
+  );
 
   const competitorAccounts = useMemo(() => {
-    const map = new Map<string, { handle: string; platform: string; postCount: number }>();
+    const map = new Map<string, { handle: string; platform: string; postCount: number; avgViews: number; avgLikes: number }>();
     competitorPosts.forEach((p) => {
       const key = `${p.platform}:${p.author_handle}`;
-      const cur = map.get(key) ?? { handle: p.author_handle, platform: p.platform, postCount: 0 };
+      const cur = map.get(key) ?? { handle: p.author_handle, platform: p.platform, postCount: 0, avgViews: 0, avgLikes: 0 };
       cur.postCount += 1;
+      cur.avgViews += p.views ?? 0;
+      cur.avgLikes += p.likes ?? 0;
       map.set(key, cur);
     });
-    return [...map.values()];
+    return [...map.values()].map((a) => ({
+      ...a,
+      avgViews: Math.round(a.avgViews / Math.max(a.postCount, 1)),
+      avgLikes: Math.round(a.avgLikes / Math.max(a.postCount, 1)),
+    }));
   }, [competitorPosts]);
 
   if (!run) {
