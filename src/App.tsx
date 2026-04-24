@@ -56,15 +56,7 @@ const AdminUserList = lazy(() => import("./pages/admin/AdminUserList"));
 const AdminContentLab = lazy(() => import("./pages/admin/AdminContentLab"));
 const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const ContentLabPage = lazy(() => import("./pages/content-lab/ContentLabPage"));
-const NicheFormPage = lazy(() => import("./pages/content-lab/NicheFormPage"));
 const RunDetailPage = lazy(() => import("./pages/content-lab/RunDetailPage"));
-const OnboardWizardPage = lazy(() => import("./pages/content-lab/OnboardWizardPage"));
-const ContentPipelinePage = lazy(() => import("./pages/content-lab/ContentPipelinePage"));
-const IdeasLibraryPage = lazy(() => import("./pages/content-lab/IdeasLibraryPage"));
-const SwipeFilePage = lazy(() => import("./pages/content-lab/SwipeFilePage"));
-const TrendsLibraryPage = lazy(() => import("./pages/content-lab/TrendsLibraryPage"));
-const HookLibraryPage = lazy(() => import("./pages/content-lab/HookLibraryPage"));
-const ContentLabRunShare = lazy(() => import("./pages/share/ContentLabRunShare"));
 
 const queryClient = new QueryClient();
 
@@ -147,15 +139,7 @@ const AppRoutes = () => (
       <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="/content-lab" element={<ProtectedRoute><ContentLabPage /></ProtectedRoute>} />
-      <Route path="/content-lab/onboard" element={<ProtectedRoute><OnboardWizardPage /></ProtectedRoute>} />
-      <Route path="/content-lab/niche/new" element={<ProtectedRoute><NicheFormPage /></ProtectedRoute>} />
-      <Route path="/content-lab/niche/:id" element={<ProtectedRoute><NicheFormPage /></ProtectedRoute>} />
       <Route path="/content-lab/run/:id" element={<ProtectedRoute><RunDetailPage /></ProtectedRoute>} />
-      <Route path="/content-pipeline" element={<ProtectedRoute><ContentPipelinePage /></ProtectedRoute>} />
-      <Route path="/ideas" element={<ProtectedRoute><IdeasLibraryPage /></ProtectedRoute>} />
-      <Route path="/content-lab/swipe-file" element={<ProtectedRoute><SwipeFilePage /></ProtectedRoute>} />
-      <Route path="/content-lab/trends" element={<ProtectedRoute><TrendsLibraryPage /></ProtectedRoute>} />
-      <Route path="/content-lab/hooks" element={<ProtectedRoute><HookLibraryPage /></ProtectedRoute>} />
       <Route path="/debug" element={<AdminRoute><DebugConsole /></AdminRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/organisations" element={<AdminRoute><AdminOrgList /></AdminRoute>} />
@@ -164,7 +148,6 @@ const AppRoutes = () => (
       <Route path="/admin/activity" element={<AdminRoute><AdminActivityLog /></AdminRoute>} />
       <Route path="/admin/content-lab" element={<AdminRoute><AdminContentLab /></AdminRoute>} />
       <Route path="/admin/security" element={<AdminRoute><AdminSecurity /></AdminRoute>} />
-      <Route path="/share/content-lab/:slug" element={<ContentLabRunShare />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/client-portal" element={<ClientPortalAuth />} />
       <Route path="*" element={<NotFound />} />
