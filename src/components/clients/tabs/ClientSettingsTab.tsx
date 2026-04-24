@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Mail, Save, Trash2, UserPlus, Users } from 'lucide-react';
+import { Loader2, Mail, Save, Trash2, UserPlus, Users, Sparkles, ExternalLink } from 'lucide-react';
 import type { Client } from '@/types/database';
 import { CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
@@ -19,15 +19,17 @@ interface ClientSettingsTabProps {
   onInviteEmailChange: (email: string) => void;
   onInviteClient: () => void;
   onRevokeClientUser: (cuId: string) => void;
-  onSettingChange: (field: string, value: string | boolean) => void;
+  onSettingChange: (field: string, value: unknown) => void;
 }
 
 const BUSINESS_CONTEXT_KEYS = [
   'industry', 'target_audience', 'service_area_type', 'service_areas',
   'business_goals', 'competitors', 'unique_selling_points', 'brand_voice',
+  'location',
 ] as const;
 
 type BusinessDraft = Record<typeof BUSINESS_CONTEXT_KEYS[number], string>;
+type HandlesDraft = { instagram: string; tiktok: string; facebook: string };
 
 const pickDraft = (c: Client): BusinessDraft => ({
   industry: c.industry ?? '',
@@ -38,7 +40,17 @@ const pickDraft = (c: Client): BusinessDraft => ({
   competitors: c.competitors ?? '',
   unique_selling_points: c.unique_selling_points ?? '',
   brand_voice: c.brand_voice ?? '',
+  location: c.location ?? '',
 });
+
+const pickHandles = (c: Client): HandlesDraft => {
+  const h = (c.social_handles ?? {}) as Record<string, string>;
+  return {
+    instagram: (h.instagram ?? '').replace(/^@/, ''),
+    tiktok: (h.tiktok ?? '').replace(/^@/, ''),
+    facebook: (h.facebook ?? '').replace(/^@/, ''),
+  };
+};
 
 const ClientSettingsTab = ({
   client,
