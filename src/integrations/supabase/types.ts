@@ -2039,6 +2039,14 @@ export type Database = {
         Args: { _amount: number; _org_id: string; _stripe_payment_id?: string }
         Returns: number
       }
+      admin_adjust_content_lab_credits: {
+        Args: { _delta: number; _org_id: string; _reason: string }
+        Returns: number
+      }
+      admin_set_content_lab_tier: {
+        Args: { _org_id: string; _tier: string }
+        Returns: undefined
+      }
       cleanup_request_idempotency: { Args: never; Returns: undefined }
       consume_content_lab_credit: {
         Args: { _amount?: number; _org_id: string; _run_id: string }
