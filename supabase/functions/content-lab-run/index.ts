@@ -312,14 +312,35 @@ function toInt(v: unknown): number | null {
 
 interface IGItem {
   id?: string; shortCode?: string; url?: string; type?: string;
+  productType?: string; isVideo?: boolean;
   caption?: string; displayUrl?: string; videoUrl?: string;
+  images?: string[];
+  childPosts?: Array<{ displayUrl?: string; type?: string }>;
   ownerUsername?: string; ownerFullName?: string;
   likesCount?: number; commentsCount?: number; videoViewCount?: number;
   videoPlayCount?: number; videoDuration?: number;
   timestamp?: string; hashtags?: string[]; mentions?: string[];
 }
 
+function inferIGMediaKind(item: IGItem): "video" | "photo" | "carousel" {
+  const t = (item.type ?? item.productType ?? "").toLowerCase();
+  if (item.isVideo || t.includes("video") || t.includes("clips") || t === "reel" || item.videoUrl) return "video";
+  if (t.includes("sidecar") || t.includes("carousel") || (item.childPosts?.length ?? 0) > 1) return "carousel";
+  return "photo";
+}
+
+function pickIGThumbnail(item: IGItem): string | null {
+  if (item.displayUrl) return item.displayUrl;
+  if (item.images && item.images.length > 0) return item.images[0];
+  if (item.childPosts && item.childPosts.length > 0) {
+    const first = item.childPosts.find((c) => c.displayUrl);
+    if (first?.displayUrl) return first.displayUrl;
+  }
+  return null;
+}
+
 function mapIG(item: IGItem, bucket: RawPost["bucket"], handle: string): RawPost {
+  const kind = inferIGMediaKind(item);
   return {
     bucket,
     platform: "instagram",
@@ -329,14 +350,16 @@ function mapIG(item: IGItem, bucket: RawPost["bucket"], handle: string): RawPost
     post_url: item.url ?? (item.shortCode ? `https://www.instagram.com/p/${item.shortCode}/` : null),
     external_id: item.id ?? item.shortCode ?? null,
     post_type: item.type ?? null,
+    media_kind: kind,
     caption: item.caption ?? null,
-    thumbnail_url: item.displayUrl ?? null,
+    thumbnail_url: pickIGThumbnail(item),
     hashtags: item.hashtags ?? [],
     mentions: item.mentions ?? [],
     likes: item.likesCount ?? 0,
     comments: item.commentsCount ?? 0,
     shares: 0,
-    views: item.videoPlayCount ?? item.videoViewCount ?? 0,
+    // Only videos report meaningful view counts on IG.
+    views: kind === "video" ? (item.videoPlayCount ?? item.videoViewCount ?? 0) : 0,
     video_duration_seconds: item.videoDuration ?? null,
     posted_at: item.timestamp ?? null,
   };
