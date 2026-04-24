@@ -636,7 +636,7 @@ ${items}`,
 }
 
 // ─── PHASE: ideate — call ideate function ─────────────────────────────────────
-async function phaseIdeate(runId: string): Promise<void> {
+async function phaseIdeate(runId: string): Promise<number> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/content-lab-ideate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
@@ -646,6 +646,8 @@ async function phaseIdeate(runId: string): Promise<void> {
     const t = await res.text();
     throw new Error(`ideate failed: ${res.status} ${t.slice(0, 200)}`);
   }
+  const json = await res.json().catch(() => ({}));
+  return Number(json?.inserted ?? 0);
 }
 
 // ─── Pipeline ─────────────────────────────────────────────────────────────────
@@ -692,8 +694,8 @@ async function runPipeline(
 
     // 4. Ideate
     await logProgress(admin, runId, "ideate", "started");
-    await runPhase("ideate", () => phaseIdeate(runId));
-    await logProgress(admin, runId, "ideate", "ok", "Generated 30 ideas");
+    const ideasInserted = await runPhase("ideate", () => phaseIdeate(runId));
+    await logProgress(admin, runId, "ideate", "ok", `Generated ${ideasInserted} ideas`);
 
     await admin.from("content_lab_runs").update({
       status: "completed", completed_at: new Date().toISOString(), current_phase: "completed",

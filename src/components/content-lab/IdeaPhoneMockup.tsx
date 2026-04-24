@@ -118,8 +118,8 @@ const IdeaPhoneMockup = ({ idea, runId, handle, onEdit }: Props) => {
   });
 
   return (
-    <Card className="overflow-hidden p-4 md:p-5">
-      <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
+    <Card className="overflow-hidden p-3 md:p-5">
+      <div className="grid gap-4 md:gap-5 lg:grid-cols-[260px_1fr]">
         {/* ---------- LEFT: phone ---------- */}
         <div className="lg:sticky lg:top-4 lg:self-start">
           <PhoneFrame
@@ -483,7 +483,7 @@ const CommentsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Comments</DialogTitle>
           <DialogDescription>
@@ -584,7 +584,7 @@ const ShareDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Share this idea with a client</DialogTitle>
           <DialogDescription>
