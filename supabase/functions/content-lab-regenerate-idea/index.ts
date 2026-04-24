@@ -1,252 +1,157 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { z } from "https://esm.sh/zod@3.23.8";
+// content-lab-regenerate-idea: free AI re-write of one idea, rate-limited.
+// Limits: 5 edits per idea per user per 24h; 50 edits per org per day.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BodySchema = z.object({
-  ideaId: z.string().uuid(),
-  shift: z.enum(["angle", "cluster", "hook"]),
-});
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") ?? "";
 
-const SHIFT_INSTRUCTIONS: Record<string, string> = {
-  angle: "Keep the same TOPIC and target outcome, but take a completely different ANGLE — different framing, different entry point, different argument. Do not repeat the existing hook, structure or examples.",
-  cluster: "JUMP to a fundamentally different topic cluster than the current idea. Use the source-post context to find an UNUSED viral angle from the pool. Different topic, different hook, different script. The only continuity is the brand voice.",
-  hook: "KEEP the existing script body, CTA, visual direction and hashtags exactly as they are. Rewrite ONLY the opening hook and the 3 hook variants. Make them sharper, more pattern-interrupting, and more curiosity-driven than the originals.",
-};
+const PER_IDEA_PER_USER_24H = 5;
+const PER_ORG_PER_DAY = 50;
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  console.log(JSON.stringify({ ts: new Date().toISOString(), fn: "content-lab-regenerate-idea", method: req.method }));
-
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    if (!jwt) return json({ error: "Missing auth" }, 401);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    });
+    const { data: u } = await userClient.auth.getUser();
+    if (!u.user) return json({ error: "Invalid auth" }, 401);
+    const userId = u.user.id;
 
-    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData.user) {
-      return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const body = await req.json().catch(() => ({}));
+    const ideaId = String(body?.idea_id ?? "").trim();
+    const instruction = String(body?.instruction ?? "").trim().slice(0, 500);
+    if (!ideaId || !instruction) return json({ error: "idea_id and instruction required" }, 400);
 
-    const parsed = BodySchema.safeParse(await req.json());
-    if (!parsed.success) {
-      return new Response(JSON.stringify({ error: parsed.error.flatten().fieldErrors }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const { ideaId, shift } = parsed.data;
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    const admin = createClient(supabaseUrl, serviceKey);
-
-    // Fetch idea + run + niche to verify ownership and gather context
+    // Load idea + run + org
     const { data: idea, error: ideaErr } = await admin
       .from("content_lab_ideas")
-      .select("*, content_lab_runs!inner(id, org_id, niche_id, client_id)")
-      .eq("id", ideaId)
-      .single();
-    if (ideaErr || !idea) {
-      return new Response(JSON.stringify({ error: "Idea not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      .select("*, content_lab_runs!inner(org_id, client_snapshot)")
+      .eq("id", ideaId).maybeSingle();
+    if (ideaErr || !idea) return json({ error: "Idea not found" }, 404);
+
+    // deno-lint-ignore no-explicit-any
+    const orgId = (idea as any).content_lab_runs?.org_id as string;
+    // deno-lint-ignore no-explicit-any
+    const snap = ((idea as any).content_lab_runs?.client_snapshot ?? {}) as Record<string, unknown>;
+
+    // Membership check
+    const { data: m } = await admin.from("org_members")
+      .select("user_id").eq("org_id", orgId).eq("user_id", userId).maybeSingle();
+    if (!m) return json({ error: "Not a member of this org" }, 403);
+
+    // Rate limit checks
+    const since24h = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const sinceDay = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+
+    const [{ count: perIdeaCount }, { count: perOrgCount }] = await Promise.all([
+      admin.from("content_lab_idea_edits")
+        .select("id", { count: "exact", head: true })
+        .eq("idea_id", ideaId).eq("edited_by", userId).gte("created_at", since24h),
+      admin.from("content_lab_idea_edits")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId).gte("created_at", sinceDay),
+    ]);
+
+    if ((perIdeaCount ?? 0) >= PER_IDEA_PER_USER_24H) {
+      return json({ error: `Limit reached: ${PER_IDEA_PER_USER_24H} edits per idea per day` }, 429);
+    }
+    if ((perOrgCount ?? 0) >= PER_ORG_PER_DAY) {
+      return json({ error: `Daily org limit reached: ${PER_ORG_PER_DAY} edits` }, 429);
     }
 
-    const run = (idea as unknown as { content_lab_runs: { id: string; org_id: string; niche_id: string } }).content_lab_runs;
-    const orgId = run.org_id;
-    const runId = run.id;
+    // Call AI
+    const before = {
+      title: idea.title, hook: idea.hook, script: idea.script,
+      caption: idea.caption, visual_direction: idea.visual_direction,
+      cta: idea.cta, hashtags: idea.hashtags, best_fit_platform: idea.best_fit_platform,
+    };
 
-    // Verify membership
-    const { data: membership } = await admin
-      .from("org_members")
-      .select("id")
-      .eq("user_id", userData.user.id)
-      .eq("org_id", orgId)
-      .maybeSingle();
-    if (!membership) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: `You refine social-media content ideas. Keep the brand voice (${snap.brand_voice ?? "natural"}). Return ONLY the revised idea via the tool call.` },
+          { role: "user", content: `Industry: ${snap.industry ?? "?"}, Audience: ${snap.target_audience ?? "?"}.
+
+Current idea:
+${JSON.stringify(before, null, 2)}
+
+User instruction: ${instruction}
+
+Rewrite the idea applying the instruction. Keep best_fit_platform unless the instruction asks otherwise.` },
+        ],
+        max_tokens: 1500,
+        tools: [{
+          type: "function",
+          function: {
+            name: "submit_revision",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string" }, hook: { type: "string" }, script: { type: "string" },
+                caption: { type: "string" }, visual_direction: { type: "string" }, cta: { type: "string" },
+                best_fit_platform: { type: "string" },
+                hashtags: { type: "array", items: { type: "string" } },
+              },
+              required: ["title", "hook", "script", "caption", "visual_direction", "cta", "best_fit_platform", "hashtags"],
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "submit_revision" } },
+      }),
+    });
+    if (aiRes.status === 429) return json({ error: "AI rate limit. Try again shortly." }, 429);
+    if (aiRes.status === 402) return json({ error: "AI credits exhausted." }, 402);
+    if (!aiRes.ok) {
+      const t = await aiRes.text();
+      return json({ error: `AI error: ${t.slice(0, 200)}` }, 500);
     }
+    const aiJson = await aiRes.json();
+    const argsStr = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    if (!argsStr) return json({ error: "AI did not return a revision" }, 500);
+    const after = JSON.parse(argsStr) as typeof before;
 
-    // Cost gates
-    const { assertPlatformNotFrozen, assertOrgWithinBudget, recordCost, estimateAnthropic, BudgetExceededError, PlatformFrozenError } = await import("../_shared/costGuard.ts");
-    try {
-      await assertPlatformNotFrozen();
-      await assertOrgWithinBudget(orgId);
-    } catch (e) {
-      if (e instanceof PlatformFrozenError) return new Response(JSON.stringify({ error: e.message }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (e instanceof BudgetExceededError) return new Response(JSON.stringify({ error: e.message, scope: e.scope }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      throw e;
-    }
-    await recordCost({ orgId, service: "anthropic", operation: "regenerate_idea", pence: estimateAnthropic("haiku", 2000, 1500), runId });
+    const newVersion = (idea.current_version ?? 1) + 1;
+    const { error: updErr } = await admin.from("content_lab_ideas").update({
+      title: after.title, hook: after.hook, script: after.script,
+      caption: after.caption, visual_direction: after.visual_direction, cta: after.cta,
+      hashtags: after.hashtags ?? [], best_fit_platform: after.best_fit_platform,
+      current_version: newVersion, edit_count: (idea.edit_count ?? 0) + 1,
+      updated_at: new Date().toISOString(),
+    }).eq("id", ideaId);
+    if (updErr) return json({ error: `Update failed: ${updErr.message}` }, 500);
 
-    // Spend 1 credit atomically
-    const { data: ledgerId, error: spendErr } = await admin.rpc("spend_content_lab_credit", {
-      _org_id: orgId,
-      _amount: 1,
-      _reason: "idea_regenerate",
-      _run_id: runId,
+    await admin.from("content_lab_idea_edits").insert({
+      idea_id: ideaId, org_id: orgId, edited_by: userId,
+      instruction, before_snapshot: before, after_snapshot: after, version: newVersion,
     });
 
-    if (spendErr) {
-      const msg = String(spendErr.message ?? spendErr);
-      if (msg.includes("INSUFFICIENT_CREDITS")) {
-        const { data: bal } = await admin.from("content_lab_credits").select("balance").eq("org_id", orgId).maybeSingle();
-        return new Response(
-          JSON.stringify({ error: "Insufficient credits", needsCredits: true, currentBalance: bal?.balance ?? 0 }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw spendErr;
-    }
-
-    try {
-      // Fetch niche brief + source post for context
-      const { data: niche } = await admin
-        .from("content_lab_niches")
-        .select("label, brand_brief, tone_of_voice, do_not_use, video_length_preference")
-        .eq("id", run.niche_id)
-        .maybeSingle();
-
-      let sourcePost: { caption: string | null; hook_text: string | null; transcript: string | null; author_handle: string } | null = null;
-      if (idea.based_on_post_id) {
-        const { data: sp } = await admin
-          .from("content_lab_posts")
-          .select("caption, hook_text, transcript, author_handle")
-          .eq("id", idea.based_on_post_id)
-          .maybeSingle();
-        sourcePost = sp ?? null;
-      }
-
-      const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-      if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
-
-      const systemPrompt = `You are a senior short-form video strategist regenerating ONE content idea for a brand.
-
-Niche: ${niche?.label ?? "unknown"}
-Tone of voice: ${niche?.tone_of_voice ?? "not specified"}
-Do NOT use: ${(niche?.do_not_use ?? []).join(", ") || "n/a"}
-Preferred length: ${niche?.video_length_preference ?? "30-60s"}
-
-REGENERATION SHIFT: ${shift.toUpperCase()}
-${SHIFT_INSTRUCTIONS[shift]}
-
-Return ONLY valid JSON, no markdown fences. Schema:
-{
-  "title": string,
-  "hook": string,
-  "hook_variants": [{"text": string, "mechanism": string, "why": string}, {"text": string, "mechanism": string, "why": string}, {"text": string, "mechanism": string, "why": string}],
-  "body": string,
-  "cta": string,
-  "script_full": string,
-  "caption": string,
-  "caption_with_hashtag": string,
-  "hashtags": string[],
-  "visual_direction": string,
-  "why_it_works": string,
-  "duration_seconds": number,
-  "platform_style_notes": string
-}`;
-
-      const userPrompt = `EXISTING IDEA (to ${shift === "hook" ? "preserve except hook" : "replace"}):
-Title: ${idea.title}
-Hook: ${idea.hook ?? ""}
-Body: ${idea.body ?? ""}
-CTA: ${idea.cta ?? ""}
-Script: ${idea.script_full ?? ""}
-Why it works: ${idea.why_it_works ?? ""}
-
-${sourcePost ? `SOURCE POST CONTEXT:
-@${sourcePost.author_handle}
-Hook: ${sourcePost.hook_text ?? ""}
-Caption: ${sourcePost.caption ?? ""}
-Transcript: ${(sourcePost.transcript ?? "").slice(0, 1500)}` : ""}
-
-Regenerate the idea now per the shift instruction. JSON only.`;
-
-      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-5-20250929",
-          max_tokens: 3000,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
-      });
-
-      if (!claudeRes.ok) {
-        const errText = await claudeRes.text();
-        throw new Error(`Claude error ${claudeRes.status}: ${errText.slice(0, 300)}`);
-      }
-
-      const claudeData = await claudeRes.json();
-      const text: string = claudeData?.content?.[0]?.text ?? "";
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON in Claude response");
-      const newIdea = JSON.parse(jsonMatch[0]);
-
-      // For "hook" shift, only update hook fields; otherwise full update
-      const updatePayload: Record<string, unknown> = {
-        regen_count: (idea.regen_count ?? 0) + 1,
-        last_modified_via: "regenerate",
-      };
-
-      if (shift === "hook") {
-        updatePayload.hook = newIdea.hook ?? idea.hook;
-        updatePayload.hook_variants = newIdea.hook_variants ?? idea.hook_variants;
-      } else {
-        Object.assign(updatePayload, {
-          title: newIdea.title ?? idea.title,
-          hook: newIdea.hook ?? idea.hook,
-          hook_variants: newIdea.hook_variants ?? idea.hook_variants,
-          body: newIdea.body ?? idea.body,
-          cta: newIdea.cta ?? idea.cta,
-          script_full: newIdea.script_full ?? idea.script_full,
-          caption: newIdea.caption ?? idea.caption,
-          caption_with_hashtag: newIdea.caption_with_hashtag ?? idea.caption_with_hashtag,
-          hashtags: newIdea.hashtags ?? idea.hashtags,
-          visual_direction: newIdea.visual_direction ?? idea.visual_direction,
-          why_it_works: newIdea.why_it_works ?? idea.why_it_works,
-          duration_seconds: newIdea.duration_seconds ?? idea.duration_seconds,
-          platform_style_notes: newIdea.platform_style_notes ?? idea.platform_style_notes,
-        });
-      }
-
-      const { error: updErr } = await admin.from("content_lab_ideas").update(updatePayload).eq("id", ideaId);
-      if (updErr) throw updErr;
-
-      console.log(JSON.stringify({ fn: "content-lab-regenerate-idea", status: "ok", ideaId, shift, orgId }));
-
-      return new Response(JSON.stringify({ ok: true, ideaId, shift }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } catch (innerErr) {
-      // Refund on any failure after credit was spent. Retried + audit-logged
-      // so a DB blip can't silently consume a user's credit.
-      console.error("[content-lab-regenerate-idea] failed, refunding:", innerErr);
-      const { refundCreditWithRetry } = await import("../_shared/contentLabCreditRefund.ts");
-      await refundCreditWithRetry({
-        admin,
-        ledgerId,
-        refundReason: "idea_regenerate_refund",
-        runId: typeof runId === "string" ? runId : null,
-        caller: "content-lab-regenerate-idea",
-      });
-      return new Response(
-        JSON.stringify({ error: innerErr instanceof Error ? innerErr.message : "Regeneration failed", refunded: true }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    return json({ ok: true, idea: { id: ideaId, ...after, current_version: newVersion } });
   } catch (e) {
-    console.error("[content-lab-regenerate-idea] error:", e);
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("[regenerate-idea]", e);
+    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
+
+function json(body: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
