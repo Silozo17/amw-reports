@@ -256,60 +256,75 @@ const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string
   if (posts.length === 0) return <p className="text-sm text-muted-foreground">{emptyMsg ?? 'No posts.'}</p>;
   return (
     <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-      {posts.map((p) => (
-        <Card key={p.id} className="overflow-hidden">
-          <div className="aspect-square bg-muted">
-            {p.thumbnail_url && <img src={p.thumbnail_url} alt={p.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />}
-          </div>
-          <div className="space-y-1 p-2 text-[11px]">
-            <p className="font-semibold truncate">@{p.author_handle}</p>
-            {p.hook_type && <Badge variant="secondary" className="text-[9px]">{p.hook_type}</Badge>}
-            {p.caption && <p className="text-muted-foreground line-clamp-2">{p.caption}</p>}
-            <div className="flex items-center gap-2 pt-1 text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> {(p.views ?? 0).toLocaleString()}</span>
-              <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {(p.likes ?? 0).toLocaleString()}</span>
-              <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" /> {(p.comments ?? 0).toLocaleString()}</span>
+      {posts.map((p) => {
+        const kind = p.media_kind ?? (p.platform === 'tiktok' ? 'video' : null);
+        const isVideo = kind === 'video';
+        return (
+          <Card key={p.id} className="overflow-hidden">
+            <div className="relative aspect-square bg-gradient-to-br from-muted to-muted/40">
+              {p.thumbnail_url ? (
+                <img src={p.thumbnail_url} alt={p.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center p-3 text-center">
+                  <p className="line-clamp-4 text-[10px] text-muted-foreground">{p.caption ?? 'No preview available'}</p>
+                </div>
+              )}
+              {kind && kind !== 'video' && (
+                <Badge variant="secondary" className="absolute left-1 top-1 text-[9px] capitalize">{kind}</Badge>
+              )}
             </div>
-            <div className="flex items-center justify-between gap-1 pt-1">
-              {p.post_url ? (
-                <a href={p.post_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  View <ExternalLink className="h-3 w-3" />
-                </a>
-              ) : <span />}
-              <div className="flex items-center gap-0.5">
-                {p.hook_text && (
+            <div className="space-y-1 p-2 text-[11px]">
+              <p className="font-semibold truncate">@{p.author_handle}</p>
+              {p.hook_type && <Badge variant="secondary" className="text-[9px]">{p.hook_type}</Badge>}
+              {p.caption && <p className="text-muted-foreground line-clamp-2">{p.caption}</p>}
+              <div className="flex items-center gap-2 pt-1 text-muted-foreground">
+                {isVideo && (
+                  <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> {(p.views ?? 0).toLocaleString()}</span>
+                )}
+                <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {(p.likes ?? 0).toLocaleString()}</span>
+                <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" /> {(p.comments ?? 0).toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between gap-1 pt-1">
+                {p.post_url ? (
+                  <a href={p.post_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                    View <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : <span />}
+                <div className="flex items-center gap-0.5">
+                  {p.hook_text && (
+                    <Button
+                      variant="ghost" size="icon" className="h-6 w-6"
+                      title="Save hook"
+                      onClick={() => saveHook.mutate({
+                        hook_text: p.hook_text!,
+                        hook_type: p.hook_type,
+                        platform: p.platform,
+                        source_post_id: p.id,
+                        example_caption: p.caption,
+                        example_post_url: p.post_url,
+                      })}
+                    >
+                      <Anchor className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost" size="icon" className="h-6 w-6"
-                    title="Save hook"
-                    onClick={() => saveHook.mutate({
-                      hook_text: p.hook_text!,
-                      hook_type: p.hook_type,
-                      platform: p.platform,
-                      source_post_id: p.id,
-                      example_caption: p.caption,
-                      example_post_url: p.post_url,
+                    title="Save post"
+                    onClick={() => saveItem.mutate({
+                      kind: 'post',
+                      source_run_id: runId ?? null,
+                      source_id: p.id,
+                      payload: { ...p },
                     })}
                   >
-                    <Anchor className="h-3 w-3" />
+                    <Bookmark className="h-3 w-3" />
                   </Button>
-                )}
-                <Button
-                  variant="ghost" size="icon" className="h-6 w-6"
-                  title="Save post"
-                  onClick={() => saveItem.mutate({
-                    kind: 'post',
-                    source_run_id: runId ?? null,
-                    source_id: p.id,
-                    payload: { ...p },
-                  })}
-                >
-                  <Bookmark className="h-3 w-3" />
-                </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 };
