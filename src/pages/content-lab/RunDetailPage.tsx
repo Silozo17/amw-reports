@@ -28,6 +28,7 @@ interface PostRow {
   caption: string | null; thumbnail_url: string | null; post_url: string | null;
   views: number; likes: number; comments: number; engagement_rate: number;
   posted_at: string | null; hook_type: string | null; hook_text: string | null;
+  media_kind: 'video' | 'photo' | 'carousel' | null;
 }
 interface IdeaRow {
   id: string; idea_number: number; title: string; hook: string | null;
@@ -89,7 +90,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_posts')
-        .select('id, bucket, platform, author_handle, caption, thumbnail_url, post_url, views, likes, comments, engagement_rate, posted_at, hook_type, hook_text')
+        .select('id, bucket, platform, author_handle, caption, thumbnail_url, post_url, views, likes, comments, engagement_rate, posted_at, hook_type, hook_text, media_kind')
         .eq('run_id', id!)
         .order('engagement_rate', { ascending: false });
       if (error) throw error;
@@ -113,17 +114,30 @@ const RunDetailPage = () => {
 
   const ownPosts = useMemo(() => posts.filter((p) => p.bucket === 'own'), [posts]);
   const competitorPosts = useMemo(() => posts.filter((p) => p.bucket === 'competitor'), [posts]);
-  const viralPosts = useMemo(() => posts.filter((p) => p.bucket === 'viral').slice(0, 15), [posts]);
+  const viralPosts = useMemo(
+    () => posts
+      .filter((p) => p.bucket === 'viral')
+      .slice()
+      .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+      .slice(0, 15),
+    [posts],
+  );
 
   const competitorAccounts = useMemo(() => {
-    const map = new Map<string, { handle: string; platform: string; postCount: number }>();
+    const map = new Map<string, { handle: string; platform: string; postCount: number; avgViews: number; avgLikes: number }>();
     competitorPosts.forEach((p) => {
       const key = `${p.platform}:${p.author_handle}`;
-      const cur = map.get(key) ?? { handle: p.author_handle, platform: p.platform, postCount: 0 };
+      const cur = map.get(key) ?? { handle: p.author_handle, platform: p.platform, postCount: 0, avgViews: 0, avgLikes: 0 };
       cur.postCount += 1;
+      cur.avgViews += p.views ?? 0;
+      cur.avgLikes += p.likes ?? 0;
       map.set(key, cur);
     });
-    return [...map.values()];
+    return [...map.values()].map((a) => ({
+      ...a,
+      avgViews: Math.round(a.avgViews / Math.max(a.postCount, 1)),
+      avgLikes: Math.round(a.avgLikes / Math.max(a.postCount, 1)),
+    }));
   }, [competitorPosts]);
 
   if (!run) {
@@ -184,7 +198,7 @@ const RunDetailPage = () => {
               <TabsTrigger value="ideas">Ideas ({ideas.length})</TabsTrigger>
               <TabsTrigger value="own">Your content ({ownPosts.length})</TabsTrigger>
               <TabsTrigger value="competitors">Local competitors ({competitorAccounts.length})</TabsTrigger>
-              <TabsTrigger value="viral">Viral worldwide ({viralPosts.length})</TabsTrigger>
+              <TabsTrigger value="viral">Viral ({viralPosts.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="ideas" className="mt-4">
@@ -207,10 +221,12 @@ const RunDetailPage = () => {
               ) : (
                 competitorAccounts.map((acc) => (
                   <div key={`${acc.platform}:${acc.handle}`} className="space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-display text-base">@{acc.handle}</h3>
                       <Badge variant="outline" className="text-[10px] capitalize">{acc.platform}</Badge>
                       <span className="text-xs text-muted-foreground">{acc.postCount} posts</span>
+                      <span className="text-xs text-muted-foreground">· avg {acc.avgViews.toLocaleString()} views</span>
+                      <span className="text-xs text-muted-foreground">· avg {acc.avgLikes.toLocaleString()} likes</span>
                     </div>
                     <PostGrid posts={competitorPosts.filter((p) => p.author_handle === acc.handle && p.platform === acc.platform).slice(0, 6)} />
                   </div>
@@ -219,7 +235,7 @@ const RunDetailPage = () => {
             </TabsContent>
 
             <TabsContent value="viral" className="mt-4">
-              <PostGrid posts={viralPosts} emptyMsg="No viral posts found." />
+              <PostGrid posts={viralPosts} emptyMsg="No viral posts found yet — try running again or add more competitor handles." />
             </TabsContent>
           </Tabs>
         )}
@@ -240,60 +256,75 @@ const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string
   if (posts.length === 0) return <p className="text-sm text-muted-foreground">{emptyMsg ?? 'No posts.'}</p>;
   return (
     <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-      {posts.map((p) => (
-        <Card key={p.id} className="overflow-hidden">
-          <div className="aspect-square bg-muted">
-            {p.thumbnail_url && <img src={p.thumbnail_url} alt={p.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />}
-          </div>
-          <div className="space-y-1 p-2 text-[11px]">
-            <p className="font-semibold truncate">@{p.author_handle}</p>
-            {p.hook_type && <Badge variant="secondary" className="text-[9px]">{p.hook_type}</Badge>}
-            {p.caption && <p className="text-muted-foreground line-clamp-2">{p.caption}</p>}
-            <div className="flex items-center gap-2 pt-1 text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> {(p.views ?? 0).toLocaleString()}</span>
-              <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {(p.likes ?? 0).toLocaleString()}</span>
-              <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" /> {(p.comments ?? 0).toLocaleString()}</span>
+      {posts.map((p) => {
+        const kind = p.media_kind ?? (p.platform === 'tiktok' ? 'video' : null);
+        const isVideo = kind === 'video';
+        return (
+          <Card key={p.id} className="overflow-hidden">
+            <div className="relative aspect-square bg-gradient-to-br from-muted to-muted/40">
+              {p.thumbnail_url ? (
+                <img src={p.thumbnail_url} alt={p.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center p-3 text-center">
+                  <p className="line-clamp-4 text-[10px] text-muted-foreground">{p.caption ?? 'No preview available'}</p>
+                </div>
+              )}
+              {kind && kind !== 'video' && (
+                <Badge variant="secondary" className="absolute left-1 top-1 text-[9px] capitalize">{kind}</Badge>
+              )}
             </div>
-            <div className="flex items-center justify-between gap-1 pt-1">
-              {p.post_url ? (
-                <a href={p.post_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  View <ExternalLink className="h-3 w-3" />
-                </a>
-              ) : <span />}
-              <div className="flex items-center gap-0.5">
-                {p.hook_text && (
+            <div className="space-y-1 p-2 text-[11px]">
+              <p className="font-semibold truncate">@{p.author_handle}</p>
+              {p.hook_type && <Badge variant="secondary" className="text-[9px]">{p.hook_type}</Badge>}
+              {p.caption && <p className="text-muted-foreground line-clamp-2">{p.caption}</p>}
+              <div className="flex items-center gap-2 pt-1 text-muted-foreground">
+                {isVideo && (
+                  <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> {(p.views ?? 0).toLocaleString()}</span>
+                )}
+                <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {(p.likes ?? 0).toLocaleString()}</span>
+                <span className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" /> {(p.comments ?? 0).toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between gap-1 pt-1">
+                {p.post_url ? (
+                  <a href={p.post_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                    View <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : <span />}
+                <div className="flex items-center gap-0.5">
+                  {p.hook_text && (
+                    <Button
+                      variant="ghost" size="icon" className="h-6 w-6"
+                      title="Save hook"
+                      onClick={() => saveHook.mutate({
+                        hook_text: p.hook_text!,
+                        hook_type: p.hook_type,
+                        platform: p.platform,
+                        source_post_id: p.id,
+                        example_caption: p.caption,
+                        example_post_url: p.post_url,
+                      })}
+                    >
+                      <Anchor className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost" size="icon" className="h-6 w-6"
-                    title="Save hook"
-                    onClick={() => saveHook.mutate({
-                      hook_text: p.hook_text!,
-                      hook_type: p.hook_type,
-                      platform: p.platform,
-                      source_post_id: p.id,
-                      example_caption: p.caption,
-                      example_post_url: p.post_url,
+                    title="Save post"
+                    onClick={() => saveItem.mutate({
+                      kind: 'post',
+                      source_run_id: runId ?? null,
+                      source_id: p.id,
+                      payload: { ...p },
                     })}
                   >
-                    <Anchor className="h-3 w-3" />
+                    <Bookmark className="h-3 w-3" />
                   </Button>
-                )}
-                <Button
-                  variant="ghost" size="icon" className="h-6 w-6"
-                  title="Save post"
-                  onClick={() => saveItem.mutate({
-                    kind: 'post',
-                    source_run_id: runId ?? null,
-                    source_id: p.id,
-                    payload: { ...p },
-                  })}
-                >
-                  <Bookmark className="h-3 w-3" />
-                </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 };

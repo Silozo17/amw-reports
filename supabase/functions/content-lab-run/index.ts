@@ -271,6 +271,7 @@ interface RawPost {
   post_url?: string | null;
   external_id?: string | null;
   post_type?: string | null;
+  media_kind?: "video" | "photo" | "carousel" | null;
   caption?: string | null;
   thumbnail_url?: string | null;
   hashtags: string[];
@@ -312,14 +313,35 @@ function toInt(v: unknown): number | null {
 
 interface IGItem {
   id?: string; shortCode?: string; url?: string; type?: string;
+  productType?: string; isVideo?: boolean;
   caption?: string; displayUrl?: string; videoUrl?: string;
+  images?: string[];
+  childPosts?: Array<{ displayUrl?: string; type?: string }>;
   ownerUsername?: string; ownerFullName?: string;
   likesCount?: number; commentsCount?: number; videoViewCount?: number;
   videoPlayCount?: number; videoDuration?: number;
   timestamp?: string; hashtags?: string[]; mentions?: string[];
 }
 
+function inferIGMediaKind(item: IGItem): "video" | "photo" | "carousel" {
+  const t = (item.type ?? item.productType ?? "").toLowerCase();
+  if (item.isVideo || t.includes("video") || t.includes("clips") || t === "reel" || item.videoUrl) return "video";
+  if (t.includes("sidecar") || t.includes("carousel") || (item.childPosts?.length ?? 0) > 1) return "carousel";
+  return "photo";
+}
+
+function pickIGThumbnail(item: IGItem): string | null {
+  if (item.displayUrl) return item.displayUrl;
+  if (item.images && item.images.length > 0) return item.images[0];
+  if (item.childPosts && item.childPosts.length > 0) {
+    const first = item.childPosts.find((c) => c.displayUrl);
+    if (first?.displayUrl) return first.displayUrl;
+  }
+  return null;
+}
+
 function mapIG(item: IGItem, bucket: RawPost["bucket"], handle: string): RawPost {
+  const kind = inferIGMediaKind(item);
   return {
     bucket,
     platform: "instagram",
@@ -329,14 +351,16 @@ function mapIG(item: IGItem, bucket: RawPost["bucket"], handle: string): RawPost
     post_url: item.url ?? (item.shortCode ? `https://www.instagram.com/p/${item.shortCode}/` : null),
     external_id: item.id ?? item.shortCode ?? null,
     post_type: item.type ?? null,
+    media_kind: kind,
     caption: item.caption ?? null,
-    thumbnail_url: item.displayUrl ?? null,
+    thumbnail_url: pickIGThumbnail(item),
     hashtags: item.hashtags ?? [],
     mentions: item.mentions ?? [],
     likes: item.likesCount ?? 0,
     comments: item.commentsCount ?? 0,
     shares: 0,
-    views: item.videoPlayCount ?? item.videoViewCount ?? 0,
+    // Only videos report meaningful view counts on IG.
+    views: kind === "video" ? (item.videoPlayCount ?? item.videoViewCount ?? 0) : 0,
     video_duration_seconds: item.videoDuration ?? null,
     posted_at: item.timestamp ?? null,
   };
@@ -360,6 +384,7 @@ function mapTT(item: TTItem, bucket: RawPost["bucket"], handle: string): RawPost
     post_url: item.webVideoUrl ?? null,
     external_id: item.id ?? null,
     post_type: "video",
+    media_kind: "video",
     caption: item.text ?? null,
     thumbnail_url: item.videoMeta?.coverUrl ?? null,
     hashtags: (item.hashtags ?? []).map((h) => h.name ?? "").filter(Boolean),
@@ -373,15 +398,31 @@ function mapTT(item: TTItem, bucket: RawPost["bucket"], handle: string): RawPost
   };
 }
 
-async function scrapeIG(handles: string[], bucket: RawPost["bucket"], maxPerHandle: number): Promise<RawPost[]> {
+async function scrapeIG(
+  handles: string[],
+  bucket: RawPost["bucket"],
+  maxPerHandle: number,
+  opts: { onlyReels?: boolean } = {},
+): Promise<RawPost[]> {
   if (handles.length === 0) return [];
   const r = await runApifyActor<IGItem>({
     actor: "apify~instagram-scraper",
-    input: { directUrls: handles.map((h) => `https://www.instagram.com/${h}/`), resultsType: "posts", resultsLimit: maxPerHandle, addParentData: false },
-    timeoutSec: 120, maxItems: handles.length * maxPerHandle,
+    input: {
+      directUrls: handles.map((h) => `https://www.instagram.com/${h}/`),
+      // resultsType "stories" is unrelated; "posts" returns the unified feed
+      // including reels. We filter to videos client-side when onlyReels is set.
+      resultsType: "posts",
+      resultsLimit: opts.onlyReels ? maxPerHandle * 3 : maxPerHandle,
+      addParentData: false,
+    },
+    timeoutSec: 120,
+    maxItems: handles.length * (opts.onlyReels ? maxPerHandle * 3 : maxPerHandle),
   });
   if (!r.ok) return [];
-  return r.items.map((item) => mapIG(item, bucket, item.ownerUsername ?? "")).filter((p) => isRecent(p.posted_at));
+  const mapped = r.items.map((item) => mapIG(item, bucket, item.ownerUsername ?? "")).filter((p) => isRecent(p.posted_at));
+  if (!opts.onlyReels) return mapped;
+  // Keep only videos so the Viral bucket isn't flooded with photo carousels.
+  return mapped.filter((p) => p.media_kind === "video").slice(0, handles.length * maxPerHandle);
 }
 
 async function scrapeTT(handles: string[], bucket: RawPost["bucket"], maxPerHandle: number): Promise<RawPost[]> {
@@ -395,15 +436,27 @@ async function scrapeTT(handles: string[], bucket: RawPost["bucket"], maxPerHand
   return r.items.map((item) => mapTT(item, bucket, item.authorMeta?.name ?? "")).filter((p) => isRecent(p.posted_at));
 }
 
-async function scrapeIGHashtag(tag: string): Promise<RawPost[]> {
-  const r = await runApifyActor<IGItem>({
-    actor: "apify~instagram-hashtag-scraper",
-    input: { hashtags: [tag], resultsLimit: 30 },
-    timeoutSec: 90, maxItems: 30,
+/**
+ * Hashtag-driven viral discovery via TikTok (video-first platform). The previous
+ * IG hashtag scraper returned mostly low-engagement photo carousels, so we route
+ * niche-tag discovery through TikTok and keep IG sourced exclusively from the
+ * AI-discovered viral accounts (filtered to reels above).
+ */
+async function scrapeTTHashtag(tag: string): Promise<RawPost[]> {
+  const r = await runApifyActor<TTItem>({
+    actor: "clockworks~tiktok-scraper",
+    input: {
+      hashtags: [tag.replace(/^#/, "")],
+      resultsPerPage: 20,
+      shouldDownloadVideos: false,
+      shouldDownloadCovers: false,
+    },
+    timeoutSec: 120,
+    maxItems: 20,
   });
   if (!r.ok) return [];
   return r.items.map((item) => {
-    const p = mapIG(item, "viral", item.ownerUsername ?? "");
+    const p = mapTT(item, "viral", item.authorMeta?.name ?? "");
     p.source_query = `#${tag}`;
     return p;
   }).filter((p) => isRecent(p.posted_at));
@@ -446,21 +499,42 @@ async function phaseScrape(
     scrapeTT(ownTT, "own", 12),
     scrapeIG(compIG, "competitor", 6),
     scrapeTT(compTT, "competitor", 6),
-    scrapeIG(viralIG, "viral", 6),
+    // Viral IG: only reels, so we don't end up with 100 photo carousels.
+    scrapeIG(viralIG, "viral", 6, { onlyReels: true }),
     scrapeTT(viralTT, "viral", 6),
-    ...discover.viral_hashtags.slice(0, 3).map((t) => scrapeIGHashtag(t)),
+    // Hashtag-driven viral discovery now goes through TikTok (video-first).
+    ...discover.viral_hashtags.slice(0, 3).map((t) => scrapeTTHashtag(t)),
   ]);
 
   await logProgress(admin, runId, "scrape", "ok", "Scrape pools fetched", {
     own_ig: r1.length, own_tt: r2.length,
     comp_ig: r3.length, comp_tt: r4.length,
-    viral_ig: r5.length, viral_tt: r6.length,
-    viral_hashtag: hashtagResults.reduce((s, a) => s + a.length, 0),
+    viral_ig_reels: r5.length, viral_tt: r6.length,
+    viral_hashtag_tt: hashtagResults.reduce((s, a) => s + a.length, 0),
   });
 
   const all: RawPost[] = [...r1, ...r2, ...r3, ...r4, ...r5, ...r6, ...hashtagResults.flat()];
   for (const p of all) p.likes = Math.max(0, p.likes | 0);
-  return dedupePosts(all);
+
+  // Quality gate: the Viral bucket must be videos with real reach. If a post
+  // is in the viral bucket but isn't a video OR has tiny reach, drop it.
+  // Falls back gracefully — competitor / own buckets are untouched.
+  const VIRAL_MIN_VIEWS = 10_000;
+  const VIRAL_MIN_ER = 0.05;
+  const filtered = all.filter((p) => {
+    if (p.bucket !== "viral") return true;
+    if (p.media_kind && p.media_kind !== "video") return false;
+    const er = calcEngagement(p);
+    return (p.views ?? 0) >= VIRAL_MIN_VIEWS || er >= VIRAL_MIN_ER;
+  });
+
+  // Junk filter for all buckets: no caption AND no thumbnail AND no engagement.
+  const cleaned = filtered.filter((p) => {
+    const empty = !p.caption && !p.thumbnail_url && (p.likes + p.comments + p.shares + p.views) === 0;
+    return !empty;
+  });
+
+  return dedupePosts(cleaned);
 }
 
 // ─── PHASE: persist scraped posts ─────────────────────────────────────────────
@@ -477,6 +551,7 @@ async function persistPosts(admin: SupabaseClient, runId: string, posts: RawPost
     post_url: p.post_url ?? null,
     external_id: p.external_id ?? null,
     post_type: p.post_type ?? null,
+    media_kind: p.media_kind ?? null,
     caption: p.caption ?? null,
     thumbnail_url: p.thumbnail_url ?? null,
     hashtags: p.hashtags ?? [],

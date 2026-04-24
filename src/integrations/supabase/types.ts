@@ -641,6 +641,7 @@ export type Database = {
           hook_type: string | null
           id: string
           likes: number
+          media_kind: string | null
           mentions: string[]
           pattern_tag: string | null
           platform: string
@@ -670,6 +671,7 @@ export type Database = {
           hook_type?: string | null
           id?: string
           likes?: number
+          media_kind?: string | null
           mentions?: string[]
           pattern_tag?: string | null
           platform: string
@@ -699,6 +701,7 @@ export type Database = {
           hook_type?: string | null
           id?: string
           likes?: number
+          media_kind?: string | null
           mentions?: string[]
           pattern_tag?: string | null
           platform?: string
