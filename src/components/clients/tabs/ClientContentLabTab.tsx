@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, Play, FileText, Loader2, CheckCircle2, AlertCircle, Clock,
-  CreditCard, Pencil, ArrowRight,
+  Pencil, ArrowRight,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { useStartContentLabRun } from '@/hooks/useStartContentLabRun';
 import { useRunProgress } from '@/hooks/useRunProgress';
 import StartRunDialog from '@/components/content-lab/StartRunDialog';
-import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
+import UsageHeader from '@/components/content-lab/UsageHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
 import { parseCompetitors } from '@/lib/competitors';
 import type { Client } from '@/types/database';
@@ -55,7 +55,6 @@ const ClientContentLabTab = ({ client, onEditClient }: Props) => {
   const { start, starting } = useStartContentLabRun();
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [creditsOpen, setCreditsOpen] = useState(false);
 
   const latest = runs[0];
   const isActive = latest?.status === 'pending' || latest?.status === 'running';
@@ -117,19 +116,10 @@ const ClientContentLabTab = ({ client, onEditClient }: Props) => {
             Research-backed content ideas from your client's posts, local competitors, and viral worldwide content.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {usage && (
-            <Badge variant={noCredits ? 'destructive' : 'outline'} className="text-xs">
-              {usage.creditBalance.toLocaleString()} credits
-            </Badge>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setCreditsOpen(true)}>
-            <CreditCard className="mr-2 h-3.5 w-3.5" /> Buy credits
-          </Button>
-        </div>
+        <UsageHeader buttonSize="sm" />
       </div>
 
-      <BuyCreditsDialog open={creditsOpen} onOpenChange={setCreditsOpen} />
+
       <StartRunDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}

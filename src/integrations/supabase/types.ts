@@ -461,6 +461,45 @@ export type Database = {
         }
         Relationships: []
       }
+      content_lab_hooks: {
+        Row: {
+          created_at: string
+          example_caption: string | null
+          example_post_url: string | null
+          hook_text: string
+          hook_type: string | null
+          id: string
+          org_id: string
+          platform: string | null
+          saved_by: string | null
+          source_post_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          example_caption?: string | null
+          example_post_url?: string | null
+          hook_text: string
+          hook_type?: string | null
+          id?: string
+          org_id: string
+          platform?: string | null
+          saved_by?: string | null
+          source_post_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          example_caption?: string | null
+          example_post_url?: string | null
+          hook_text?: string
+          hook_type?: string | null
+          id?: string
+          org_id?: string
+          platform?: string | null
+          saved_by?: string | null
+          source_post_id?: string | null
+        }
+        Relationships: []
+      }
       content_lab_idea_edits: {
         Row: {
           after_snapshot: Json
@@ -769,6 +808,78 @@ export type Database = {
           status?: Database["public"]["Enums"]["content_lab_run_status"]
           summary?: Json
           triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      content_lab_saves: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          notes: string | null
+          org_id: string
+          payload: Json
+          saved_by: string | null
+          source_id: string | null
+          source_run_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          notes?: string | null
+          org_id: string
+          payload?: Json
+          saved_by?: string | null
+          source_id?: string | null
+          source_run_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          notes?: string | null
+          org_id?: string
+          payload?: Json
+          saved_by?: string | null
+          source_id?: string | null
+          source_run_id?: string | null
+        }
+        Relationships: []
+      }
+      content_lab_trends: {
+        Row: {
+          created_at: string
+          description: string | null
+          evidence: Json
+          id: string
+          label: string
+          org_id: string
+          saved_by: string | null
+          source_run_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          evidence?: Json
+          id?: string
+          label: string
+          org_id: string
+          saved_by?: string | null
+          source_run_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          evidence?: Json
+          id?: string
+          label?: string
+          org_id?: string
+          saved_by?: string | null
+          source_run_id?: string | null
           updated_at?: string
         }
         Relationships: []

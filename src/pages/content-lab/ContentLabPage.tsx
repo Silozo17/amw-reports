@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Sparkles, Search, Loader2, Play, FileText, Clock, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
+import { Sparkles, Search, Loader2, Play, FileText, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+// Badge still used for run status indicators below.
 import { Input } from '@/components/ui/input';
 import { useContentLabRuns, useContentLabUsage, useClientsForPicker, type ContentLabRun, type ClientForPicker } from '@/hooks/useContentLab';
 import { useContentLabAccess } from '@/hooks/useContentLabAccess';
 import { useStartContentLabRun } from '@/hooks/useStartContentLabRun';
 import ContentLabHeader from '@/components/content-lab/ContentLabHeader';
 import ContentLabPaywall from '@/components/content-lab/ContentLabPaywall';
-import BuyCreditsDialog from '@/components/content-lab/BuyCreditsDialog';
 import StartRunDialog from '@/components/content-lab/StartRunDialog';
+import UsageHeader from '@/components/content-lab/UsageHeader';
 import usePageMeta from '@/hooks/usePageMeta';
 
 const STATUS_TONE: Record<string, string> = {
@@ -37,7 +38,6 @@ const ContentLabPage = () => {
 
   const [search, setSearch] = useState('');
   const [pendingClient, setPendingClient] = useState<ClientForPicker | null>(null);
-  const [creditsDialogOpen, setCreditsDialogOpen] = useState(false);
 
   usePageMeta({ title: 'Content Lab', description: 'Pick a client. Generate research-backed content ideas in minutes.' });
 
@@ -84,21 +84,10 @@ const ContentLabPage = () => {
           icon={Sparkles}
           title="Pick a client. Generate ideas."
           subtitle="Research-backed content ideas based on your client's own posts, local competitors, and viral worldwide content."
-          actions={
-            <>
-              {usage && (
-                <Badge variant={noCredits ? 'destructive' : 'outline'} className="text-xs">
-                  {usage.creditBalance.toLocaleString()} credits
-                </Badge>
-              )}
-              <Button variant="outline" size="lg" onClick={() => setCreditsDialogOpen(true)}>
-                <CreditCard className="mr-2 h-4 w-4" /> Buy credits
-              </Button>
-            </>
-          }
+          actions={<UsageHeader />}
         />
 
-        <BuyCreditsDialog open={creditsDialogOpen} onOpenChange={setCreditsDialogOpen} />
+
 
         <StartRunDialog
           open={!!pendingClient}
