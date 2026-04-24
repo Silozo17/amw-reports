@@ -107,6 +107,7 @@ export interface Client {
   email_alert_warnings: boolean;
   email_recipient_mode: string;
   industry: string | null;
+  location: string | null;
   target_audience: string | null;
   service_area_type: string;
   service_areas: string | null;

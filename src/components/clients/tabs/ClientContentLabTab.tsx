@@ -70,7 +70,7 @@ const ClientContentLabTab = ({ client, onEditClient }: Props) => {
 
   const checks = [
     { key: 'industry', ok: !!client.industry, label: 'Industry', value: client.industry ?? 'Not set' },
-    { key: 'location', ok: !!(client as unknown as { location?: string | null }).location, label: 'Location', value: (client as unknown as { location?: string | null }).location ?? 'Not set' },
+    { key: 'location', ok: !!client.location, label: 'Location', value: client.location ?? 'Not set' },
     {
       key: 'handles',
       ok: connectedHandles.length > 0,
@@ -95,7 +95,7 @@ const ClientContentLabTab = ({ client, onEditClient }: Props) => {
 
   const missingHints: string[] = [];
   if (!client.industry) missingHints.push('Industry');
-  if (!(client as unknown as { location?: string | null }).location) missingHints.push('Location');
+  if (!client.location) missingHints.push('Location');
   if (connectedHandles.length === 0) missingHints.push('Instagram or TikTok handle');
   if (competitors.length === 0) missingHints.push('A few competitors');
 
@@ -190,7 +190,7 @@ const ClientContentLabTab = ({ client, onEditClient }: Props) => {
           <h3 className="font-display text-base">What we'll do</h3>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
             <li>· Scan your client's last 30 days of posts</li>
-            <li>· Find {(client as unknown as { location?: string | null }).location ? `local competitors in ${(client as unknown as { location?: string | null }).location}` : 'local competitors'}</li>
+            <li>· Find {client.location ? `local competitors in ${client.location}` : 'local competitors'}</li>
             <li>
               · Pull viral content in {client.industry ?? 'your niche'} worldwide
             </li>
