@@ -16,7 +16,7 @@ const IDEA_SCHEMA = {
   type: "object",
   properties: {
     ideas: {
-      type: "array", minItems: 8, maxItems: 12,
+      type: "array", minItems: 10, maxItems: 10,
       items: {
         type: "object",
         properties: {
