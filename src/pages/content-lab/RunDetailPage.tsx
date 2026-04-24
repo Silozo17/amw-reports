@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveItem, useSaveHook } from '@/hooks/useContentLabSaves';
 import UsageHeader from '@/components/content-lab/UsageHeader';
+import IdeaPhoneMockup from '@/components/content-lab/IdeaPhoneMockup';
 import usePageMeta from '@/hooks/usePageMeta';
 
 interface RunRow {
@@ -32,10 +33,11 @@ interface PostRow {
 }
 interface IdeaRow {
   id: string; idea_number: number; title: string; hook: string | null;
+  hooks: string[] | null;
   script: string | null; caption: string | null; cta: string | null;
   hashtags: string[]; best_fit_platform: string | null;
   why_it_works: string | null; visual_direction: string | null;
-  edit_count: number;
+  edit_count: number; like_count: number | null;
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -104,7 +106,7 @@ const RunDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_lab_ideas')
-        .select('id, idea_number, title, hook, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count')
+        .select('id, idea_number, title, hook, hooks, script, caption, cta, hashtags, best_fit_platform, why_it_works, visual_direction, edit_count, like_count')
         .eq('run_id', id!)
         .order('idea_number');
       if (error) throw error;
@@ -205,8 +207,20 @@ const RunDetailPage = () => {
               {ideas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No ideas in this run.</p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {ideas.map((i) => <IdeaCard key={i.id} idea={i} onEdit={() => setEditingIdea(i)} />)}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {ideas
+                    .slice()
+                    .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0) || a.idea_number - b.idea_number)
+                    .map((i) => (
+                      <IdeaPhoneMockup
+                        key={i.id}
+                        idea={i}
+                        runId={id}
+                        orgHandle={(run.client_snapshot?.company_name ?? 'your.brand')
+                          .toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}
+                        onEdit={() => setEditingIdea(i)}
+                      />
+                    ))}
                 </div>
               )}
             </TabsContent>
@@ -326,48 +340,6 @@ const PostGrid = ({ posts, runId, emptyMsg }: { posts: PostRow[]; runId?: string
         );
       })}
     </div>
-  );
-};
-
-const IdeaCard = ({ idea, runId, onEdit }: { idea: IdeaRow; runId?: string; onEdit: () => void }) => {
-  const saveItem = useSaveItem();
-  return (
-    <Card className="flex flex-col gap-2 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Idea #{idea.idea_number}{idea.best_fit_platform && <> · <span className="capitalize">{idea.best_fit_platform}</span></>}
-          </p>
-          <h3 className="mt-1 font-display text-base leading-tight">{idea.title}</h3>
-        </div>
-        <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-      </div>
-      {idea.hook && <p className="text-sm font-medium">{idea.hook}</p>}
-      {idea.script && <p className="text-xs text-muted-foreground line-clamp-4 whitespace-pre-line">{idea.script}</p>}
-      {idea.caption && <p className="text-[11px] text-muted-foreground line-clamp-2">{idea.caption}</p>}
-      {idea.hashtags?.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {idea.hashtags.slice(0, 5).map((h) => <Badge key={h} variant="secondary" className="text-[9px]">#{h}</Badge>)}
-        </div>
-      )}
-      <div className="mt-auto flex gap-2">
-        <Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
-          <Wand2 className="mr-2 h-3 w-3" /> AI edit
-        </Button>
-        <Button
-          variant="outline" size="sm"
-          title="Save to library"
-          onClick={() => saveItem.mutate({
-            kind: 'idea',
-            source_run_id: runId ?? null,
-            source_id: idea.id,
-            payload: { ...idea },
-          })}
-        >
-          <Bookmark className="h-3 w-3" />
-        </Button>
-      </div>
-    </Card>
   );
 };
 

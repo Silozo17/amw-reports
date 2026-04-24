@@ -21,16 +21,21 @@ const IDEA_SCHEMA = {
         type: "object",
         properties: {
           title: { type: "string" },
-          hook: { type: "string", description: "Opening line / scroll-stopper" },
+          hook: { type: "string", description: "Primary opening line / scroll-stopper" },
+          hooks: {
+            type: "array", minItems: 3, maxItems: 3,
+            description: "Three distinct hook variations the user can choose between",
+            items: { type: "string" },
+          },
           script: { type: "string", description: "Brief outline or script body" },
           caption: { type: "string" },
           visual_direction: { type: "string" },
           cta: { type: "string" },
           best_fit_platform: { type: "string", enum: ["instagram", "tiktok", "facebook"] },
-          why_it_works: { type: "string" },
+          why_it_works: { type: "string", description: "1–2 sentence credibility note that cites a specific viral or competitor pattern from the context above" },
           hashtags: { type: "array", items: { type: "string" } },
         },
-        required: ["title", "hook", "script", "caption", "visual_direction", "cta", "best_fit_platform", "why_it_works", "hashtags"],
+        required: ["title", "hook", "hooks", "script", "caption", "visual_direction", "cta", "best_fit_platform", "why_it_works", "hashtags"],
       },
     },
   },
@@ -38,7 +43,7 @@ const IDEA_SCHEMA = {
 };
 
 interface IdeaPayload {
-  title: string; hook: string; script: string; caption: string;
+  title: string; hook: string; hooks?: string[]; script: string; caption: string;
   visual_direction: string; cta: string; best_fit_platform: string;
   why_it_works: string; hashtags: string[];
 }
@@ -125,7 +130,7 @@ ${viralPosts.length ? viralPosts.map(fmt).join("\n") : "(none)"}`;
 TASK
 Generate 10 fresh content ideas (numbers ${offset + 1}–${offset + 10}). They must NOT overlap with each other thematically. Cover a mix of: education, entertainment, behind-the-scenes, transformation, opinion, and trend-jacking.
 
-For each idea provide: title, hook (scroll-stopper opener), script (3–6 sentence outline), caption (ready to post), visual_direction (1 sentence), cta, best_fit_platform, why_it_works (1 sentence linking to a viral / competitor pattern above), hashtags (4–6).`;
+For each idea provide: title, hook (primary scroll-stopper opener), hooks (exactly 3 distinct alternative opener lines the user can A/B test — different angles, none repeating the primary hook verbatim), script (3–6 sentence outline), caption (ready to post), visual_direction (1 sentence), cta, best_fit_platform, why_it_works (1–2 sentences citing a SPECIFIC viral or competitor post above for credibility, e.g. "@handle's 1.2M-view post on X proves this format works"), hashtags (4–6).`;
 
     const batches = await Promise.allSettled([
       callIdeate(systemBase, promptForBatch(0)),
@@ -150,22 +155,30 @@ For each idea provide: title, hook (scroll-stopper opener), script (3–6 senten
       return "instagram";
     };
 
-    const rows = allIdeas.slice(0, 30).map((idea, idx) => ({
-      run_id: runId,
-      idea_number: idx + 1,
-      title: idea.title,
-      hook: idea.hook,
-      script: idea.script,
-      caption: idea.caption,
-      visual_direction: idea.visual_direction,
-      cta: idea.cta,
-      best_fit_platform: normalisePlatform(idea.best_fit_platform),
-      why_it_works: idea.why_it_works,
-      hashtags: idea.hashtags ?? [],
-      status: "new",
-      current_version: 1,
-      edit_count: 0,
-    }));
+    const rows = allIdeas.slice(0, 30).map((idea, idx) => {
+      const primary = (idea.hook ?? "").trim();
+      const variants = Array.isArray(idea.hooks) ? idea.hooks.map((h) => String(h).trim()).filter(Boolean) : [];
+      const merged = [primary, ...variants].filter(Boolean);
+      const unique = [...new Set(merged)].slice(0, 3);
+      while (unique.length < 3 && primary) unique.push(primary);
+      return {
+        run_id: runId,
+        idea_number: idx + 1,
+        title: idea.title,
+        hook: primary,
+        hooks: unique,
+        script: idea.script,
+        caption: idea.caption,
+        visual_direction: idea.visual_direction,
+        cta: idea.cta,
+        best_fit_platform: normalisePlatform(idea.best_fit_platform),
+        why_it_works: idea.why_it_works,
+        hashtags: idea.hashtags ?? [],
+        status: "new",
+        current_version: 1,
+        edit_count: 0,
+      };
+    });
 
     const { error: insErr } = await admin.from("content_lab_ideas").insert(rows);
     if (insErr) return json({ error: `Insert ideas failed: ${insErr.message}` }, 500);
