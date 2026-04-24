@@ -1,96 +1,75 @@
-## What we're building
+## Goal
 
-Two focused changes to make Content Lab much easier to use from inside a client:
+Add a dedicated **"Content Lab Settings"** section to the client Settings tab that exposes every field the Content Lab pipeline reads, in one place, so users can prep a client for a run without hunting around.
 
-1. **Smart competitor picker** in client Settings tab — search Google to find competitors by name, or paste a URL. Each pick is added to a chip list (one by one).
-2. **In-client Content Lab tab** becomes the full launchpad — shows the data the run will use, lets you launch a run inline, surfaces missing inputs, and shows progress/history without bouncing to the global page.
+## What Content Lab actually consumes
 
-Plus a couple of quality-of-life nudges so non-technical users always know what to do next.
+From `content-lab-run`'s `ClientRow` and the launchpad readiness checks:
 
----
+| Field | Used for | Already editable? |
+|---|---|---|
+| `industry` | AI niche prompts, viral pool | Yes (Business Context) |
+| `location` | Local competitor discovery | **No — missing from UI** |
+| `website` | AI grounding | Yes (basic info) |
+| `social_handles.instagram` / `.tiktok` / `.facebook` | Own-account scrape (hard requirement) | **No — missing from UI** |
+| `competitors` | Seed list for discover phase | Yes (CompetitorPicker) |
+| `brand_voice` | Idea tone | Yes |
+| `target_audience` | Idea targeting | Yes |
+| `business_goals` | Idea CTA framing | Yes |
+| `unique_selling_points` | Idea differentiation | Yes |
 
-## 1. Competitors → searchable, structured list
+The two gaps (`location`, `social_handles`) are exactly what causes the launchpad to show "Not set" and block the run today.
 
-Today `clients.competitors` is a single free-text string ("A, B, C"). It works but gives the AI fuzzy matches and no website signal.
+## Plan
 
-**Behaviour**
-- New `CompetitorPicker` component (used in `ClientSettingsTab` and the new client form):
-  - Search box → calls existing `google-places-lookup` edge function (already wired to Google Places API, returns name + address + website).
-  - Results show as a dropdown: name, address, website. Click → adds to the list below.
-  - Alternative input: "Add by URL" — paste any website, validated client-side, added as `{ name: <hostname>, website: <url> }`.
-  - List below shows each competitor as a removable chip with name + small website link.
-  - Reorder not needed for v1.
+### 1. New section: `ContentLabSettingsCard` (in Settings tab)
 
-**Storage** (no schema change — keep it simple, low risk)
-- Continue using the existing `clients.competitors` text column.
-- Store as **newline-separated `Name | https://website`** entries (e.g. `Joe's Garage | https://joesgarage.co.uk`).
-- Parser/serialiser lives in `src/lib/competitors.ts` so both the picker and the edge functions can read it consistently.
-- Backwards compatible: existing comma-separated strings parse as name-only entries.
+A single card titled **"Content Lab Settings"** placed directly under Business Context. It reuses the same draft/Save pattern already in `ClientSettingsTab.tsx` (so it batches into the existing "unsaved changes" save bar).
 
-**Edge function update**
-- `content-lab-run` (orchestrator) and `content-lab-discover-competitors` already read `client_snapshot.competitors`. Update the snapshot builder to also pass a parsed `competitors_list: [{name, website}]` so AI prompts can use the websites directly.
+Fields, grouped:
 
----
+- **Audience & niche** (read-only mirror with link "Edit in Business Context")
+  - Industry, Target audience, Brand voice
+  - Just shows current values + a one-click jump to scroll to the existing card. Avoids duplicating inputs.
 
-## 2. Client → Content Lab tab becomes the full launchpad
+- **Location** (new editable input)
+  - `client.location` — text input, placeholder "e.g. Manchester, UK"
+  - Helper: "Used to find local competitors."
 
-Today the tab is a thin teaser ("Open Content Lab"). We'll inline the whole flow scoped to this one client.
+- **Social handles for scraping** (new editable inputs)
+  - Three inputs: Instagram, TikTok, Facebook (handle only, `@` stripped on save)
+  - Stored as `social_handles` jsonb (`{ instagram, tiktok, facebook }`)
+  - Helper under each: link to the public profile when present
+  - Inline note: "Instagram or TikTok required to run."
 
-**New layout for `ClientContentLabTab`** (replaces current file):
+- **Competitors** (existing `CompetitorPicker`, moved/duplicated here)
+  - Same chip picker already in Business Context. Show it here too with a small note "Shared with Business Context."
+  - Single source of truth: same `competitors` text column, same draft key — editing in either place reflects in both.
 
-1. **Header** — "Content Lab for {company}" + credits badge + "Buy credits" link.
-2. **Readiness card** — a checklist of inputs the run will use, pulled from the client record:
-   - Industry ✓/✗
-   - Location ✓/✗
-   - Social handles (Instagram / TikTok / Facebook) — count connected
-   - Competitors — count in the new list
-   - Brand voice ✓/✗
-   - Each missing item links to the Settings tab with the relevant field focused.
-3. **"What this run will do" summary** — short bullets reflecting actual values: "We'll scan @handle's last 30 days, pull posts from N competitors, find viral content in {industry} worldwide, then draft 30 ideas."
-4. **Generate button** — calls `content-lab-run` directly (same call as the global page). Confirmation dialog warns about credit cost. Disabled with a helpful tooltip when no credits / no industry / no competitors.
-5. **Progress strip** — if the latest run is `pending`/`running`, show the live phase from `content_lab_run_progress` (reuse polling logic from `RunDetailPage`).
-6. **History list** — all previous runs for this client with status + open button.
+- **Run preferences** (small, optional)
+  - Read-only summary of credit balance + a "Buy credits" link
+  - Read-only summary of current month's run count
 
-**Reuse, don't duplicate**
-- Extract the run-trigger + confirmation dialog from `ContentLabPage` into `useStartContentLabRun` hook + `<StartRunDialog />` so both pages share one implementation.
-- Extract the live-progress polling from `RunDetailPage` into `useRunProgress(runId)` hook.
+### 2. Wiring
 
----
+- Extend `BUSINESS_CONTEXT_KEYS` in `ClientSettingsTab.tsx` to include `location` so it goes through the same draft/Save flow.
+- Add a new `social_handles` draft slice (object, not string) with its own `isDirty` check; on Save call `onSettingChange('social_handles', draftHandles)`.
+- Confirm `onSettingChange` in `ClientDetail.tsx` already accepts arbitrary fields → if not, broaden the type signature to `(field: keyof Client, value: unknown)`.
 
-## 3. Easy-to-use nudges (small)
+### 3. Launchpad sync
 
-- **Empty competitors warning** in the readiness card: "Add 3-5 competitors for sharper local research" with a one-click jump to Settings.
-- **Industry/Location auto-suggest**: when the user picks a Google Places result for the *client itself* (already supported in `ClientForm`), pre-fill `location` from the result's city if currently empty.
-- **Tab badge**: show a small dot on the "Content Lab" client tab when a run is `running` so the user can see progress while on other tabs.
+- `ClientContentLabTab.tsx`'s existing `onEditClient` already switches to Settings — no change needed.
+- After this card lands, the readiness checklist's "Add Instagram or TikTok handle in Settings" hint becomes actionable in one click.
 
----
+### 4. Out of scope (flagged)
 
-## Technical details
+- No new DB columns. `location` and `social_handles` already exist on `clients`.
+- No changes to `ClientForm.tsx` (creation flow). We can add these fields there in a follow-up if you want the wizard to capture them upfront — say the word.
+- No changes to `content-lab-run` edge function — it already reads all these fields.
 
-**New files**
-- `src/lib/competitors.ts` — `parseCompetitors(str): {name, website?}[]` and `serializeCompetitors(arr): string`.
-- `src/components/clients/CompetitorPicker.tsx` — search + URL input + chip list.
-- `src/hooks/useStartContentLabRun.ts` — wraps the `content-lab-run` invoke + toast + invalidations.
-- `src/hooks/useRunProgress.ts` — polls `content_lab_run_progress` every 4s.
-- `src/components/content-lab/StartRunDialog.tsx` — shared confirmation dialog.
-- `src/components/content-lab/RunReadinessCard.tsx` — checklist + "what will run" summary.
+## Files touched
 
-**Edited files**
-- `src/components/clients/tabs/ClientSettingsTab.tsx` — replace competitors `<Input>` with `<CompetitorPicker>`.
-- `src/pages/clients/ClientForm.tsx` — same swap in new-client form.
-- `src/components/clients/tabs/ClientContentLabTab.tsx` — full rewrite to the launchpad layout above.
-- `src/pages/content-lab/ContentLabPage.tsx` — refactor to use the new shared hook + dialog (no behaviour change).
-- `src/pages/content-lab/RunDetailPage.tsx` — refactor to use `useRunProgress`.
-- `supabase/functions/content-lab-run/index.ts` — extend `client_snapshot` with `competitors_list` (parsed).
+- `src/components/clients/tabs/ClientSettingsTab.tsx` — add `ContentLabSettingsCard` section, extend draft to include `location` + `social_handles`.
+- `src/pages/clients/ClientDetail.tsx` — only if `onSettingChange` signature needs broadening.
 
-**No DB migration needed.** `clients.competitors` stays as TEXT, with a documented format. If we later want first-class structure, that's a follow-up.
-
-**No new secrets needed.** `GOOGLE_API_KEY` already exists and `google-places-lookup` is already deployed.
-
----
-
-## Out of scope (flag for follow-up)
-
-- Promoting `competitors` to a real `client_competitors` table — only worth doing if we start storing extra fields per competitor (notes, priority).
-- Automatically discovering competitor social handles from a website URL — possible via Firecrawl but adds cost; ask before adding.
-- Editing the run's input data inline from the Content Lab tab — current plan is "view here, edit in Settings". Confirm if you'd rather edit in place.
+That's it. Single card, no new routes, no schema changes.

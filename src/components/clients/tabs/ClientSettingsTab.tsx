@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Mail, Save, Trash2, UserPlus, Users } from 'lucide-react';
+import { Loader2, Mail, Save, Trash2, UserPlus, Users, Sparkles, ExternalLink } from 'lucide-react';
 import type { Client } from '@/types/database';
 import { CURRENCY_OPTIONS } from '@/types/database';
 import { TIMEZONE_OPTIONS } from '@/types/metrics';
@@ -19,15 +19,17 @@ interface ClientSettingsTabProps {
   onInviteEmailChange: (email: string) => void;
   onInviteClient: () => void;
   onRevokeClientUser: (cuId: string) => void;
-  onSettingChange: (field: string, value: string | boolean) => void;
+  onSettingChange: (field: string, value: unknown) => void;
 }
 
 const BUSINESS_CONTEXT_KEYS = [
   'industry', 'target_audience', 'service_area_type', 'service_areas',
   'business_goals', 'competitors', 'unique_selling_points', 'brand_voice',
+  'location',
 ] as const;
 
 type BusinessDraft = Record<typeof BUSINESS_CONTEXT_KEYS[number], string>;
+type HandlesDraft = { instagram: string; tiktok: string; facebook: string };
 
 const pickDraft = (c: Client): BusinessDraft => ({
   industry: c.industry ?? '',
@@ -38,7 +40,17 @@ const pickDraft = (c: Client): BusinessDraft => ({
   competitors: c.competitors ?? '',
   unique_selling_points: c.unique_selling_points ?? '',
   brand_voice: c.brand_voice ?? '',
+  location: c.location ?? '',
 });
+
+const pickHandles = (c: Client): HandlesDraft => {
+  const h = (c.social_handles ?? {}) as Record<string, string>;
+  return {
+    instagram: (h.instagram ?? '').replace(/^@/, ''),
+    tiktok: (h.tiktok ?? '').replace(/^@/, ''),
+    facebook: (h.facebook ?? '').replace(/^@/, ''),
+  };
+};
 
 const ClientSettingsTab = ({
   client,
@@ -51,15 +63,23 @@ const ClientSettingsTab = ({
   onSettingChange,
 }: ClientSettingsTabProps) => {
   const [draft, setDraft] = useState<BusinessDraft>(() => pickDraft(client));
+  const [handles, setHandles] = useState<HandlesDraft>(() => pickHandles(client));
 
-  // Reset draft when client changes
+  // Reset drafts when client changes
   useEffect(() => {
     setDraft(pickDraft(client));
+    setHandles(pickHandles(client));
   }, [client.id]);
 
-  const isDirty = BUSINESS_CONTEXT_KEYS.some(
+  const isDraftDirty = BUSINESS_CONTEXT_KEYS.some(
     k => draft[k] !== (client[k as keyof Client] ?? (k === 'service_area_type' ? 'local' : ''))
   );
+  const original = pickHandles(client);
+  const isHandlesDirty =
+    handles.instagram !== original.instagram ||
+    handles.tiktok !== original.tiktok ||
+    handles.facebook !== original.facebook;
+  const isDirty = isDraftDirty || isHandlesDirty;
 
   // Warn on tab/window close with unsaved changes
   useEffect(() => {
@@ -76,14 +96,27 @@ const ClientSettingsTab = ({
     setDraft(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleHandleChange = useCallback((key: keyof HandlesDraft, value: string) => {
+    setHandles(prev => ({ ...prev, [key]: value.replace(/^@/, '').trim() }));
+  }, []);
+
   const handleSave = useCallback(() => {
     BUSINESS_CONTEXT_KEYS.forEach(key => {
-      const original = client[key as keyof Client] ?? (key === 'service_area_type' ? 'local' : '');
-      if (draft[key] !== original) {
+      const orig = client[key as keyof Client] ?? (key === 'service_area_type' ? 'local' : '');
+      if (draft[key] !== orig) {
         onSettingChange(key, draft[key]);
       }
     });
-  }, [draft, client, onSettingChange]);
+    if (isHandlesDirty) {
+      const existing = (client.social_handles ?? {}) as Record<string, string>;
+      const next: Record<string, string> = { ...existing };
+      (['instagram', 'tiktok', 'facebook'] as const).forEach(p => {
+        if (handles[p]) next[p] = handles[p];
+        else delete next[p];
+      });
+      onSettingChange('social_handles', next);
+    }
+  }, [draft, handles, isHandlesDirty, client, onSettingChange]);
 
   return (
     <>
@@ -313,6 +346,93 @@ const ClientSettingsTab = ({
               placeholder="e.g. Professional but friendly, avoid jargon"
             />
           </div>
+          {isDirty && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <p className="text-sm text-amber-600 dark:text-amber-400">You have unsaved changes</p>
+              <Button onClick={handleSave} size="sm">
+                <Save className="h-4 w-4 mr-1" /> Save Changes
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Content Lab Settings */}
+      <Card className="mt-4 border-primary/20">
+        <CardHeader>
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> Content Lab Settings
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Everything Content Lab uses to research and generate ideas for this client. All fields save together with the button at the top.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Audience & niche mirror */}
+          <div className="rounded-md border bg-muted/30 p-3 space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">Audience & niche (from Business Context above)</p>
+            <div className="grid gap-1 text-xs sm:grid-cols-3">
+              <div><span className="text-muted-foreground">Industry:</span> <span className="font-medium">{draft.industry || '—'}</span></div>
+              <div><span className="text-muted-foreground">Audience:</span> <span className="font-medium">{draft.target_audience ? draft.target_audience.slice(0, 40) + (draft.target_audience.length > 40 ? '…' : '') : '—'}</span></div>
+              <div><span className="text-muted-foreground">Voice:</span> <span className="font-medium">{draft.brand_voice ? draft.brand_voice.slice(0, 40) + (draft.brand_voice.length > 40 ? '…' : '') : '—'}</span></div>
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Location</p>
+            <Input
+              value={draft.location}
+              onChange={e => handleDraftChange('location', e.target.value)}
+              placeholder="e.g. Manchester, UK"
+            />
+            <p className="text-xs text-muted-foreground">Used to find local competitors in the same area.</p>
+          </div>
+
+          {/* Social handles */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Social handles to scrape</p>
+              <p className="text-xs text-muted-foreground">Instagram or TikTok is required to run Content Lab. Enter the username without the @.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {(['instagram', 'tiktok', 'facebook'] as const).map(p => (
+                <div key={p} className="space-y-1.5">
+                  <p className="text-xs font-medium capitalize">{p}</p>
+                  <Input
+                    value={handles[p]}
+                    onChange={e => handleHandleChange(p, e.target.value)}
+                    placeholder={p === 'facebook' ? 'jane.doe' : 'janedoe'}
+                  />
+                  {handles[p] && (
+                    <a
+                      href={
+                        p === 'instagram' ? `https://instagram.com/${handles[p]}` :
+                        p === 'tiktok' ? `https://tiktok.com/@${handles[p]}` :
+                        `https://facebook.com/${handles[p]}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                    >
+                      View profile <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Competitors (shared with Business Context) */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Competitors</p>
+            <p className="text-xs text-muted-foreground">Search Google by name or paste a website URL. Shared with Business Context above.</p>
+            <CompetitorPicker
+              value={draft.competitors}
+              onChange={(next) => handleDraftChange('competitors', next)}
+            />
+          </div>
+
           {isDirty && (
             <div className="flex items-center justify-between border-t pt-4">
               <p className="text-sm text-amber-600 dark:text-amber-400">You have unsaved changes</p>

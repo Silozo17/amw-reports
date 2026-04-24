@@ -324,11 +324,11 @@ const ClientDetail = () => {
     else { toast.success('Connection and data removed'); fetchData(); }
   };
 
-  const handleSettingChange = async (field: string, value: string | boolean) => {
+  const handleSettingChange = async (field: string, value: unknown) => {
     if (!client) return;
     const { error } = await supabase.from('clients').update({ [field]: value }).eq('id', client.id);
     if (error) toast.error('Failed to update setting');
-    else { setClient(prev => prev ? { ...prev, [field]: value } : null); toast.success('Setting updated'); }
+    else { setClient(prev => prev ? { ...prev, [field]: value } as typeof prev : null); toast.success('Setting updated'); }
   };
 
   if (isLoading) {
