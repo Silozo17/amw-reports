@@ -298,6 +298,18 @@ function calcEngagement(p: RawPost): number {
   return (p.likes + p.comments + p.shares) / audience;
 }
 
+/**
+ * Coerce scraper values (often floats like 42.281 for video duration) to
+ * integers so DB inserts into integer columns don't fail with
+ * "invalid input syntax for type integer".
+ */
+function toInt(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!isFinite(n)) return null;
+  return Math.round(n);
+}
+
 interface IGItem {
   id?: string; shortCode?: string; url?: string; type?: string;
   caption?: string; displayUrl?: string; videoUrl?: string;
