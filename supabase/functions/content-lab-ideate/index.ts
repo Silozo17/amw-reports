@@ -130,7 +130,7 @@ ${viralPosts.length ? viralPosts.map(fmt).join("\n") : "(none)"}`;
 TASK
 Generate 10 fresh content ideas (numbers ${offset + 1}–${offset + 10}). They must NOT overlap with each other thematically. Cover a mix of: education, entertainment, behind-the-scenes, transformation, opinion, and trend-jacking.
 
-For each idea provide: title, hook (scroll-stopper opener), script (3–6 sentence outline), caption (ready to post), visual_direction (1 sentence), cta, best_fit_platform, why_it_works (1 sentence linking to a viral / competitor pattern above), hashtags (4–6).`;
+For each idea provide: title, hook (primary scroll-stopper opener), hooks (exactly 3 distinct alternative opener lines the user can A/B test — different angles, none repeating the primary hook verbatim), script (3–6 sentence outline), caption (ready to post), visual_direction (1 sentence), cta, best_fit_platform, why_it_works (1–2 sentences citing a SPECIFIC viral or competitor post above for credibility, e.g. "@handle's 1.2M-view post on X proves this format works"), hashtags (4–6).`;
 
     const batches = await Promise.allSettled([
       callIdeate(systemBase, promptForBatch(0)),
